@@ -15,6 +15,7 @@ lerna-debug.log*
 
 # Runtime / environment
 .env
+.conda
 .env.local
 .env.*.local
 *.env
@@ -43,11 +44,10 @@ htmlcov/
 ENV/
 env/
 venv.bak/
-cache/
 
 # Project-specific data and cache
-Main/cache/
-Main/data/
+cache
+data
 
 # C/C++ / other compiled artifacts
 *.o
