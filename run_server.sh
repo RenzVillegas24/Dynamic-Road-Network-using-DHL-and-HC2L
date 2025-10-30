@@ -65,7 +65,15 @@ generate_data() {
     echo ""
     
     # Activate virtual environment if it exists
-    if [ -d "$SCRIPT_DIR/.venv" ]; then
+    ENV_NAME="roadnet"
+    CONDA_ENV_PATH="$SCRIPT_DIR/.conda"
+    if [ -d "$CONDA_ENV_PATH" ]; then
+        source "$(conda info --base)/etc/profile.d/conda.sh"
+        conda activate "$CONDA_ENV_PATH"
+    elif conda env list | grep -q "^$ENV_NAME "; then
+        source "$(conda info --base)/etc/profile.d/conda.sh"
+        conda activate $ENV_NAME
+    elif [ -d "$SCRIPT_DIR/.venv" ]; then
         source "$SCRIPT_DIR/.venv/bin/activate"
     fi
     
@@ -187,7 +195,17 @@ echo ""
 cd "$MAIN_DIR"
 
 # Check if virtual environment exists and activate it
-if [ -d "$SCRIPT_DIR/.venv" ]; then
+ENV_NAME="roadnet"
+CONDA_ENV_PATH="$SCRIPT_DIR/.conda"
+if [ -d "$CONDA_ENV_PATH" ]; then
+    echo "  ✓ Activating conda environment at .conda/..."
+    source "$(conda info --base)/etc/profile.d/conda.sh"
+    conda activate "$CONDA_ENV_PATH"
+elif conda env list | grep -q "^$ENV_NAME "; then
+    echo "  ✓ Activating conda environment '$ENV_NAME'..."
+    source "$(conda info --base)/etc/profile.d/conda.sh"
+    conda activate $ENV_NAME
+elif [ -d "$SCRIPT_DIR/.venv" ]; then
     echo "  ✓ Activating virtual environment..."
     source "$SCRIPT_DIR/.venv/bin/activate"
 fi

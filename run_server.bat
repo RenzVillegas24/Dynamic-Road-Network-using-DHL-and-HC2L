@@ -155,9 +155,20 @@ REM Change to Main directory
 cd /d "%MAIN_DIR%"
 
 REM Check if virtual environment exists and activate it
-if exist "%SCRIPT_DIR%.venv\Scripts\activate.bat" (
-    echo   Activating virtual environment...
-    call "%SCRIPT_DIR%.venv\Scripts\activate.bat"
+set "ENV_NAME=roadnet"
+set "CONDA_ENV_PATH=%SCRIPT_DIR%.conda"
+if exist "%CONDA_ENV_PATH%" (
+    echo   Activating conda environment at .conda\...
+    call conda activate "%CONDA_ENV_PATH%"
+) else (
+    conda env list | findstr /C:"%ENV_NAME%" >nul 2>&1
+    if %errorlevel% equ 0 (
+        echo   Activating conda environment "%ENV_NAME%"...
+        call conda activate %ENV_NAME%
+    ) else if exist "%SCRIPT_DIR%.venv\Scripts\activate.bat" (
+        echo   Activating virtual environment...
+        call "%SCRIPT_DIR%.venv\Scripts\activate.bat"
+    )
 )
 
 REM Run Flask server
@@ -179,8 +190,17 @@ echo ========================================================================
 echo.
 
 REM Activate virtual environment if it exists
-if exist "%SCRIPT_DIR%.venv\Scripts\activate.bat" (
-    call "%SCRIPT_DIR%.venv\Scripts\activate.bat"
+set "ENV_NAME=roadnet"
+set "CONDA_ENV_PATH=%SCRIPT_DIR%.conda"
+if exist "%CONDA_ENV_PATH%" (
+    call conda activate "%CONDA_ENV_PATH%"
+) else (
+    conda env list | findstr /C:"%ENV_NAME%" >nul 2>&1
+    if %errorlevel% equ 0 (
+        call conda activate %ENV_NAME%
+    ) else if exist "%SCRIPT_DIR%.venv\Scripts\activate.bat" (
+        call "%SCRIPT_DIR%.venv\Scripts\activate.bat"
+    )
 )
 
 cd /d "%MAIN_DIR%"

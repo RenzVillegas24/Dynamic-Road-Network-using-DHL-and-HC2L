@@ -7,10 +7,17 @@ pandas==2.3.2
 numpy==2.3.3
 
 # Geographic/Mapping Libraries
+# NOTE FOR WINDOWS USERS:
+# These packages require GDAL C library which is not pre-installed on Windows.
+# Please see WINDOWS_SETUP.md for GDAL installation instructions.
+# Recommended: Use conda to install these packages on Windows:
+#   conda install -c conda-forge pyogrio geopandas shapely pyproj
+# Or install GDAL first, then run: pip install -r requirements.txt
 osmnx==2.0.6
 geopandas==1.1.1
 shapely==2.1.2
 pyproj==3.7.2
+pyogrio==0.11.1
 
 # HTTP Requests
 requests==2.32.5
@@ -23,4 +30,8 @@ matplotlib>=3.7.0
 
 # OSMnx and GeoPandas dependencies
 networkx==3.5
-pyogrio==0.11.1
+
+# Notes:
+# - On Windows, install GDAL first before running pip install -r requirements.txt
+# - Run check_gdal.py to verify your installation
+# - See WINDOWS_SETUP.md for detailed Windows setup instructions

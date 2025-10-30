@@ -20,6 +20,9 @@
  * Output:
  *   JSON object with routing results
  */
+ 
+// Syntax for windows MSVC compiler
+#define _USE_MATH_DEFINES
 
 #include "road_network.h"
 #include "util.h"
