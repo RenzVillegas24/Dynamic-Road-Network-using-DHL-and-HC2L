@@ -2,14 +2,14 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - python=3.12
-  # Geographic/GIS libraries (let conda-forge resolve compatible builds)
+  - python=3.11
+  # Geographic/GIS libraries with version compatibility
   - gdal
-  - geopandas
-  - pyogrio
-  - shapely
-  - pyproj
-  - osmnx
+  - geopandas>=0.14
+  - pyogrio>=0.7
+  - shapely>=2.0
+  - pyproj>=3.5
+  - osmnx>=1.9
   # Data processing
   - pandas
   - numpy

@@ -1,7 +1,8 @@
 #!/bin/bash
 
-# Build Graph Indexes Script
-# This script builds the binary graph and index files needed by the routing APIs
+# Generate Graph Indexes Script
+# This script generates the binary graph and index files needed by the routing APIs
+# Note: Run build_all.sh first to compile the index executables
 
 set -e  # Exit on error
 
@@ -13,7 +14,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 echo -e "${BLUE}========================================${NC}"
-echo -e "${BLUE}  Building Graph Indexes${NC}"
+echo -e "${BLUE}  Generating Graph Indexes${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 
@@ -22,8 +23,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 # Directories (absolute paths)
-DHL_DIR="$SCRIPT_DIR/DualHierarchyLabelling"
-HC2L_DIR="$SCRIPT_DIR/HighCardinalityTwoLevel"
+BUILD_DIR="$SCRIPT_DIR/Main/build"
 DATA_DIR="$SCRIPT_DIR/Main/data"
 RAW_DIR="$DATA_DIR/raw"
 PROCESSED_DIR="$DATA_DIR/processed"
@@ -31,7 +31,7 @@ PROCESSED_DIR="$DATA_DIR/processed"
 # Check if data files exist
 if [ ! -f "$RAW_DIR/quezon_city_nodes.csv" ] || [ ! -f "$RAW_DIR/quezon_city_edges.csv" ]; then
     echo -e "${RED}✗ Error: CSV data files not found${NC}"
-    echo -e "${YELLOW}  Please run 'request_new_datasets.py' first to generate data files${NC}"
+    echo -e "${YELLOW}  Please run 'python request_new_datasets.py' first to generate data files${NC}"
     exit 1
 fi
 
@@ -40,40 +40,25 @@ echo -e "${GREEN}✓ CSV data files found${NC}"
 # Check if .gr files exist
 if [ ! -f "$PROCESSED_DIR/qc_from_csv.gr" ]; then
     echo -e "${RED}✗ Error: Graph file not found: $PROCESSED_DIR/qc_from_csv.gr${NC}"
-    echo -e "${YELLOW}  Please run 'request_new_datasets.py' first to generate .gr files${NC}"
+    echo -e "${YELLOW}  Please run 'python request_new_datasets.py' first to generate .gr files${NC}"
     exit 1
 fi
 
 echo -e "${GREEN}✓ Graph files found${NC}"
 echo ""
 
-# Step 1: Build index executables
-echo -e "${BLUE}Step 1: Building index executables...${NC}"
-
-echo -e "${YELLOW}  Building DHL index executable...${NC}"
-cd "$DHL_DIR"
-make index 2>&1 | grep -E "g\+\+|error|warning" || true
-if [ ! -f "index" ]; then
-    echo -e "${RED}✗ Failed to build DHL index${NC}"
+# Check if index executables exist
+if [ ! -f "$BUILD_DIR/dhl/index" ] || [ ! -f "$BUILD_DIR/hc2l/index" ]; then
+    echo -e "${RED}✗ Error: Index executables not found${NC}"
+    echo -e "${YELLOW}  Please run './build_all.sh' first to compile the index executables${NC}"
     exit 1
 fi
-echo -e "${GREEN}  ✓ DHL index executable built${NC}"
-cd "$SCRIPT_DIR"
 
-echo -e "${YELLOW}  Building HC2L index executable...${NC}"
-cd "$HC2L_DIR"
-make index 2>&1 | grep -E "g\+\+|error|warning" || true
-if [ ! -f "index" ]; then
-    echo -e "${RED}✗ Failed to build HC2L index${NC}"
-    exit 1
-fi
-echo -e "${GREEN}  ✓ HC2L index executable built${NC}"
-cd "$SCRIPT_DIR"
-
+echo -e "${GREEN}✓ Index executables found${NC}"
 echo ""
 
-# Step 2: Build graph file (binary format)
-echo -e "${BLUE}Step 2: Converting .gr to binary graph format...${NC}"
+# Step 1: Build graph file (binary format)
+echo -e "${BLUE}Step 1: Converting .gr to binary graph format...${NC}"
 
 # The graph file is the same for both algorithms
 GR_INPUT="$PROCESSED_DIR/qc_from_csv.gr"
@@ -90,15 +75,14 @@ echo -e "${GREEN}  ✓ Graph file created${NC}"
 
 echo ""
 
-# Step 3: Build DHL index
-echo -e "${BLUE}Step 3: Building DHL index...${NC}"
+# Step 2: Build DHL index
+echo -e "${BLUE}Step 2: Building DHL index...${NC}"
 
 DHL_INDEX_OUTPUT="$PROCESSED_DIR/quezon_city"  # The index builder will append _dhl
 echo -e "${YELLOW}  Input: $GRAPH_OUTPUT${NC}"
 echo -e "${YELLOW}  Output: ${DHL_INDEX_OUTPUT}.dhl.index${NC}"
 
-cd "$DHL_DIR"
-./index "$GRAPH_OUTPUT" "$DHL_INDEX_OUTPUT" 2>&1 | head -20 || true
+"$BUILD_DIR/dhl/index" "$GRAPH_OUTPUT" "$DHL_INDEX_OUTPUT" 2>&1 | head -20 || true
 
 # The DHL index builder creates two files: _dhl and _ch
 # We need to rename them to match what the API expects
@@ -114,30 +98,27 @@ if [ -f "${DHL_INDEX_OUTPUT}_ch" ]; then
     echo -e "${GREEN}  ✓ DHL contraction hierarchy built${NC}"
 fi
 
-cd "$SCRIPT_DIR"
 echo ""
 
-# Step 4: Build HC2L index
-echo -e "${BLUE}Step 4: Building HC2L index...${NC}"
+# Step 3: Build HC2L index
+echo -e "${BLUE}Step 3: Building HC2L index...${NC}"
 
 HC2L_INDEX_OUTPUT="$PROCESSED_DIR/quezon_city.hc2l.index"
 echo -e "${YELLOW}  Input: $GRAPH_OUTPUT${NC}"
 echo -e "${YELLOW}  Output: $HC2L_INDEX_OUTPUT${NC}"
 
-cd "$HC2L_DIR"
-./index < "$GRAPH_OUTPUT" > "$HC2L_INDEX_OUTPUT" 2>&1 || true
+"$BUILD_DIR/hc2l/index" < "$GRAPH_OUTPUT" > "$HC2L_INDEX_OUTPUT" 2>&1 || true
 
-if [ -f "$SCRIPT_DIR/$HC2L_INDEX_OUTPUT" ] && [ -s "$SCRIPT_DIR/$HC2L_INDEX_OUTPUT" ]; then
+if [ -f "$HC2L_INDEX_OUTPUT" ] && [ -s "$HC2L_INDEX_OUTPUT" ]; then
     echo -e "${GREEN}  ✓ HC2L index built successfully${NC}"
 else
     echo -e "${YELLOW}  ⚠ HC2L index file not found or empty${NC}"
 fi
 
-cd "$SCRIPT_DIR"
 echo ""
 
-# Step 5: Verify all files
-echo -e "${BLUE}Step 5: Verifying created files...${NC}"
+# Step 4: Verify all files
+echo -e "${BLUE}Step 4: Verifying created files...${NC}"
 
 FILES_TO_CHECK=(
     "$GRAPH_OUTPUT"
@@ -160,12 +141,12 @@ echo ""
 echo -e "${BLUE}========================================${NC}"
 
 if [ "$ALL_OK" = true ]; then
-    echo -e "${GREEN}✓ Index building completed successfully!${NC}"
+    echo -e "${GREEN}✓ Index generation completed successfully!${NC}"
     echo ""
     echo -e "${GREEN}You can now run the routing APIs:${NC}"
-    echo -e "  ${YELLOW}./run_server.sh${NC} or ${YELLOW}./run_server.fish${NC}"
+    echo -e "  ${YELLOW}./run_server.sh${NC}"
 else
-    echo -e "${YELLOW}⚠ Index building completed with warnings${NC}"
+    echo -e "${YELLOW}⚠ Index generation completed with warnings${NC}"
     echo ""
     echo -e "${YELLOW}Note: Some index files may not have been created.${NC}"
     echo -e "${YELLOW}This might be due to graph format compatibility.${NC}"

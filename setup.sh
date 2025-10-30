@@ -319,8 +319,8 @@ generate_data() {
 
     cd "$PROJECT_ROOT"
     echo "[Step 3/3] Building indexes..."
-    chmod +x build_indexes.sh
-    ./build_indexes.sh || {
+    chmod +x generate_indexes.sh
+    ./generate_indexes.sh || {
         echo -e "${RED}[ERROR]${NC} Index building failed"
         return 1
     }

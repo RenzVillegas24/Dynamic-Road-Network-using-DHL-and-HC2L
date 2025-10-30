@@ -90,7 +90,7 @@ generate_data() {
     echo "════════════════════════════════════════════════════════════════"
     echo ""
     
-    ./build_indexes.sh
+    ./generate_indexes.sh
     
     if [ $? -ne 0 ]; then
         echo ""
@@ -158,7 +158,7 @@ if [ "$DATA_EXISTS" = false ] || [ "$INDEX_EXISTS" = false ]; then
                 echo "  Building Graph Indexes"
                 echo "════════════════════════════════════════════════════════════════"
                 echo ""
-                ./build_indexes.sh
+                ./generate_indexes.sh
                 if [ $? -ne 0 ]; then
                     echo ""
                     echo "  ✗ Error: Index building failed"

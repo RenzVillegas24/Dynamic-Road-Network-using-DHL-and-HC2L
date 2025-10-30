@@ -1,11 +1,12 @@
 @echo off
-REM Build Graph Indexes Script (Windows)
-REM This script builds the binary graph and index files needed by the routing APIs
+REM Generate Graph Indexes Script (Windows)
+REM This script generates the binary graph and index files needed by the routing APIs
+REM Note: Run build_all.bat first to compile the index executables
 
 setlocal enabledelayedexpansion
 
 echo ========================================================================
-echo   Building Graph Indexes (Windows)
+echo   Generating Graph Indexes (Windows)
 echo ========================================================================
 echo.
 
@@ -14,8 +15,7 @@ set "SCRIPT_DIR=%~dp0"
 cd /d "%SCRIPT_DIR%"
 
 REM Directories (absolute paths)
-set "DHL_DIR=%SCRIPT_DIR%DualHierarchyLabelling"
-set "HC2L_DIR=%SCRIPT_DIR%HighCardinalityTwoLevel"
+set "BUILD_DIR=%SCRIPT_DIR%Main\build"
 set "DATA_DIR=%SCRIPT_DIR%Main\data"
 set "RAW_DIR=%DATA_DIR%\raw"
 set "PROCESSED_DIR=%DATA_DIR%\processed"
@@ -47,45 +47,25 @@ if not exist "%PROCESSED_DIR%\qc_from_csv.gr" (
 echo [OK] Graph files found
 echo.
 
-REM Step 1: Build index executables
-echo Step 1: Building index executables...
-
-echo   Building DHL index executable...
-cd /d "%DHL_DIR%"
-
-REM Check if MinGW/g++ is available
-where g++ >nul 2>&1
-if %errorlevel% neq 0 (
-    echo ERROR: g++ compiler not found!
-    echo   Please install MinGW-w64 or MSYS2 and add g++ to your PATH.
+REM Check if index executables exist
+if not exist "%BUILD_DIR%\dhl\index.exe" (
+    echo ERROR: DHL index executable not found
+    echo   Please run 'build_all.bat' first to compile the index executables
+    pause
+    exit /b 1
+)
+if not exist "%BUILD_DIR%\hc2l\index.exe" (
+    echo ERROR: HC2L index executable not found
+    echo   Please run 'build_all.bat' first to compile the index executables
     pause
     exit /b 1
 )
 
-mingw32-make index >nul 2>&1
-if not exist "index.exe" (
-    echo ERROR: Failed to build DHL index
-    pause
-    exit /b 1
-)
-echo   [OK] DHL index executable built
-cd /d "%SCRIPT_DIR%"
-
-echo   Building HC2L index executable...
-cd /d "%HC2L_DIR%"
-mingw32-make index >nul 2>&1
-if not exist "index.exe" (
-    echo ERROR: Failed to build HC2L index
-    pause
-    exit /b 1
-)
-echo   [OK] HC2L index executable built
-cd /d "%SCRIPT_DIR%"
-
+echo [OK] Index executables found
 echo.
 
-REM Step 2: Build graph file (binary format)
-echo Step 2: Converting .gr to binary graph format...
+REM Step 1: Build graph file (binary format)
+echo Step 1: Converting .gr to binary graph format...
 
 set "GR_INPUT=%PROCESSED_DIR%\qc_from_csv.gr"
 set "GRAPH_OUTPUT=%PROCESSED_DIR%\quezon_city.graph"
@@ -100,15 +80,14 @@ echo   [OK] Graph file created
 
 echo.
 
-REM Step 3: Build DHL index
-echo Step 3: Building DHL index...
+REM Step 2: Build DHL index
+echo Step 2: Building DHL index...
 
 set "DHL_INDEX_OUTPUT=%PROCESSED_DIR%\quezon_city"
 echo   Input: %GRAPH_OUTPUT%
 echo   Output: %DHL_INDEX_OUTPUT%.dhl.index
 
-cd /d "%DHL_DIR%"
-index.exe "%GRAPH_OUTPUT%" "%DHL_INDEX_OUTPUT%" 2>nul
+"%BUILD_DIR%\dhl\index.exe" "%GRAPH_OUTPUT%" "%DHL_INDEX_OUTPUT%" 2>nul
 
 REM The DHL index builder creates two files: _dhl and _ch
 REM We need to rename them to match what the API expects
@@ -124,18 +103,16 @@ if exist "%DHL_INDEX_OUTPUT%_ch" (
     echo   [OK] DHL contraction hierarchy built
 )
 
-cd /d "%SCRIPT_DIR%"
 echo.
 
-REM Step 4: Build HC2L index
-echo Step 4: Building HC2L index...
+REM Step 3: Build HC2L index
+echo Step 3: Building HC2L index...
 
 set "HC2L_INDEX_OUTPUT=%PROCESSED_DIR%\quezon_city.hc2l.index"
 echo   Input: %GRAPH_OUTPUT%
 echo   Output: %HC2L_INDEX_OUTPUT%
 
-cd /d "%HC2L_DIR%"
-index.exe < "%GRAPH_OUTPUT%" > "%HC2L_INDEX_OUTPUT%" 2>nul
+"%BUILD_DIR%\hc2l\index.exe" < "%GRAPH_OUTPUT%" > "%HC2L_INDEX_OUTPUT%" 2>nul
 
 if exist "%HC2L_INDEX_OUTPUT%" (
     echo   [OK] HC2L index built successfully
@@ -143,11 +120,10 @@ if exist "%HC2L_INDEX_OUTPUT%" (
     echo   WARNING: HC2L index file not found or empty
 )
 
-cd /d "%SCRIPT_DIR%"
 echo.
 
-REM Step 5: Verify all files
-echo Step 5: Verifying created files...
+REM Step 4: Verify all files
+echo Step 4: Verifying created files...
 
 set "ALL_OK=true"
 
@@ -179,12 +155,12 @@ echo.
 echo ========================================================================
 
 if "%ALL_OK%"=="true" (
-    echo [OK] Index building completed successfully!
+    echo [OK] Index generation completed successfully!
     echo.
     echo You can now run the routing APIs:
     echo   run_server.bat
 ) else (
-    echo WARNING: Index building completed with warnings
+    echo WARNING: Index generation completed with warnings
     echo.
     echo Note: Some index files may not have been created.
     echo This might be due to graph format compatibility.
