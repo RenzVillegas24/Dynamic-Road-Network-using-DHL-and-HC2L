@@ -34,6 +34,11 @@
     .severity-heavy { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
     .severity-medium { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
     .severity-light { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+    
+    /* Ensure Leaflet controls and popups are above the map */
+    .leaflet-control { z-index: 10 !important; }
+    .leaflet-popup { z-index: 10 !important; }
+    .leaflet-tooltip { z-index: 10 !important; }
   </style>
 </head>
 <body class="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
@@ -143,12 +148,12 @@
   </div>
 
   <!-- Map View -->
-  <div class="flex-1 relative" id="map-container">
+  <div class="flex-1 relative z-0" id="map-container">
     <!-- Leaflet Map will be loaded here -->
     <div id="google-map" class="w-full h-full"></div>
     
     <!-- Map placeholder (shown when maps fail to load) -->
-    <div class="absolute inset-0 flex items-center justify-center text-slate-300 text-xl font-light pointer-events-none hidden" id="map-placeholder">
+    <div class="absolute inset-0 flex items-center justify-center text-slate-300 text-xl font-light pointer-events-none hidden z-10" id="map-placeholder">
       <div class="text-center">
         <svg class="w-20 h-20 mx-auto mb-4 text-slate-300 float-animation" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>

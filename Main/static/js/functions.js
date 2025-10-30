@@ -40,15 +40,35 @@ function showUpdateToast(message, type = 'info') {
 function clearRoutes() {
     console.log('Clearing routes...');
 
-    // Clear existing route polylines
+    // Clear existing route polylines (Leaflet)
     if (routePolylines && routePolylines.length > 0) {
         routePolylines.forEach(polyline => {
-        if (polyline && polyline.setMap) {
-            polyline.setMap(null);
-        }
+            if (polyline && map) {
+                map.removeLayer(polyline);
+            }
         });
-        routePolylines = [];
         console.log('Cleared', routePolylines.length, 'route polylines');
+        routePolylines = [];
+    }
+
+    // Clear start and destination markers (Leaflet)
+    if (startMarker && map) {
+        map.removeLayer(startMarker);
+        startMarker = null;
+        console.log('Cleared start marker');
+    }
+
+    if (destMarker && map) {
+        map.removeLayer(destMarker);
+        destMarker = null;
+        console.log('Cleared destination marker');
+    }
+
+    // Clear report marker if exists (Leaflet)
+    if (reportMarker && map) {
+        map.removeLayer(reportMarker);
+        reportMarker = null;
+        console.log('Cleared report marker');
     }
 
     // Clear current route data
@@ -60,10 +80,7 @@ function clearRoutes() {
     // Reset bottom info bar
     resetBottomInfoBar();
 
-    // We don't need to clear DirectionsRenderer since we're only using D-HC2L polylines
-    // The DirectionsRenderer should remain untouched to avoid the travelMode error
-
-    console.log('D-HC2L route clearing complete');
+    console.log('✅ Route clearing complete (Leaflet)');
 }
 
 // Function to reset the Bottom Information Bar
