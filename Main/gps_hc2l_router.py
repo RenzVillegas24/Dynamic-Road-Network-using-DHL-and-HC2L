@@ -6,6 +6,7 @@ import csv
 from typing import Dict, List, Tuple, Optional
 from road_name_mapper import RoadNameMapper
 from config import Config
+from geometry_utils import enhance_route_geometry
 
 class GPSRoutingService:
     """
@@ -200,20 +201,26 @@ class GPSRoutingService:
                 else:
                     print(f"⚠️  Warning: Node {node_id} not found in nodes data")
             
-            # Update route data with enhanced coordinates
-            route_data['route']['coordinates'] = enhanced_coordinates
+            print(f"📍 Route has {len(enhanced_coordinates)} original node coordinates")
             
-            # Create polylines for Google Maps
-            if len(enhanced_coordinates) >= 2:
+            # Interpolate intermediate points for smoother visualization
+            # This adds points every ~30 meters to make routes follow roads better
+            interpolated_coordinates = enhance_route_geometry(enhanced_coordinates, max_distance=30.0)
+            
+            print(f"✅ Enhanced route with {len(interpolated_coordinates)} GPS coordinates (interpolated from {len(enhanced_coordinates)} nodes)")
+            
+            # Update route data with enhanced coordinates
+            route_data['route']['coordinates'] = interpolated_coordinates
+            
+            # Create polylines for Google Maps/Leaflet
+            if len(interpolated_coordinates) >= 2:
                 route_data['route']['polylines'] = [{
-                    'path': [{'lat': coord['lat'], 'lng': coord['lng']} for coord in enhanced_coordinates],
+                    'path': [{'lat': coord['lat'], 'lng': coord['lng']} for coord in interpolated_coordinates],
                     'strokeColor': '#FF0000',  # Red for HC2L route
                     'strokeOpacity': 0.8,
                     'strokeWeight': 5,
                     'geodesic': True
                 }]
-            
-            print(f"✅ Enhanced route with {len(enhanced_coordinates)} GPS coordinates")
             
         except Exception as e:
             print(f"⚠️  Warning: Failed to enhance coordinates: {e}")

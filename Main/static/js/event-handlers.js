@@ -29,7 +29,7 @@ document.getElementById('start-location-btn').addEventListener('click', () => {
         return;
     }
     pinningMode = 'start';
-    map.setOptions({ cursor: 'crosshair' });
+    map.getContainer().style.cursor = 'crosshair';
     showUpdateToast("Click on the map to pin starting location", 'info');
 });
   
@@ -39,7 +39,7 @@ document.getElementById('dest-location-btn').addEventListener('click', () => {
     return;
     }
     pinningMode = 'dest';
-    map.setOptions({ cursor: 'crosshair' });
+    map.getContainer().style.cursor = 'crosshair';
     showUpdateToast("Click on the map to pin destination", 'info');
 });
   
@@ -49,7 +49,7 @@ document.getElementById('pin-disruption-btn').addEventListener('click', () => {
         return;
     }
     pinningMode = 'report';
-    map.setOptions({ cursor: 'crosshair' });
+    map.getContainer().style.cursor = 'crosshair';
     showUpdateToast("Click on the map to pin disruption location", 'info');
 });
 
@@ -155,21 +155,20 @@ document.getElementById("go-button").onclick = async () => {
             console.log('Received comparison data:', comparisonData);
             
             if (comparisonData.success) {
-              // Display both routes with different colors and patterns
+              // Display both routes with different colors and patterns using Leaflet
               const routes = comparisonData.routes;
               
               if (routes.dhl && routes.dhl.polylines) {
                 // Display DHL route with solid blue line (thicker, on top)
                 routes.dhl.polylines.forEach(polyline => {
-                  const dhlPolyline = new google.maps.Polyline({
-                    path: polyline.path,
-                    geodesic: polyline.geodesic,
-                    strokeColor: '#0066FF', // Blue for DHL
-                    strokeOpacity: 0.9,
-                    strokeWeight: 6, // Thicker for DHL
-                    zIndex: 1000 // Higher z-index to show on top
-                  });
-                  dhlPolyline.setMap(map);
+                  const pathCoords = polyline.path.map(p => [p.lat, p.lng]);
+                  
+                  const dhlPolyline = L.polyline(pathCoords, {
+                    color: '#0066FF', // Blue for DHL
+                    opacity: 0.9,
+                    weight: 6 // Thicker for DHL
+                  }).addTo(map);
+                  
                   routePolylines.push(dhlPolyline);
                 });
                 console.log('✅ DHL route displayed in solid blue');
@@ -181,27 +180,15 @@ document.getElementById("go-button").onclick = async () => {
               if (routes.dhc2l && routes.dhc2l.polylines) {
                 // Display D-HC2L route with dashed red line (thinner, underneath)
                 routes.dhc2l.polylines.forEach(polyline => {
-                  const dhc2lPolyline = new google.maps.Polyline({
-                    path: polyline.path,
-                    geodesic: polyline.geodesic,
-                    strokeColor: '#FF0000', // Red for D-HC2L
-                    strokeOpacity: 0.9,
-                    strokeWeight: 4, // Thinner for D-HC2L
-                    zIndex: 999, // Lower z-index so it shows under DHL
-                    icons: [{
-                      icon: {
-                        path: 'M 0,-1 0,1',
-                        strokeOpacity: 1,
-                        strokeColor: '#FF0000',
-                        strokeWeight: 4,
-                        scale: 1
-                      },
-                      offset: '0',
-                      repeat: '12px'
-                    }],
-                    strokeOpacity: 0 // Make the main stroke invisible so only dashes show
-                  });
-                  dhc2lPolyline.setMap(map);
+                  const pathCoords = polyline.path.map(p => [p.lat, p.lng]);
+                  
+                  const dhc2lPolyline = L.polyline(pathCoords, {
+                    color: '#FF0000', // Red for D-HC2L
+                    opacity: 0.9,
+                    weight: 4, // Thinner for D-HC2L
+                    dashArray: '10, 5' // Dashed pattern
+                  }).addTo(map);
+                  
                   routePolylines.push(dhc2lPolyline);
                 });
                 console.log('✅ D-HC2L route displayed in dashed red');
@@ -265,21 +252,20 @@ document.getElementById("go-button").onclick = async () => {
             console.log('Received comparison data:', comparisonData);
             
             if (comparisonData.success) {
-              // Display both routes with different colors and patterns
+              // Display both routes with different colors and patterns using Leaflet
               const routes = comparisonData.routes;
               
               if (routes.dhl && routes.dhl.polylines) {
                 // Display DHL route with solid blue line (thicker, on top)
                 routes.dhl.polylines.forEach(polyline => {
-                  const dhlPolyline = new google.maps.Polyline({
-                    path: polyline.path,
-                    geodesic: polyline.geodesic,
-                    strokeColor: '#0066FF', // Blue for DHL
-                    strokeOpacity: 0.9,
-                    strokeWeight: 6, // Thicker for DHL
-                    zIndex: 1000 // Higher z-index to show on top
-                  });
-                  dhlPolyline.setMap(map);
+                  const pathCoords = polyline.path.map(p => [p.lat, p.lng]);
+                  
+                  const dhlPolyline = L.polyline(pathCoords, {
+                    color: '#0066FF', // Blue for DHL
+                    opacity: 0.9,
+                    weight: 6 // Thicker for DHL
+                  }).addTo(map);
+                  
                   routePolylines.push(dhlPolyline);
                 });
                 console.log('✅ DHL route displayed in solid blue');
@@ -291,27 +277,15 @@ document.getElementById("go-button").onclick = async () => {
               if (routes.dhc2l && routes.dhc2l.polylines) {
                 // Display D-HC2L route with dashed red line (thinner, underneath)
                 routes.dhc2l.polylines.forEach(polyline => {
-                  const dhc2lPolyline = new google.maps.Polyline({
-                    path: polyline.path,
-                    geodesic: polyline.geodesic,
-                    strokeColor: '#FF0000', // Red for D-HC2L
-                    strokeOpacity: 0.9,
-                    strokeWeight: 4, // Thinner for D-HC2L
-                    zIndex: 999, // Lower z-index so it shows under DHL
-                    icons: [{
-                      icon: {
-                        path: 'M 0,-1 0,1',
-                        strokeOpacity: 1,
-                        strokeColor: '#FF0000',
-                        strokeWeight: 4,
-                        scale: 1
-                      },
-                      offset: '0',
-                      repeat: '12px'
-                    }],
-                    strokeOpacity: 0 // Make the main stroke invisible so only dashes show
-                  });
-                  dhc2lPolyline.setMap(map);
+                  const pathCoords = polyline.path.map(p => [p.lat, p.lng]);
+                  
+                  const dhc2lPolyline = L.polyline(pathCoords, {
+                    color: '#FF0000', // Red for D-HC2L
+                    opacity: 0.9,
+                    weight: 4, // Thinner for D-HC2L
+                    dashArray: '10, 5' // Dashed pattern
+                  }).addTo(map);
+                  
                   routePolylines.push(dhc2lPolyline);
                 });
                 console.log('✅ D-HC2L route displayed in dashed red');

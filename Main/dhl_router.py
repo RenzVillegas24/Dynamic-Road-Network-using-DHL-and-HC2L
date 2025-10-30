@@ -5,6 +5,7 @@ import os
 from typing import Dict, List, Tuple, Optional
 from road_name_mapper import RoadNameMapper
 from config import Config
+from geometry_utils import enhance_route_geometry
 
 class DHLRouter:
     def __init__(self, cpp_executable_path: str = None):
@@ -179,8 +180,19 @@ class DHLRouter:
         
         # Create polylines from coordinates
         if len(coordinates) >= 2:
+            print(f"📍 DHL route has {len(coordinates)} original node coordinates")
+            
+            # Interpolate intermediate points for smoother visualization
+            # This adds points every ~30 meters to make routes follow roads better
+            interpolated_coordinates = enhance_route_geometry(coordinates, max_distance=30.0)
+            
+            print(f"✅ Enhanced DHL route with {len(interpolated_coordinates)} GPS coordinates (interpolated from {len(coordinates)} nodes)")
+            
+            # Update coordinates with interpolated version
+            route_data['route']['coordinates'] = interpolated_coordinates
+            
             polyline_coords = []
-            for coord in coordinates:
+            for coord in interpolated_coordinates:
                 polyline_coords.append([coord['lat'], coord['lng']])
             
             route_data['route']['polylines'] = [{

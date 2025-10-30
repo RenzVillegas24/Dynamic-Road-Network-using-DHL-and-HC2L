@@ -3,35 +3,40 @@ function highlightDisruptedSegments(disruptedSegments) {
     
     // Clear any existing highlights
     if (window.disruptionHighlights) {
-      window.disruptionHighlights.forEach(highlight => highlight.setMap(null));
+      window.disruptionHighlights.forEach(highlight => map.removeLayer(highlight));
     }
     window.disruptionHighlights = [];
     
     disruptedSegments.forEach(segment => {
-      // Create a visual highlight for each disrupted segment
-      const marker = new google.maps.Marker({
-        position: { 
-          lat: (segment.sourceNode?.lat || 0), 
-          lng: (segment.sourceNode?.lng || 0) 
-        },
-        map: map,
-        title: `${segment.incidentType} on ${segment.roadName}`,
-        icon: {
-          url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-            <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="12" cy="12" r="10" fill="#ef4444" stroke="white" stroke-width="2"/>
-              <text x="12" y="16" text-anchor="middle" fill="white" font-size="10" font-weight="bold">!</text>
-            </svg>
-          `)}`,
-          scaledSize: new google.maps.Size(24, 24)
-        },
-        animation: google.maps.Animation.BOUNCE
+      // Create a visual highlight for each disrupted segment using Leaflet
+      const icon = L.divIcon({
+        html: `<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="10" fill="#ef4444" stroke="white" stroke-width="2"/>
+                <text x="12" y="16" text-anchor="middle" fill="white" font-size="10" font-weight="bold">!</text>
+              </svg>`,
+        className: 'disruption-highlight-marker',
+        iconSize: [24, 24],
+        iconAnchor: [12, 24]
       });
       
-      // Stop animation after 3 seconds
-      setTimeout(() => {
-        marker.setAnimation(null);
-      }, 3000);
+      const marker = L.marker([
+        segment.sourceNode?.lat || 0,
+        segment.sourceNode?.lng || 0
+      ], { 
+        icon: icon,
+        title: `${segment.incidentType} on ${segment.roadName}`
+      }).addTo(map);
+      
+      // Add bounce animation class (you can add CSS for this)
+      const markerElement = marker.getElement();
+      if (markerElement) {
+        markerElement.classList.add('bounce-animation');
+        
+        // Stop animation after 3 seconds
+        setTimeout(() => {
+          markerElement.classList.remove('bounce-animation');
+        }, 3000);
+      }
       
       window.disruptionHighlights.push(marker);
     });
@@ -372,29 +377,31 @@ function showDisruptionOnMap(disruption) {
     const centerLat = (disruption.source_lat + disruption.target_lat) / 2;
     const centerLng = (disruption.source_lng + disruption.target_lng) / 2;
     
-    // Center map on the disruption
-    map.setCenter({ lat: centerLat, lng: centerLng });
-    map.setZoom(16);
+    // Center map on the disruption using Leaflet
+    map.setView([centerLat, centerLng], 16);
     
-    // Create a temporary marker to highlight the disruption
-    const marker = new google.maps.Marker({
-      position: { lat: centerLat, lng: centerLng },
-      map: map,
-      title: `${disruption.incident_type} on ${disruption.road_name}`,
-      icon: {
-        url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-          <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="16" cy="16" r="12" fill="${disruption.severity === 'Heavy' ? '#ef4444' : disruption.severity === 'Medium' ? '#f59e0b' : '#10b981'}" stroke="white" stroke-width="2"/>
-            <text x="16" y="20" text-anchor="middle" fill="white" font-size="12" font-weight="bold">!</text>
-          </svg>
-        `)}`,
-        scaledSize: new google.maps.Size(32, 32)
-      }
+    // Create a temporary marker to highlight the disruption using Leaflet
+    const severityColor = disruption.severity === 'Heavy' ? '#ef4444' : 
+                         disruption.severity === 'Medium' ? '#f59e0b' : '#10b981';
+    
+    const icon = L.divIcon({
+      html: `<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="16" cy="16" r="12" fill="${severityColor}" stroke="white" stroke-width="2"/>
+              <text x="16" y="20" text-anchor="middle" fill="white" font-size="12" font-weight="bold">!</text>
+            </svg>`,
+      className: 'disruption-temp-marker',
+      iconSize: [32, 32],
+      iconAnchor: [16, 32]
     });
+    
+    const marker = L.marker([centerLat, centerLng], { 
+      icon: icon,
+      title: `${disruption.incident_type} on ${disruption.road_name}`
+    }).addTo(map);
     
     // Remove marker after 5 seconds
     setTimeout(() => {
-      marker.setMap(null);
+      map.removeLayer(marker);
     }, 5000);
     
     // Close disruptions panel to see the map
@@ -409,7 +416,7 @@ function showAllDisruptionsOnMap(disruptionData) {
     // Clear existing disruption markers
     clearDisruptionMarkers();
     
-    // Add markers for each disruption type
+    // Add markers for each disruption type using Leaflet
     for (const [incidentType, disruptions] of Object.entries(disruptionData.disruptions_by_type)) {
       // Limit markers to prevent performance issues (show max 50 per type)
       const markersToShow = disruptions.slice(0, 50);
@@ -439,36 +446,32 @@ function showAllDisruptionsOnMap(disruptionData) {
           return symbols[type] || '!';
         };
         
-        const marker = new google.maps.Marker({
-          position: { lat: centerLat, lng: centerLng },
-          map: map,
-          title: `${disruption.incident_type} on ${disruption.road_name}`,
-          icon: {
-            url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-              <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="12" cy="12" r="10" fill="${markerColor}" stroke="white" stroke-width="1"/>
-                <text x="12" y="16" text-anchor="middle" fill="white" font-size="10" font-weight="bold">${getMarkerSymbol(disruption.incident_type)}</text>
-              </svg>
-            `)}`,
-            scaledSize: new google.maps.Size(24, 24)
-          }
+        const icon = L.divIcon({
+          html: `<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="12" cy="12" r="10" fill="${markerColor}" stroke="white" stroke-width="1"/>
+                  <text x="12" y="16" text-anchor="middle" fill="white" font-size="10" font-weight="bold">${getMarkerSymbol(disruption.incident_type)}</text>
+                </svg>`,
+          className: 'disruption-marker',
+          iconSize: [24, 24],
+          iconAnchor: [12, 24]
         });
         
-        // Add info window
-        const infoWindow = new google.maps.InfoWindow({
-          content: `
-            <div class="p-2">
-              <h3 class="font-bold text-sm">${disruption.road_name}</h3>
-              <p class="text-xs text-gray-600">${disruption.incident_type}</p>
-              <p class="text-xs">Severity: <span class="font-semibold" style="color: ${markerColor}">${disruption.severity}</span></p>
-              <p class="text-xs">Speed: ${disruption.speed_kph.toFixed(1)} km/h (${Math.round(disruption.slowdown_ratio * 100)}% of normal)</p>
-            </div>
-          `
-        });
+        const marker = L.marker([centerLat, centerLng], { 
+          icon: icon,
+          title: `${disruption.incident_type} on ${disruption.road_name}`
+        }).addTo(map);
         
-        marker.addListener('click', () => {
-          infoWindow.open(map, marker);
-        });
+        // Add popup with info
+        const popupContent = `
+          <div class="p-2">
+            <h3 class="font-bold text-sm">${disruption.road_name}</h3>
+            <p class="text-xs text-gray-600">${disruption.incident_type}</p>
+            <p class="text-xs">Severity: <span class="font-semibold" style="color: ${markerColor}">${disruption.severity}</span></p>
+            <p class="text-xs">Speed: ${disruption.speed_kph.toFixed(1)} km/h (${Math.round(disruption.slowdown_ratio * 100)}% of normal)</p>
+          </div>
+        `;
+        
+        marker.bindPopup(popupContent);
         
         disruptionMarkers.push(marker);
       });
@@ -477,10 +480,10 @@ function showAllDisruptionsOnMap(disruptionData) {
     console.log(`Added ${disruptionMarkers.length} disruption markers to map`);
 }
 
-// Function to clear the disruption markers from the map
+// Function to clear the disruption markers from the map (Leaflet)
 function clearDisruptionMarkers() {
     disruptionMarkers.forEach(marker => {
-        marker.setMap(null);
+        map.removeLayer(marker);
     });
     disruptionMarkers = [];
 }
