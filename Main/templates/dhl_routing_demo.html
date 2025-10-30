@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>DHL Routing on Google Maps</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 10px; }
+        #map { height: 70vh; width: 100%; border: 1px solid #ccc; }
+        .controls { margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 5px; }
+        .control-group { display: inline-block; margin-right: 15px; vertical-align: top; }
+        button { padding: 8px 15px; margin: 3px; cursor: pointer; border: none; border-radius: 3px; }
+        .btn-primary { background: #0066FF; color: white; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-warning { background: #ffc107; color: black; }
+        .info-panel { margin: 10px 0; padding: 10px; background: #e9ecef; border-radius: 5px; }
+        .route-info { display: none; margin: 10px 0; padding: 15px; background: #cce5ff; border-radius: 5px; border-left: 5px solid #0066FF; }
+        .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin: 15px 0; }
+        .metric-box { padding: 10px; text-align: center; background: white; border-radius: 5px; border: 1px solid #ddd; }
+        .metric-value { font-size: 24px; font-weight: bold; color: #0066FF; }
+        .metric-label { font-size: 12px; color: #666; margin-top: 5px; }
+        .coordinates-input { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
+        .coord-input { padding: 5px; border: 1px solid #ddd; border-radius: 3px; }
+        .loading { display: none; text-align: center; padding: 20px; }
+        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #0066FF; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 0 auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .error-message { background: #f8d7da; color: #721c24; padding: 10px; border-radius: 5px; margin: 10px 0; border: 1px solid #f5c6cb; }
+        .legend { background: white; padding: 10px; border-radius: 5px; border: 1px solid #ddd; margin: 10px 0; }
+        .legend-item { display: inline-block; margin-right: 15px; }
+        .color-box { display: inline-block; width: 20px; height: 3px; margin-right: 5px; vertical-align: middle; }
+        .algorithm-comparison { background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 10px 0; border-left: 5px solid #6c757d; }
+    </style>
+</head>
+<body>
+    <h1>🔵 DHL (Dual-Hierarchy Labelling) Routing System</h1>
+    <p>Click two points on the map to compute optimal routes using the DHL algorithm with immediate update and disruption handling.</p>
+    
+    <div class="controls">
+        <div class="control-group">
+            <h4>🎯 DHL Route Planning</h4>
+            <button class="btn-primary" onclick="enableRouteMode()">Select Route Points</button>
+            <button class="btn-success" onclick="computeDHLRoute(false)" id="computeBtn" disabled>Compute Base Route</button>
+            <button class="btn-warning" onclick="computeDHLRoute(true)" id="computeDisruptedBtn" disabled>Compute Disrupted Route</button>
+            <button class="btn-secondary" onclick="compareDHLRoutes()" id="compareBtn" disabled>Compare Routes</button>
+            <button class="btn-danger" onclick="clearRoute()">Clear Route</button>
+        </div>
+        
+        <div class="control-group">
+            <h4>📍 Manual Coordinates</h4>
+            <div class="coordinates-input">
+                <input type="number" class="coord-input" id="startLat" placeholder="Start Latitude" step="0.000001">
+                <input type="number" class="coord-input" id="startLng" placeholder="Start Longitude" step="0.000001">
+                <input type="number" class="coord-input" id="destLat" placeholder="Dest Latitude" step="0.000001">
+                <input type="number" class="coord-input" id="destLng" placeholder="Dest Longitude" step="0.000001">
+            </div>
+            <button class="btn-success" onclick="enablePinStartMode()">📍 Pin Start Point</button>
+            <button class="btn-danger" onclick="enablePinDestMode()">📍 Pin Destination</button>
+            <button class="btn-primary" onclick="computeRouteFromInputs()">Compute from Inputs</button>
+            <button class="btn-secondary" onclick="useQuezOnCityDefaults()">Use QC Defaults</button>
+        </div>
+        
+        <div class="control-group">
+            <h4>🗺️ Map Data</h4>
+            <button class="btn-primary" onclick="loadAllNodes()">Load All Nodes</button>
+            <button class="btn-secondary" onclick="loadTrafficData()">Load Traffic Data</button>
+            <button class="btn-danger" onclick="clearAll()">Clear All</button>
+        </div>
+        
+        <div class="control-group">
+            <h4>⚔️ Algorithm Comparison</h4>
+            <button class="btn-warning" onclick="compareAlgorithms(false)">Compare Base Routes</button>
+            <button class="btn-danger" onclick="compareAlgorithms(true)">Compare with Disruptions</button>
+        </div>
+    </div>
+    
+    <div class="legend" id="routeLegend" style="display: none;">
+        <h4>Route Legend</h4>
+        <div class="legend-item">
+            <span class="color-box" style="background: #0066FF;"></span>
+            DHL Route
+        </div>
+        <div class="legend-item">
+            <span class="color-box" style="background: #FF6600;"></span>
+            DHL Disrupted Route
+        </div>
+        <div class="legend-item">
+            <span class="color-box" style="background: #FF0000;"></span>
+            D-HC2L Route
+        </div>
+        <div class="legend-item">
+            <span class="color-box" style="background: #00FF00;"></span>
+            Straight Line Distance
+        </div>
+        <div class="legend-item">
+            <span class="color-box" style="background: #FFA500;"></span>
+            Traffic Disruptions
+        </div>
+    </div>
+    
+    <div class="loading" id="loadingIndicator">
+        <div class="spinner"></div>
+        <p>Computing optimal route using DHL algorithm...</p>
+    </div>
+    
+    <div id="errorContainer"></div>
+    
+    <div class="info-panel" id="instructionPanel">
+        <strong>Instructions:</strong>
+        <ol>
+            <li>Click "Select Route Points" to enable point selection mode</li>
+            <li>Click on the map to set your start point (green marker)</li>
+            <li>Click on the map again to set your destination (red marker)</li>
+            <li>Click "Compute Base Route" to calculate the DHL route without disruptions</li>
+            <li>Click "Compute Disrupted Route" to see how DHL handles traffic disruptions</li>
+            <li>Use "Compare Routes" to see both routes side by side</li>
+            <li>Use "Compare Base Routes" to compare DHL vs D-HC2L algorithms</li>
+        </ol>
+    </div>
+    
+    <div class="route-info" id="routeResults">
+        <h4>🔵 DHL Route Results</h4>
+        <div class="metrics-grid" id="metricsContainer">
+            <!-- Metrics will be populated here -->
+        </div>
+        <div id="routeDetails">
+            <!-- Route details will be populated here -->
+        </div>
+    </div>
+    
+    <div class="algorithm-comparison" id="comparisonResults" style="display: none;">
+        <h4>⚔️ Algorithm Comparison Results</h4>
+        <div id="comparisonDetails">
+            <!-- Comparison details will be populated here -->
+        </div>
+    </div>
+    
+    <div id="map"></div>
+
+    <script>
+        let map;
+        let startMarker, destMarker;
+        let routeMode = false;
+        let pinMode = null; // 'start' or 'dest'
+        let currentPolylines = [];
+        let startCoords = null;
+        let destCoords = null;
+        let trafficData = [];
+        let nodesData = [];
+
+        function initMap() {
+            // Initialize the map centered on Quezon City
+            map = new google.maps.Map(document.getElementById('map'), {
+                zoom: 13,
+                center: { lat: 14.6760, lng: 121.0437 },
+                mapTypeId: 'roadmap'
+            });
+
+            // Add click listener for setting route points
+            map.addListener('click', function(e) {
+                if (routeMode) {
+                    handleMapClick(e.latLng);
+                } else if (pinMode) {
+                    handlePinClick(e.latLng);
+                }
+            });
+
+            console.log('DHL Map initialized');
+        }
+
+        function enableRouteMode() {
+            routeMode = true;
+            pinMode = null;
+            updateInstructions('Click on the map to set start point');
+        }
+
+        function enablePinStartMode() {
+            routeMode = false;
+            pinMode = 'start';
+            updateInstructions('Click on the map to pin start point');
+        }
+
+        function enablePinDestMode() {
+            routeMode = false;
+            pinMode = 'dest';
+            updateInstructions('Click on the map to pin destination point');
+        }
+
+        function handleMapClick(latLng) {
+            if (!startCoords) {
+                setStartPoint(latLng.lat(), latLng.lng());
+                updateInstructions('Click on the map to set destination point');
+            } else if (!destCoords) {
+                setDestPoint(latLng.lat(), latLng.lng());
+                routeMode = false;
+                updateInstructions('Ready to compute route!');
+                enableRouteButtons();
+            }
+        }
+
+        function handlePinClick(latLng) {
+            if (pinMode === 'start') {
+                setStartPoint(latLng.lat(), latLng.lng());
+                document.getElementById('startLat').value = latLng.lat().toFixed(6);
+                document.getElementById('startLng').value = latLng.lng().toFixed(6);
+            } else if (pinMode === 'dest') {
+                setDestPoint(latLng.lat(), latLng.lng());
+                document.getElementById('destLat').value = latLng.lat().toFixed(6);
+                document.getElementById('destLng').value = latLng.lng().toFixed(6);
+            }
+            pinMode = null;
+            updateInstructions('Point set successfully');
+            enableRouteButtons();
+        }
+
+        function setStartPoint(lat, lng) {
+            startCoords = { lat: lat, lng: lng };
+            
+            if (startMarker) startMarker.setMap(null);
+            startMarker = new google.maps.Marker({
+                position: { lat: lat, lng: lng },
+                map: map,
+                title: 'Start Point',
+                icon: {
+                    url: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png'
+                }
+            });
+        }
+
+        function setDestPoint(lat, lng) {
+            destCoords = { lat: lat, lng: lng };
+            
+            if (destMarker) destMarker.setMap(null);
+            destMarker = new google.maps.Marker({
+                position: { lat: lat, lng: lng },
+                map: map,
+                title: 'Destination Point',
+                icon: {
+                    url: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png'
+                }
+            });
+        }
+
+        function enableRouteButtons() {
+            if (startCoords && destCoords) {
+                document.getElementById('computeBtn').disabled = false;
+                document.getElementById('computeDisruptedBtn').disabled = false;
+                document.getElementById('compareBtn').disabled = false;
+            }
+        }
+
+        function updateInstructions(message) {
+            document.getElementById('instructionPanel').innerHTML = '<strong>Status:</strong> ' + message;
+        }
+
+        function showLoading(show) {
+            document.getElementById('loadingIndicator').style.display = show ? 'block' : 'none';
+        }
+
+        function showError(message) {
+            const container = document.getElementById('errorContainer');
+            container.innerHTML = '<div class="error-message"><strong>Error:</strong> ' + message + '</div>';
+        }
+
+        function clearErrors() {
+            document.getElementById('errorContainer').innerHTML = '';
+        }
+
+        function clearRoute() {
+            // Clear markers
+            if (startMarker) startMarker.setMap(null);
+            if (destMarker) destMarker.setMap(null);
+            startMarker = null;
+            destMarker = null;
+            
+            // Clear polylines
+            currentPolylines.forEach(polyline => polyline.setMap(null));
+            currentPolylines = [];
+            
+            // Reset coordinates
+            startCoords = null;
+            destCoords = null;
+            
+            // Reset UI
+            document.getElementById('computeBtn').disabled = true;
+            document.getElementById('computeDisruptedBtn').disabled = true;
+            document.getElementById('compareBtn').disabled = true;
+            document.getElementById('routeResults').style.display = 'none';
+            document.getElementById('comparisonResults').style.display = 'none';
+            document.getElementById('routeLegend').style.display = 'none';
+            
+            updateInstructions('Route cleared. Select new route points.');
+            clearErrors();
+        }
+
+        function computeDHLRoute(useDisruptions) {
+            if (!startCoords || !destCoords) {
+                showError('Please set both start and destination points');
+                return;
+            }
+
+            showLoading(true);
+            clearErrors();
+
+            const requestData = {
+                start_lat: startCoords.lat,
+                start_lng: startCoords.lng,
+                dest_lat: destCoords.lat,
+                dest_lng: destCoords.lng,
+                use_disruptions: useDisruptions
+            };
+
+            fetch('/compute_dhl_route', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                showLoading(false);
+                if (data.success) {
+                    displayDHLRoute(data, useDisruptions);
+                } else {
+                    showError(data.error || 'Route computation failed');
+                }
+            })
+            .catch(error => {
+                showLoading(false);
+                showError('Network error: ' + error.message);
+            });
+        }
+
+        function displayDHLRoute(data, useDisruptions) {
+            // Clear existing polylines
+            currentPolylines.forEach(polyline => polyline.setMap(null));
+            currentPolylines = [];
+
+            // Draw route polylines
+            if (data.route && data.route.polylines) {
+                data.route.polylines.forEach(polylineData => {
+                    const polyline = new google.maps.Polyline(polylineData);
+                    polyline.setMap(map);
+                    currentPolylines.push(polyline);
+                });
+            }
+
+            // Display metrics
+            displayMetrics(data.metrics, useDisruptions);
+            
+            // Show route info panel
+            document.getElementById('routeResults').style.display = 'block';
+            document.getElementById('routeLegend').style.display = 'block';
+            
+            updateInstructions(`DHL route computed successfully ${useDisruptions ? 'with' : 'without'} disruptions`);
+        }
+
+        function displayMetrics(metrics, useDisruptions) {
+            const container = document.getElementById('metricsContainer');
+            container.innerHTML = `
+                <div class="metric-box">
+                    <div class="metric-value">${metrics.query_time_ms?.toFixed(3) || 0}</div>
+                    <div class="metric-label">Query Time (ms)</div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-value">${metrics.total_distance_units || 0}</div>
+                    <div class="metric-label">Distance (units)</div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-value">${metrics.path_length || 0}</div>
+                    <div class="metric-label">Path Length (nodes)</div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-value">${metrics.hoplinks_examined || 0}</div>
+                    <div class="metric-label">Hoplinks Examined</div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-value">${metrics.index_height || 0}</div>
+                    <div class="metric-label">Index Height</div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-value">${metrics.avg_cut_size?.toFixed(2) || 0}</div>
+                    <div class="metric-label">Avg Cut Size</div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-value">${(metrics.labeling_size_mb || 0).toFixed(2)}</div>
+                    <div class="metric-label">Index Size (MB)</div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-value">${useDisruptions ? 'YES' : 'NO'}</div>
+                    <div class="metric-label">Uses Disruptions</div>
+                </div>
+            `;
+        }
+
+        function compareDHLRoutes() {
+            if (!startCoords || !destCoords) {
+                showError('Please set both start and destination points');
+                return;
+            }
+
+            showLoading(true);
+            clearErrors();
+
+            const requestData = {
+                start_lat: startCoords.lat,
+                start_lng: startCoords.lng,
+                dest_lat: destCoords.lat,
+                dest_lng: destCoords.lng
+            };
+
+            fetch('/compare_dhl_routes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                showLoading(false);
+                if (data.success) {
+                    displayRouteComparison(data);
+                } else {
+                    showError(data.error || 'Route comparison failed');
+                }
+            })
+            .catch(error => {
+                showLoading(false);
+                showError('Network error: ' + error.message);
+            });
+        }
+
+        function compareAlgorithms(useDisruptions) {
+            if (!startCoords || !destCoords) {
+                showError('Please set both start and destination points');
+                return;
+            }
+
+            showLoading(true);
+            clearErrors();
+
+            const requestData = {
+                start_lat: startCoords.lat,
+                start_lng: startCoords.lng,
+                dest_lat: destCoords.lat,
+                dest_lng: destCoords.lng,
+                use_disruptions: useDisruptions
+            };
+
+            fetch('/compare_algorithms', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                showLoading(false);
+                if (data.success) {
+                    displayAlgorithmComparison(data, useDisruptions);
+                } else {
+                    showError(data.error || 'Algorithm comparison failed');
+                }
+            })
+            .catch(error => {
+                showLoading(false);
+                showError('Network error: ' + error.message);
+            });
+        }
+
+        function displayRouteComparison(data) {
+            // Clear existing polylines
+            currentPolylines.forEach(polyline => polyline.setMap(null));
+            currentPolylines = [];
+
+            // Draw all route polylines
+            Object.values(data.routes).forEach(route => {
+                if (route.polylines) {
+                    route.polylines.forEach(polylineData => {
+                        const polyline = new google.maps.Polyline(polylineData);
+                        polyline.setMap(map);
+                        currentPolylines.push(polyline);
+                    });
+                }
+            });
+
+            document.getElementById('routeLegend').style.display = 'block';
+            updateInstructions('DHL route comparison displayed');
+        }
+
+        function displayAlgorithmComparison(data, useDisruptions) {
+            // Clear existing polylines
+            currentPolylines.forEach(polyline => polyline.setMap(null));
+            currentPolylines = [];
+
+            // Draw all route polylines
+            Object.values(data.routes).forEach(route => {
+                if (route.polylines) {
+                    route.polylines.forEach(polylineData => {
+                        const polyline = new google.maps.Polyline(polylineData);
+                        polyline.setMap(map);
+                        currentPolylines.push(polyline);
+                    });
+                }
+            });
+
+            // Display comparison results
+            let comparisonHtml = `<h5>Algorithm Comparison ${useDisruptions ? '(with disruptions)' : '(base routes)'}</h5>`;
+            
+            if (data.routes.dhc2l && data.routes.dhl) {
+                comparisonHtml += `
+                    <div class="metrics-grid">
+                        <div class="metric-box">
+                            <div class="metric-value" style="color: #FF0000;">${data.routes.dhc2l.summary.query_time_ms || 0}</div>
+                            <div class="metric-label">D-HC2L Query Time (ms)</div>
+                        </div>
+                        <div class="metric-box">
+                            <div class="metric-value" style="color: #0066FF;">${data.routes.dhl.summary.query_time_ms || 0}</div>
+                            <div class="metric-label">DHL Query Time (ms)</div>
+                        </div>
+                        <div class="metric-box">
+                            <div class="metric-value">${(data.routes.dhc2l.computation_time * 1000).toFixed(3)}</div>
+                            <div class="metric-label">D-HC2L Total Time (ms)</div>
+                        </div>
+                        <div class="metric-box">
+                            <div class="metric-value">${(data.routes.dhl.computation_time * 1000).toFixed(3)}</div>
+                            <div class="metric-label">DHL Total Time (ms)</div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            document.getElementById('comparisonDetails').innerHTML = comparisonHtml;
+            document.getElementById('comparisonResults').style.display = 'block';
+            document.getElementById('routeLegend').style.display = 'block';
+            
+            updateInstructions(`Algorithm comparison displayed ${useDisruptions ? 'with' : 'without'} disruptions`);
+        }
+
+        function computeRouteFromInputs() {
+            const startLat = parseFloat(document.getElementById('startLat').value);
+            const startLng = parseFloat(document.getElementById('startLng').value);
+            const destLat = parseFloat(document.getElementById('destLat').value);
+            const destLng = parseFloat(document.getElementById('destLng').value);
+
+            if (isNaN(startLat) || isNaN(startLng) || isNaN(destLat) || isNaN(destLng)) {
+                showError('Please enter valid coordinates');
+                return;
+            }
+
+            setStartPoint(startLat, startLng);
+            setDestPoint(destLat, destLng);
+            enableRouteButtons();
+            updateInstructions('Coordinates set from inputs');
+        }
+
+        function useQuezOnCityDefaults() {
+            document.getElementById('startLat').value = '14.6760';
+            document.getElementById('startLng').value = '121.0437';
+            document.getElementById('destLat').value = '14.6507';
+            document.getElementById('destLng').value = '121.0323';
+            computeRouteFromInputs();
+        }
+
+        function loadAllNodes() {
+            fetch('/get_all_nodes')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        nodesData = data.nodes;
+                        updateInstructions(`Loaded ${data.count} nodes`);
+                    } else {
+                        showError('Failed to load nodes: ' + data.error);
+                    }
+                })
+                .catch(error => showError('Network error: ' + error.message));
+        }
+
+        function loadTrafficData() {
+            fetch('/get_scenario_data')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        trafficData = data.edges;
+                        updateInstructions(`Loaded ${data.count} traffic disruptions`);
+                    } else {
+                        showError('Failed to load traffic data: ' + data.error);
+                    }
+                })
+                .catch(error => showError('Network error: ' + error.message));
+        }
+
+        function clearAll() {
+            clearRoute();
+            // Clear data
+            nodesData = [];
+            trafficData = [];
+            updateInstructions('All data cleared');
+        }
+
+        // Initialize the map when the page loads
+        window.onload = initMap;
+    </script>
+    
+    <!-- Google Maps API -->
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initMap"></script>
+</body>
+</html>

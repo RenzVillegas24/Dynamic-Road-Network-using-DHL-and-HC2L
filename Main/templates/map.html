@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Quezon City Road Network Node Validator</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 10px; }
+        #map { height: 70vh; width: 100%; border: 1px solid #ccc; }
+        .controls { margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 5px; }
+        .control-group { display: inline-block; margin-right: 15px; }
+        button { padding: 8px 15px; margin: 3px; cursor: pointer; border: none; border-radius: 3px; }
+        .btn-primary { background: #007cba; color: white; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-danger { background: #dc3545; color: white; }
+        .info-panel { margin: 10px 0; padding: 10px; background: #e9ecef; border-radius: 5px; }
+        .node-info { display: none; margin: 10px 0; padding: 10px; background: #d4edda; border-radius: 5px; }
+        .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 10px 0; }
+        .stat-box { padding: 10px; text-align: center; background: white; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>🗺️ Quezon City Road Network Node Validator</h1>
+    <p>This tool validates that your generated nodes correspond to actual road intersections in Quezon City.</p>
+    
+    <div class="controls">
+        <div class="control-group">
+            <button class="btn-primary" onclick="loadAllNodes()">Load All Nodes</button>
+            <button class="btn-secondary" onclick="clearNodes()">Clear Nodes</button>
+            <button class="btn-success" onclick="toggleNodeNumbers()">Toggle Node Numbers</button>
+        </div>
+        <div class="control-group">
+            <button class="btn-primary" onclick="loadAllEdges()">Load All Edges</button>
+            <button class="btn-secondary" onclick="clearEdges()">Clear Edges</button>
+            <button class="btn-success" onclick="loadNodesAndEdges()">Load Both</button>
+            <button class="btn-primary" onclick="loadScenarioData()">Load Traffic Scenario</button>
+        </div>
+        <div class="control-group">
+            <label>Sample Size: </label>
+            <select id="sampleSize">
+                <option value="100">100 nodes</option>
+                <option value="500">500 nodes</option>
+                <option value="1000">1000 nodes</option>
+                <option value="-1">All nodes</option>
+            </select>
+            <button class="btn-primary" onclick="loadSampleNodes()">Load Sample</button>
+        </div>
+    </div>
+    
+    <div class="controls">
+        <div class="control-group">
+            <label>Specific Node: </label>
+            <input type="number" id="nodeId" placeholder="Enter Node ID (1-1292)" min="1" max="1292" style="width: 150px;">
+            <button class="btn-success" onclick="loadSpecificNode()">Load Node</button>
+            <button class="btn-secondary" onclick="showNodeConnections()">Show Connections</button>
+        </div>
+        <div class="control-group">
+            <label>Specific Edge: </label>
+            <input type="number" id="edgeIndex" placeholder="Enter Edge Index (0-33906)" min="0" max="33906" style="width: 150px;">
+            <button class="btn-success" onclick="loadSpecificEdge()">Load Edge</button>
+            <button class="btn-secondary" onclick="showEdgeDetails()">Show Details</button>
+        </div>
+        <div class="control-group">
+            <button class="btn-primary" onclick="loadNodeAndConnectedEdges()">Load Node + Connected Edges</button>
+            <button class="btn-danger" onclick="clearAll()">Clear All</button>
+        </div>
+    </div>
+    
+    <div class="stats" id="stats" style="display:none;">
+        <div class="stat-box">
+            <strong id="totalNodes">0</strong><br>
+            <small>Total Nodes</small>
+        </div>
+        <div class="stat-box">
+            <strong id="displayedNodes">0</strong><br>
+            <small>Displayed</small>
+        </div>
+        <div class="stat-box">
+            <strong id="totalEdges">0</strong><br>
+            <small>Total Edges</small>
+        </div>
+        <div class="stat-box">
+            <strong id="displayedEdges">0</strong><br>
+            <small>Displayed Edges</small>
+        </div>
+    </div>
+    
+        <div class="info-panel">
+        <strong>Instructions:</strong>
+        <ul>
+            <li>Click "Load All Nodes" to display all road intersections</li>
+            <li>Click "Load All Edges" to display road network as lines</li>
+            <li>Click "Load Traffic Scenario" to see real traffic conditions with coordinates!</li>
+            <li>Click "Load Both" to see complete road network</li>
+            <li>Click on the map to find the nearest node</li>
+            <li>Verify that nodes appear on actual roads/intersections</li>
+            <li>Use "Load Sample" to test with fewer nodes first</li>
+        </ul>
+        <strong>Traffic Colors:</strong> 🟢 Free Flow | 🟡 Light Traffic | 🟠 Medium Traffic | 🔴 Heavy Traffic | 🚫 Closed
+    </div>
+    
+    <div id="map"></div>
+    
+    <div id="nodeInfo" class="node-info">
+        <h3>📍 Selected Node Info</h3>
+        <div id="nodeDetails"></div>
+    </div>
+
+    <div id="detailedInfo" class="node-info" style="background: #f8f9fa; border-left: 4px solid #007cba;">
+        <h3>🔍 Detailed Analysis</h3>
+        <div id="analysisDetails">
+            <p>Select a specific node or edge to see detailed connection analysis...</p>
+        </div>
+    </div>
+
+    <script>
+        let map;
+        let allNodes = [];
+        let allEdges = [];
+        let nodeMarkers = [];
+        let edgePolylines = [];
+        let highlightedElements = [];
+        let selectedMarker = null;
+        let showNodeNumbers = false;
+        
+        function initMap() {
+            // Center on Quezon City
+            map = new google.maps.Map(document.getElementById('map'), {
+                zoom: 12,
+                center: {lat: 14.6760, lng: 121.0437}, // Quezon City center
+                mapTypeId: 'roadmap'
+            });
+            
+            // Click listener for finding nearest node
+            map.addListener('click', function(event) {
+                findNearestNode(event.latLng.lat(), event.latLng.lng());
+            });
+            
+            console.log('Map initialized. Click "Load All Nodes" to start validation.');
+        }
+        
+        async function loadAllEdges() {
+            console.log('Loading all edges...');
+            
+            try {
+                const response = await fetch('/get_all_edges');
+                const result = await response.json();
+                
+                if (result.success) {
+                    allEdges = result.edges;
+                    displayEdges(allEdges);
+                    updateEdgeStats(allEdges.length, allEdges.length);
+                    console.log(`✅ Loaded ${result.edges_count} edges (${result.skipped_edges} skipped)`);
+                    if (result.skipped_edges > 0) {
+                        console.log(`ℹ️ ${result.skipped_edges} edges skipped due to missing nodes`);
+                    }
+                } else {
+                    alert('Error loading edges: ' + result.error);
+                }
+            } catch (error) {
+                alert('Network error: ' + error);
+            }
+        }
+        
+        async function loadScenarioData() {
+            console.log('Loading traffic scenario data with coordinates...');
+            
+            try {
+                const response = await fetch('/get_scenario_data');
+                const result = await response.json();
+                
+                if (result.success) {
+                    allEdges = result.edges;
+                    clearAll();
+                    displayScenarioEdges(allEdges);
+                    updateEdgeStats(allEdges.length, allEdges.length);
+                    console.log(`✅ Loaded traffic scenario: ${result.count} road segments with coordinates`);
+                    console.log(`📍 Description: ${result.description}`);
+                } else {
+                    alert('Error loading scenario data: ' + result.error);
+                }
+            } catch (error) {
+                alert('Network error: ' + error);
+            }
+        }
+        
+        function displayScenarioEdges(edges) {
+            clearEdges();
+            
+            edges.forEach(edge => {
+                const path = [
+                    {lat: edge.source_lat, lng: edge.source_lng},
+                    {lat: edge.target_lat, lng: edge.target_lng}
+                ];
+                
+                // Color based on traffic conditions
+                let color, weight;
+                if (edge.isClosed) {
+                    color = '#FF0000';  // Red for closed roads
+                    weight = 4;
+                } else if (edge.jamFactor > 7) {
+                    color = '#FF4500';  // Orange-red for heavy traffic
+                    weight = 3;
+                } else if (edge.jamFactor > 4) {
+                    color = '#FFA500';  // Orange for medium traffic
+                    weight = 3;
+                } else if (edge.jamFactor > 2) {
+                    color = '#FFFF00';  // Yellow for light traffic
+                    weight = 2;
+                } else {
+                    color = '#00FF00';  // Green for free flow
+                    weight = 2;
+                }
+                
+                const polyline = new google.maps.Polyline({
+                    path: path,
+                    geodesic: true,
+                    strokeColor: color,
+                    strokeOpacity: 0.8,
+                    strokeWeight: weight,
+                    map: map
+                });
+                
+                // Add click listener to show traffic info
+                polyline.addListener('click', function(event) {
+                    showTrafficInfo(edge, event.latLng);
+                });
+                
+                edgePolylines.push(polyline);
+            });
+            
+            console.log(`✅ Displayed ${edges.length} road segments with traffic conditions`);
+        }
+        
+        function showTrafficInfo(edgeData, clickLatLng) {
+            const infoDiv = document.getElementById('nodeDetails');
+            const nodeInfoDiv = document.getElementById('nodeInfo');
+            
+            let statusText = edgeData.isClosed ? '🚫 CLOSED' : 
+                           edgeData.jamFactor > 7 ? '🔴 HEAVY TRAFFIC' :
+                           edgeData.jamFactor > 4 ? '🟠 MEDIUM TRAFFIC' :
+                           edgeData.jamFactor > 2 ? '🟡 LIGHT TRAFFIC' : '🟢 FREE FLOW';
+            
+            let html = `
+                <h3>🚦 Traffic Scenario Info</h3>
+                <strong>Status:</strong> ${statusText}<br>
+                <strong>Road Name:</strong> ${edgeData.road_name}<br>
+                <strong>Current Speed:</strong> ${edgeData.speed_kph.toFixed(1)} km/h<br>
+                <strong>Free Flow Speed:</strong> ${edgeData.freeFlow_kph} km/h<br>
+                <strong>Jam Factor:</strong> ${edgeData.jamFactor.toFixed(2)}x<br>
+                <strong>Length:</strong> ${edgeData.segmentLength.toFixed(2)}m<br>
+                <br>
+                <strong>Source Node:</strong> ${edgeData.source_id} (${edgeData.source_lat.toFixed(6)}, ${edgeData.source_lng.toFixed(6)})<br>
+                <strong>Target Node:</strong> ${edgeData.target_id} (${edgeData.target_lat.toFixed(6)}, ${edgeData.target_lng.toFixed(6)})<br>
+                <br>
+                <button onclick="centerOnEdge(${edgeData.source_lat}, ${edgeData.source_lng}, ${edgeData.target_lat}, ${edgeData.target_lng})">Center on Edge</button>
+                <button onclick="openInGoogleMaps(${clickLatLng.lat()}, ${clickLatLng.lng()})">Open in Google Maps</button>
+            `;
+            
+            infoDiv.innerHTML = html;
+            nodeInfoDiv.style.display = 'block';
+            
+            // Highlight the clicked edge temporarily
+            if (selectedMarker) selectedMarker.setMap(null);
+            selectedMarker = new google.maps.Marker({
+                position: clickLatLng,
+                map: map,
+                title: `${edgeData.road_name} - ${statusText}`,
+                icon: 'http://maps.google.com/mapfiles/ms/icons/yellow-dot.png'
+            });
+        }
+        
+        async function loadNodesAndEdges() {
+            console.log('Loading nodes and edges...');
+            await loadAllNodes();
+            await loadAllEdges();
+        }
+        
+        function displayEdges(edges) {
+            clearEdges();
+            
+            // Create color map for different highway types
+            const highwayColors = {
+                'primary': '#FF6B35',      // Orange-red for primary roads
+                'secondary': '#F7931E',    // Orange for secondary roads  
+                'tertiary': '#FFD23F',     // Yellow for tertiary roads
+                'residential': '#06D6A0',  // Green for residential roads
+                'unclassified': '#A8DADC', // Light blue for unclassified
+                'service': '#457B9D',      // Blue for service roads
+                'motorway': '#E63946',     // Red for motorways
+                'trunk': '#F77F00'         // Dark orange for trunk roads
+            };
+            
+            edges.forEach(edge => {
+                const path = [
+                    {lat: edge.source_lat, lng: edge.source_lng},
+                    {lat: edge.target_lat, lng: edge.target_lng}
+                ];
+                
+                const color = highwayColors[edge.highway] || '#999999';
+                
+                const polyline = new google.maps.Polyline({
+                    path: path,
+                    geodesic: true,
+                    strokeColor: color,
+                    strokeOpacity: 0.8,
+                    strokeWeight: 2,
+                    map: map
+                });
+                
+                // Add click listener to show edge info
+                polyline.addListener('click', function(event) {
+                    showEdgeInfo(edge, event.latLng);
+                });
+                
+                edgePolylines.push(polyline);
+            });
+            
+            console.log(`✅ Displayed ${edges.length} edges on map`);
+        }
+        
+        function clearEdges() {
+            edgePolylines.forEach(polyline => polyline.setMap(null));
+            edgePolylines = [];
+        }
+        
+        function showEdgeInfo(edgeData, clickLatLng) {
+            const infoDiv = document.getElementById('nodeDetails');
+            const nodeInfoDiv = document.getElementById('nodeInfo');
+            
+            let html = `
+                <h3>🛣️ Road Segment Info</h3>
+                <strong>Road Name:</strong> ${edgeData.name}<br>
+                <strong>Highway Type:</strong> ${edgeData.highway}<br>
+                <strong>Length:</strong> ${edgeData.length.toFixed(2)}m<br>
+                <strong>Source Node:</strong> ${edgeData.source_id} (${edgeData.source_lat.toFixed(6)}, ${edgeData.source_lng.toFixed(6)})<br>
+                <strong>Target Node:</strong> ${edgeData.target_id} (${edgeData.target_lat.toFixed(6)}, ${edgeData.target_lng.toFixed(6)})<br>
+                <br>
+                <button onclick="centerOnEdge(${edgeData.source_lat}, ${edgeData.source_lng}, ${edgeData.target_lat}, ${edgeData.target_lng})">Center on Edge</button>
+                <button onclick="openInGoogleMaps(${clickLatLng.lat()}, ${clickLatLng.lng()})">Open in Google Maps</button>
+            `;
+            
+            infoDiv.innerHTML = html;
+            nodeInfoDiv.style.display = 'block';
+            
+            // Highlight the clicked edge temporarily
+            if (selectedMarker) selectedMarker.setMap(null);
+            selectedMarker = new google.maps.Marker({
+                position: clickLatLng,
+                map: map,
+                title: 'Edge clicked here',
+                icon: 'http://maps.google.com/mapfiles/ms/icons/yellow-dot.png'
+            });
+        }
+        
+        function centerOnEdge(sourceLat, sourceLng, targetLat, targetLng) {
+            const bounds = new google.maps.LatLngBounds();
+            bounds.extend({lat: sourceLat, lng: sourceLng});
+            bounds.extend({lat: targetLat, lng: targetLng});
+            map.fitBounds(bounds);
+        }
+        
+        async function loadAllNodes() {
+            console.log('Loading all nodes...');
+            
+            try {
+                const response = await fetch('/get_all_nodes');
+                const result = await response.json();
+                
+                if (result.success) {
+                    allNodes = result.nodes;
+                    displayNodes(allNodes);
+                    updateStats(allNodes.length, allNodes.length);
+                    console.log(`✅ Loaded ${result.count} nodes`);
+                } else {
+                    alert('Error loading nodes: ' + result.error);
+                }
+            } catch (error) {
+                alert('Network error: ' + error);
+            }
+        }
+        
+        async function loadSampleNodes() {
+            if (allNodes.length === 0) {
+                await loadAllNodes();
+            }
+            
+            const sampleSize = parseInt(document.getElementById('sampleSize').value);
+            let sample;
+            
+            if (sampleSize === -1) {
+                sample = allNodes;
+            } else {
+                // Random sample
+                const shuffled = [...allNodes].sort(() => 0.5 - Math.random());
+                sample = shuffled.slice(0, sampleSize);
+            }
+            
+            clearNodes();
+            displayNodes(sample);
+            updateStats(allNodes.length, sample.length);
+            console.log(`✅ Displaying ${sample.length} nodes`);
+        }
+        
+        function displayNodes(nodes) {
+            clearNodes();
+            
+            nodes.forEach(node => {
+                const marker = new google.maps.Marker({
+                    position: {lat: node.lat, lng: node.lng},
+                    map: map,
+                    title: `Node ${node.node_id}`,
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 3,
+                        fillColor: '#FF0000',
+                        fillOpacity: 0.8,
+                        strokeWeight: 1,
+                        strokeColor: '#FFFFFF'
+                    }
+                });
+                
+                // Add click listener to show node info
+                marker.addListener('click', function() {
+                    showNodeInfo(node, marker);
+                });
+                
+                nodeMarkers.push(marker);
+                
+                // Add label if enabled
+                if (showNodeNumbers) {
+                    const label = new google.maps.Marker({
+                        position: {lat: node.lat, lng: node.lng},
+                        map: map,
+                        label: {
+                            text: node.node_id.toString(),
+                            color: 'black',
+                            fontSize: '10px',
+                            fontWeight: 'bold'
+                        },
+                        icon: {
+                            path: google.maps.SymbolPath.CIRCLE,
+                            scale: 0,
+                            fillOpacity: 0,
+                            strokeWeight: 0
+                        }
+                    });
+                    nodeMarkers.push(label);
+                }
+            });
+            
+            // Fit map to show all nodes
+            if (nodes.length > 0) {
+                const bounds = new google.maps.LatLngBounds();
+                nodes.forEach(node => {
+                    bounds.extend({lat: node.lat, lng: node.lng});
+                });
+                map.fitBounds(bounds);
+            }
+        }
+        
+        function clearNodes() {
+            nodeMarkers.forEach(marker => marker.setMap(null));
+            nodeMarkers = [];
+            
+            document.getElementById('nodeInfo').style.display = 'none';
+        }
+        
+        function toggleNodeNumbers() {
+            showNodeNumbers = !showNodeNumbers;
+            const button = document.querySelector('button[onclick="toggleNodeNumbers()"]');
+            button.textContent = showNodeNumbers ? 'Hide Node Numbers' : 'Show Node Numbers';
+            
+            // Reload current display
+            if (nodeMarkers.length > 0) {
+                const currentNodes = allNodes.slice(0, nodeMarkers.length / (showNodeNumbers ? 1 : 2));
+                displayNodes(currentNodes);
+            }
+        }
+        
+        async function findNearestNode(lat, lng) {
+            try {
+                const response = await fetch('/find_nearest_node', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({lat: lat, lng: lng})
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Clear previous selection
+                    if (selectedMarker) selectedMarker.setMap(null);
+                    
+                    // Show clicked point
+                    selectedMarker = new google.maps.Marker({
+                        position: {lat: lat, lng: lng},
+                        map: map,
+                        title: 'Clicked location',
+                        icon: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png'
+                    });
+                    
+                    // Show nearest node info
+                    showNodeInfo(result, null, true);
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Network error: ' + error);
+            }
+        }
+        
+        function showNodeInfo(nodeData, marker, isNearest = false) {
+            const infoDiv = document.getElementById('nodeDetails');
+            const nodeInfoDiv = document.getElementById('nodeInfo');
+            
+            let html = `
+                <strong>Node ID:</strong> ${nodeData.node_id}<br>
+                <strong>Latitude:</strong> ${nodeData.lat.toFixed(6)}<br>
+                <strong>Longitude:</strong> ${nodeData.lng.toFixed(6)}<br>
+            `;
+            
+            if (isNearest) {
+                html += `
+                    <strong>Distance from click:</strong> ${nodeData.distance_m}m<br>
+                    <strong>Clicked coordinates:</strong> ${nodeData.clicked_lat.toFixed(6)}, ${nodeData.clicked_lng.toFixed(6)}<br>
+                `;
+            }
+            
+            html += `
+                <br>
+                <button onclick="centerOnNode(${nodeData.lat}, ${nodeData.lng})">Center Map</button>
+                <button onclick="openInGoogleMaps(${nodeData.lat}, ${nodeData.lng})">Open in Google Maps</button>
+            `;
+            
+            infoDiv.innerHTML = html;
+            nodeInfoDiv.style.display = 'block';
+        }
+        
+        function centerOnNode(lat, lng) {
+            map.setCenter({lat: lat, lng: lng});
+            map.setZoom(18);
+        }
+        
+        function openInGoogleMaps(lat, lng) {
+            window.open(`https://www.google.com/maps?q=${lat},${lng}`, '_blank');
+        }
+        
+        function updateStats(total, displayed) {
+            document.getElementById('totalNodes').textContent = total.toLocaleString();
+            document.getElementById('displayedNodes').textContent = displayed.toLocaleString();
+            
+            document.getElementById('stats').style.display = 'grid';
+        }
+        
+        function updateEdgeStats(total, displayed) {
+            document.getElementById('totalEdges').textContent = total.toLocaleString();
+            document.getElementById('displayedEdges').textContent = displayed.toLocaleString();
+            
+            document.getElementById('stats').style.display = 'grid';
+        }
+        
+        // NEW FUNCTIONS FOR SPECIFIC NODE/EDGE LOADING
+        
+        async function loadSpecificNode() {
+            const nodeId = parseInt(document.getElementById('nodeId').value);
+            if (!nodeId || nodeId < 1 || nodeId > 1292) {
+                alert('Please enter a valid Node ID between 1 and 1292');
+                return;
+            }
+            
+            // Load all nodes if not already loaded
+            if (allNodes.length === 0) {
+                await loadAllNodes();
+            }
+            
+            // Find the specific node
+            const node = allNodes.find(n => n.node_id === nodeId);
+            if (!node) {
+                alert(`Node ${nodeId} not found in dataset`);
+                return;
+            }
+            
+            // Clear existing and display only this node
+            clearAll();
+            displaySpecificNode(node, true);
+            
+            // Log detailed info
+            console.log('🎯 SPECIFIC NODE LOADED:');
+            console.log(`Node ID: ${node.node_id}`);
+            console.log(`Coordinates: ${node.lat}, ${node.lng}`);
+            
+            updateAnalysisPanel('node', node);
+        }
+        
+        async function loadSpecificEdge() {
+            const edgeIndex = parseInt(document.getElementById('edgeIndex').value);
+            if (edgeIndex < 0 || edgeIndex > 33906) {
+                alert('Please enter a valid Edge Index between 0 and 33906');
+                return;
+            }
+            
+            // Load all edges if not already loaded
+            if (allEdges.length === 0) {
+                await loadAllEdges();
+            }
+            
+            if (edgeIndex >= allEdges.length) {
+                alert(`Edge index ${edgeIndex} not found. Available: 0-${allEdges.length-1}`);
+                return;
+            }
+            
+            const edge = allEdges[edgeIndex];
+            
+            // Clear existing and display only this edge
+            clearAll();
+            displaySpecificEdge(edge, true);
+            
+            // Log detailed info
+            console.log('🎯 SPECIFIC EDGE LOADED:');
+            console.log(`Edge Index: ${edgeIndex}`);
+            console.log(`Source Node: ${edge.source_id} (${edge.source_lat}, ${edge.source_lng})`);
+            console.log(`Target Node: ${edge.target_id} (${edge.target_lat}, ${edge.target_lng})`);
+            console.log(`Road Name: ${edge.name}`);
+            console.log(`Highway Type: ${edge.highway}`);
+            console.log(`Length: ${edge.length}m`);
+            
+            updateAnalysisPanel('edge', edge, edgeIndex);
+        }
+        
+        async function showEdgeDetails() {
+            const edgeIndex = parseInt(document.getElementById('edgeIndex').value);
+            if (edgeIndex < 0) {
+                alert('Please enter a valid Edge Index');
+                return;
+            }
+            
+            // Load all edges if not already loaded
+            if (allEdges.length === 0) {
+                await loadAllEdges();
+            }
+            
+            if (edgeIndex >= allEdges.length) {
+                alert(`Edge index ${edgeIndex} not found. Available: 0-${allEdges.length-1}`);
+                return;
+            }
+            
+            const edge = allEdges[edgeIndex];
+            
+            // Clear and show edge with both endpoint nodes
+            clearAll();
+            
+            // Show the edge
+            displaySpecificEdge(edge, true);
+            
+            // Show both endpoint nodes
+            const sourceNode = allNodes.find(n => n.node_id === edge.source_id);
+            const targetNode = allNodes.find(n => n.node_id === edge.target_id);
+            
+            if (sourceNode) displaySpecificNode(sourceNode, false);
+            if (targetNode) displaySpecificNode(targetNode, false);
+            
+            console.log('🔍 DETAILED EDGE ANALYSIS:');
+            console.log(`Edge Index: ${edgeIndex}`);
+            console.log(`Road: ${edge.name} (${edge.highway})`);
+            console.log(`Source: Node ${edge.source_id} at (${edge.source_lat}, ${edge.source_lng})`);
+            console.log(`Target: Node ${edge.target_id} at (${edge.target_lat}, ${edge.target_lng})`);
+            console.log(`Length: ${edge.length}m`);
+            console.log(`Polyline: ${edge.source_lat},${edge.source_lng} → ${edge.target_lat},${edge.target_lng}`);
+            
+            updateAnalysisPanel('edge', edge, edgeIndex);
+        }
+        
+        async function showNodeConnections() {
+            const nodeId = parseInt(document.getElementById('nodeId').value);
+            if (!nodeId) {
+                alert('Please enter a Node ID first');
+                return;
+            }
+            
+            // Load data if needed
+            if (allNodes.length === 0) await loadAllNodes();
+            if (allEdges.length === 0) await loadAllEdges();
+            
+            const node = allNodes.find(n => n.node_id === nodeId);
+            if (!node) {
+                alert(`Node ${nodeId} not found`);
+                return;
+            }
+            
+            // Find all edges connected to this node
+            const connectedEdges = allEdges.filter(edge => 
+                edge.source_id === nodeId || edge.target_id === nodeId
+            );
+            
+            // Clear and display node + connected edges
+            clearAll();
+            displaySpecificNode(node, true);
+            
+            console.log(`🔗 NODE ${nodeId} CONNECTIONS:`);
+            console.log(`Found ${connectedEdges.length} connected edges:`);
+            
+            connectedEdges.forEach((edge, index) => {
+                displaySpecificEdge(edge, false);
+                console.log(`  ${index + 1}. ${edge.source_id} → ${edge.target_id} (${edge.name})`);
+            });
+            
+            updateAnalysisPanel('connections', {node, connectedEdges});
+        }
+        
+        async function loadNodeAndConnectedEdges() {
+            const nodeId = parseInt(document.getElementById('nodeId').value);
+            if (!nodeId) {
+                alert('Please enter a Node ID first');
+                return;
+            }
+            
+            await showNodeConnections();
+        }
+        
+        function displaySpecificNode(node, highlight = false) {
+            const marker = new google.maps.Marker({
+                position: {lat: node.lat, lng: node.lng},
+                map: map,
+                title: `Node ${node.node_id}`,
+                icon: {
+                    path: google.maps.SymbolPath.CIRCLE,
+                    scale: highlight ? 8 : 5,
+                    fillColor: highlight ? '#00FF00' : '#FF0000',
+                    fillOpacity: 1,
+                    strokeWeight: 2,
+                    strokeColor: '#FFFFFF'
+                },
+                label: {
+                    text: node.node_id.toString(),
+                    color: 'black',
+                    fontSize: '12px',
+                    fontWeight: 'bold'
+                }
+            });
+            
+            marker.addListener('click', function() {
+                showNodeInfo(node, marker);
+            });
+            
+            if (highlight) {
+                highlightedElements.push(marker);
+                // Center map on this node
+                map.setCenter({lat: node.lat, lng: node.lng});
+                map.setZoom(16);
+            } else {
+                nodeMarkers.push(marker);
+            }
+        }
+        
+        function displaySpecificEdge(edge, highlight = false) {
+            const path = [
+                {lat: edge.source_lat, lng: edge.source_lng},
+                {lat: edge.target_lat, lng: edge.target_lng}
+            ];
+            
+            const polyline = new google.maps.Polyline({
+                path: path,
+                geodesic: true,
+                strokeColor: highlight ? '#FF00FF' : '#FF6B35',
+                strokeOpacity: highlight ? 1 : 0.8,
+                strokeWeight: highlight ? 5 : 3,
+                map: map
+            });
+            
+            polyline.addListener('click', function(event) {
+                showEdgeInfo(edge, event.latLng);
+            });
+            
+            if (highlight) {
+                highlightedElements.push(polyline);
+                // Fit map to show the edge
+                const bounds = new google.maps.LatLngBounds();
+                bounds.extend({lat: edge.source_lat, lng: edge.source_lng});
+                bounds.extend({lat: edge.target_lat, lng: edge.target_lng});
+                map.fitBounds(bounds);
+            } else {
+                edgePolylines.push(polyline);
+            }
+        }
+        
+        function clearAll() {
+            clearNodes();
+            clearEdges();
+            clearHighlighted();
+        }
+        
+        function clearHighlighted() {
+            highlightedElements.forEach(element => element.setMap(null));
+            highlightedElements = [];
+        }
+        
+        function updateAnalysisPanel(type, data, index = null) {
+            const panel = document.getElementById('analysisDetails');
+            let html = '';
+            
+            if (type === 'node') {
+                html = `
+                    <h4>🎯 Node Analysis</h4>
+                    <strong>Node ID:</strong> ${data.node_id}<br>
+                    <strong>Coordinates:</strong> ${data.lat.toFixed(6)}, ${data.lng.toFixed(6)}<br>
+                    <strong>Google Maps:</strong> <a href="https://www.google.com/maps?q=${data.lat},${data.lng}" target="_blank">Open Location</a><br>
+                    <br>
+                    <strong>How Polylines Work:</strong><br>
+                    • This node serves as an endpoint for road segments (edges)<br>
+                    • Each edge is a polyline connecting two nodes<br>
+                    • Click "Show Connections" to see all edges connected to this node<br>
+                `;
+            } else if (type === 'edge') {
+                html = `
+                    <h4>🛣️ Edge Analysis (Index: ${index})</h4>
+                    <strong>Road Name:</strong> ${data.name}<br>
+                    <strong>Highway Type:</strong> ${data.highway}<br>
+                    <strong>Length:</strong> ${data.length.toFixed(2)} meters<br>
+                    <br>
+                    <strong>Polyline Details:</strong><br>
+                    • <strong>Source Node:</strong> ${data.source_id} (${data.source_lat.toFixed(6)}, ${data.source_lng.toFixed(6)})<br>
+                    • <strong>Target Node:</strong> ${data.target_id} (${data.target_lat.toFixed(6)}, ${data.target_lng.toFixed(6)})<br>
+                    • <strong>Google Maps Path:</strong> <a href="https://www.google.com/maps/dir/${data.source_lat},${data.source_lng}/${data.target_lat},${data.target_lng}" target="_blank">View Route</a><br>
+                    <br>
+                    <strong>How This Polyline Works:</strong><br>
+                    • Connects two geographic points with a straight line<br>
+                    • Represents the road segment between intersections<br>
+                    • Length calculated using geographic distance<br>
+                `;
+            } else if (type === 'connections') {
+                html = `
+                    <h4>🔗 Connection Analysis</h4>
+                    <strong>Selected Node:</strong> ${data.node.node_id}<br>
+                    <strong>Connected Edges:</strong> ${data.connectedEdges.length}<br>
+                    <br>
+                    <strong>Connection Details:</strong><br>
+                `;
+                data.connectedEdges.forEach((edge, i) => {
+                    const isSource = edge.source_id === data.node.node_id;
+                    const otherNode = isSource ? edge.target_id : edge.source_id;
+                    html += `• Edge ${i+1}: Node ${data.node.node_id} ${isSource ? '→' : '←'} Node ${otherNode} (${edge.name})<br>`;
+                });
+                
+                html += `
+                    <br>
+                    <strong>Polyline Network:</strong><br>
+                    • This node is a junction point for ${data.connectedEdges.length} road segments<br>
+                    • Each colored line represents a separate polyline object<br>
+                    • Together they form the road network topology<br>
+                `;
+            }
+            
+            panel.innerHTML = html;
+            document.getElementById('detailedInfo').style.display = 'block';
+        }
+    </script>
+    
+    <script async defer
+        src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initMap">
+    </script>
+</body>
+</html>

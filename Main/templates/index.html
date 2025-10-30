@@ -1,0 +1,1487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dynamic Navigator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-10px); }
+    }
+    .float-animation { animation: float 3s ease-in-out infinite; }
+    
+    @keyframes pulse-ring {
+      0% { transform: scale(0.8); opacity: 1; }
+      100% { transform: scale(1.4); opacity: 0; }
+    }
+    .pulse-ring { animation: pulse-ring 2s ease-out infinite; }
+    
+    .glass-effect {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    
+    .severity-heavy { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
+    .severity-medium { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+    .severity-light { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+
+<div class="h-screen w-full flex flex-col relative">
+
+  <!-- Update Mode Toast Notification -->
+  <div id="update-toast"
+       class="fixed top-24 left-6 glass-effect border-2 shadow-2xl rounded-2xl px-6 py-4 text-sm font-semibold hidden z-50 transition-all transform hover:scale-105">
+    <span id="update-toast-message"></span>
+  </div>
+
+  <!-- Top Navigation Bar -->
+  <div class="glass-effect shadow-xl px-6 py-4 flex items-center justify-between border-b border-slate-200/50">
+    <div class="flex items-center space-x-4">
+      <div class="bg-gradient-to-br from-blue-600 to-indigo-600 p-3 rounded-2xl shadow-lg">
+        <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path>
+        </svg>
+      </div>
+      <div>
+        <span class="font-bold text-2xl text-slate-800 tracking-tight">REACT</span>
+        <p class="text-xs text-slate-500 font-medium">Intelligent Route Planning</p>
+      </div>
+    </div>
+    
+    <!-- Location inputs -->
+    <div class="flex items-center space-x-3 flex-1 max-w-3xl mx-8">
+      <div class="flex items-center glass-effect rounded-2xl px-5 py-3 flex-1 cursor-pointer hover:shadow-lg transition-all duration-300 border border-slate-200/50" id="start-location-btn">
+        <div class="bg-emerald-500 rounded-xl p-2 mr-3 shadow-md">
+          <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"></path>
+          </svg>
+        </div>
+        <div class="flex-1">
+          <p class="text-xs font-semibold text-emerald-600 mb-0.5">Start Location</p>
+          <span id="start-location-text" class="text-sm text-slate-500 font-medium">Click to pin starting point</span>
+        </div>
+      </div>
+      
+      <div class="bg-gradient-to-r from-slate-300 to-slate-400 rounded-full p-2">
+        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M9 5l7 7-7 7"></path>
+        </svg>
+      </div>
+      
+      <div class="flex items-center glass-effect rounded-2xl px-5 py-3 flex-1 cursor-pointer hover:shadow-lg transition-all duration-300 border border-slate-200/50" id="dest-location-btn">
+        <div class="bg-rose-500 rounded-xl p-2 mr-3 shadow-md">
+          <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"></path>
+          </svg>
+        </div>
+        <div class="flex-1">
+          <p class="text-xs font-semibold text-rose-600 mb-0.5">Destination</p>
+          <span id="dest-location-text" class="text-sm text-slate-500 font-medium">Click to pin destination</span>
+        </div>
+      </div>
+      
+      <button id="go-button" class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-8 py-4 rounded-2xl font-bold shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
+        <span class="text-lg">Go</span>
+      </button>
+    </div>
+
+    <!-- Admin button -->
+     <div class="flex items-center justify-center space-x-4">
+      <button id="new-dataset" class="flex items-center space-x-3 px-6 py-3 glass-effect hover:shadow-lg rounded-2xl transition-all duration-300 border border-slate-200/50">
+        <div class="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl p-2">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <ellipse cx="12" cy="5" rx="9" ry="3" />
+            <path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5" />
+            <path d="M12 12v7m-3.5-3.5h7" />
+          </svg>
+        </div>
+        <span id="new-dataset-text" class="font-bold text-slate-700">New Dataset</span>
+      </button>
+      <button id="admin-toggle" class="flex items-center space-x-3 px-6 py-3 glass-effect hover:shadow-lg rounded-2xl transition-all duration-300 border border-slate-200/50">
+        <div class="bg-gradient-to-br from-slate-600 to-slate-700 rounded-xl p-2">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+          </svg>
+        </div>
+        <span class="font-bold text-slate-700">Admin</span>
+      </button>
+     </div>
+  </div>
+
+  <!-- Alert Banner -->
+  <div id="alert-banner" class="bg-gradient-to-r from-red-50 to-orange-50 border-l-4 border-red-500 px-6 py-4 flex items-start shadow-md hidden">
+    <div class="bg-red-500 rounded-xl p-2 mr-4">
+      <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+      </svg>
+    </div>
+    <div class="flex-1">
+      <p class="font-bold text-red-900 text-lg mb-1">
+        <span id="incident-type">Accident</span> Detected
+      </p>
+      <div class="flex items-center space-x-4 text-sm text-red-800">
+        <span class="font-semibold">Severity: <span id="severity-level" class="px-2 py-1 bg-red-500 text-white rounded-lg text-xs">Heavy</span></span>
+        <span>•</span>
+        <span class="font-medium">Location: <span id="incident-location" class="font-bold">EDSA</span></span>
+        <span>•</span>
+        <span>ETA: <span id="eta-time" class="font-bold">22 min</span> <span id="eta-delay" class="text-red-600 font-bold">(+4 min)</span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Map View -->
+  <div class="flex-1 relative" id="map-container">
+    <!-- Google Maps will be loaded here -->
+    <div id="google-map" class="w-full h-full"></div>
+    
+    <!-- Map placeholder (shown when maps fail to load) -->
+    <div class="absolute inset-0 flex items-center justify-center text-slate-300 text-xl font-light pointer-events-none hidden" id="map-placeholder">
+      <div class="text-center">
+        <svg class="w-20 h-20 mx-auto mb-4 text-slate-300 float-animation" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+        </svg>
+        <p>Map loading failed. Check your internet connection.</p>
+      </div>
+    </div>
+
+    <!-- Disruption markers (you can add these as Google Maps markers later) -->
+    <!-- These will be replaced with actual Google Maps markers -->
+    
+    <!-- Old placeholder markers - can be removed since we're using Google Maps markers now -->
+  </div>
+
+  <!-- Bottom Info Bar -->
+  <div class="glass-effect shadow-2xl border-t border-slate-200/50 px-8 py-5">
+    <div class="flex items-center justify-between w-full gap-6">
+      <!-- ETA -->
+      <div class="flex items-center space-x-3 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl px-5 py-3 border border-blue-200/50">
+        <div class="bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl p-3 shadow-lg">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+        </div>
+        <div>
+          <p class="text-xs font-bold text-blue-600 uppercase tracking-wide">ETA</p>
+          <p id="bottom-info-eta" class="font-bold text-2xl text-slate-800">--</p>
+        </div>
+      </div>
+
+      <!-- Distance -->
+      <div class="flex items-center space-x-3 bg-gradient-to-br from-emerald-50 to-green-50 rounded-2xl px-5 py-3 border border-emerald-200/50">
+        <div class="bg-gradient-to-br from-emerald-600 to-green-600 rounded-xl p-3 shadow-lg">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+          </svg>
+        </div>
+        <div>
+          <p class="text-xs font-bold text-emerald-600 uppercase tracking-wide">Distance</p>
+          <p id="bottom-info-distance" class="font-bold text-2xl text-slate-800">--</p>
+        </div>
+      </div>
+
+      <!-- Algorithm Performance / Comparison -->
+      <div class="flex items-center space-x-3 bg-gradient-to-br from-purple-50 to-violet-50 rounded-2xl px-5 py-3 border border-purple-200/50">
+        <div class="bg-gradient-to-br from-purple-600 to-violet-600 rounded-xl p-3 shadow-lg">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+          </svg>
+        </div>
+        <div>
+          <p id="bottom-info-metric-label" class="text-xs font-bold text-purple-600 uppercase tracking-wide">Query Time</p>
+          <p id="bottom-info-metric-value" class="font-bold text-2xl text-slate-800">--</p>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex items-center space-x-3 flex-shrink-0">
+        <button id="disruptions-toggle" class="px-6 py-3 bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white rounded-2xl font-bold shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 whitespace-nowrap">
+          Active Disruptions
+        </button>
+        <button id="report-toggle" class="px-6 py-3 glass-effect hover:shadow-xl border-2 border-red-200 rounded-2xl font-bold text-red-600 whitespace-nowrap transition-all duration-300 transform hover:scale-105">
+          Report Incident
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Report Incident Panel -->
+  <div id="report-panel"
+       class="fixed top-0 right-0 w-[28rem] h-full glass-effect shadow-2xl transform translate-x-full transition-transform duration-300 overflow-y-auto z-50 border-l border-slate-200/50">
+    
+    <div class="p-6 bg-gradient-to-r from-purple-600 via-purple-700 to-violet-700 text-white flex justify-between items-center">
+      <div>
+        <h2 class="font-bold text-2xl mb-1">Report Disruption</h2>
+        <p class="text-purple-200 text-sm">Help others navigate better</p>
+      </div>
+      <button id="report-close" class="hover:bg-white/20 rounded-xl p-2 transition-all">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+
+    <div class="p-6">
+      <form class="space-y-5" id="report-form">
+        <div>
+          <label class="block text-sm font-bold text-slate-700 mb-3">Incident Location</label>
+          <button type="button" id="pin-disruption-btn" class="w-full px-5 py-4 bg-gradient-to-br from-purple-50 to-violet-50 hover:from-purple-100 hover:to-violet-100 border-2 border-purple-300 rounded-2xl flex items-center justify-center gap-3 text-purple-700 font-bold transition-all duration-300 shadow-md hover:shadow-lg">
+            <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"></path>
+            </svg>
+            <span id="pin-disruption-text">Click to pin location on map</span>
+          </button>
+          <div id="disruption-coords" class="mt-3 text-xs text-slate-600 text-center font-semibold hidden bg-slate-100 py-2 rounded-xl"></div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-bold text-slate-700 mb-3">Incident Type</label>
+          <select id="disruption-type" class="w-full px-4 py-4 bg-slate-50 border-2 border-slate-300 rounded-2xl focus:border-purple-500 focus:ring-4 focus:ring-purple-200 outline-none font-medium text-slate-700 transition-all">
+            <option value="">Select incident type...</option>
+            <option value="accident">Accident</option>
+            <option value="construction">Construction Work</option>
+            <option value="congestion">Heavy Congestion</option>
+            <option value="disabled-vehicle">Disabled Vehicle</option>
+            <option value="mass-transit">Mass Transit Event</option>
+            <option value="planned-event">Planned Event</option>
+            <option value="road-hazard">Road Hazard</option>
+            <option value="road-closure">Road Closure</option>
+            <option value="weather">Severe Weather</option>
+            <option value="lane-restriction">Lane Restriction</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-sm font-bold text-slate-700 mb-3">Traffic Severity</label>
+          <div class="space-y-3">
+            <label class="flex items-center severity-heavy text-white p-4 rounded-2xl cursor-pointer hover:shadow-lg transition-all duration-300 transform hover:scale-102">
+              <input type="radio" name="traffic" value="heavy" class="mr-4 w-5 h-5">
+              <div class="flex-1">
+                <span class="font-bold text-lg">Heavy Traffic</span>
+                <p class="text-sm text-red-100 mt-0.5">Severe delays, barely moving</p>
+              </div>
+            </label>
+            <label class="flex items-center severity-medium text-white p-4 rounded-2xl cursor-pointer hover:shadow-lg transition-all duration-300 transform hover:scale-102">
+              <input type="radio" name="traffic" value="medium" class="mr-4 w-5 h-5">
+              <div class="flex-1">
+                <span class="font-bold text-lg">Moderate Traffic</span>
+                <p class="text-sm text-orange-100 mt-0.5">Slower than usual</p>
+              </div>
+            </label>
+            <label class="flex items-center severity-light text-white p-4 rounded-2xl cursor-pointer hover:shadow-lg transition-all duration-300 transform hover:scale-102">
+              <input type="radio" name="traffic" value="light" class="mr-4 w-5 h-5">
+              <div class="flex-1">
+                <span class="font-bold text-lg">Light Impact</span>
+                <p class="text-sm text-green-100 mt-0.5">Minor slowdown</p>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <button type="submit" class="w-full bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white font-bold py-5 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 text-lg">
+          Submit Report
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Active Disruptions Panel -->
+  <div id="disruptions-panel"
+       class="fixed top-0 right-0 w-[28rem] h-full glass-effect shadow-2xl transform translate-x-full transition-transform duration-300 overflow-y-auto z-50 border-l border-slate-200/50">
+    
+    <div class="p-6 bg-gradient-to-r from-red-500 via-red-600 to-rose-600 text-white flex justify-between items-center">
+      <div>
+        <h2 class="font-bold text-2xl mb-1">Active Disruptions</h2>
+        <p class="text-red-100 text-sm">Real-time traffic incidents</p>
+      </div>
+      <button id="disruptions-close" class="hover:bg-white/20 rounded-xl p-2 transition-all">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+
+    <div class="p-6 space-y-4">
+      <div class="bg-gradient-to-br from-amber-50 to-orange-50 border-l-4 border-amber-500 rounded-2xl p-5 hover:shadow-xl transition-all duration-300">
+        <div class="flex items-start">
+          <div class="bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl p-3 mr-4 shadow-md">
+            <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M 57 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+            </svg>
+          </div>
+          <div class="flex-1">
+            <h3 class="font-bold text-slate-900 text-xl mb-1">EDSA</h3>
+            <p class="text-sm text-amber-700 font-semibold mb-2">Accident • 22 min delay</p>
+            <div class="flex items-center justify-between">
+              <p class="text-xs text-slate-600 font-medium">Reported 15 mins ago</p>
+              <span class="px-3 py-1 bg-amber-500 text-white rounded-lg text-xs font-bold">Medium</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-gradient-to-br from-orange-50 to-red-50 border-l-4 border-orange-500 rounded-2xl p-5 hover:shadow-xl transition-all duration-300">
+        <div class="flex items-start">
+          <div class="bg-gradient-to-br from-orange-400 to-red-500 rounded-xl p-3 mr-4 shadow-md">
+            <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+            </svg>
+          </div>
+          <div class="flex-1">
+            <h3 class="font-bold text-slate-900 text-xl mb-1">Highway 54</h3>
+            <p class="text-sm text-orange-700 font-semibold mb-2">Construction • 15 min delay</p>
+            <div class="flex items-center justify-between">
+              <p class="text-xs text-slate-600 font-medium">Reported 8 mins ago</p>
+              <span class="px-3 py-1 bg-orange-500 text-white rounded-lg text-xs font-bold">Medium</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-gradient-to-br from-red-50 to-rose-50 border-l-4 border-red-500 rounded-2xl p-5 hover:shadow-xl transition-all duration-300">
+        <div class="flex items-start">
+          <div class="bg-gradient-to-br from-red-500 to-rose-600 rounded-xl p-3 mr-4 shadow-md">
+            <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+            </svg>
+          </div>
+          <div class="flex-1">
+            <h3 class="font-bold text-slate-900 text-xl mb-1">C-5</h3>
+            <p class="text-sm text-red-700 font-semibold mb-2">Heavy traffic • 10 min delay</p>
+            <div class="flex items-center justify-between">
+              <p class="text-xs text-slate-600 font-medium">Reported 3 mins ago</p>
+              <span class="px-3 py-1 bg-red-500 text-white rounded-lg text-xs font-bold">Heavy</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Current Path Panel -->
+  <div id="current-path-panel"
+       class="fixed top-0 right-0 w-[28rem] h-full glass-effect shadow-2xl transform translate-x-full transition-transform duration-300 overflow-y-auto z-50 border-l border-slate-200/50">
+    
+    <div class="p-6 bg-gradient-to-r from-emerald-500 via-green-600 to-teal-600 text-white flex justify-between items-center">
+      <div>
+        <h2 class="font-bold text-2xl mb-1">Current Path</h2>
+        <p class="text-green-100 text-sm">Optimized route details</p>
+      </div>
+      <button id="current-path-close" class="hover:bg-white/20 rounded-xl p-2 transition-all">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+
+    <div class="p-6">
+      <!-- Route Header -->
+      <div class="bg-gradient-to-br from-emerald-50 via-green-50 to-blue-50 rounded-2xl p-5 mb-5 border-2 border-emerald-200 shadow-lg">
+        <div class="text-xl font-bold text-slate-900 mb-4">Route Found</div>
+        <div class="grid grid-cols-3 gap-3">
+          <div class="bg-white rounded-xl p-4 text-center border-2 border-slate-200 shadow-sm">
+            <div class="text-xs text-slate-600 font-bold uppercase mb-1">Distance</div>
+            <div class="text-xl font-bold text-emerald-600">12.4 km</div>
+          </div>
+          <div class="bg-white rounded-xl p-4 text-center border-2 border-slate-200 shadow-sm">
+            <div class="text-xs text-slate-600 font-bold uppercase mb-1">Duration</div>
+            <div class="text-xl font-bold text-blue-600">22 min</div>
+          </div>
+          <div class="bg-white rounded-xl p-4 text-center border-2 border-slate-200 shadow-sm">
+            <div class="text-xs text-slate-600 font-bold uppercase mb-1">Steps</div>
+            <div class="text-xl font-bold text-purple-600">8</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Disruption Alert -->
+      <!-- Disruption Alert (Hidden by default, shown when route has disruptions) -->
+      <div id="route-disruption-alert" class="bg-gradient-to-br from-red-50 to-rose-50 border-l-4 border-red-500 rounded-2xl p-4 mb-5 shadow-md hidden">
+        <div class="flex items-start">
+          <div class="bg-red-500 rounded-xl p-2 mr-3">
+            <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+            </svg>
+          </div>
+          <div class="flex-1">
+            <p class="text-sm font-bold text-red-900">Disruption on Route</p>
+            <p class="text-xs text-red-700 mt-1">Click for details</p>
+          </div>
+          <div class="ml-2">
+            <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Route Path - Dynamic Content -->
+      <div class="space-y-4 max-h-96 overflow-y-auto">
+        <!-- Route steps will be dynamically populated by JavaScript -->
+        <div id="route-steps-placeholder" class="text-center py-8 text-slate-500">
+          <svg class="w-16 h-16 mx-auto mb-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-1.447-.894L15 4m0 13V4m0 0L9 7"></path>
+          </svg>
+          <p class="text-sm font-medium">Pin locations and click "Go" to see turn-by-turn directions</p>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-5 mt-6 mb-5 border-2 border-slate-200 shadow-md">
+        <h3 class="text-sm font-bold text-slate-700 mb-3 uppercase tracking-wide">Route Accuracy vs Google Maps</h3>
+        <div class="space-y-2">
+          <div class="flex justify-between text-sm text-slate-700 bg-white p-3 rounded-xl border border-slate-200">
+            <span class="font-medium">Fréchet Distance:</span>
+            <span id="frechet-distance-value" class="font-bold text-blue-700">-- m</span>
+          </div>
+          <div class="flex justify-between text-sm text-slate-700 bg-white p-3 rounded-xl border border-slate-200">
+            <span class="font-medium">Segment Overlap:</span>
+            <span id="segment-overlap-value" class="font-bold text-emerald-700">--%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin Panel -->
+  <div id="admin-panel"
+       class="fixed top-0 right-0 w-[28rem] h-full glass-effect shadow-2xl transform translate-x-full transition-transform duration-300 overflow-y-auto z-50 border-l border-slate-200/50">
+    
+    <div class="p-6 bg-gradient-to-r from-slate-700 via-slate-800 to-slate-900 text-white flex justify-between items-center">
+      <div>
+        <h2 class="font-bold text-2xl mb-1">Admin Panel</h2>
+        <p class="text-slate-300 text-sm">System configuration & metrics</p>
+      </div>
+      <button id="admin-close" class="hover:bg-white/20 rounded-xl p-2 transition-all">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+
+    <div class="p-6 space-y-5">
+      <!-- System Controls -->
+      <div class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-5 border-2 border-slate-200 shadow-md">
+        <h3 class="font-bold text-slate-800 mb-4 flex items-center text-lg">
+          <div class="bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl p-2 mr-3">
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+          </div>
+          System Controls
+        </h3>
+        <div class="grid grid-cols-2 gap-3">
+          <button id="admin-start-btn" class="col-span-2 px-4 py-3 bg-gradient-to-br from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white rounded-xl font-bold shadow-md hover:shadow-lg transition-all duration-300 flex items-center justify-center">
+            <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path>
+            </svg>
+            Simulate
+          </button>
+          <button id="admin-reset-btn" class="px-4 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-bold transition-all duration-300">Reset</button>
+          <button class="px-4 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-bold transition-all duration-300">Export</button>
+        </div>
+      </div>
+
+      <!-- Algorithm & Dataset Selection -->
+      <div class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-5 border-2 border-slate-200 shadow-md">
+        <h3 class="font-bold text-slate-800 mb-4 text-lg">Algorithm & Dataset Selection</h3>
+        
+        <label class="flex items-center mb-2 cursor-pointer hover:bg-white p-2 rounded transition">
+          <input type="radio" name="algo-dataset" value="dhl-base" class="mr-3 w-4 h-4 text-blue-600">
+          <span class="text-sm">DHL - Base Dataset</span>
+        </label>
+        <label class="flex items-center mb-2 cursor-pointer hover:bg-white p-2 rounded transition">
+          <input type="radio" name="algo-dataset" value="dhl-disrupted" class="mr-3 w-4 h-4 text-blue-600">
+          <span class="text-sm">DHL - Disrupted Dataset</span>
+        </label>
+        <label class="flex items-center mb-2 cursor-pointer hover:bg-white p-2 rounded transition">
+          <input type="radio" name="algo-dataset" value="dhc2l-base" class="mr-3 w-4 h-4 text-blue-600" checked>
+          <span class="text-sm">D-HC2L - Base Dataset</span>
+        </label>
+        <label class="flex items-center mb-2 cursor-pointer hover:bg-white p-2 rounded transition">
+          <input type="radio" name="algo-dataset" value="dhc2l-disrupted" class="mr-3 w-4 h-4 text-blue-600">
+          <span class="text-sm">D-HC2L - Disrupted Dataset</span>
+        </label>
+        <label class="flex items-center mb-2 cursor-pointer hover:bg-white p-2 rounded transition">
+          <input type="radio" name="algo-dataset" value="comparison-base" class="mr-3 w-4 h-4 text-blue-600">
+          <span class="text-sm">Comparison Mode - Base Dataset</span>
+        </label>
+        <label class="flex items-center cursor-pointer hover:bg-white p-2 rounded transition">
+          <input type="radio" name="algo-dataset" value="comparison-disrupted" class="mr-3 w-4 h-4 text-blue-600">
+          <span class="text-sm">Comparison Mode - Disrupted Dataset</span>
+        </label>
+      </div>
+
+      <!-- Threshold (τ) with Discrete Buttons -->
+      <div class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-5 border-2 border-slate-200 shadow-md">
+        <h3 class="font-bold text-slate-800 mb-4 text-lg">Threshold (τ)</h3>
+        
+        <!-- Threshold Value Display -->
+        <div class="mb-4 flex items-center justify-between bg-white rounded-xl p-4 border-2 border-slate-300 shadow-sm">
+          <span class="text-sm font-bold text-slate-600">Current τ:</span>
+          <span id="threshold-value" class="font-bold text-2xl text-blue-600">0.5</span>
+        </div>
+        
+        <!-- Threshold Buttons Grid -->
+        <div class="grid grid-cols-5 gap-2">
+          <button class="threshold-btn px-3 py-3 bg-white hover:bg-blue-50 border-2 border-slate-300 rounded-xl font-bold text-sm transition-all hover:shadow-md" data-value="0.1">0.1</button>
+          <button class="threshold-btn px-3 py-3 bg-white hover:bg-blue-50 border-2 border-slate-300 rounded-xl font-bold text-sm transition-all hover:shadow-md" data-value="0.2">0.2</button>
+          <button class="threshold-btn px-3 py-3 bg-white hover:bg-blue-50 border-2 border-slate-300 rounded-xl font-bold text-sm transition-all hover:shadow-md" data-value="0.3">0.3</button>
+          <button class="threshold-btn px-3 py-3 bg-white hover:bg-blue-50 border-2 border-slate-300 rounded-xl font-bold text-sm transition-all hover:shadow-md" data-value="0.4">0.4</button>
+          <button class="threshold-btn px-3 py-3 bg-blue-50 hover:bg-blue-100 border-2 border-blue-500 rounded-xl font-bold text-sm transition-all shadow-md" data-value="0.5">0.5</button>
+          <button class="threshold-btn px-3 py-3 bg-white hover:bg-blue-50 border-2 border-slate-300 rounded-xl font-bold text-sm transition-all hover:shadow-md" data-value="0.6">0.6</button>
+          <button class="threshold-btn px-3 py-3 bg-white hover:bg-blue-50 border-2 border-slate-300 rounded-xl font-bold text-sm transition-all hover:shadow-md" data-value="0.7">0.7</button>
+          <button class="threshold-btn px-3 py-3 bg-white hover:bg-blue-50 border-2 border-slate-300 rounded-xl font-bold text-sm transition-all hover:shadow-md" data-value="0.8">0.8</button>
+          <button class="threshold-btn px-3 py-3 bg-white hover:bg-blue-50 border-2 border-slate-300 rounded-xl font-bold text-sm transition-all hover:shadow-md" data-value="0.9">0.9</button>
+          <button class="threshold-btn px-3 py-3 bg-white hover:bg-blue-50 border-2 border-slate-300 rounded-xl font-bold text-sm transition-all hover:shadow-md" data-value="1.0">1.0</button>
+        </div>
+      </div>
+
+      <!-- Update Mode Status -->
+      <div class="bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50 rounded-2xl p-5 border-2 border-orange-300 shadow-md">
+        <h3 class="font-bold text-slate-800 mb-4 flex items-center text-lg">
+          <div class="bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl p-2 mr-3">
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+            </svg>
+          </div>
+          Update Mode Status
+        </h3>
+        <div class="bg-white rounded-xl p-4 border-2 border-orange-200 shadow-sm">
+          <div class="flex items-center justify-between">
+            <span class="text-sm font-bold text-slate-700">Current Mode:</span>
+            <span id="update-mode-badge" class="px-4 py-2 bg-orange-500 text-white rounded-xl text-sm font-bold shadow-md">
+              Immediate Update
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Performance Metrics -->
+      <div class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-5 border-2 border-slate-200 shadow-md">
+        <h3 class="font-bold text-slate-800 mb-4 text-lg">Performance Metrics</h3>
+        <div class="space-y-3">
+          <div class="flex justify-between bg-white p-4 rounded-xl border-2 border-slate-200 shadow-sm hover:shadow-md transition-all">
+            <span class="text-sm font-semibold text-slate-700">Labeling Time</span>
+            <span id="perf-labeling-time" class="font-bold text-emerald-600 text-lg">-</span>
+          </div>
+          <div class="flex justify-between bg-white p-4 rounded-xl border-2 border-slate-200 shadow-sm hover:shadow-md transition-all">
+            <span class="text-sm font-semibold text-slate-700">Labeling Size</span>
+            <span id="perf-labeling-size" class="font-bold text-blue-600 text-lg">-</span>
+          </div>
+          <div class="flex justify-between bg-white p-4 rounded-xl border-2 border-slate-200 shadow-sm hover:shadow-md transition-all">
+            <span class="text-sm font-semibold text-slate-700">Query Response Time</span>
+            <span id="perf-query-time" class="font-bold text-indigo-600 text-lg">-</span>
+          </div>
+        </div>
+        
+        <!-- Comparison Mode Buttons -->
+        <div id="comparison-buttons" class="mt-5 space-y-3 hidden">
+          <button id="show-comparison-summary" class="w-full px-5 py-4 bg-gradient-to-r from-blue-600 via-blue-700 to-purple-600 hover:from-blue-700 hover:via-blue-800 hover:to-purple-700 text-white rounded-2xl font-bold shadow-xl hover:shadow-2xl flex items-center justify-center gap-3 transition-all duration-300 transform hover:scale-105">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+            </svg>
+            View Algorithm Comparison
+          </button>
+          <!-- <button id="show-similarity-computation" class="w-full px-5 py-4 bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 hover:from-emerald-700 hover:via-green-700 hover:to-teal-700 text-white rounded-2xl font-bold shadow-xl hover:shadow-2xl flex items-center justify-center gap-3 transition-all duration-300 transform hover:scale-105">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+            </svg>
+            View Similarity Computation
+          </button> -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Algorithm Comparison Modal -->
+  <div id="comparison-modal" class="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-6">
+    <div class="bg-white rounded-3xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="p-6 bg-gradient-to-r from-blue-600 via-blue-700 to-purple-700 text-white flex justify-between items-center sticky top-0 rounded-t-3xl">
+        <div>
+          <h2 class="font-bold text-2xl mb-1">Algorithm Performance Comparison</h2>
+          <p class="text-blue-100 text-sm">DHL vs Dynamic HC2L Analysis</p>
+        </div>
+        <button id="comparison-modal-close" class="hover:bg-white/20 rounded-xl p-2 transition-all">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      <div class="p-8">
+        <h3 class="text-2xl font-bold text-slate-900 mb-6">Performance Summary</h3>
+        
+        <div class="grid grid-cols-2 gap-5 mb-8">
+          <!-- DHL Column -->
+          <div class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-6 border-2 border-slate-300 shadow-lg">
+            <h4 class="font-bold text-xl text-slate-800 mb-4 flex items-center">
+              <span class="w-4 h-4 bg-slate-500 rounded-full mr-3 shadow-md"></span>
+              DHL (Baseline)
+            </h4>
+            <div class="space-y-3">
+              <div class="flex justify-between text-sm bg-white p-3 rounded-xl border border-slate-200">
+                <span class="text-slate-600 font-medium">Labeling Time:</span>
+                <span id="dhl-labeling-time" class="font-bold text-slate-800">--</span>
+              </div>
+              <div class="flex justify-between text-sm bg-white p-3 rounded-xl border border-slate-200">
+                <span class="text-slate-600 font-medium">Labeling Size:</span>
+                <span id="dhl-labeling-size" class="font-bold text-slate-800">--</span>
+              </div>
+              <div class="flex justify-between text-sm bg-white p-3 rounded-xl border border-slate-200">
+                <span class="text-slate-600 font-medium">Query Time:</span>
+                <span id="dhl-query-time" class="font-bold text-slate-800">--</span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- D-HC2L Column -->
+          <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 border-2 border-blue-400 shadow-lg">
+            <h4 class="font-bold text-xl text-blue-900 mb-4 flex items-center">
+              <span class="w-4 h-4 bg-blue-600 rounded-full mr-3 shadow-md"></span>
+              Dynamic HC2L
+            </h4>
+            <div class="space-y-3">
+              <div class="flex justify-between text-sm bg-white p-3 rounded-xl border border-blue-200">
+                <span class="text-slate-600 font-medium">Labeling Time:</span>
+                <span id="dhc2l-labeling-time" class="font-bold text-emerald-600">--</span>
+              </div>
+              <div class="flex justify-between text-sm bg-white p-3 rounded-xl border border-blue-200">
+                <span class="text-slate-600 font-medium">Labeling Size:</span>
+                <span id="dhc2l-labeling-size" class="font-bold text-emerald-600">--</span>
+              </div>
+              <div class="flex justify-between text-sm bg-white p-3 rounded-xl border border-blue-200">
+                <span class="text-slate-600 font-medium">Query Time:</span>
+                <span id="dhc2l-query-time" class="font-bold text-red-600">--</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Similarity Computation Modal -->
+  <div id="similarity-modal" class="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-6">
+    <div class="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="p-6 bg-gradient-to-r from-emerald-600 via-green-600 to-teal-700 text-white flex justify-between items-center sticky top-0 rounded-t-3xl">
+        <div>
+          <h2 class="font-bold text-2xl mb-1">Route Similarity Computation</h2>
+          <p class="text-green-100 text-sm">Understanding similarity metrics</p>
+        </div>
+        <button id="similarity-modal-close" class="hover:bg-white/20 rounded-xl p-2 transition-all">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      <div class="p-8">
+        <h3 class="text-2xl font-bold text-slate-900 mb-6">Similarity Metrics Explained</h3>
+        
+        <div class="space-y-5">
+          <!-- Fréchet Distance -->
+          <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 border-2 border-blue-300 shadow-md">
+            <h4 class="font-bold text-blue-900 mb-3 flex items-center text-lg">
+              <div class="bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl p-2 mr-3">
+                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                </svg>
+              </div>
+              Fréchet Distance
+            </h4>
+            <p class="text-sm text-slate-700 mb-4 leading-relaxed">
+              Measures how similar two curves are by finding the minimum leash length needed for a person walking a dog along two paths.
+            </p>
+            <div class="bg-white rounded-xl p-4 border-2 border-blue-200 shadow-sm">
+              <div class="flex justify-between text-sm">
+                <span class="text-slate-600 font-semibold">Current Value:</span>
+                <span class="font-bold text-blue-700 text-lg">12.3</span>
+              </div>
+              <p class="text-xs text-slate-500 mt-2 font-medium">Lower is better (closer routes)</p>
+            </div>
+          </div>
+          
+          <!-- Segment Overlap -->
+          <div class="bg-gradient-to-br from-emerald-50 to-green-50 rounded-2xl p-6 border-2 border-emerald-300 shadow-md">
+            <h4 class="font-bold text-emerald-900 mb-3 flex items-center text-lg">
+              <div class="bg-gradient-to-br from-emerald-600 to-green-600 rounded-xl p-2 mr-3">
+                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+              </div>
+              Segment Overlap
+            </h4>
+            <p class="text-sm text-slate-700 mb-4 leading-relaxed">
+              Percentage of road segments that are common between the computed route and Google Maps baseline route.
+            </p>
+            <div class="bg-white rounded-xl p-4 border-2 border-emerald-200 shadow-sm">
+              <div class="flex justify-between text-sm">
+                <span class="text-slate-600 font-semibold">Current Value:</span>
+                <span class="font-bold text-emerald-700 text-lg">87%</span>
+              </div>
+              <p class="text-xs text-slate-500 mt-2 font-medium">Higher is better (more similar routes)</p>
+            </div>
+          </div>
+          
+          <!-- Combined Interpretation -->
+          <div class="bg-gradient-to-br from-purple-50 to-violet-50 rounded-2xl p-6 border-2 border-purple-300 shadow-md">
+            <h4 class="font-bold text-purple-900 mb-3 text-lg">Combined Interpretation</h4>
+            <p class="text-sm text-slate-700 leading-relaxed">
+              With <strong class="text-emerald-600">87% segment overlap</strong> and a Fréchet distance of <strong class="text-blue-600">12.3</strong>, 
+              the Dynamic HC2L algorithm produces routes that are highly similar to Google Maps baseline, 
+              while achieving significant improvements in labeling efficiency.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- Javascripts -->
+<script src="{{ url_for('static', filename='js/variables.js') }}"></script>
+<script src="{{ url_for('static', filename='js/functions.js') }}"></script>
+<script src="{{ url_for('static', filename='js/disruptions.js') }}"></script>
+<script src="{{ url_for('static', filename='js/metrics.js') }}"></script>
+<script src="{{ url_for('static', filename='js/event-handlers.js') }}"></script>
+
+<script>
+
+  // Initialize Google Maps
+  function initMap() {
+    try {
+      // Center on Manila, Philippines (adjust as needed)
+      const center = {lat: 14.6540, lng: 121.0540};
+      
+      map = new google.maps.Map(document.getElementById("google-map"), {
+        zoom: 14,
+        center: center,
+        mapTypeControl: true,
+        streetViewControl: true,
+        fullscreenControl: true,
+        zoomControl: true,
+        styles: [
+          {
+            featureType: "poi.business",
+            stylers: [{ visibility: "off" }]
+          }
+        ]
+      });
+      
+      // Initialize directions service and renderer
+      directionsService = new google.maps.DirectionsService();
+      directionsRenderer = new google.maps.DirectionsRenderer({
+        draggable: true,
+        panel: null
+      });
+      directionsRenderer.setMap(map);
+      
+      // Hide placeholder since maps loaded successfully
+      document.getElementById("map-placeholder").classList.add("hidden");
+      
+      setupMapClickHandlers();
+      showUpdateToast("Google Maps loaded successfully", 'success');
+    } catch (error) {
+      console.error("Failed to initialize Google Maps:", error);
+      document.getElementById("map-placeholder").classList.remove("hidden");
+      showUpdateToast("Failed to load Google Maps", 'warning');
+    }
+  }
+  
+  function setupMapClickHandlers() {
+    map.addListener("click", (event) => {
+      if (!pinningMode) return;
+      
+      const lat = event.latLng.lat();
+      const lng = event.latLng.lng();
+      
+      console.log(`Map clicked at: ${lat}, ${lng}`);
+      // console.log(`${event}`);
+      for (const key in event) {
+        if (event.hasOwnProperty(key)) {
+          console.log(`${key}: ${event[key]}`);
+        }
+      }
+      const geoCoder = new google.maps.Geocoder();
+      
+      if (pinningMode === 'start') {
+        if (startMarker) startMarker.setMap(null);
+        
+        startMarker = new google.maps.Marker({
+          position: { lat, lng },
+          map: map,
+          title: "Start Location",
+          icon: {
+            url: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(`
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="32" height="32">
+                <path fill="#10b981" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+              </svg>
+            `),
+            scaledSize: new google.maps.Size(32, 32),
+            anchor: new google.maps.Point(16, 32)
+          }
+        });
+        
+        startLocation = { lat, lng };
+        
+        
+        geoCoder.geocode({ location: startLocation }, (results, status) => {
+          if (status === "OK") {
+            if (results[0]) {
+              document.getElementById('start-location-text').textContent = results[0].formatted_address;
+            } else {
+              document.getElementById('start-location-text').textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+            }
+          } else {
+            document.getElementById('start-location-text').textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+          }
+        });
+        // document.getElementById('start-location-text').textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+        document.getElementById('start-location-text').classList.remove('text-slate-500');
+        document.getElementById('start-location-text').classList.add('text-slate-900', 'font-semibold');
+        showUpdateToast("Starting location pinned", 'success');
+        pinningMode = null;
+        map.setOptions({cursor: 'default'});
+        
+      } else if (pinningMode === 'dest') {
+        if (destMarker) destMarker.setMap(null);
+        
+        destMarker = new google.maps.Marker({
+          position: { lat, lng },
+          map: map,
+          title: "Destination",
+          icon: {
+            url: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(`
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="32" height="32">
+                <path fill="#ef4444" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+              </svg>
+            `),
+            scaledSize: new google.maps.Size(32, 32),
+            anchor: new google.maps.Point(16, 32)
+          }
+        });
+        
+        destLocation = { lat, lng };
+        geoCoder.geocode({ location: destLocation }, (results, status) => {
+          if (status === "OK") {
+            if (results[0]) {
+              document.getElementById('dest-location-text').textContent = results[0].formatted_address;
+            } else {
+              document.getElementById('dest-location-text').textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+            }
+          } else {
+            document.getElementById('dest-location-text').textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+          }
+        });
+        // document.getElementById('dest-location-text').textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+        document.getElementById('dest-location-text').classList.remove('text-slate-500');
+        document.getElementById('dest-location-text').classList.add('text-slate-900', 'font-semibold');
+        showUpdateToast("Destination pinned", 'success');
+        pinningMode = null;
+        map.setOptions({cursor: 'default'});
+        
+      } else if (pinningMode === 'report') {
+        if (reportMarker) reportMarker.setMap(null);
+        
+        reportMarker = new google.maps.Marker({
+          position: { lat, lng },
+          map: map,
+          title: "Report Location",
+          icon: {
+            url: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(`
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="32" height="32">
+                <path fill="#8b5cf6" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+              </svg>
+            `),
+            scaledSize: new google.maps.Size(32, 32),
+            anchor: new google.maps.Point(16, 32)
+          }
+        });
+        
+        reportLocation = { lat, lng };
+
+        geoCoder.geocode({ location: reportLocation }, (results, status) => {
+          if (status === "OK") {
+            if (results[0]) {
+              document.getElementById('pin-disruption-text').textContent = results[0].formatted_address;
+            } else {
+              document.getElementById('pin-disruption-text').textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+            }
+          } else {
+            document.getElementById('pin-disruption-text').textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+          }
+        });
+
+        // document.getElementById('pin-disruption-text').textContent = 'Location pinned';
+        document.getElementById('disruption-coords').textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+        document.getElementById('disruption-coords').classList.remove('hidden');
+        showUpdateToast("Disruption location pinned", 'success');
+        pinningMode = null;
+        map.setOptions({cursor: 'default'});
+      }
+    });
+  }
+
+  
+  // D-HC2L Route Display Functions
+  function displayDHC2LRoute(routeData) {
+    // Clear any existing D-HC2L routes
+    clearRoutes();
+    
+    // Display route polylines
+    if (routeData.route && routeData.route.polylines) {
+      console.log('Displaying D-HC2L route with', routeData.route.polylines.length, 'polylines');
+      
+      routeData.route.polylines.forEach((polylineData, index) => {
+        try {
+          // Handle both coordinate array formats
+          let polylinePath;
+          if (polylineData.coordinates) {
+            // Format: [{coordinates: [[lat, lng], ...]}, ...]
+            polylinePath = polylineData.coordinates.map(coord => ({
+              lat: coord[0],
+              lng: coord[1]
+            }));
+          } else if (polylineData.path) {
+            // Format: [{path: [{lat, lng}, ...]}, ...]
+            polylinePath = polylineData.path;
+          } else {
+            console.warn('Unknown polyline format:', polylineData);
+            return;
+          }
+          
+          const polyline = new google.maps.Polyline({
+            path: polylinePath,
+            geodesic: true,
+            strokeColor: polylineData.strokeColor || polylineData.color || '#FF0000',
+            strokeOpacity: polylineData.strokeOpacity || polylineData.opacity || 0.8,
+            strokeWeight: polylineData.strokeWeight || polylineData.weight || 5
+          });
+          
+          polyline.setMap(map);
+          routePolylines.push(polyline);
+          
+          console.log(`Polyline ${index + 1} added with ${polylinePath.length} points`);
+        } catch (error) {
+          console.error(`Error creating polyline ${index + 1}:`, error);
+        }
+      });
+      
+      // Add connector polylines from pinned locations to route start/end nodes
+      addConnectorPolylines(routeData);
+      
+      // Fit map to show the route
+      if (routePolylines.length > 0) {
+        const bounds = new google.maps.LatLngBounds();
+        
+        // Include start and destination markers
+        if (startLocation) bounds.extend(new google.maps.LatLng(startLocation.lat, startLocation.lng));
+        if (destLocation) bounds.extend(new google.maps.LatLng(destLocation.lat, destLocation.lng));
+        
+        // Include route points
+        routeData.route.polylines.forEach(polylineData => {
+          if (polylineData.coordinates) {
+            polylineData.coordinates.forEach(coord => {
+              bounds.extend(new google.maps.LatLng(coord[0], coord[1]));
+            });
+          } else if (polylineData.path) {
+            polylineData.path.forEach(point => {
+              bounds.extend(new google.maps.LatLng(point.lat, point.lng));
+            });
+          }
+        });
+        
+        map.fitBounds(bounds);
+        console.log('Map bounds fitted to route');
+      }
+    } else {
+      console.warn('No polylines found in route data:', routeData);
+    }
+    
+    console.log('D-HC2L route display complete');
+  }
+  
+
+  function addConnectorPolylines(routeData) {
+    try {
+      // Get the first and last coordinates of the actual route
+      let routeStartCoord = null;
+      let routeEndCoord = null;
+      
+      if (routeData.route && routeData.route.coordinates && routeData.route.coordinates.length > 0) {
+        // Use coordinates from the enhanced route data
+        const coordinates = routeData.route.coordinates;
+        routeStartCoord = {
+          lat: coordinates[0].lat,
+          lng: coordinates[0].lng
+        };
+        routeEndCoord = {
+          lat: coordinates[coordinates.length - 1].lat,
+          lng: coordinates[coordinates.length - 1].lng
+        };
+        console.log('Using route coordinates for connectors');
+        console.log('Route start node:', routeStartCoord);
+        console.log('Route end node:', routeEndCoord);
+      } else if (routeData.route && routeData.route.polylines && routeData.route.polylines.length > 0) {
+        // Fallback: extract from polylines
+        const firstPolyline = routeData.route.polylines[0];
+        const lastPolyline = routeData.route.polylines[routeData.route.polylines.length - 1];
+        
+        if (firstPolyline.path && firstPolyline.path.length > 0) {
+          routeStartCoord = firstPolyline.path[0];
+        } else if (firstPolyline.coordinates && firstPolyline.coordinates.length > 0) {
+          routeStartCoord = {
+            lat: firstPolyline.coordinates[0][0],
+            lng: firstPolyline.coordinates[0][1]
+          };
+        }
+        
+        if (lastPolyline.path && lastPolyline.path.length > 0) {
+          routeEndCoord = lastPolyline.path[lastPolyline.path.length - 1];
+        } else if (lastPolyline.coordinates && lastPolyline.coordinates.length > 0) {
+          const lastCoordIndex = lastPolyline.coordinates.length - 1;
+          routeEndCoord = {
+            lat: lastPolyline.coordinates[lastCoordIndex][0],
+            lng: lastPolyline.coordinates[lastCoordIndex][1]
+          };
+        }
+        console.log('Using polyline coordinates for connectors');
+      }
+      
+      // Add connector from start pin to route start node
+      if (startLocation && routeStartCoord) {
+        const startDistance = calculateHaversineDistance(
+          startLocation.lat, startLocation.lng,
+          routeStartCoord.lat, routeStartCoord.lng
+        );
+        
+        console.log(`Adding D-HC2L start connector: ${startDistance.toFixed(0)}m`);
+        
+        const startConnector = new google.maps.Polyline({
+          path: [
+            { lat: startLocation.lat, lng: startLocation.lng },
+            { lat: routeStartCoord.lat, lng: routeStartCoord.lng }
+          ],
+          geodesic: true,
+          strokeColor: '#FF0000', // Red to match D-HC2L algorithm
+          strokeOpacity: 0.8,
+          strokeWeight: 5,
+          strokePattern: [10, 5] // Dashed line to distinguish from main route
+        });
+        
+        startConnector.setMap(map);
+        routePolylines.push(startConnector);
+      }
+      
+      // Add connector from route end node to destination pin
+      if (destLocation && routeEndCoord) {
+        const endDistance = calculateHaversineDistance(
+          routeEndCoord.lat, routeEndCoord.lng,
+          destLocation.lat, destLocation.lng
+        );
+        
+        console.log(`Adding D-HC2L end connector: ${endDistance.toFixed(0)}m`);
+        
+        const endConnector = new google.maps.Polyline({
+          path: [
+            { lat: routeEndCoord.lat, lng: routeEndCoord.lng },
+            { lat: destLocation.lat, lng: destLocation.lng }
+          ],
+          geodesic: true,
+          strokeColor: '#FF0000', // Red to match D-HC2L algorithm
+          strokeOpacity: 0.8,
+          strokeWeight: 5,
+          strokePattern: [10, 5] // Dashed line to distinguish from main route
+        });
+        
+        endConnector.setMap(map);
+        routePolylines.push(endConnector);
+      }
+      
+      console.log('D-HC2L connector polylines added successfully');
+      
+    } catch (error) {
+      console.error('Error adding D-HC2L connector polylines:', error);
+    }
+  }
+
+
+  function addDHLConnectorPolylines(routeData) {
+    try {
+      // Get the first and last coordinates of the actual DHL route
+      let routeStartCoord = null;
+      let routeEndCoord = null;
+      
+      if (routeData.route && routeData.route.coordinates && routeData.route.coordinates.length > 0) {
+        // Use coordinates from the enhanced route data
+        const coordinates = routeData.route.coordinates;
+        routeStartCoord = {
+          lat: coordinates[0].lat,
+          lng: coordinates[0].lng
+        };
+        routeEndCoord = {
+          lat: coordinates[coordinates.length - 1].lat,
+          lng: coordinates[coordinates.length - 1].lng
+        };
+        console.log('Using DHL route coordinates for connectors');
+        console.log('DHL route start node:', routeStartCoord);
+        console.log('DHL route end node:', routeEndCoord);
+      } else if (routeData.route && routeData.route.polylines && routeData.route.polylines.length > 0) {
+        // Fallback: extract from polylines
+        const firstPolyline = routeData.route.polylines[0];
+        const lastPolyline = routeData.route.polylines[routeData.route.polylines.length - 1];
+        
+        if (firstPolyline.path && firstPolyline.path.length > 0) {
+          routeStartCoord = firstPolyline.path[0];
+        } else if (firstPolyline.coordinates && firstPolyline.coordinates.length > 0) {
+          routeStartCoord = {
+            lat: firstPolyline.coordinates[0][0],
+            lng: firstPolyline.coordinates[0][1]
+          };
+        }
+        
+        if (lastPolyline.path && lastPolyline.path.length > 0) {
+          routeEndCoord = lastPolyline.path[lastPolyline.path.length - 1];
+        } else if (lastPolyline.coordinates && lastPolyline.coordinates.length > 0) {
+          const lastCoordIndex = lastPolyline.coordinates.length - 1;
+          routeEndCoord = {
+            lat: lastPolyline.coordinates[lastCoordIndex][0],
+            lng: lastPolyline.coordinates[lastCoordIndex][1]
+          };
+        }
+        console.log('Using DHL polyline coordinates for connectors');
+      }
+      
+      // Add connector from start pin to route start node
+      if (startLocation && routeStartCoord) {
+        const startDistance = calculateHaversineDistance(
+          startLocation.lat, startLocation.lng,
+          routeStartCoord.lat, routeStartCoord.lng
+        );
+        
+        console.log(`Adding DHL start connector: ${startDistance.toFixed(0)}m`);
+        
+        const startConnector = new google.maps.Polyline({
+          path: [
+            { lat: startLocation.lat, lng: startLocation.lng },
+            { lat: routeStartCoord.lat, lng: routeStartCoord.lng }
+          ],
+          geodesic: true,
+          strokeColor: '#0066FF', // Blue to match DHL algorithm
+          strokeOpacity: 0.8,
+          strokeWeight: 5,
+          strokePattern: [10, 5] // Dashed line to distinguish from main route
+        });
+        
+        startConnector.setMap(map);
+        routePolylines.push(startConnector);
+      }
+      
+      // Add connector from route end node to destination pin
+      if (destLocation && routeEndCoord) {
+        const endDistance = calculateHaversineDistance(
+          routeEndCoord.lat, routeEndCoord.lng,
+          destLocation.lat, destLocation.lng
+        );
+        
+        console.log(`Adding DHL end connector: ${endDistance.toFixed(0)}m`);
+        
+        const endConnector = new google.maps.Polyline({
+          path: [
+            { lat: routeEndCoord.lat, lng: routeEndCoord.lng },
+            { lat: destLocation.lat, lng: destLocation.lng }
+          ],
+          geodesic: true,
+          strokeColor: '#0066FF', // Blue to match DHL algorithm
+          strokeOpacity: 0.8,
+          strokeWeight: 5,
+          strokePattern: [10, 5] // Dashed line to distinguish from main route
+        });
+        
+        endConnector.setMap(map);
+        routePolylines.push(endConnector);
+      }
+      
+      console.log('DHL connector polylines added successfully');
+      
+    } catch (error) {
+      console.error('Error adding DHL connector polylines:', error);
+    }
+  }
+
+
+  function updateCurrentPathPanel(routeData) {
+    console.log('Updating Current Path Panel with route data:', routeData);
+    
+    if (!routeData || !routeData.success) {
+      console.warn('Invalid route data provided to updateCurrentPathPanel');
+      return;
+    }
+    
+    const route = routeData.route || {};
+    const metrics = routeData.metrics || {};
+    
+    // Update route header metrics
+    updateRouteHeaderMetrics(route, metrics);
+    
+    // Update route steps with turn-by-turn directions
+    updateRouteSteps(route);
+    
+    // Update comparison metrics
+    updateComparisonMetrics(routeData);
+    
+    // Check for disruptions on the route (async operation)
+    checkAndDisplayRouteDisruptions(routeData);
+    
+    console.log('Current Path Panel updated successfully');
+  }
+  
+
+  async function checkAndDisplayRouteDisruptions(routeData) {
+    try {
+      console.log('Checking route for disruptions...');
+      const disruptedSegments = await checkRouteForDisruptions(routeData);
+      
+      if (disruptedSegments) {
+        console.log(`Found ${disruptedSegments.length} disrupted segments on route`);
+        displayRouteDisruptionAlert(disruptedSegments);
+      } else {
+        console.log('No disruptions found on route');
+        // Hide the alert if no disruptions
+        const alertElement = document.getElementById('route-disruption-alert');
+        if (alertElement) {
+          alertElement.classList.add('hidden');
+        }
+      }
+    } catch (error) {
+      console.error('Error checking route disruptions:', error);
+      // Hide alert on error
+      const alertElement = document.getElementById('route-disruption-alert');
+      if (alertElement) {
+        alertElement.classList.add('hidden');
+      }
+    }
+  }
+
+  
+  async function loadActiveDisruptions() {
+    try {
+      showUpdateToast("Loading active disruptions...", 'info');
+      
+      const response = await fetch('/get_active_disruptions');
+      const data = await response.json();
+      
+      if (!data.success) {
+        showUpdateToast(`Error loading disruptions: ${data.error}`, 'warning');
+        return;
+      }
+      
+      // Update disruption panel content
+      updateDisruptionsPanel(data);
+      
+      // Show disruption markers on map
+      showAllDisruptionsOnMap(data);
+      
+      showUpdateToast(`Loaded ${data.total_disruptions} active disruptions`, 'success');
+      
+    } catch (error) {
+      showUpdateToast('Network error loading disruptions', 'warning');
+      console.error('Error loading disruptions:', error);
+    }
+  }
+
+  // Automatic loading with disrupted algorithms
+  async function loadActiveDisruptionsForAlgorithm(algorithmName) {
+    try {
+      showUpdateToast(`Loading disruptions for ${algorithmName}...`, 'info');
+      
+      const response = await fetch('/get_active_disruptions');
+      const data = await response.json();
+      
+      if (!data.success) {
+        showUpdateToast(`Error loading disruptions: ${data.error}`, 'warning');
+        return;
+      }
+      
+      // Update disruption panel content
+      updateDisruptionsPanel(data);
+      
+      // Show disruption markers on map
+      showAllDisruptionsOnMap(data);
+      
+      showUpdateToast(`${data.total_disruptions} disruptions loaded for ${algorithmName}`, 'success');
+      
+    } catch (error) {
+      showUpdateToast('Network error loading disruptions', 'warning');
+      console.error('Error loading disruptions:', error);
+    }
+  }
+
+
+  async function checkRouteForDisruptions(routeData) {
+    if (!routeData || !routeData.route || !routeData.route.path_nodes) {
+      return null;
+    }
+    
+    try {
+      // Fetch current disruption data
+      const response = await fetch('/get_active_disruptions');
+      const disruptionData = await response.json();
+      
+      if (!disruptionData.success) {
+        console.warn('Could not fetch disruption data for route checking');
+        return null;
+      }
+      
+      // Get route path nodes
+      const routeNodes = routeData.route.path_nodes;
+      const disruptedSegments = [];
+      
+      // Check each road segment in the route
+      for (let i = 0; i < routeNodes.length - 1; i++) {
+        const sourceNode = routeNodes[i];
+        const targetNode = routeNodes[i + 1];
+        
+        // Check all disruption types for matching road segments
+        for (const [incidentType, disruptions] of Object.entries(disruptionData.disruptions_by_type)) {
+          for (const disruption of disruptions) {
+            // Check if this disruption matches the current route segment
+            if ((disruption.source_id === sourceNode && disruption.target_id === targetNode) ||
+                (disruption.source_id === targetNode && disruption.target_id === sourceNode)) {
+              
+              disruptedSegments.push({
+                sourceNode: sourceNode,
+                targetNode: targetNode,
+                roadName: disruption.road_name,
+                incidentType: disruption.incident_type,
+                severity: disruption.severity,
+                slowdownRatio: disruption.slowdown_ratio,
+                jamFactor: disruption.jam_factor,
+                speedKph: disruption.speed_kph
+              });
+            }
+          }
+        }
+      }
+      
+      return disruptedSegments.length > 0 ? disruptedSegments : null;
+      
+    } catch (error) {
+      console.error('Error checking route for disruptions:', error);
+      return null;
+    }
+  }
+  
+
+  // Function to compute DHL route
+  async function computeDHLRoute(useDisruptions = false) {
+    if (!startLocation || !destLocation) {
+      showUpdateToast("Please pin both starting location and destination", 'warning');
+      return null;
+    }
+    
+    showUpdateToast(`Computing DHL route ${useDisruptions ? 'with disruptions' : ''}...`, 'info');
+    
+    try {
+      const response = await fetch('/compute_dhl_route', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          start_lat: startLocation.lat,
+          start_lng: startLocation.lng,
+          dest_lat: destLocation.lat,
+          dest_lng: destLocation.lng,
+          use_disruptions: useDisruptions
+        })
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+      
+      const routeData = await response.json();
+      console.log('Received DHL route data:', routeData);
+      
+      if (routeData.success) {
+        showUpdateToast("DHL route calculated successfully", 'success');
+        return routeData;
+      } else {
+        showUpdateToast(`DHL route calculation failed: ${routeData.error}`, 'warning');
+        return null;
+      }
+      
+    } catch (error) {
+      showUpdateToast(`DHL route error: ${error.message}`, 'warning');
+      console.error('DHL route calculation error:', error);
+      return null;
+    }
+  }
+  
+  // Function to compute D-HC2L route  
+  async function computeDHC2LRoute(useDisruptions = false, threshold = 0.5) {
+    if (!startLocation || !destLocation) {
+      showUpdateToast("Please pin both starting location and destination", 'warning');
+      return null;
+    }
+    
+    const actualThreshold = threshold !== null ? threshold : currentThreshold;
+    showUpdateToast(`Computing D-HC2L route (τ=${actualThreshold}) ${useDisruptions ? 'with disruptions' : ''}...`, 'info');
+    
+    try {
+      const response = await fetch('/compute_dhc2l_route', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          start_lat: startLocation.lat,
+          start_lng: startLocation.lng,
+          dest_lat: destLocation.lat,
+          dest_lng: destLocation.lng,
+          threshold: actualThreshold,
+          use_disruptions: useDisruptions
+        })
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+      
+      const routeData = await response.json();
+      console.log('Received D-HC2L route data:', routeData);
+      
+      if (routeData.success) {
+        showUpdateToast("D-HC2L route calculated successfully", 'success');
+        return routeData;
+      } else {
+        showUpdateToast(`D-HC2L route calculation failed: ${routeData.error}`, 'warning');
+        return null;
+      }
+      
+    } catch (error) {
+      showUpdateToast(`D-HC2L route error: ${error.message}`, 'warning');
+      console.error('D-HC2L route calculation error:', error);
+      return null;
+    }
+  }
+  
+  
+</script>
+
+<!-- Google Maps JavaScript API -->
+<script async defer src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initMap"></script>
+
+</body>
+</html>
