@@ -18,7 +18,6 @@
 #include <vector>
 #include <ostream>
 #include <cassert>
-#include <boost/functional/hash.hpp>
 #include <unordered_map>
 #include <condition_variable>
 #include <mutex>
