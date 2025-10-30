@@ -100,6 +100,45 @@ map<NodeID, GPSCoordinate> load_node_coordinates(const string& filename) {
     return coordinates;
 }
 
+// Load edges from CSV file
+map<NodeID, vector<Neighbor>> load_edges(const string& filename) {
+    map<NodeID, vector<Neighbor>> adj_list;
+    ifstream file(filename);
+    
+    if (!file.is_open()) {
+        cerr << "Warning: Could not open " << filename << endl;
+        return adj_list;
+    }
+    
+    string line;
+    getline(file, line); // Skip header: source,target,length,name,highway,oneway
+    
+    while (getline(file, line)) {
+        stringstream ss(line);
+        string source_str, target_str, length_str;
+        
+        // Read source,target,length (ignore rest)
+        if (getline(ss, source_str, ',') &&
+            getline(ss, target_str, ',') &&
+            getline(ss, length_str, ',')) {
+            
+            try {
+                NodeID source = stoul(source_str);
+                NodeID target = stoul(target_str);
+                distance_t length = static_cast<distance_t>(stod(length_str));
+                
+                adj_list[source].push_back(Neighbor(target, length));
+            } catch (...) {
+                // Skip invalid lines
+                continue;
+            }
+        }
+    }
+    
+    file.close();
+    return adj_list;
+}
+
 // Find nearest node to given GPS coordinates
 NodeID find_nearest_node(double lat, double lng, const map<NodeID, GPSCoordinate>& coordinates, double max_distance = 1000.0) {
     NodeID nearest = 0;
@@ -120,16 +159,70 @@ NodeID find_nearest_node(double lat, double lng, const map<NodeID, GPSCoordinate
     return nearest;
 }
 
-// Find shortest path using DHL index
-vector<NodeID> find_shortest_path(NodeID start, NodeID dest, const Graph& g, const ContractionIndex& ci) {
-    // This is a simplified pathreconstruction - in a full implementation, you would
-    // use the actual DHL path reconstruction algorithm
+// Find shortest path using Dijkstra on the adjacency list
+vector<NodeID> find_shortest_path(NodeID start, NodeID dest, const map<NodeID, vector<Neighbor>>& adj_list) {
     vector<NodeID> path;
     
-    // For now, just return start and dest
-    // TODO: Implement proper path reconstruction from DHL labels
-    path.push_back(start);
-    path.push_back(dest);
+    if (start == dest) {
+        path.push_back(start);
+        return path;
+    }
+    
+    // Distance and predecessor tracking
+    map<NodeID, distance_t> dist;
+    map<NodeID, NodeID> pred;
+    set<NodeID> visited;
+    
+    // Priority queue: (distance, node)
+    priority_queue<pair<distance_t, NodeID>, 
+                   vector<pair<distance_t, NodeID>>,
+                   greater<pair<distance_t, NodeID>>> pq;
+    
+    // Initialize
+    dist[start] = 0;
+    pq.push({0, start});
+    
+    // Dijkstra's algorithm
+    while (!pq.empty()) {
+        auto [d, u] = pq.top();
+        pq.pop();
+        
+        if (visited.count(u)) continue;
+        visited.insert(u);
+        
+        if (u == dest) break;
+        
+        // Check neighbors
+        if (adj_list.count(u)) {
+            for (const auto& neighbor : adj_list.at(u)) {
+                NodeID v = neighbor.node;
+                distance_t edge_dist = neighbor.distance;
+                distance_t new_dist = dist[u] + edge_dist;
+                
+                if (!dist.count(v) || new_dist < dist[v]) {
+                    dist[v] = new_dist;
+                    pred[v] = u;
+                    pq.push({new_dist, v});
+                }
+            }
+        }
+    }
+    
+    // Reconstruct path
+    if (pred.count(dest) || dest == start) {
+        NodeID curr = dest;
+        while (curr != start) {
+            path.push_back(curr);
+            if (!pred.count(curr)) break;
+            curr = pred[curr];
+        }
+        path.push_back(start);
+        reverse(path.begin(), path.end());
+    } else {
+        // No path found, return empty or just endpoints
+        path.push_back(start);
+        path.push_back(dest);
+    }
     
     return path;
 }
@@ -242,6 +335,13 @@ int main(int argc, char* argv[]) {
             return 1;
         }
         
+        // Load edges for path reconstruction
+        auto adj_list = load_edges(edges_csv);
+        if (adj_list.empty()) {
+            output_json_response(false, "Failed to load edges from " + edges_csv);
+            return 1;
+        }
+        
         // Find nearest nodes to start and destination
         NodeID start_node = find_nearest_node(start_lat, start_lng, coordinates);
         NodeID dest_node = find_nearest_node(dest_lat, dest_lng, coordinates);
@@ -276,8 +376,8 @@ int main(int argc, char* argv[]) {
         
         double query_time_ms = chrono::duration<double, milli>(end_time - start_time).count();
         
-        // Get path (simplified - would use proper path reconstruction in full implementation)
-        vector<NodeID> path = find_shortest_path(start_node, dest_node, g, ci);
+        // Get path using Dijkstra on the actual road network edges
+        vector<NodeID> path = find_shortest_path(start_node, dest_node, adj_list);
         
         // Output JSON response
         output_json_response(true, "", start_node, dest_node,

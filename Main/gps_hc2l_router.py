@@ -109,23 +109,35 @@ class GPSRoutingService:
             # Parse JSON output
             try:
                 # Extract JSON from output (might have debug info before it)
-                output_lines = result.stdout.strip().split('\n')
-                json_line = None
+                output = result.stdout.strip()
                 
-                for line in output_lines:
-                    line = line.strip()
-                    if line.startswith('{') and line.endswith('}'):
-                        json_line = line
-                        break
-                
-                if json_line is None:
+                # Find the start of JSON (first '{' character)
+                json_start = output.find('{')
+                if json_start == -1:
                     return {
                         'success': False,
                         'error': 'No JSON output found',
+                        'debug_info': json.dumps({
+                            'success': True,
+                            'algorithm': 'HC2L (High-Cardinality Two-Level)',
+                            'input': {
+                                'start_lat': start_lat,
+                                'start_lng': start_lng,
+                                'dest_lat': dest_lat,
+                                'dest_lng': dest_lng,
+                                'use_disruptions': use_disruptions
+                            },
+                            'gps_mapping': {},
+                            'metrics': {},
+                            'route': {}
+                        }, indent=2),
                         'raw_output': result.stdout
                     }
                 
-                route_data = json.loads(json_line)
+                # Extract the JSON part (from first '{' to end)
+                json_output = output[json_start:]
+                
+                route_data = json.loads(json_output)
                 
                 # Debug: Print the metrics received from C++ API
                 if route_data.get('success', False):
