@@ -17,6 +17,7 @@ Usage:
 """
 
 import os
+import platform
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -27,6 +28,13 @@ load_dotenv(dotenv_path=env_path)
 
 class Config:
     """Centralized configuration for the Dynamic Road Network application"""
+    
+    # ========================================================================
+    # PLATFORM DETECTION
+    # ========================================================================
+    
+    IS_WINDOWS = platform.system() == 'Windows'
+    EXECUTABLE_SUFFIX = '.exe' if IS_WINDOWS else ''
     
     # ========================================================================
     # DIRECTORY PATHS
@@ -105,9 +113,9 @@ class Config:
         
         Priority:
         1. Environment variable DHL_EXECUTABLE
-        2. Main/build/dhl/dhl_routing_api
-        3. DualHierarchyLabelling/build/dhl_routing_api
-        4. DualHierarchyLabelling/dhl_routing_api
+        2. Main/build/dhl/dhl_routing_api[.exe]
+        3. DualHierarchyLabelling/build/dhl_routing_api[.exe]
+        4. DualHierarchyLabelling/dhl_routing_api[.exe]
         
         Returns:
             Path to DHL executable
@@ -120,15 +128,18 @@ class Config:
         if env_path and Path(env_path).exists():
             return Path(env_path).absolute()
         
+        # Executable name with platform-specific suffix
+        executable_name = f'dhl_routing_api{cls.EXECUTABLE_SUFFIX}'
+        
         # Search in standard locations
         search_paths = [
-            cls.DHL_BUILD_DIR / 'dhl_routing_api',
-            cls.DHL_SRC_DIR / 'build' / 'dhl_routing_api',
-            cls.DHL_SRC_DIR / 'dhl_routing_api',
-            cls.MAIN_DIR / 'dhl_routing_api',
+            cls.DHL_BUILD_DIR / executable_name,
+            cls.DHL_SRC_DIR / 'build' / executable_name,
+            cls.DHL_SRC_DIR / executable_name,
+            cls.MAIN_DIR / executable_name,
         ]
         
-        found = cls._find_executable('dhl_routing_api', search_paths)
+        found = cls._find_executable(executable_name, search_paths)
         if found:
             return found
         
@@ -145,9 +156,9 @@ class Config:
         
         Priority:
         1. Environment variable HC2L_EXECUTABLE
-        2. Main/build/hc2l/hc2l_routing_api
-        3. HighCardinalityTwoLevel/build/hc2l_routing_api
-        4. HighCardinalityTwoLevel/hc2l_routing_api
+        2. Main/build/hc2l/hc2l_routing_api[.exe]
+        3. HighCardinalityTwoLevel/build/hc2l_routing_api[.exe]
+        4. HighCardinalityTwoLevel/hc2l_routing_api[.exe]
         
         Returns:
             Path to HC2L executable
@@ -160,15 +171,18 @@ class Config:
         if env_path and Path(env_path).exists():
             return Path(env_path).absolute()
         
+        # Executable name with platform-specific suffix
+        executable_name = f'hc2l_routing_api{cls.EXECUTABLE_SUFFIX}'
+        
         # Search in standard locations
         search_paths = [
-            cls.HC2L_BUILD_DIR / 'hc2l_routing_api',
-            cls.HC2L_SRC_DIR / 'build' / 'hc2l_routing_api',
-            cls.HC2L_SRC_DIR / 'hc2l_routing_api',
-            cls.MAIN_DIR / 'hc2l_routing_api',
+            cls.HC2L_BUILD_DIR / executable_name,
+            cls.HC2L_SRC_DIR / 'build' / executable_name,
+            cls.HC2L_SRC_DIR / executable_name,
+            cls.MAIN_DIR / executable_name,
         ]
         
-        found = cls._find_executable('hc2l_routing_api', search_paths)
+        found = cls._find_executable(executable_name, search_paths)
         if found:
             return found
         
@@ -258,6 +272,12 @@ class Config:
         summary.append("=" * 60)
         summary.append("Dynamic Road Network - Configuration Summary")
         summary.append("=" * 60)
+        summary.append("")
+        
+        summary.append("PLATFORM:")
+        summary.append(f"  OS:            {platform.system()} ({platform.release()})")
+        summary.append(f"  Windows:       {'Yes' if cls.IS_WINDOWS else 'No'}")
+        summary.append(f"  Executable:    {cls.EXECUTABLE_SUFFIX or '(no suffix)'}")
         summary.append("")
         
         summary.append("DIRECTORIES:")

@@ -39,32 +39,15 @@ __pycache__/
 .pytest_cache/
 .coverage
 htmlcov/
-venv/
+.venv/
 ENV/
 env/
 venv.bak/
 cache/
 
-# Java / Maven / Gradle
-target/
-*.class
-*.jar
-*.war
-*.ear
-.springBeans
-.gradle/
-build/
-
-# Go
-bin/
-pkg/
-*.exe
-*.test
-vendor/
-
-# Rust
-/target/
-/**/*.rs.bk
+# Project-specific data and cache
+Main/cache/
+Main/data/
 
 # C/C++ / other compiled artifacts
 *.o
@@ -92,10 +75,6 @@ cmake-build-*/
 *.suo
 *.user
 *.userosscache
-
-# JetBrains
-.idea/
-out/
 
 # Mac / Linux editor temp files
 .*.swp
