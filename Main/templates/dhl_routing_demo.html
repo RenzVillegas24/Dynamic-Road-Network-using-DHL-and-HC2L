@@ -1,7 +1,11 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>DHL Routing on Google Maps</title>
+    <title>DHL Routing on OpenStreetMap</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+     crossorigin=""/>
     <style>
         body { font-family: Arial, sans-serif; margin: 0; padding: 10px; }
         #map { height: 70vh; width: 100%; border: 1px solid #ccc; }
@@ -148,23 +152,25 @@
         let nodesData = [];
 
         function initMap() {
-            // Initialize the map centered on Quezon City
-            map = new google.maps.Map(document.getElementById('map'), {
-                zoom: 13,
-                center: { lat: 14.6760, lng: 121.0437 },
-                mapTypeId: 'roadmap'
-            });
+            // Initialize Leaflet map centered on Quezon City
+            map = L.map('map').setView([14.6760, 121.0437], 13);
+
+            // Add OpenStreetMap tile layer
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                maxZoom: 19
+            }).addTo(map);
 
             // Add click listener for setting route points
-            map.addListener('click', function(e) {
+            map.on('click', function(e) {
                 if (routeMode) {
-                    handleMapClick(e.latLng);
+                    handleMapClick(e.latlng);
                 } else if (pinMode) {
-                    handlePinClick(e.latLng);
+                    handlePinClick(e.latlng);
                 }
             });
 
-            console.log('DHL Map initialized');
+            console.log('DHL Map initialized with OpenStreetMap');
         }
 
         function enableRouteMode() {
@@ -187,10 +193,10 @@
 
         function handleMapClick(latLng) {
             if (!startCoords) {
-                setStartPoint(latLng.lat(), latLng.lng());
+                setStartPoint(latLng.lat, latLng.lng);
                 updateInstructions('Click on the map to set destination point');
             } else if (!destCoords) {
-                setDestPoint(latLng.lat(), latLng.lng());
+                setDestPoint(latLng.lat, latLng.lng);
                 routeMode = false;
                 updateInstructions('Ready to compute route!');
                 enableRouteButtons();
@@ -199,13 +205,13 @@
 
         function handlePinClick(latLng) {
             if (pinMode === 'start') {
-                setStartPoint(latLng.lat(), latLng.lng());
-                document.getElementById('startLat').value = latLng.lat().toFixed(6);
-                document.getElementById('startLng').value = latLng.lng().toFixed(6);
+                setStartPoint(latLng.lat, latLng.lng);
+                document.getElementById('startLat').value = latLng.lat.toFixed(6);
+                document.getElementById('startLng').value = latLng.lng.toFixed(6);
             } else if (pinMode === 'dest') {
-                setDestPoint(latLng.lat(), latLng.lng());
-                document.getElementById('destLat').value = latLng.lat().toFixed(6);
-                document.getElementById('destLng').value = latLng.lng().toFixed(6);
+                setDestPoint(latLng.lat, latLng.lng);
+                document.getElementById('destLat').value = latLng.lat.toFixed(6);
+                document.getElementById('destLng').value = latLng.lng.toFixed(6);
             }
             pinMode = null;
             updateInstructions('Point set successfully');
@@ -215,29 +221,39 @@
         function setStartPoint(lat, lng) {
             startCoords = { lat: lat, lng: lng };
             
-            if (startMarker) startMarker.setMap(null);
-            startMarker = new google.maps.Marker({
-                position: { lat: lat, lng: lng },
-                map: map,
-                title: 'Start Point',
-                icon: {
-                    url: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png'
-                }
+            if (startMarker) map.removeLayer(startMarker);
+            
+            // Create green marker for start point
+            const greenIcon = L.icon({
+                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+                iconSize: [25, 41],
+                iconAnchor: [12, 41],
+                popupAnchor: [1, -34],
+                shadowSize: [41, 41]
             });
+            
+            startMarker = L.marker([lat, lng], {icon: greenIcon}).addTo(map);
+            startMarker.bindPopup('Start Point').openPopup();
         }
 
         function setDestPoint(lat, lng) {
             destCoords = { lat: lat, lng: lng };
             
-            if (destMarker) destMarker.setMap(null);
-            destMarker = new google.maps.Marker({
-                position: { lat: lat, lng: lng },
-                map: map,
-                title: 'Destination Point',
-                icon: {
-                    url: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png'
-                }
+            if (destMarker) map.removeLayer(destMarker);
+            
+            // Create red marker for destination point
+            const redIcon = L.icon({
+                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+                iconSize: [25, 41],
+                iconAnchor: [12, 41],
+                popupAnchor: [1, -34],
+                shadowSize: [41, 41]
             });
+            
+            destMarker = L.marker([lat, lng], {icon: redIcon}).addTo(map);
+            destMarker.bindPopup('Destination Point').openPopup();
         }
 
         function enableRouteButtons() {
@@ -267,13 +283,13 @@
 
         function clearRoute() {
             // Clear markers
-            if (startMarker) startMarker.setMap(null);
-            if (destMarker) destMarker.setMap(null);
+            if (startMarker) map.removeLayer(startMarker);
+            if (destMarker) map.removeLayer(destMarker);
             startMarker = null;
             destMarker = null;
             
             // Clear polylines
-            currentPolylines.forEach(polyline => polyline.setMap(null));
+            currentPolylines.forEach(polyline => map.removeLayer(polyline));
             currentPolylines = [];
             
             // Reset coordinates
@@ -331,14 +347,21 @@
 
         function displayDHLRoute(data, useDisruptions) {
             // Clear existing polylines
-            currentPolylines.forEach(polyline => polyline.setMap(null));
+            currentPolylines.forEach(polyline => map.removeLayer(polyline));
             currentPolylines = [];
 
             // Draw route polylines
             if (data.route && data.route.polylines) {
                 data.route.polylines.forEach(polylineData => {
-                    const polyline = new google.maps.Polyline(polylineData);
-                    polyline.setMap(map);
+                    // Convert Google Maps format to Leaflet format
+                    const latlngs = polylineData.path.map(coord => [coord.lat, coord.lng]);
+                    
+                    const polyline = L.polyline(latlngs, {
+                        color: polylineData.strokeColor || '#0066FF',
+                        weight: polylineData.strokeWeight || 5,
+                        opacity: polylineData.strokeOpacity || 0.8
+                    }).addTo(map);
+                    
                     currentPolylines.push(polyline);
                 });
             }
@@ -466,15 +489,22 @@
 
         function displayRouteComparison(data) {
             // Clear existing polylines
-            currentPolylines.forEach(polyline => polyline.setMap(null));
+            currentPolylines.forEach(polyline => map.removeLayer(polyline));
             currentPolylines = [];
 
             // Draw all route polylines
             Object.values(data.routes).forEach(route => {
                 if (route.polylines) {
                     route.polylines.forEach(polylineData => {
-                        const polyline = new google.maps.Polyline(polylineData);
-                        polyline.setMap(map);
+                        // Convert Google Maps format to Leaflet format
+                        const latlngs = polylineData.path.map(coord => [coord.lat, coord.lng]);
+                        
+                        const polyline = L.polyline(latlngs, {
+                            color: polylineData.strokeColor || '#0066FF',
+                            weight: polylineData.strokeWeight || 5,
+                            opacity: polylineData.strokeOpacity || 0.8
+                        }).addTo(map);
+                        
                         currentPolylines.push(polyline);
                     });
                 }
@@ -486,15 +516,22 @@
 
         function displayAlgorithmComparison(data, useDisruptions) {
             // Clear existing polylines
-            currentPolylines.forEach(polyline => polyline.setMap(null));
+            currentPolylines.forEach(polyline => map.removeLayer(polyline));
             currentPolylines = [];
 
             // Draw all route polylines
             Object.values(data.routes).forEach(route => {
                 if (route.polylines) {
                     route.polylines.forEach(polylineData => {
-                        const polyline = new google.maps.Polyline(polylineData);
-                        polyline.setMap(map);
+                        // Convert Google Maps format to Leaflet format
+                        const latlngs = polylineData.path.map(coord => [coord.lat, coord.lng]);
+                        
+                        const polyline = L.polyline(latlngs, {
+                            color: polylineData.strokeColor || '#0066FF',
+                            weight: polylineData.strokeWeight || 5,
+                            opacity: polylineData.strokeOpacity || 0.8
+                        }).addTo(map);
+                        
                         currentPolylines.push(polyline);
                     });
                 }
@@ -598,7 +635,9 @@
         window.onload = initMap;
     </script>
     
-    <!-- Google Maps API -->
-    <script async defer src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initMap"></script>
+    <!-- Leaflet JavaScript -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+     integrity="sha512-gZwIG9x3wUXg2hdXF6+rVkLF/0Vi9U8D2Ntg4Ga5I5BZpVkVxlJWbSQtXPSiUTtC0TjtGOmxa1AJPuV0CPthew=="
+     crossorigin=""></script>
 </body>
 </html>

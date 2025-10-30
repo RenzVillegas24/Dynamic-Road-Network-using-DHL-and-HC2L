@@ -1,7 +1,11 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>D-HC2L Dynamic Routing on Google Maps</title>
+    <title>D-HC2L Dynamic Routing on OpenStreetMap</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+     crossorigin=""/>
     <style>
         body { font-family: Arial, sans-serif; margin: 0; padding: 10px; }
         #map { height: 70vh; width: 100%; border: 1px solid #ccc; }
@@ -128,25 +132,27 @@
         let trafficPolylines = [];
         
         function initMap() {
-            // Center on Quezon City
-            map = new google.maps.Map(document.getElementById('map'), {
-                zoom: 13,
-                center: {lat: 14.6760, lng: 121.0437},
-                mapTypeId: 'roadmap'
-            });
+            // Initialize Leaflet map centered on Quezon City
+            map = L.map('map').setView([14.6760, 121.0437], 13);
+
+            // Add OpenStreetMap tile layer
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                maxZoom: 19
+            }).addTo(map);
             
             // Click listener for route planning and pin modes
-            map.addListener('click', function(event) {
+            map.on('click', function(event) {
                 if (routeMode) {
-                    handleMapClick(event.latLng.lat(), event.latLng.lng());
+                    handleMapClick(event.latlng.lat, event.latlng.lng);
                 } else if (pinStartMode) {
-                    handlePinStartClick(event.latLng.lat(), event.latLng.lng());
+                    handlePinStartClick(event.latlng.lat, event.latlng.lng);
                 } else if (pinDestMode) {
-                    handlePinDestClick(event.latLng.lat(), event.latLng.lng());
+                    handlePinDestClick(event.latlng.lat, event.latlng.lng);
                 }
             });
             
-            console.log('D-HC2L Map initialized. Click "Select Route Points" to start planning.');
+            console.log('D-HC2L Map initialized with OpenStreetMap. Click "Select Route Points" to start planning.');
         }
         
         function enableRouteMode() {
@@ -171,13 +177,20 @@
                 // Set start point
                 startCoords = {lat: lat, lng: lng};
                 
-                if (startMarker) startMarker.setMap(null);
-                startMarker = new google.maps.Marker({
-                    position: {lat: lat, lng: lng},
-                    map: map,
-                    title: 'Start Point',
-                    icon: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png'
+                if (startMarker) map.removeLayer(startMarker);
+                
+                // Create green marker for start point
+                const greenIcon = L.icon({
+                    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+                    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+                    iconSize: [25, 41],
+                    iconAnchor: [12, 41],
+                    popupAnchor: [1, -34],
+                    shadowSize: [41, 41]
                 });
+                
+                startMarker = L.marker([lat, lng], {icon: greenIcon}).addTo(map);
+                startMarker.bindPopup('Start Point').openPopup();
                 
                 // Update input fields
                 document.getElementById('startLat').value = lat.toFixed(6);
@@ -189,13 +202,20 @@
                 // Set end point
                 endCoords = {lat: lat, lng: lng};
                 
-                if (endMarker) endMarker.setMap(null);
-                endMarker = new google.maps.Marker({
-                    position: {lat: lat, lng: lng},
-                    map: map,
-                    title: 'Destination',
-                    icon: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png'
+                if (endMarker) map.removeLayer(endMarker);
+                
+                // Create red marker for destination point
+                const redIcon = L.icon({
+                    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+                    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+                    iconSize: [25, 41],
+                    iconAnchor: [12, 41],
+                    popupAnchor: [1, -34],
+                    shadowSize: [41, 41]
                 });
+                
+                endMarker = L.marker([lat, lng], {icon: redIcon}).addTo(map);
+                endMarker.bindPopup('Destination').openPopup();
                 
                 // Update input fields
                 document.getElementById('destLat').value = lat.toFixed(6);
@@ -215,7 +235,6 @@
                 `;
                 
                 routeMode = false;
-                map.setOptions({cursor: 'default'});
                 
                 console.log(`Destination set: ${lat.toFixed(6)}, ${lng.toFixed(6)}`);
                 console.log('Ready to compute route!');
@@ -258,13 +277,19 @@
             // Set start point
             startCoords = {lat: lat, lng: lng};
             
-            if (startMarker) startMarker.setMap(null);
-            startMarker = new google.maps.Marker({
-                position: {lat: lat, lng: lng},
-                map: map,
-                title: 'Start Point',
-                icon: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png'
+            if (startMarker) map.removeLayer(startMarker);
+            
+            const greenIcon = L.icon({
+                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+                iconSize: [25, 41],
+                iconAnchor: [12, 41],
+                popupAnchor: [1, -34],
+                shadowSize: [41, 41]
             });
+            
+            startMarker = L.marker([lat, lng], {icon: greenIcon}).addTo(map);
+            startMarker.bindPopup('Start Point');
             
             // Update input fields
             document.getElementById('startLat').value = lat.toFixed(6);
@@ -272,7 +297,6 @@
             
             // Exit pin mode
             pinStartMode = false;
-            map.setOptions({cursor: 'default'});
             
             // Update instructions
             document.getElementById('instructionPanel').innerHTML = `
@@ -295,13 +319,19 @@
             // Set destination point
             endCoords = {lat: lat, lng: lng};
             
-            if (endMarker) endMarker.setMap(null);
-            endMarker = new google.maps.Marker({
-                position: {lat: lat, lng: lng},
-                map: map,
-                title: 'Destination',
-                icon: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png'
+            if (endMarker) map.removeLayer(endMarker);
+            
+            const redIcon = L.icon({
+                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+                iconSize: [25, 41],
+                iconAnchor: [12, 41],
+                popupAnchor: [1, -34],
+                shadowSize: [41, 41]
             });
+            
+            endMarker = L.marker([lat, lng], {icon: redIcon}).addTo(map);
+            endMarker.bindPopup('Destination');
             
             // Update input fields
             document.getElementById('destLat').value = lat.toFixed(6);
@@ -309,7 +339,6 @@
             
             // Exit pin mode
             pinDestMode = false;
-            map.setOptions({cursor: 'default'});
             
             // Update instructions
             document.getElementById('instructionPanel').innerHTML = `
@@ -425,24 +454,32 @@
             
             clearMarkers();
             
-            startMarker = new google.maps.Marker({
-                position: startCoords,
-                map: map,
-                title: 'Start Point',
-                icon: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png'
+            const greenIcon = L.icon({
+                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+                iconSize: [25, 41],
+                iconAnchor: [12, 41],
+                popupAnchor: [1, -34],
+                shadowSize: [41, 41]
             });
             
-            endMarker = new google.maps.Marker({
-                position: endCoords,
-                map: map,
-                title: 'Destination',
-                icon: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png'
+            const redIcon = L.icon({
+                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+                iconSize: [25, 41],
+                iconAnchor: [12, 41],
+                popupAnchor: [1, -34],
+                shadowSize: [41, 41]
             });
+            
+            startMarker = L.marker([startLat, startLng], {icon: greenIcon}).addTo(map);
+            startMarker.bindPopup('Start Point');
+            
+            endMarker = L.marker([destLat, destLng], {icon: redIcon}).addTo(map);
+            endMarker.bindPopup('Destination');
             
             // Fit map to show both points
-            const bounds = new google.maps.LatLngBounds();
-            bounds.extend(startCoords);
-            bounds.extend(endCoords);
+            const bounds = L.latLngBounds([[startLat, startLng], [destLat, destLng]]);
             map.fitBounds(bounds);
             
             // Enable buttons
@@ -506,24 +543,21 @@
             
             // Display route polylines
             routeData.route.polylines.forEach(polyline => {
-                const mapPolyline = new google.maps.Polyline({
-                    path: polyline.path,
-                    geodesic: polyline.geodesic,
-                    strokeColor: polyline.strokeColor,
-                    strokeOpacity: polyline.strokeOpacity,
-                    strokeWeight: polyline.strokeWeight,
-                    map: map
-                });
+                const latlngs = polyline.path.map(coord => [coord.lat, coord.lng]);
+                
+                const mapPolyline = L.polyline(latlngs, {
+                    color: polyline.strokeColor,
+                    weight: polyline.strokeWeight,
+                    opacity: polyline.strokeOpacity
+                }).addTo(map);
                 
                 routePolylines.push(mapPolyline);
             });
             
             // Fit map to show route
-            if (routeData.route.polylines.length > 0) {
-                const bounds = new google.maps.LatLngBounds();
-                routeData.route.polylines[0].path.forEach(point => {
-                    bounds.extend(point);
-                });
+            if (routeData.route.polylines.length > 0 && routeData.route.polylines[0].path.length > 0) {
+                const latlngs = routeData.route.polylines[0].path.map(coord => [coord.lat, coord.lng]);
+                const bounds = L.latLngBounds(latlngs);
                 map.fitBounds(bounds);
             }
             
@@ -531,7 +565,7 @@
             document.getElementById('routeLegend').style.display = 'block';
             document.getElementById('routeInfo').style.display = 'block';
         }
-        
+
         function displayRouteComparison(comparisonData) {
             clearRoute(false);
             
@@ -539,14 +573,13 @@
             Object.values(comparisonData.routes).forEach(routeInfo => {
                 if (routeInfo.polylines) {
                     routeInfo.polylines.forEach(polyline => {
-                        const mapPolyline = new google.maps.Polyline({
-                            path: polyline.path,
-                            geodesic: polyline.geodesic || true,
-                            strokeColor: polyline.strokeColor,
-                            strokeOpacity: polyline.strokeOpacity,
-                            strokeWeight: polyline.strokeWeight,
-                            map: map
-                        });
+                        const latlngs = polyline.path.map(coord => [coord.lat, coord.lng]);
+                        
+                        const mapPolyline = L.polyline(latlngs, {
+                            color: polyline.strokeColor,
+                            weight: polyline.strokeWeight,
+                            opacity: polyline.strokeOpacity
+                        }).addTo(map);
                         
                         routePolylines.push(mapPolyline);
                     });
@@ -569,10 +602,13 @@
             }
             
             // Fit map to show all routes
-            const bounds = new google.maps.LatLngBounds();
-            bounds.extend(comparisonData.start_point);
-            bounds.extend(comparisonData.end_point);
-            map.fitBounds(bounds);
+            if (comparisonData.start_point && comparisonData.end_point) {
+                const bounds = L.latLngBounds([
+                    [comparisonData.start_point.lat, comparisonData.start_point.lng],
+                    [comparisonData.end_point.lat, comparisonData.end_point.lng]
+                ]);
+                map.fitBounds(bounds);
+            }
             
             document.getElementById('routeLegend').style.display = 'block';
             document.getElementById('routeInfo').style.display = 'block';
@@ -758,12 +794,12 @@ ${routeData.raw_output || 'No raw output available'}
             detailsContainer.innerHTML = detailsHTML;
         }
         
-        function clearRoute(clearMarkers = true) {
+        function clearRoute(shouldClearMarkers = true) {
             // Clear polylines
-            routePolylines.forEach(polyline => polyline.setMap(null));
+            routePolylines.forEach(polyline => map.removeLayer(polyline));
             routePolylines = [];
             
-            if (clearMarkers) {
+            if (shouldClearMarkers) {
                 clearMarkers();
                 
                 // Reset state
@@ -810,11 +846,11 @@ ${routeData.raw_output || 'No raw output available'}
         
         function clearMarkers() {
             if (startMarker) {
-                startMarker.setMap(null);
+                map.removeLayer(startMarker);
                 startMarker = null;
             }
             if (endMarker) {
-                endMarker.setMap(null);
+                map.removeLayer(endMarker);
                 endMarker = null;
             }
         }
@@ -837,7 +873,7 @@ ${routeData.raw_output || 'No raw output available'}
         
         function displayNodes(nodes) {
             // Clear existing nodes
-            nodeMarkers.forEach(marker => marker.setMap(null));
+            nodeMarkers.forEach(marker => map.removeLayer(marker));
             nodeMarkers = [];
             
             // Sample nodes to avoid overwhelming the map
@@ -845,20 +881,16 @@ ${routeData.raw_output || 'No raw output available'}
             const sampledNodes = nodes.sort(() => 0.5 - Math.random()).slice(0, sampleSize);
             
             sampledNodes.forEach(node => {
-                const marker = new google.maps.Marker({
-                    position: {lat: node.lat, lng: node.lng},
-                    map: map,
-                    title: `Node ${node.node_id}`,
-                    icon: {
-                        path: google.maps.SymbolPath.CIRCLE,
-                        scale: 2,
-                        fillColor: '#0000FF',
-                        fillOpacity: 0.6,
-                        strokeWeight: 1,
-                        strokeColor: '#FFFFFF'
-                    }
-                });
+                const marker = L.circleMarker([node.lat, node.lng], {
+                    radius: 2,
+                    fillColor: '#0000FF',
+                    color: '#FFFFFF',
+                    weight: 1,
+                    opacity: 1,
+                    fillOpacity: 0.6
+                }).addTo(map);
                 
+                marker.bindPopup(`Node ${node.node_id}`);
                 nodeMarkers.push(marker);
             });
             
@@ -883,13 +915,13 @@ ${routeData.raw_output || 'No raw output available'}
         
         function displayTrafficData(edges) {
             // Clear existing traffic data
-            trafficPolylines.forEach(polyline => polyline.setMap(null));
+            trafficPolylines.forEach(polyline => map.removeLayer(polyline));
             trafficPolylines = [];
             
             edges.forEach(edge => {
                 const path = [
-                    {lat: edge.source_lat, lng: edge.source_lng},
-                    {lat: edge.target_lat, lng: edge.target_lng}
+                    [edge.source_lat, edge.source_lng],
+                    [edge.target_lat, edge.target_lng]
                 ];
                 
                 // Color based on traffic conditions
@@ -911,14 +943,11 @@ ${routeData.raw_output || 'No raw output available'}
                     weight = 2;
                 }
                 
-                const polyline = new google.maps.Polyline({
-                    path: path,
-                    geodesic: true,
-                    strokeColor: color,
-                    strokeOpacity: 0.7,
-                    strokeWeight: weight,
-                    map: map
-                });
+                const polyline = L.polyline(path, {
+                    color: color,
+                    weight: weight,
+                    opacity: 0.7
+                }).addTo(map);
                 
                 trafficPolylines.push(polyline);
             });
@@ -928,11 +957,11 @@ ${routeData.raw_output || 'No raw output available'}
             clearRoute(true);
             
             // Clear nodes
-            nodeMarkers.forEach(marker => marker.setMap(null));
+            nodeMarkers.forEach(marker => map.removeLayer(marker));
             nodeMarkers = [];
             
             // Clear traffic data
-            trafficPolylines.forEach(polyline => polyline.setMap(null));
+            trafficPolylines.forEach(polyline => map.removeLayer(polyline));
             trafficPolylines = [];
             
             // Reset all modes
@@ -940,7 +969,6 @@ ${routeData.raw_output || 'No raw output available'}
             pinStartMode = false;
             pinDestMode = false;
             
-            map.setOptions({cursor: 'default'});
             console.log('All map data cleared');
         }
         
@@ -955,8 +983,9 @@ ${routeData.raw_output || 'No raw output available'}
         }
     </script>
     
-    <script async defer
-        src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initMap">
-    </script>
+    <!-- Leaflet JavaScript -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+     integrity="sha512-gZwIG9x3wUXg2hdXF6+rVkLF/0Vi9U8D2Ntg4Ga5I5BZpVkVxlJWbSQtXPSiUTtC0TjtGOmxa1AJPuV0CPthew=="
+     crossorigin=""></script>
 </body>
 </html>

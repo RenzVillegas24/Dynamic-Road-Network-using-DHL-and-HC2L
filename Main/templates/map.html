@@ -1,7 +1,13 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Quezon City Road Network Node Validator</title>
+    <title>Quezon City Road Network Node Validator - OpenStreetMap</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+          crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+            crossorigin=""></script>
     <style>
         body { font-family: Arial, sans-serif; margin: 0; padding: 10px; }
         #map { height: 70vh; width: 100%; border: 1px solid #ccc; }
@@ -123,16 +129,18 @@
         let showNodeNumbers = false;
         
         function initMap() {
-            // Center on Quezon City
-            map = new google.maps.Map(document.getElementById('map'), {
-                zoom: 12,
-                center: {lat: 14.6760, lng: 121.0437}, // Quezon City center
-                mapTypeId: 'roadmap'
-            });
+            // Center on Quezon City with Leaflet
+            map = L.map('map').setView([14.6760, 121.0437], 12);
+            
+            // Add OpenStreetMap tiles
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 19
+            }).addTo(map);
             
             // Click listener for finding nearest node
-            map.addListener('click', function(event) {
-                findNearestNode(event.latLng.lat(), event.latLng.lng());
+            map.on('click', function(event) {
+                findNearestNode(event.latlng.lat, event.latlng.lng);
             });
             
             console.log('Map initialized. Click "Load All Nodes" to start validation.');
@@ -187,9 +195,9 @@
             clearEdges();
             
             edges.forEach(edge => {
-                const path = [
-                    {lat: edge.source_lat, lng: edge.source_lng},
-                    {lat: edge.target_lat, lng: edge.target_lng}
+                const latlngs = [
+                    [edge.source_lat, edge.source_lng],
+                    [edge.target_lat, edge.target_lng]
                 ];
                 
                 // Color based on traffic conditions
@@ -211,18 +219,15 @@
                     weight = 2;
                 }
                 
-                const polyline = new google.maps.Polyline({
-                    path: path,
-                    geodesic: true,
-                    strokeColor: color,
-                    strokeOpacity: 0.8,
-                    strokeWeight: weight,
-                    map: map
-                });
+                const polyline = L.polyline(latlngs, {
+                    color: color,
+                    opacity: 0.8,
+                    weight: weight
+                }).addTo(map);
                 
                 // Add click listener to show traffic info
-                polyline.addListener('click', function(event) {
-                    showTrafficInfo(edge, event.latLng);
+                polyline.on('click', function(event) {
+                    showTrafficInfo(edge, event.latlng);
                 });
                 
                 edgePolylines.push(polyline);
@@ -253,20 +258,28 @@
                 <strong>Target Node:</strong> ${edgeData.target_id} (${edgeData.target_lat.toFixed(6)}, ${edgeData.target_lng.toFixed(6)})<br>
                 <br>
                 <button onclick="centerOnEdge(${edgeData.source_lat}, ${edgeData.source_lng}, ${edgeData.target_lat}, ${edgeData.target_lng})">Center on Edge</button>
-                <button onclick="openInGoogleMaps(${clickLatLng.lat()}, ${clickLatLng.lng()})">Open in Google Maps</button>
+                <button onclick="window.open('https://www.openstreetmap.org/?mlat=${clickLatLng.lat}&mlon=${clickLatLng.lng}#map=18/${clickLatLng.lat}/${clickLatLng.lng}', '_blank')">Open in OpenStreetMap</button>
             `;
             
             infoDiv.innerHTML = html;
             nodeInfoDiv.style.display = 'block';
             
             // Highlight the clicked edge temporarily
-            if (selectedMarker) selectedMarker.setMap(null);
-            selectedMarker = new google.maps.Marker({
-                position: clickLatLng,
-                map: map,
-                title: `${edgeData.road_name} - ${statusText}`,
-                icon: 'http://maps.google.com/mapfiles/ms/icons/yellow-dot.png'
+            if (selectedMarker) map.removeLayer(selectedMarker);
+            
+            const yellowIcon = L.icon({
+                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-yellow.png',
+                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+                iconSize: [25, 41],
+                iconAnchor: [12, 41],
+                popupAnchor: [1, -34],
+                shadowSize: [41, 41]
             });
+            
+            selectedMarker = L.marker([clickLatLng.lat, clickLatLng.lng], {
+                icon: yellowIcon,
+                title: `${edgeData.road_name} - ${statusText}`
+            }).addTo(map);
         }
         
         async function loadNodesAndEdges() {
@@ -291,25 +304,22 @@
             };
             
             edges.forEach(edge => {
-                const path = [
-                    {lat: edge.source_lat, lng: edge.source_lng},
-                    {lat: edge.target_lat, lng: edge.target_lng}
+                const latlngs = [
+                    [edge.source_lat, edge.source_lng],
+                    [edge.target_lat, edge.target_lng]
                 ];
                 
                 const color = highwayColors[edge.highway] || '#999999';
                 
-                const polyline = new google.maps.Polyline({
-                    path: path,
-                    geodesic: true,
-                    strokeColor: color,
-                    strokeOpacity: 0.8,
-                    strokeWeight: 2,
-                    map: map
-                });
+                const polyline = L.polyline(latlngs, {
+                    color: color,
+                    opacity: 0.8,
+                    weight: 2
+                }).addTo(map);
                 
                 // Add click listener to show edge info
-                polyline.addListener('click', function(event) {
-                    showEdgeInfo(edge, event.latLng);
+                polyline.on('click', function(event) {
+                    showEdgeInfo(edge, event.latlng);
                 });
                 
                 edgePolylines.push(polyline);
@@ -319,7 +329,7 @@
         }
         
         function clearEdges() {
-            edgePolylines.forEach(polyline => polyline.setMap(null));
+            edgePolylines.forEach(polyline => map.removeLayer(polyline));
             edgePolylines = [];
         }
         
@@ -336,26 +346,35 @@
                 <strong>Target Node:</strong> ${edgeData.target_id} (${edgeData.target_lat.toFixed(6)}, ${edgeData.target_lng.toFixed(6)})<br>
                 <br>
                 <button onclick="centerOnEdge(${edgeData.source_lat}, ${edgeData.source_lng}, ${edgeData.target_lat}, ${edgeData.target_lng})">Center on Edge</button>
-                <button onclick="openInGoogleMaps(${clickLatLng.lat()}, ${clickLatLng.lng()})">Open in Google Maps</button>
+                <button onclick="window.open('https://www.openstreetmap.org/?mlat=${clickLatLng.lat}&mlon=${clickLatLng.lng}#map=18/${clickLatLng.lat}/${clickLatLng.lng}', '_blank')">Open in OpenStreetMap</button>
             `;
             
             infoDiv.innerHTML = html;
             nodeInfoDiv.style.display = 'block';
             
             // Highlight the clicked edge temporarily
-            if (selectedMarker) selectedMarker.setMap(null);
-            selectedMarker = new google.maps.Marker({
-                position: clickLatLng,
-                map: map,
-                title: 'Edge clicked here',
-                icon: 'http://maps.google.com/mapfiles/ms/icons/yellow-dot.png'
+            if (selectedMarker) map.removeLayer(selectedMarker);
+            
+            const yellowIcon = L.icon({
+                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-yellow.png',
+                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+                iconSize: [25, 41],
+                iconAnchor: [12, 41],
+                popupAnchor: [1, -34],
+                shadowSize: [41, 41]
             });
+            
+            selectedMarker = L.marker([clickLatLng.lat, clickLatLng.lng], {
+                icon: yellowIcon,
+                title: 'Edge clicked here'
+            }).addTo(map);
         }
         
         function centerOnEdge(sourceLat, sourceLng, targetLat, targetLng) {
-            const bounds = new google.maps.LatLngBounds();
-            bounds.extend({lat: sourceLat, lng: sourceLng});
-            bounds.extend({lat: targetLat, lng: targetLng});
+            const bounds = L.latLngBounds(
+                [sourceLat, sourceLng],
+                [targetLat, targetLng]
+            );
             map.fitBounds(bounds);
         }
         
@@ -405,22 +424,18 @@
             clearNodes();
             
             nodes.forEach(node => {
-                const marker = new google.maps.Marker({
-                    position: {lat: node.lat, lng: node.lng},
-                    map: map,
-                    title: `Node ${node.node_id}`,
-                    icon: {
-                        path: google.maps.SymbolPath.CIRCLE,
-                        scale: 3,
-                        fillColor: '#FF0000',
-                        fillOpacity: 0.8,
-                        strokeWeight: 1,
-                        strokeColor: '#FFFFFF'
-                    }
-                });
+                const marker = L.circleMarker([node.lat, node.lng], {
+                    radius: 3,
+                    fillColor: '#FF0000',
+                    fillOpacity: 0.8,
+                    color: '#FFFFFF',
+                    weight: 1
+                }).addTo(map);
+                
+                marker.bindPopup(`Node ${node.node_id}`);
                 
                 // Add click listener to show node info
-                marker.addListener('click', function() {
+                marker.on('click', function() {
                     showNodeInfo(node, marker);
                 });
                 
@@ -428,38 +443,26 @@
                 
                 // Add label if enabled
                 if (showNodeNumbers) {
-                    const label = new google.maps.Marker({
-                        position: {lat: node.lat, lng: node.lng},
-                        map: map,
-                        label: {
-                            text: node.node_id.toString(),
-                            color: 'black',
-                            fontSize: '10px',
-                            fontWeight: 'bold'
-                        },
-                        icon: {
-                            path: google.maps.SymbolPath.CIRCLE,
-                            scale: 0,
-                            fillOpacity: 0,
-                            strokeWeight: 0
-                        }
+                    const icon = L.divIcon({
+                        className: 'node-label',
+                        html: `<div style="font-size: 10px; font-weight: bold; color: black; text-shadow: 1px 1px 2px white;">${node.node_id}</div>`,
+                        iconSize: [30, 12],
+                        iconAnchor: [15, 6]
                     });
+                    const label = L.marker([node.lat, node.lng], {icon: icon}).addTo(map);
                     nodeMarkers.push(label);
                 }
             });
             
             // Fit map to show all nodes
             if (nodes.length > 0) {
-                const bounds = new google.maps.LatLngBounds();
-                nodes.forEach(node => {
-                    bounds.extend({lat: node.lat, lng: node.lng});
-                });
+                const bounds = L.latLngBounds(nodes.map(node => [node.lat, node.lng]));
                 map.fitBounds(bounds);
             }
         }
         
         function clearNodes() {
-            nodeMarkers.forEach(marker => marker.setMap(null));
+            nodeMarkers.forEach(marker => map.removeLayer(marker));
             nodeMarkers = [];
             
             document.getElementById('nodeInfo').style.display = 'none';
@@ -489,15 +492,22 @@
                 
                 if (result.success) {
                     // Clear previous selection
-                    if (selectedMarker) selectedMarker.setMap(null);
+                    if (selectedMarker) map.removeLayer(selectedMarker);
+                    
+                    const blueIcon = L.icon({
+                        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+                        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+                        iconSize: [25, 41],
+                        iconAnchor: [12, 41],
+                        popupAnchor: [1, -34],
+                        shadowSize: [41, 41]
+                    });
                     
                     // Show clicked point
-                    selectedMarker = new google.maps.Marker({
-                        position: {lat: lat, lng: lng},
-                        map: map,
-                        title: 'Clicked location',
-                        icon: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png'
-                    });
+                    selectedMarker = L.marker([lat, lng], {
+                        icon: blueIcon,
+                        title: 'Clicked location'
+                    }).addTo(map);
                     
                     // Show nearest node info
                     showNodeInfo(result, null, true);
@@ -529,7 +539,7 @@
             html += `
                 <br>
                 <button onclick="centerOnNode(${nodeData.lat}, ${nodeData.lng})">Center Map</button>
-                <button onclick="openInGoogleMaps(${nodeData.lat}, ${nodeData.lng})">Open in Google Maps</button>
+                <button onclick="window.open('https://www.openstreetmap.org/?mlat=${nodeData.lat}&mlon=${nodeData.lng}#map=18/${nodeData.lat}/${nodeData.lng}', '_blank')">Open in OpenStreetMap</button>
             `;
             
             infoDiv.innerHTML = html;
@@ -537,12 +547,7 @@
         }
         
         function centerOnNode(lat, lng) {
-            map.setCenter({lat: lat, lng: lng});
-            map.setZoom(18);
-        }
-        
-        function openInGoogleMaps(lat, lng) {
-            window.open(`https://www.google.com/maps?q=${lat},${lng}`, '_blank');
+            map.setView([lat, lng], 18);
         }
         
         function updateStats(total, displayed) {
@@ -718,65 +723,69 @@
         }
         
         function displaySpecificNode(node, highlight = false) {
-            const marker = new google.maps.Marker({
-                position: {lat: node.lat, lng: node.lng},
-                map: map,
-                title: `Node ${node.node_id}`,
-                icon: {
-                    path: google.maps.SymbolPath.CIRCLE,
-                    scale: highlight ? 8 : 5,
-                    fillColor: highlight ? '#00FF00' : '#FF0000',
-                    fillOpacity: 1,
-                    strokeWeight: 2,
-                    strokeColor: '#FFFFFF'
-                },
-                label: {
-                    text: node.node_id.toString(),
-                    color: 'black',
-                    fontSize: '12px',
-                    fontWeight: 'bold'
-                }
+            const greenIcon = L.icon({
+                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+                iconSize: highlight ? [38, 62] : [25, 41],
+                iconAnchor: highlight ? [19, 62] : [12, 41],
+                popupAnchor: [1, -34],
+                shadowSize: [41, 41]
             });
             
-            marker.addListener('click', function() {
+            const redIcon = L.icon({
+                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+                iconSize: [25, 41],
+                iconAnchor: [12, 41],
+                popupAnchor: [1, -34],
+                shadowSize: [41, 41]
+            });
+            
+            const marker = L.marker([node.lat, node.lng], {
+                icon: highlight ? greenIcon : redIcon,
+                title: `Node ${node.node_id}`
+            }).addTo(map);
+            
+            marker.bindTooltip(`${node.node_id}`, {
+                permanent: true,
+                direction: 'top',
+                className: 'node-label-tooltip',
+                offset: [0, -20]
+            });
+            
+            marker.on('click', function() {
                 showNodeInfo(node, marker);
             });
             
             if (highlight) {
                 highlightedElements.push(marker);
                 // Center map on this node
-                map.setCenter({lat: node.lat, lng: node.lng});
-                map.setZoom(16);
+                map.setView([node.lat, node.lng], 16);
             } else {
                 nodeMarkers.push(marker);
             }
         }
         
         function displaySpecificEdge(edge, highlight = false) {
-            const path = [
-                {lat: edge.source_lat, lng: edge.source_lng},
-                {lat: edge.target_lat, lng: edge.target_lng}
+            const latlngs = [
+                [edge.source_lat, edge.source_lng],
+                [edge.target_lat, edge.target_lng]
             ];
             
-            const polyline = new google.maps.Polyline({
-                path: path,
-                geodesic: true,
-                strokeColor: highlight ? '#FF00FF' : '#FF6B35',
-                strokeOpacity: highlight ? 1 : 0.8,
-                strokeWeight: highlight ? 5 : 3,
-                map: map
-            });
+            const polyline = L.polyline(latlngs, {
+                color: highlight ? '#FF00FF' : '#FF6B35',
+                opacity: highlight ? 1 : 0.8,
+                weight: highlight ? 5 : 3
+            }).addTo(map);
             
-            polyline.addListener('click', function(event) {
-                showEdgeInfo(edge, event.latLng);
+            polyline.on('click', function(event) {
+                showEdgeInfo(edge, event.latlng);
             });
             
             if (highlight) {
                 highlightedElements.push(polyline);
                 // Fit map to show the edge
-                const bounds = new google.maps.LatLngBounds();
-                bounds.extend({lat: edge.source_lat, lng: edge.source_lng});
-                bounds.extend({lat: edge.target_lat, lng: edge.target_lng});
+                const bounds = L.latLngBounds(latlngs);
                 map.fitBounds(bounds);
             } else {
                 edgePolylines.push(polyline);
@@ -790,7 +799,7 @@
         }
         
         function clearHighlighted() {
-            highlightedElements.forEach(element => element.setMap(null));
+            highlightedElements.forEach(element => map.removeLayer(element));
             highlightedElements = [];
         }
         
@@ -820,7 +829,7 @@
                     <strong>Polyline Details:</strong><br>
                     • <strong>Source Node:</strong> ${data.source_id} (${data.source_lat.toFixed(6)}, ${data.source_lng.toFixed(6)})<br>
                     • <strong>Target Node:</strong> ${data.target_id} (${data.target_lat.toFixed(6)}, ${data.target_lng.toFixed(6)})<br>
-                    • <strong>Google Maps Path:</strong> <a href="https://www.google.com/maps/dir/${data.source_lat},${data.source_lng}/${data.target_lat},${data.target_lng}" target="_blank">View Route</a><br>
+                    • <strong>OpenStreetMap Path:</strong> <a href="https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=${data.source_lat}%2C${data.source_lng}%3B${data.target_lat}%2C${data.target_lng}" target="_blank">View Route</a><br>
                     <br>
                     <strong>How This Polyline Works:</strong><br>
                     • Connects two geographic points with a straight line<br>
@@ -855,8 +864,11 @@
         }
     </script>
     
-    <script async defer
-        src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initMap">
+    <script>
+        // Initialize map when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            initMap();
+        });
     </script>
 </body>
 </html>

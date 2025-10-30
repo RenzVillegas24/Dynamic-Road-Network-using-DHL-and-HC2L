@@ -38,20 +38,20 @@ except Exception as e:
 
 @app.route('/')
 def index():
-    return render_template('index.html', google_maps_api_key=Config.GOOGLE_MAPS_API_KEY)
+    return render_template('index.html')
 
 @app.route('/test')
 def test():
-    return render_template('dhc2l_routing_demo.html', google_maps_api_key=Config.GOOGLE_MAPS_API_KEY)
+    return render_template('dhc2l_routing_demo.html')
 
 @app.route('/dhl')
 def dhl_test():
-    return render_template('dhl_routing_demo.html', google_maps_api_key=Config.GOOGLE_MAPS_API_KEY)
+    return render_template('dhl_routing_demo.html')
 
 
 @app.route('/validation')
 def validation_tool():
-    return render_template('map.html', google_maps_api_key=Config.GOOGLE_MAPS_API_KEY)
+    return render_template('map.html')
 
 @app.route('/request_new_dataset')
 def request_new_dataset():
