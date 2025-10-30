@@ -5,6 +5,7 @@ import os
 import csv
 from typing import Dict, List, Tuple, Optional
 from road_name_mapper import RoadNameMapper
+from road_geometry_loader import RoadGeometryLoader
 from config import Config
 from geometry_utils import enhance_route_geometry
 
@@ -38,6 +39,15 @@ class GPSRoutingService:
         
         # Initialize road name mapper using config
         self.road_mapper = RoadNameMapper(str(Config.EDGES_CSV))
+        
+        # Initialize road geometry loader for accurate path visualization
+        mapping_path = str(Config.NODES_CSV).replace('quezon_city_nodes.csv', 'node_id_mapping.csv')
+        self.geometry_loader = RoadGeometryLoader(
+            str(Config.EDGES_CSV), 
+            str(Config.NODES_CSV),
+            mapping_path
+        )
+        print(f"✅ Road geometry loader initialized")
     
     def _load_nodes_data(self):
         """Load nodes CSV data for coordinate lookup"""
@@ -175,9 +185,9 @@ class GPSRoutingService:
             }
     
     def _enhance_route_with_coordinates(self, route_data: Dict) -> Dict:
-        """Enhance route data with actual GPS coordinates for all path nodes"""
+        """Enhance route data with actual GPS coordinates following road network"""
         
-        if not route_data.get('success', False) or self.nodes_data is None:
+        if not route_data.get('success', False):
             return route_data
         
         try:
@@ -186,31 +196,37 @@ class GPSRoutingService:
             if not path_nodes:
                 return route_data
             
-            # Get coordinates for all nodes in the path
-            enhanced_coordinates = []
+            # Use the geometry loader to get coordinates following actual road network
+            print(f"📍 Getting road network coordinates for {len(path_nodes)} nodes")
             
-            for node_id in path_nodes:
-                # Find node in our nodes data
-                if node_id in self.nodes_data:
-                    node_info = self.nodes_data[node_id]
-                    enhanced_coordinates.append({
-                        'node_id': int(node_id),
-                        'lat': float(node_info['latitude']),
-                        'lng': float(node_info['longitude'])
-                    })
-                else:
-                    print(f"⚠️  Warning: Node {node_id} not found in nodes data")
+            # Get coordinates following actual edges with OSM geometry (includes curves)
+            road_coordinates = self.geometry_loader.get_path_coordinates(path_nodes, use_osm_geometry=True)
             
-            print(f"📍 Route has {len(enhanced_coordinates)} original node coordinates")
+            print(f"📍 Route has {len(road_coordinates)} points following road network (with curves)")
             
-            # Interpolate intermediate points for smoother visualization
-            # This adds points every ~30 meters to make routes follow roads better
-            interpolated_coordinates = enhance_route_geometry(enhanced_coordinates, max_distance=30.0)
+            # Validate the path
+            is_valid, validation_message = self.geometry_loader.validate_path(path_nodes)
+            if not is_valid:
+                print(f"⚠️  Warning: Path validation: {validation_message}")
             
-            print(f"✅ Enhanced route with {len(interpolated_coordinates)} GPS coordinates (interpolated from {len(enhanced_coordinates)} nodes)")
+            # Get path summary
+            path_summary = self.geometry_loader.get_path_summary(path_nodes)
+            print(f"📊 Path summary: {path_summary['total_distance_m']:.1f}m over {path_summary['num_segments']} segments")
+            
+            # Since OSM geometry already includes curve points, only do minimal interpolation
+            # (OSM geometry will have given us smooth curves already)
+            # Only interpolate if there are still very long gaps (>100m)
+            interpolated_coordinates = enhance_route_geometry(
+                road_coordinates, 
+                max_distance=100.0,  # Higher threshold since OSM already provides curves
+                preserve_node_ids=False  # OSM curve points don't have node IDs
+            )
+            
+            print(f"✅ Final route with {len(interpolated_coordinates)} GPS coordinates")
             
             # Update route data with enhanced coordinates
             route_data['route']['coordinates'] = interpolated_coordinates
+            route_data['route']['path_summary_stats'] = path_summary
             
             # Create polylines for Google Maps/Leaflet
             if len(interpolated_coordinates) >= 2:
@@ -224,6 +240,8 @@ class GPSRoutingService:
             
         except Exception as e:
             print(f"⚠️  Warning: Failed to enhance coordinates: {e}")
+            import traceback
+            traceback.print_exc()
         
         return route_data
     

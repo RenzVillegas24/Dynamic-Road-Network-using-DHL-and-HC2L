@@ -107,13 +107,18 @@ def interpolate_segment(lat1: float, lon1: float, lat2: float, lon2: float,
 
 
 def enhance_route_geometry(coordinates: List[Dict[str, float]], 
-                           max_distance: float = 50.0) -> List[Dict[str, float]]:
+                           max_distance: float = 50.0,
+                           preserve_node_ids: bool = True) -> List[Dict[str, float]]:
     """
     Enhance a route by interpolating intermediate points along all segments.
+    
+    This function adds intermediate points between coordinates to create smoother
+    polylines for visualization, especially useful when coordinates are far apart.
     
     Args:
         coordinates: List of coordinate dicts with 'lat' and 'lng' keys
         max_distance: Maximum distance between points in meters (default: 50m)
+        preserve_node_ids: If True, preserve node_id in interpolated points when available
     
     Returns:
         Enhanced list of coordinates with interpolated points
@@ -127,19 +132,40 @@ def enhance_route_geometry(coordinates: List[Dict[str, float]],
         curr = coordinates[i]
         next_coord = coordinates[i + 1]
         
-        # Interpolate segment
-        segment_points = interpolate_segment(
-            curr['lat'], curr['lng'],
-            next_coord['lat'], next_coord['lng'],
-            max_distance
-        )
+        # Calculate actual distance between current points
+        dist = haversine_distance(curr['lat'], curr['lng'], 
+                                  next_coord['lat'], next_coord['lng'])
         
-        # Add all points except the last one (to avoid duplicates)
-        for lat, lng in segment_points[:-1]:
-            enhanced.append({'lat': lat, 'lng': lng})
+        # Only interpolate if distance is larger than max_distance
+        if dist > max_distance:
+            # Interpolate segment
+            segment_points = interpolate_segment(
+                curr['lat'], curr['lng'],
+                next_coord['lat'], next_coord['lng'],
+                max_distance
+            )
+            
+            # Add current point with its metadata
+            point = {'lat': curr['lat'], 'lng': curr['lng']}
+            if preserve_node_ids and 'node_id' in curr:
+                point['node_id'] = curr['node_id']
+            enhanced.append(point)
+            
+            # Add interpolated points (skip first and last to avoid duplicates)
+            for lat, lng in segment_points[1:-1]:
+                enhanced.append({'lat': lat, 'lng': lng, 'interpolated': True})
+        else:
+            # Distance is small enough, just add the current point
+            point = {'lat': curr['lat'], 'lng': curr['lng']}
+            if preserve_node_ids and 'node_id' in curr:
+                point['node_id'] = curr['node_id']
+            enhanced.append(point)
     
-    # Add the final point
-    enhanced.append(coordinates[-1])
+    # Add the final point with its metadata
+    final_point = {'lat': coordinates[-1]['lat'], 'lng': coordinates[-1]['lng']}
+    if preserve_node_ids and 'node_id' in coordinates[-1]:
+        final_point['node_id'] = coordinates[-1]['node_id']
+    enhanced.append(final_point)
     
     return enhanced
 

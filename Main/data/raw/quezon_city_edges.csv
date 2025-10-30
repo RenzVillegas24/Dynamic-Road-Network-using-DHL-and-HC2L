@@ -106,7 +106,7 @@ source,target,length,name,highway,oneway
 42,224,119.05,Carlos P. Garcia Avenue,secondary,0
 43,8151,31.33,EDSA,primary,1
 44,45,93.02,Kamuning Road,secondary,0
-44,10123,39.11,"['Kamias Road', 'Kamuning Road']",secondary,0
+44,10123,39.11,"['Kamuning Road', 'Kamias Road']",secondary,0
 44,8452,168.5,EDSA,primary,1
 45,628,61.49,K-F Street,residential,0
 45,10069,4.85,Kamuning Road,secondary,0
@@ -633,7 +633,7 @@ source,target,length,name,highway,oneway
 238,9497,162.35,Carlos P. Garcia Avenue,secondary,0
 239,9121,76.48,V. Francisco Street,residential,1
 239,240,65.72,B. Baluyot Street,residential,0
-239,2537,132.84,"['Magiting Street', 'B. Baluyot Street']",residential,0
+239,2537,132.84,"['B. Baluyot Street', 'Magiting Street']",residential,0
 240,241,130.27,B. Baluyot Street,residential,0
 240,239,65.72,B. Baluyot Street,residential,0
 241,9120,166.77,Lieutenant J. Francisco Street,residential,1
@@ -970,7 +970,7 @@ source,target,length,name,highway,oneway
 359,356,73.54,Columbia Street,residential,0
 359,358,68.1,Columbia Street,residential,0
 359,2464,231.57,Miami Street,residential,1
-360,7346,266.6,"['K-J Street', 'Miami Street']",tertiary,0
+360,7346,266.6,"['Miami Street', 'K-J Street']",tertiary,0
 360,359,201.1,Miami Street,residential,1
 360,113,73.93,Ermin Garcia Street,tertiary,1
 361,848,69.0,Ermin Garcia Street,tertiary,0
@@ -1279,10 +1279,10 @@ source,target,length,name,highway,oneway
 462,10097,240.63,West Avenue,primary,0
 462,8157,50.22,West Avenue,primary,0
 463,125,128.12,B. Gonzales Street,residential,0
-463,12233,350.65,"['B. Gonzales Street', 'A. Albert Street']",residential,0
+463,12233,350.65,"['A. Albert Street', 'B. Gonzales Street']",residential,0
 463,10108,98.55,M. V. del Rosario Street,residential,0
 464,133,74.56,B. Gonzales Street,residential,0
-465,691,107.13,"['Batino Street', 'Molave Street']",tertiary,0
+465,691,107.13,"['Molave Street', 'Batino Street']",tertiary,0
 465,141,211.57,Aurora Boulevard,primary,1
 466,3547,10.71,F. Collantes Street,residential,0
 466,9618,208.7,Esteban Abada Street,residential,1
@@ -1336,7 +1336,7 @@ source,target,length,name,highway,oneway
 483,13040,6.56,General Malvar Avenue,unclassified,0
 483,488,53.36,General Romulo Avenue,tertiary,1
 484,9448,6.6,General Malvar Avenue,unclassified,0
-484,10307,49.87,General Araneta Avenue,"['residential', 'unclassified']",1
+484,10307,49.87,General Araneta Avenue,"['unclassified', 'residential']",1
 484,480,172.58,General Malvar Avenue,unclassified,0
 485,7719,9.68,General Santos Avenue,unclassified,0
 485,12454,131.45,General Santos Avenue,unclassified,0
@@ -1932,7 +1932,7 @@ source,target,length,name,highway,oneway
 690,689,272.22,Banuyo Street,residential,1
 690,106,72.63,Banuyo Street,residential,0
 691,7160,249.47,Batino Street,residential,1
-691,465,107.13,"['Batino Street', 'Molave Street']",tertiary,0
+691,465,107.13,"['Molave Street', 'Batino Street']",tertiary,0
 691,111,88.7,Molave Street,tertiary,0
 692,11150,15.84,Palosapis Street,residential,0
 692,11696,8.2,Palosapis Street,residential,0
@@ -2160,7 +2160,7 @@ source,target,length,name,highway,oneway
 783,8508,15.27,L. Wood Street,residential,0
 784,9814,55.26,Block 2 Street,residential,0
 784,9358,38.81,Betany Street,residential,0
-784,8505,601.0,"['Carriedo Street', 'Betany Street']",residential,0
+784,8505,601.0,"['Betany Street', 'Carriedo Street']",residential,0
 785,8138,10.3,Mactan Street,unclassified,1
 785,8988,38.75,Mactan Street,unclassified,0
 786,8138,7.88,Saddlebrook Street,residential,0
@@ -2734,7 +2734,7 @@ source,target,length,name,highway,oneway
 986,1021,213.65,San Pedro Bautista Road,residential,0
 987,988,38.82,Bernardo Street,residential,0
 987,11880,189.58,San Pedro Bautista Road,residential,0
-987,11880,263.58,"['Bernardo Street', 'Morato Street']",residential,0
+987,11880,263.58,"['Morato Street', 'Bernardo Street']",residential,0
 988,989,41.12,Bernardo Street,residential,0
 988,987,38.82,Bernardo Street,residential,0
 988,991,172.14,Montemayor Street,residential,0
@@ -2788,7 +2788,7 @@ source,target,length,name,highway,oneway
 1004,999,47.12,Tolentino Street,residential,0
 1004,1005,42.49,Tolentino Street,residential,0
 1004,1003,90.79,Wilson Street,residential,0
-1004,9034,283.43,"['San Jose Street', 'San Vicente Street']",residential,0
+1004,9034,283.43,"['San Vicente Street', 'San Jose Street']",residential,0
 1005,1004,42.49,Tolentino Street,residential,0
 1005,972,21.74,Tolentino Street,residential,0
 1005,967,94.66,Subic Street,residential,0
@@ -3656,7 +3656,7 @@ source,target,length,name,highway,oneway
 1294,4331,147.91,F. Salalilla Street,residential,1
 1295,1236,106.74,E. Evangelista,residential,0
 1295,2475,369.3,21st Avenue,residential,0
-1295,7512,294.92,"['Magat Salamat', 'E. Evangelista']",residential,0
+1295,7512,294.92,"['E. Evangelista', 'Magat Salamat']",residential,0
 1296,1252,105.33,Liberty Avenue,residential,1
 1296,10133,250.77,14th Avenue,residential,1
 1297,1250,89.3,Justice Lourdes Paredes San Diego Avenue,tertiary,0
@@ -4734,7 +4734,7 @@ source,target,length,name,highway,oneway
 1622,1623,285.28,Ragang Street,residential,0
 1623,1598,68.27,Mauban Street,tertiary,0
 1623,4094,70.77,Mauban Street,tertiary,0
-1623,4093,218.12,"['Panalturan Street', 'Ragang Street']",residential,0
+1623,4093,218.12,"['Ragang Street', 'Panalturan Street']",residential,0
 1623,1622,285.28,Ragang Street,residential,0
 1624,1600,72.33,Banawe Street,secondary,0
 1624,2775,73.09,Banawe Street,secondary,0
@@ -4861,7 +4861,7 @@ source,target,length,name,highway,oneway
 1671,1699,217.14,Corumi Street,residential,0
 1672,12280,23.58,Beryl Street,residential,0
 1672,3340,39.26,Jade Street,residential,0
-1672,3333,127.16,"['Beryl Street', 'Emerald Street']",residential,0
+1672,3333,127.16,"['Emerald Street', 'Beryl Street']",residential,0
 1673,3209,78.99,Wayan Street,residential,0
 1673,1674,97.24,Mabituan Street,residential,0
 1673,3025,69.23,Wayan Street,residential,0
@@ -5023,7 +5023,7 @@ source,target,length,name,highway,oneway
 1725,1724,105.96,Maria Clara Street,residential,0
 1726,1724,253.42,Maria Clara Street,residential,0
 1726,1729,92.91,Talayan Road,residential,0
-1726,12456,370.84,"['P. Florentino Extension', 'Talayan Road', 'P. Florentino Street']",residential,0
+1726,12456,370.84,"['P. Florentino Extension', 'P. Florentino Street', 'Talayan Road']",residential,0
 1727,12527,7.6,Del Monte Avenue,secondary,0
 1727,3158,76.51,Del Monte Avenue,secondary,0
 1727,1746,52.24,Talayan Road,residential,0
@@ -5287,7 +5287,7 @@ source,target,length,name,highway,oneway
 1812,1814,55.32,Bautista Street,residential,0
 1812,2014,84.55,D. V. Madrigal Avenue,residential,0
 1813,1824,72.29,Castrillo Street,residential,0
-1813,1842,261.02,"['Castrillo Street', 'Young']",residential,0
+1813,1842,261.02,"['Young', 'Castrillo Street']",residential,0
 1813,1841,65.13,Manansala Street,residential,0
 1814,1834,89.12,Bautista Street,residential,0
 1814,1812,55.32,Bautista Street,residential,0
@@ -5373,10 +5373,10 @@ source,target,length,name,highway,oneway
 1840,1837,104.85,Hechanova Street,residential,0
 1840,1839,193.82,Francisco Street,residential,0
 1841,1843,26.12,Navarro Street,residential,0
-1841,1842,334.18,"['Manansala Street', 'Young']",residential,0
+1841,1842,334.18,"['Young', 'Manansala Street']",residential,0
 1841,1813,65.13,Manansala Street,residential,0
-1842,1841,334.18,"['Manansala Street', 'Young']",residential,0
-1842,1813,261.02,"['Castrillo Street', 'Young']",residential,0
+1842,1841,334.18,"['Young', 'Manansala Street']",residential,0
+1842,1813,261.02,"['Young', 'Castrillo Street']",residential,0
 1842,1843,158.23,Navarro Street,residential,0
 1843,1841,26.12,Navarro Street,residential,0
 1843,1842,158.23,Navarro Street,residential,0
@@ -5406,12 +5406,12 @@ source,target,length,name,highway,oneway
 1851,1845,73.32,Cesar Legaspi Street,residential,0
 1851,1852,74.85,Cesar Legaspi Street,residential,0
 1852,2008,223.5,Zalameda Street,residential,0
-1852,1853,363.27,"['Susana Paterno Street', 'Cesar Legaspi Street']",residential,0
+1852,1853,363.27,"['Cesar Legaspi Street', 'Susana Paterno Street']",residential,0
 1852,1851,74.85,Cesar Legaspi Street,residential,0
 1853,1844,72.64,D. V. Rufino Street,residential,0
 1853,1819,242.96,D. V. Rufino Street,residential,0
 1853,1854,100.84,Susana Paterno Street,residential,0
-1853,1852,363.27,"['Susana Paterno Street', 'Cesar Legaspi Street']",residential,0
+1853,1852,363.27,"['Cesar Legaspi Street', 'Susana Paterno Street']",residential,0
 1854,1855,136.29,Madrigal Street,residential,0
 1854,1855,211.5,Paterno Circle,residential,0
 1854,1853,100.84,Susana Paterno Street,residential,0
@@ -5421,7 +5421,7 @@ source,target,length,name,highway,oneway
 1856,2801,49.3,Banal Street,residential,0
 1856,1655,56.73,Banal Street,residential,0
 1856,1857,65.47,F. Torres Street,residential,0
-1856,2802,94.58,"['F. Torres Street', 'Tahimik Street']",residential,0
+1856,2802,94.58,"['Tahimik Street', 'F. Torres Street']",residential,0
 1857,9745,7.74,Ligaya Street,residential,0
 1857,1856,65.47,F. Torres Street,residential,0
 1857,2778,56.95,Ligaya Street,residential,0
@@ -6065,7 +6065,7 @@ source,target,length,name,highway,oneway
 2074,1619,74.94,Santo Domingo Avenue,tertiary,0
 2074,2075,213.64,Maximo Viola Street,residential,0
 2075,2073,69.44,Andrade Street,residential,0
-2075,11198,219.71,"['Andrade Street', 'Andrade Extension']",residential,0
+2075,11198,219.71,"['Andrade Extension', 'Andrade Street']",residential,0
 2075,2074,213.64,Maximo Viola Street,residential,0
 2075,11502,309.72,Maximo Viola Street,residential,0
 2076,2077,74.21,J. Aquino Cruz Street,tertiary,0
@@ -6187,11 +6187,11 @@ source,target,length,name,highway,oneway
 2114,2120,52.61,Bansalangin Street,tertiary,0
 2115,11543,112.57,Dangay Street,residential,0
 2115,2117,53.12,Bansalangin Street,tertiary,0
-2115,2116,199.12,"['Payna Street', 'Dangay Street']",residential,0
+2115,2116,199.12,"['Dangay Street', 'Payna Street']",residential,0
 2115,7400,110.79,Bansalangin Street,tertiary,0
 2116,2117,147.6,Anahaw Street,residential,0
 2116,2119,50.27,Payna Street,residential,0
-2116,2115,199.12,"['Payna Street', 'Dangay Street']",residential,0
+2116,2115,199.12,"['Dangay Street', 'Payna Street']",residential,0
 2117,11539,113.05,Anahaw Street,residential,0
 2117,2116,147.6,Anahaw Street,residential,0
 2117,2120,49.8,Bansalangin Street,tertiary,0
@@ -6489,7 +6489,7 @@ source,target,length,name,highway,oneway
 2211,12224,31.44,Via Venecia Street,residential,0
 2212,10033,9.97,Via Milano Street,residential,0
 2212,2210,71.35,Via Milano Street,residential,0
-2212,2216,90.2,"['Magsaysay Street', 'Via Venecia Street']",residential,0
+2212,2216,90.2,"['Via Venecia Street', 'Magsaysay Street']",residential,0
 2213,2210,67.52,Via Milano Street,residential,0
 2214,2218,29.85,Via Napoli Street,residential,0
 2215,2216,59.92,Via Torino Street,residential,0
@@ -6497,23 +6497,23 @@ source,target,length,name,highway,oneway
 2215,2218,260.69,"['Via Torino Street', 'Via Napoli Street']",residential,0
 2216,2215,59.92,Via Torino Street,residential,0
 2216,3248,85.92,Via Venecia Street,residential,0
-2216,2212,90.2,"['Magsaysay Street', 'Via Venecia Street']",residential,0
+2216,2212,90.2,"['Via Venecia Street', 'Magsaysay Street']",residential,0
 2217,2215,199.83,Via Palermo Street,residential,0
 2217,2218,55.38,Via Pisa Street,residential,0
 2217,2211,60.93,Via Pisa Street,residential,0
 2218,2214,29.85,Via Napoli Street,residential,0
 2218,2217,55.38,Via Pisa Street,residential,0
-2218,2215,260.69,"['Via Torino Street', 'Via Napoli Street']",residential,0
+2218,2215,260.69,"['Via Napoli Street', 'Via Torino Street']",residential,0
 2219,2252,38.61,,residential,0
 2219,2243,8.86,North Susana Avenue,residential,0
 2219,2234,36.54,Aduana Street,residential,0
 2220,2282,37.04,Santa Clara Street,residential,0
 2220,2223,104.97,Aduana Street,residential,0
-2220,2224,142.4,"['Santa Clara Street', 'General Luna Street']",residential,0
+2220,2224,142.4,"['General Luna Street', 'Santa Clara Street']",residential,0
 2220,10920,107.62,Aduana Street,residential,0
 2221,2282,36.68,Santa Clara Street,residential,0
 2221,2225,104.86,Potenciana Street,residential,0
-2221,2231,108.46,"['San Agustin Street', 'Potenciana Street']",residential,0
+2221,2231,108.46,"['Potenciana Street', 'San Agustin Street']",residential,0
 2222,2227,43.35,Cabildo Street,residential,0
 2222,9502,66.07,Laoor Royal Street,residential,0
 2222,8780,57.27,Laoor Royal Street,residential,0
@@ -6522,8 +6522,8 @@ source,target,length,name,highway,oneway
 2223,2281,36.25,Cabildo Street,residential,0
 2223,2233,37.21,Aduana Street,residential,0
 2224,2223,40.12,Cabildo Street,residential,0
-2224,2220,142.4,"['Santa Clara Street', 'General Luna Street']",residential,0
-2224,2234,320.39,"['San Sebastian Street', 'General Luna Street']",residential,0
+2224,2220,142.4,"['General Luna Street', 'Santa Clara Street']",residential,0
+2224,2234,320.39,"['General Luna Street', 'San Sebastian Street']",residential,0
 2225,2221,104.86,Potenciana Street,residential,0
 2225,2281,37.41,Cabildo Street,residential,0
 2225,2230,37.04,Cabildo Street,residential,0
@@ -6554,7 +6554,7 @@ source,target,length,name,highway,oneway
 2233,2223,37.21,Aduana Street,residential,0
 2234,2245,38.38,San Sebastian Street,residential,0
 2234,2236,122.94,Aduana Street,residential,0
-2234,2224,320.39,"['San Sebastian Street', 'General Luna Street']",residential,0
+2234,2224,320.39,"['General Luna Street', 'San Sebastian Street']",residential,0
 2234,2219,36.54,Aduana Street,residential,0
 2235,2244,36.97,Escuela Street,residential,0
 2235,2242,113.18,"['Beaterio Street', 'Magallanes Street']",residential,0
@@ -6569,14 +6569,14 @@ source,target,length,name,highway,oneway
 2238,2232,44.91,Muralla Street,residential,0
 2238,11621,106.08,Muralla Street,residential,0
 2239,11621,57.7,Muralla Street,residential,0
-2239,2241,130.27,"['Muralla Street', 'San Sebastian Street']",residential,0
+2239,2241,130.27,"['San Sebastian Street', 'Muralla Street']",residential,0
 2239,2240,207.6,"['San Jose Street', 'Victoria Street']",residential,0
 2240,2238,37.29,Magallanes Street,residential,0
 2240,2242,37.96,Magallanes Street,residential,0
 2240,2239,207.6,"['San Jose Street', 'Victoria Street']",residential,0
 2241,2242,203.82,Recoletos Street,residential,0
 2241,2237,37.11,San Sebastian Street,residential,0
-2241,2239,130.27,"['Muralla Street', 'San Sebastian Street']",residential,0
+2241,2239,130.27,"['San Sebastian Street', 'Muralla Street']",residential,0
 2242,2241,203.82,Recoletos Street,residential,0
 2242,2240,37.96,Magallanes Street,residential,0
 2242,2235,113.18,"['Beaterio Street', 'Magallanes Street']",residential,0
@@ -6591,7 +6591,7 @@ source,target,length,name,highway,oneway
 2245,2237,35.83,San Sebastian Street,residential,0
 2246,7909,62.57,Valencia Street,residential,0
 2246,2275,124.83,Ignacio Street,residential,0
-2246,11389,183.79,"['Ignacio Street', 'Josefa Street']",residential,0
+2246,11389,183.79,"['Josefa Street', 'Ignacio Street']",residential,0
 2247,2260,44.85,Valencia Street,residential,0
 2247,2262,122.99,Reyes Aquino Street,residential,0
 2247,2248,42.78,Valencia Street,residential,0
@@ -6613,7 +6613,7 @@ source,target,length,name,highway,oneway
 2252,2250,234.14,Lansang Street,residential,0
 2253,2288,35.62,Don Enrique Street,residential,0
 2253,9598,385.48,Don T. Francisco Street,residential,0
-2253,2286,169.98,"['Don Enrique Street', 'Doña Filomena Street']",residential,0
+2253,2286,169.98,"['Doña Filomena Street', 'Don Enrique Street']",residential,0
 2254,2243,50.84,Josefa Street,residential,0
 2254,7038,72.73,Josefa Street,residential,0
 2254,2255,195.33,Tolentino Street,residential,0
@@ -6699,7 +6699,7 @@ source,target,length,name,highway,oneway
 2279,2280,206.21,Nakpil Street,residential,0
 2280,2277,41.77,Filomena Street,residential,0
 2280,2279,206.21,Nakpil Street,residential,0
-2280,10911,196.1,"['Ignacio Street', 'Filomena Street']",residential,0
+2280,10911,196.1,"['Filomena Street', 'Ignacio Street']",residential,0
 2281,2223,36.25,Cabildo Street,residential,0
 2281,2225,37.41,Cabildo Street,residential,0
 2281,2282,104.91,Anda Street,residential,0
@@ -6714,7 +6714,7 @@ source,target,length,name,highway,oneway
 2285,7046,71.09,Don Antonio Senior Street,residential,0
 2285,12770,309.93,Doña Felicidad Street,residential,0
 2286,2287,60.72,Doña Pilar Street,residential,0
-2286,2253,169.98,"['Don Enrique Street', 'Doña Filomena Street']",residential,0
+2286,2253,169.98,"['Doña Filomena Street', 'Don Enrique Street']",residential,0
 2286,2284,26.64,Doña Pilar Street,residential,0
 2287,2288,146.78,Doña Pacita Street,residential,0
 2287,2286,60.72,Doña Pilar Street,residential,0
@@ -7006,10 +7006,10 @@ source,target,length,name,highway,oneway
 2384,3384,149.3,"['Leyte Gulf Street', 'Commodore Street']",residential,0
 2385,2352,49.69,Marine Road,residential,0
 2385,2387,80.99,Commodore Street,residential,0
-2385,2386,128.85,"['General Street', 'Marine Road']",residential,0
+2385,2386,128.85,"['Marine Road', 'General Street']",residential,0
 2386,2383,220.13,General Street,residential,0
 2386,2387,50.53,Army Road,residential,0
-2386,2385,128.85,"['General Street', 'Marine Road']",residential,0
+2386,2385,128.85,"['Marine Road', 'General Street']",residential,0
 2387,2385,80.99,Commodore Street,residential,0
 2387,2384,219.84,Commodore Street,residential,0
 2387,2388,50.16,Army Road,residential,0
@@ -7134,7 +7134,7 @@ source,target,length,name,highway,oneway
 2424,2986,149.03,9th Street,residential,0
 2424,2420,64.42,9th Street,residential,0
 2425,2426,171.67,Twin Hill,residential,0
-2425,7102,508.9,"['Calvary Hill', '10th Street']",residential,0
+2425,7102,508.9,"['10th Street', 'Calvary Hill']",residential,0
 2425,2418,197.26,10th Street,residential,0
 2426,2425,171.67,Twin Hill,residential,0
 2426,2418,63.97,Forest Hill,residential,0
@@ -7405,7 +7405,7 @@ source,target,length,name,highway,oneway
 2516,2515,64.24,Dollar Street,tertiary,0
 2516,8519,368.83,N. Labayani Street,tertiary,0
 2516,8219,53.74,Dollar Street,residential,0
-2516,11347,124.78,"['Acacia Street', 'N. Labayani Street']",residential,0
+2516,11347,124.78,"['N. Labayani Street', 'Acacia Street']",residential,0
 2517,2520,51.86,Peseta Street,residential,0
 2517,12922,18.34,Peseta Street,residential,0
 2517,2518,379.15,Dinar Street,residential,0
@@ -7468,7 +7468,7 @@ source,target,length,name,highway,oneway
 2536,2539,72.21,Mapagkumbaba Street,residential,0
 2536,8120,238.16,Maginhawa Street,tertiary,0
 2537,9497,29.72,Masinsinan Street,tertiary,1
-2537,239,132.84,"['Magiting Street', 'B. Baluyot Street']",residential,0
+2537,239,132.84,"['B. Baluyot Street', 'Magiting Street']",residential,0
 2537,425,97.17,Magiting Street,residential,1
 2538,2539,61.73,Mapagkumbaba Street,residential,0
 2538,2566,240.17,Mahiyain Street,residential,1
@@ -7476,7 +7476,7 @@ source,target,length,name,highway,oneway
 2539,2538,61.73,Mapagkumbaba Street,residential,0
 2539,2536,72.21,Mapagkumbaba Street,residential,0
 2539,2567,238.99,Matimtiman Street,residential,0
-2539,3125,292.51,"['Maamo Street', 'Matimtiman Street']",residential,0
+2539,3125,292.51,"['Matimtiman Street', 'Maamo Street']",residential,0
 2540,433,62.7,Magiting Street,residential,0
 2540,412,72.14,Magiting Street,residential,0
 2540,8622,283.12,Matimtiman Street,residential,1
@@ -7581,7 +7581,7 @@ source,target,length,name,highway,oneway
 2572,165,380.98,University Avenue,secondary,1
 2573,2574,77.87,Lands Street,residential,0
 2573,1876,253.86,Visayas Avenue,secondary,1
-2573,7394,13.16,"['Lands Street', 'DANR Street']",residential,0
+2573,7394,13.16,"['DANR Street', 'Lands Street']",residential,0
 2574,3879,66.37,Lands Street,residential,0
 2574,3815,204.41,Forestry Street,residential,0
 2574,2573,77.87,Lands Street,residential,0
@@ -7593,7 +7593,7 @@ source,target,length,name,highway,oneway
 2577,2580,58.82,Tagbilaran Street,residential,0
 2577,9820,59.65,Lucena Street,residential,0
 2578,3838,74.57,Tagbilaran Street,residential,0
-2578,3720,75.84,"['Tagbilaran Extension', 'Tagbilaran Street']",residential,0
+2578,3720,75.84,"['Tagbilaran Street', 'Tagbilaran Extension']",residential,0
 2578,3700,106.09,Tacloban Street,residential,0
 2579,4068,54.0,Naga Street,residential,0
 2579,11661,119.5,Dipolog Street,residential,0
@@ -7871,7 +7871,7 @@ source,target,length,name,highway,oneway
 2671,10931,90.49,Road 23,residential,0
 2671,8348,178.92,Road 20,tertiary,0
 2671,3824,185.4,Road 23,residential,0
-2671,2670,117.02,"['Mendez Road', 'Road 20']",tertiary,0
+2671,2670,117.02,"['Road 20', 'Mendez Road']",tertiary,0
 2672,13190,10.04,Short Horn Street,tertiary,0
 2672,3915,46.32,Road 20,tertiary,0
 2672,11604,84.31,Short Horn Street,tertiary,0
@@ -7895,7 +7895,7 @@ source,target,length,name,highway,oneway
 2679,2680,38.71,Rafael Pariñas Street,residential,0
 2679,8361,25.7,Rafael Pariñas Street,residential,0
 2680,10963,100.91,G. Abagao Street,residential,0
-2680,8921,241.46,"['Rafael Pariñas Street', 'July Extension']",residential,0
+2680,8921,241.46,"['July Extension', 'Rafael Pariñas Street']",residential,0
 2680,2679,38.71,Rafael Pariñas Street,residential,0
 2681,3977,84.75,Road 20,tertiary,0
 2681,2654,218.86,Road 20,tertiary,0
@@ -7966,12 +7966,12 @@ source,target,length,name,highway,oneway
 2703,2665,110.42,Road 18,residential,0
 2704,2702,61.0,Road 22,residential,0
 2704,8706,173.46,Road 12,residential,0
-2704,8687,307.37,"['Road 12', 'Road 14']",residential,0
+2704,8687,307.37,"['Road 14', 'Road 12']",residential,0
 2705,12857,49.41,Dividend Street,residential,0
 2705,2706,55.24,Grants Street,residential,0
 2705,8691,155.46,Grants Street,residential,0
 2706,2150,229.28,G.S.I.S. Avenue,tertiary,0
-2706,3798,105.74,"['G.S.I.S. Avenue', 'Short Horn Street']",tertiary,0
+2706,3798,105.74,"['Short Horn Street', 'G.S.I.S. Avenue']",tertiary,0
 2706,2707,33.34,Grants Street,residential,0
 2706,2705,55.24,Grants Street,residential,0
 2707,13207,30.73,Saint Joseph Street,residential,0
@@ -8103,7 +8103,7 @@ source,target,length,name,highway,oneway
 2748,868,206.23,Congressional Avenue,primary,1
 2749,2748,54.37,Esmeralda Street,residential,0
 2749,11305,6.89,San Andres,residential,0
-2749,3744,214.71,"['Esmeralda Street', 'Esmeralda Extension']",residential,0
+2749,3744,214.71,"['Esmeralda Extension', 'Esmeralda Street']",residential,0
 2750,9715,19.31,San Felipe,residential,0
 2750,12319,13.33,San Felipe,residential,0
 2750,7936,60.44,Visayas Avenue,secondary,1
@@ -8229,7 +8229,7 @@ source,target,length,name,highway,oneway
 2793,2786,259.82,Dalsol Street,residential,0
 2794,13208,55.54,Benefits Street,residential,0
 2794,8557,52.22,Benefits Street,residential,0
-2794,11462,61.95,"['Dividend Street', 'Dividends']",residential,0
+2794,11462,61.95,"['Dividends', 'Dividend Street']",residential,0
 2794,12857,188.49,Dividend Street,residential,0
 2795,2708,55.99,Benefits Street,tertiary,0
 2795,2786,52.28,Claims Street,tertiary,0
@@ -8251,7 +8251,7 @@ source,target,length,name,highway,oneway
 2801,2779,65.7,Abad Santos Street,residential,0
 2801,2802,65.2,Abad Santos Street,residential,0
 2802,2801,65.2,Abad Santos Street,residential,0
-2802,1856,94.58,"['F. Torres Street', 'Tahimik Street']",residential,0
+2802,1856,94.58,"['Tahimik Street', 'F. Torres Street']",residential,0
 2803,12877,26.25,Bagong Buwan Street,residential,0
 2803,12821,29.03,Quirino Highway,primary,0
 2803,8275,121.82,Quirino Highway,primary,0
@@ -8444,8 +8444,8 @@ source,target,length,name,highway,oneway
 2867,2945,60.73,Maginoo Street,residential,0
 2867,2837,70.24,Maginoo Street,residential,0
 2868,3038,298.5,Alta Street,residential,0
-2868,9484,200.69,"['Adrian Street', 'Astor Street']",residential,0
-2868,4489,247.08,"['Avon Street', 'Astor Street']",residential,0
+2868,9484,200.69,"['Astor Street', 'Adrian Street']",residential,0
+2868,4489,247.08,"['Astor Street', 'Avon Street']",residential,0
 2869,2901,20.77,Rosario Drive,residential,0
 2869,2860,179.01,Rosario Drive,residential,0
 2869,3039,138.35,Rosal Street,residential,0
@@ -8795,7 +8795,7 @@ source,target,length,name,highway,oneway
 2990,2164,38.99,Mindanao Avenue,tertiary,0
 2990,2165,37.83,Mindanao Avenue,tertiary,0
 2990,3139,158.03,Liberation Street,residential,0
-2990,8952,217.65,"['Liberation Street', 'Madias-as Street']",residential,0
+2990,8952,217.65,"['Madias-as Street', 'Liberation Street']",residential,0
 2991,8955,139.18,Santol Street,tertiary,0
 2991,6880,53.98,Santol Street,tertiary,1
 2992,2889,236.45,17th Avenue,residential,0
@@ -8897,7 +8897,7 @@ source,target,length,name,highway,oneway
 3026,3066,112.19,Archer Street,residential,0
 3026,3140,132.59,Alarka Street,residential,0
 3026,3024,66.05,Archer Street,residential,0
-3027,3159,351.38,"['14th Street', 'La Filonila Street']",residential,0
+3027,3159,351.38,"['La Filonila Street', '14th Street']",residential,0
 3027,3047,67.42,Santa Cecilia Street,residential,0
 3027,566,304.04,14th Street,residential,0
 3028,7336,56.38,Evangelista Street,residential,0
@@ -9062,7 +9062,7 @@ source,target,length,name,highway,oneway
 3084,3688,49.44,Marcelo H. del Pilar Street,tertiary,0
 3084,7915,87.06,"['Caroline Street', 'Marcelo H. del Pilar Street']",tertiary,0
 3084,3108,46.57,West Riverside Drive,tertiary,0
-3084,3993,131.61,"['Samonte Street', 'West Riverside Drive']",residential,0
+3084,3993,131.61,"['West Riverside Drive', 'Samonte Street']",residential,0
 3085,1766,66.0,Landargon Street,residential,0
 3085,1760,56.17,Landargon Street,residential,0
 3085,13483,8.04,Zaragoza Street,residential,0
@@ -9107,7 +9107,7 @@ source,target,length,name,highway,oneway
 3098,568,368.08,12th Street,residential,0
 3099,3016,89.34,Pedro Tuazon Boulevard,secondary,0
 3099,2892,72.79,Pedro Tuazon Boulevard,secondary,0
-3099,10068,256.74,"['Planas Ⅲ', 'Planas Ⅰ']",residential,0
+3099,10068,256.74,"['Planas Ⅰ', 'Planas Ⅲ']",residential,0
 3100,2165,157.97,Union Civica Street,residential,0
 3100,3139,37.39,Visayan Avenue,residential,0
 3100,3059,40.17,Visayan Avenue,residential,0
@@ -9535,7 +9535,7 @@ source,target,length,name,highway,oneway
 3246,3298,55.62,Collins Street,residential,0
 3247,3268,86.59,Lopez Jaena Street,residential,0
 3247,3231,218.13,General Servillano Aquino Street,residential,0
-3247,3273,263.24,"['Maria Felipe Street', 'Lopez Jaena Street']",residential,0
+3247,3273,263.24,"['Lopez Jaena Street', 'Maria Felipe Street']",residential,0
 3248,2211,113.13,Via Venecia Street,residential,0
 3248,2216,85.92,Via Venecia Street,residential,0
 3248,3273,80.7,General Luna Street,residential,0
@@ -9610,7 +9610,7 @@ source,target,length,name,highway,oneway
 3272,10151,78.51,,primary_link,1
 3273,3279,77.25,Maria Felipe Street,residential,0
 3273,3248,80.7,General Luna Street,residential,0
-3273,3247,263.24,"['Maria Felipe Street', 'Lopez Jaena Street']",residential,0
+3273,3247,263.24,"['Lopez Jaena Street', 'Maria Felipe Street']",residential,0
 3274,3250,115.39,Tyrone Street,residential,0
 3274,12391,209.66,Maria Manguiat Street,residential,0
 3274,3235,134.93,Maria Manguiat Street,residential,0
@@ -9776,7 +9776,7 @@ source,target,length,name,highway,oneway
 3333,1672,127.16,"['Beryl Street', 'Emerald Street']",residential,0
 3334,3333,40.23,Alexandrite Street,residential,0
 3334,3347,42.51,Alexandrite Street,residential,0
-3334,3347,228.91,"['Opal Street', 'Diamond Street']",residential,0
+3334,3347,228.91,"['Diamond Street', 'Opal Street']",residential,0
 3335,3333,36.78,Alexandrite Street,residential,0
 3335,10291,11.44,Jade Street,residential,0
 3335,3341,26.79,Jade Street,residential,0
@@ -9811,7 +9811,7 @@ source,target,length,name,highway,oneway
 3346,12457,94.94,Gregorio Araneta Avenue,primary,1
 3346,11224,185.35,ROTC Hunters Street,residential,1
 3347,3334,42.51,Alexandrite Street,residential,0
-3347,3334,228.91,"['Opal Street', 'Diamond Street']",residential,0
+3347,3334,228.91,"['Diamond Street', 'Opal Street']",residential,0
 3347,3350,59.8,Alexandrite Street,residential,0
 3348,10291,59.11,Ruby Street,residential,0
 3348,3341,96.42,Sapphire Street,residential,0
@@ -9895,7 +9895,7 @@ source,target,length,name,highway,oneway
 3375,3385,53.28,Leyte Gulf Street,residential,0
 3376,3377,120.53,Guerilla Road,residential,0
 3376,3375,52.7,Leyte Gulf Street,residential,0
-3376,2357,164.86,"['Leyte Gulf Street', 'Constabulary Road']",residential,0
+3376,2357,164.86,"['Constabulary Road', 'Leyte Gulf Street']",residential,0
 3377,2357,51.72,AFP Road,tertiary,0
 3377,3374,48.83,AFP Road,tertiary,0
 3377,3376,120.53,Guerilla Road,residential,0
@@ -9961,7 +9961,7 @@ source,target,length,name,highway,oneway
 3396,3397,298.52,Bonifacio Drive,residential,0
 3396,3406,380.26,Bonifacio Drive,residential,0
 3396,3361,65.46,Manila Street,residential,0
-3396,3400,51.74,"['Huk Vet Street', 'Manila Street']",residential,0
+3396,3400,51.74,"['Manila Street', 'Huk Vet Street']",residential,0
 3397,8981,22.94,Bonifacio Drive,residential,0
 3397,3404,66.14,Pampanga Street,residential,0
 3397,3396,298.52,Bonifacio Drive,residential,0
@@ -9971,7 +9971,7 @@ source,target,length,name,highway,oneway
 3399,3400,46.48,Quirino Street,residential,0
 3400,3386,14.69,Huk Vet Street,residential,0
 3400,3399,46.48,Quirino Street,residential,0
-3400,3396,51.74,"['Huk Vet Street', 'Manila Street']",residential,0
+3400,3396,51.74,"['Manila Street', 'Huk Vet Street']",residential,0
 3401,10323,67.79,Quirino Street,residential,0
 3402,10324,62.87,,residential,0
 3403,10324,100.27,,residential,0
@@ -10358,7 +10358,7 @@ source,target,length,name,highway,oneway
 3534,1226,11.93,Topside Valley Street,residential,0
 3535,3566,95.59,Cabotage Street,residential,0
 3535,927,260.84,Zorra Street,residential,0
-3535,3543,243.72,"['Zorra Street', 'Kalawag Street']",residential,0
+3535,3543,243.72,"['Kalawag Street', 'Zorra Street']",residential,0
 3536,3566,76.35,V. Ilagan Street,residential,0
 3536,11214,155.19,V. Ilagan Street,residential,0
 3536,6376,114.97,West Santiago Street,residential,0
@@ -10376,7 +10376,7 @@ source,target,length,name,highway,oneway
 3542,462,203.5,Bulletin Street,residential,0
 3542,1861,112.76,Bulletin Street,residential,0
 3543,3549,89.63,Kalawag Street,residential,0
-3543,3535,243.72,"['Zorra Street', 'Kalawag Street']",residential,0
+3543,3535,243.72,"['Kalawag Street', 'Zorra Street']",residential,0
 3543,3560,42.63,V. Ilagan Street,residential,0
 3543,3558,118.13,V. Ilagan Street,residential,0
 3544,3550,241.75,Anak Bayan Street,residential,0
@@ -10460,7 +10460,7 @@ source,target,length,name,highway,oneway
 3571,3410,44.24,Manila Street,residential,0
 3572,3574,30.9,Mannuel L. Quezon Street,residential,0
 3572,12799,20.86,D. Macapagal Street,residential,0
-3572,3416,175.25,"['Mannuel L. Quezon Street', 'F. Marcos Street']",residential,0
+3572,3416,175.25,"['F. Marcos Street', 'Mannuel L. Quezon Street']",residential,0
 3573,3575,30.92,Bonifacio Drive,residential,0
 3573,12800,75.28,D. Macapagal Street,residential,0
 3573,3416,43.49,Bonifacio Drive,residential,0
@@ -10523,7 +10523,7 @@ source,target,length,name,highway,oneway
 3593,3585,107.67,Kalamansi Street,residential,0
 3594,3593,214.59,Kalamansi Street,residential,0
 3594,12656,83.51,Dalanghita Street,residential,0
-3594,11762,180.99,"['Camachile Street', 'Kalamansi Street']",residential,0
+3594,11762,180.99,"['Kalamansi Street', 'Camachile Street']",residential,0
 3595,3593,48.59,Anonas Street,residential,0
 3595,3592,50.64,Anonas Street,residential,0
 3595,12225,170.69,Tambis Street,residential,0
@@ -10578,7 +10578,7 @@ source,target,length,name,highway,oneway
 3613,3783,135.88,Pearl Street,residential,0
 3614,3887,76.75,Doña Juana Street,residential,0
 3614,4035,140.17,C. Francisco Street,residential,0
-3614,3713,244.98,"['Alimasag Street', 'Alimango Street']",residential,0
+3614,3713,244.98,"['Alimango Street', 'Alimasag Street']",residential,0
 3614,3713,234.76,Sugpo Street,residential,0
 3615,3729,68.17,Florencio Street,residential,0
 3615,3706,67.96,Saint Martin Street,residential,0
@@ -10625,7 +10625,7 @@ source,target,length,name,highway,oneway
 3628,2729,203.23,Venus Street,tertiary,0
 3629,3682,125.73,Admirable Lane,residential,0
 3629,4083,79.92,Renowned Lane,residential,0
-3629,9856,246.88,"['Renowned Lane', 'Hizon Drive']",residential,0
+3629,9856,246.88,"['Hizon Drive', 'Renowned Lane']",residential,0
 3630,12935,29.95,Drakkar Street,residential,0
 3630,12934,7.83,Drakkar Street,residential,0
 3630,3893,232.78,San Miguel Street,residential,0
@@ -10711,7 +10711,7 @@ source,target,length,name,highway,oneway
 3659,7653,178.41,EDSA,trunk,1
 3660,10926,48.72,Visayas Avenue,secondary,1
 3660,12054,7.12,Jem 5 Street,residential,0
-3661,4019,46.07,"['Piko Street', 'Old Sauyo Road']",tertiary,0
+3661,4019,46.07,"['Old Sauyo Road', 'Piko Street']",tertiary,0
 3661,3802,96.86,Piko Street,tertiary,0
 3661,3759,86.43,Siklot Street,residential,0
 3662,2590,87.88,Alley 28,residential,0
@@ -10725,7 +10725,7 @@ source,target,length,name,highway,oneway
 3664,2695,92.18,Villa Socorro Street,residential,0
 3665,3669,43.99,Del Mundo Street,residential,0
 3665,3810,180.66,Del Mundo Street,residential,0
-3665,11489,243.53,"['Cadaing Street', 'Dela Cruz Street']",residential,0
+3665,11489,243.53,"['Dela Cruz Street', 'Cadaing Street']",residential,0
 3666,3954,54.14,Production Street,tertiary,0
 3666,2791,43.4,Premium Street,tertiary,0
 3666,2790,222.15,Premium Street,residential,0
@@ -10741,7 +10741,7 @@ source,target,length,name,highway,oneway
 3670,3849,41.71,Molave Street,residential,0
 3670,3875,137.59,Molave Street,residential,0
 3671,3676,133.15,San Pablo Road,residential,0
-3671,3683,442.37,"['West Maya Drive', 'South Maya Drive']",residential,1
+3671,3683,442.37,"['South Maya Drive', 'West Maya Drive']",residential,1
 3672,3671,58.35,West Maya Drive,residential,1
 3672,8840,88.21,Bacolod Road,residential,0
 3673,4050,54.93,,residential,0
@@ -10869,7 +10869,7 @@ source,target,length,name,highway,oneway
 3719,3938,120.9,Kalamansanay Street,residential,0
 3719,2113,60.0,Bansalangin Street,tertiary,0
 3719,3896,73.79,Bansalangin Street,tertiary,0
-3720,2578,75.84,"['Tagbilaran Extension', 'Tagbilaran Street']",residential,0
+3720,2578,75.84,"['Tagbilaran Street', 'Tagbilaran Extension']",residential,0
 3721,3663,290.08,Banlat Road,tertiary,0
 3721,3963,70.59,White Street,tertiary,0
 3721,3697,63.75,Banlat Road,tertiary,0
@@ -10900,7 +10900,7 @@ source,target,length,name,highway,oneway
 3731,3909,285.46,"['Luna Street', 'Lilibeth Street']",residential,0
 3732,10296,96.58,Judge Juan Luna Street,tertiary,0
 3732,3051,133.59,Judge Juan Luna Street,tertiary,0
-3732,3837,334.14,"['Ana Maria Street', 'Esquivel Street']",residential,0
+3732,3837,334.14,"['Esquivel Street', 'Ana Maria Street']",residential,0
 3733,8279,9.27,Pearl Street,residential,0
 3734,3990,74.25,West Lawin Avenue,residential,0
 3734,4032,64.45,West Lawin Avenue,residential,0
@@ -10933,7 +10933,7 @@ source,target,length,name,highway,oneway
 3743,3808,44.5,Sampaguita Street,tertiary,0
 3743,3820,37.61,Sampaguita Street,tertiary,0
 3744,3970,34.68,Esmeralda Street,residential,0
-3744,2749,214.71,"['Esmeralda Street', 'Esmeralda Extension']",residential,0
+3744,2749,214.71,"['Esmeralda Extension', 'Esmeralda Street']",residential,0
 3744,3976,353.63,"['Esmeralda Street', 'Angel']",residential,0
 3745,12229,7.11,Piko Street,tertiary,0
 3745,3802,70.33,Piko Street,tertiary,0
@@ -11005,7 +11005,7 @@ source,target,length,name,highway,oneway
 3771,3890,47.06,Martina Street,residential,0
 3771,3956,26.77,Martina Street,residential,0
 3771,13262,91.03,Bonifacio Street,residential,0
-3772,3888,344.26,"[""King's Road"", 'Queens Road']",residential,0
+3772,3888,344.26,"['Queens Road', ""King's Road""]",residential,0
 3772,3774,55.42,Branches Avenue,residential,0
 3772,2784,56.28,Branches Avenue,residential,0
 3773,10082,40.1,Basilan Road,residential,0
@@ -11033,7 +11033,7 @@ source,target,length,name,highway,oneway
 3780,3905,134.95,Banlat Road,tertiary,0
 3780,8368,159.84,General Isidro Torres Street,residential,0
 3781,7094,50.02,P. Rivera Street,residential,0
-3781,4030,308.22,"['V. Luzon Extension', 'V. Luzon Street']",residential,0
+3781,4030,308.22,"['V. Luzon Street', 'V. Luzon Extension']",residential,0
 3781,3768,98.3,Llano Street,residential,0
 3782,3667,109.75,Pulangui Street,residential,0
 3782,3980,52.51,Ambuklao Street,residential,0
@@ -11070,7 +11070,7 @@ source,target,length,name,highway,oneway
 3794,13571,42.08,Philand Extension Street,residential,0
 3794,8917,124.59,Aurelio Street,residential,0
 3795,11736,90.62,Prudent Lane,residential,0
-3795,11189,86.14,"['Prudent Lane', 'Peaceful Lane']",residential,0
+3795,11189,86.14,"['Peaceful Lane', 'Prudent Lane']",residential,0
 3795,3822,128.85,Cenacle Drive,tertiary,0
 3795,8732,172.02,Cenacle Drive,tertiary,0
 3796,7355,36.27,F. T. Benitez Street,residential,0
@@ -11081,7 +11081,7 @@ source,target,length,name,highway,oneway
 3797,5316,149.48,Neptune Street,residential,0
 3798,13190,126.14,Short Horn Street,tertiary,0
 3798,11295,333.9,Road 23,residential,0
-3798,2706,105.74,"['G.S.I.S. Avenue', 'Short Horn Street']",tertiary,0
+3798,2706,105.74,"['Short Horn Street', 'G.S.I.S. Avenue']",tertiary,0
 3798,3824,81.35,Road 23,residential,0
 3799,8842,65.83,East Maya Drive,residential,0
 3799,4070,64.38,East Maya Drive,residential,0
@@ -11167,7 +11167,7 @@ source,target,length,name,highway,oneway
 3827,7691,46.84,Fema Road,residential,0
 3827,4071,158.52,Fema Road,residential,0
 3827,3687,181.72,Fema Road,residential,0
-3827,7617,170.97,"['Fema Road', 'SB Road']",residential,0
+3827,7617,170.97,"['SB Road', 'Fema Road']",residential,0
 3828,4058,49.89,Caldencio Street,residential,0
 3828,3761,260.85,Daniel Street,residential,0
 3828,8733,50.81,Caldencio Street,residential,0
@@ -11197,7 +11197,7 @@ source,target,length,name,highway,oneway
 3836,3779,231.66,Caliraya Street,residential,0
 3837,10296,7.37,Judge Juan Luna Street,tertiary,0
 3837,2970,133.41,Judge Juan Luna Street,tertiary,0
-3837,3732,334.14,"['Ana Maria Street', 'Esquivel Street']",residential,0
+3837,3732,334.14,"['Esquivel Street', 'Ana Maria Street']",residential,0
 3838,2578,74.57,Tagbilaran Street,residential,0
 3838,2587,55.53,Tagbilaran Street,residential,0
 3838,3966,146.18,Cebu Street,residential,0
@@ -11290,7 +11290,7 @@ source,target,length,name,highway,oneway
 3872,3761,50.89,Daniel Street,residential,0
 3872,8611,73.47,Antonia Street,residential,0
 3872,3749,221.67,Antonia Street,residential,0
-3872,12470,238.56,"['Pingkian Road', 'Daniel Street']",residential,0
+3872,12470,238.56,"['Daniel Street', 'Pingkian Road']",residential,0
 3873,5982,161.78,Banlat Road,tertiary,0
 3873,5984,95.85,Banlat Road,tertiary,0
 3873,9345,14.49,Coco Hills Street,residential,0
@@ -11336,7 +11336,7 @@ source,target,length,name,highway,oneway
 3887,8281,55.44,Doña Sabrina Street,residential,0
 3887,10396,132.56,Doña Juana Street Extension,residential,0
 3888,3786,52.54,Rook's Road,residential,0
-3888,3772,344.26,"[""King's Road"", 'Queens Road']",residential,0
+3888,3772,344.26,"['Queens Road', ""King's Road""]",residential,0
 3888,2784,173.42,King's Road,residential,0
 3889,3938,54.44,Alibangbang Street,residential,0
 3889,2114,56.76,Alibangbang Street,residential,0
@@ -11467,7 +11467,7 @@ source,target,length,name,highway,oneway
 3933,3854,221.67,Park Lane,residential,0
 3933,2788,190.77,Premium Street,residential,0
 3934,3989,148.7,Tamban Street,tertiary,0
-3934,8532,83.84,"['Tamban Street', 'Don Raymundo Street']",tertiary,0
+3934,8532,83.84,"['Don Raymundo Street', 'Tamban Street']",tertiary,0
 3934,4081,60.37,Biya Street,residential,0
 3935,7338,105.56,Marcelo H. del Pilar Street,tertiary,0
 3935,2146,99.73,Marcelo H. del Pilar Street,tertiary,0
@@ -11563,7 +11563,7 @@ source,target,length,name,highway,oneway
 3969,7558,31.55,Mindanao Avenue,primary,1
 3970,3855,75.06,Brillante Street,residential,0
 3970,3744,34.68,Esmeralda Street,residential,0
-3970,12647,142.47,"['Esmeralda Street', 'Perlas Street']",residential,0
+3970,12647,142.47,"['Perlas Street', 'Esmeralda Street']",residential,0
 3971,4065,72.89,Roque Drive,residential,0
 3971,2720,104.37,Magdiwang Street,residential,0
 3971,3793,56.35,Magdiwang Street,residential,0
@@ -11580,7 +11580,7 @@ source,target,length,name,highway,oneway
 3975,3652,49.3,Marcelo H. del Pilar Street,tertiary,0
 3975,3688,49.43,Marcelo H. del Pilar Street,tertiary,0
 3976,4255,43.57,Tandang Sora Avenue,secondary,0
-3976,3744,353.63,"['Angel', 'Esmeralda Street']",residential,0
+3976,3744,353.63,"['Esmeralda Street', 'Angel']",residential,0
 3976,4260,81.23,Tandang Sora Avenue,secondary,0
 3977,3839,74.59,Delos Reyes Street,residential,0
 3977,2677,41.16,Road 20,tertiary,0
@@ -11628,7 +11628,7 @@ source,target,length,name,highway,oneway
 3993,3787,48.07,Samonte Street,residential,0
 3993,3688,91.66,Umandal Street,residential,0
 3993,4046,26.71,Umandal Street,residential,0
-3993,3084,131.61,"['Samonte Street', 'West Riverside Drive']",residential,0
+3993,3084,131.61,"['West Riverside Drive', 'Samonte Street']",residential,0
 3994,3617,76.24,Montenegro Street,residential,0
 3994,3763,49.35,Batangas Street,residential,0
 3994,3883,29.13,Montenegro Street,residential,0
@@ -11699,7 +11699,7 @@ source,target,length,name,highway,oneway
 4018,3751,71.88,Sagittarius Street,tertiary,0
 4018,10904,115.88,Libra Street,residential,0
 4019,3995,51.49,Old Sauyo Road,tertiary,0
-4019,3661,46.07,"['Piko Street', 'Old Sauyo Road']",tertiary,0
+4019,3661,46.07,"['Old Sauyo Road', 'Piko Street']",tertiary,0
 4019,3972,52.48,Bangus Street,residential,0
 4020,4088,88.01,Alley 27,residential,0
 4020,3662,51.77,Road 1,secondary,0
@@ -11728,7 +11728,7 @@ source,target,length,name,highway,oneway
 4028,10222,67.51,Casanova Drive,residential,0
 4029,3817,127.22,Laguna Street,residential,0
 4030,3842,99.26,V. Luzon Street,residential,0
-4030,3781,308.22,"['V. Luzon Extension', 'V. Luzon Street']",residential,0
+4030,3781,308.22,"['V. Luzon Street', 'V. Luzon Extension']",residential,0
 4030,10036,133.74,Acuña Street,residential,0
 4030,9747,398.49,Acuña Street,residential,0
 4031,3691,45.4,Barit Street,residential,0
@@ -11762,7 +11762,7 @@ source,target,length,name,highway,oneway
 4039,3793,72.35,Alley 1,residential,0
 4040,3753,105.75,APA Compound Lane,residential,0
 4041,8567,52.33,Mindanao Avenue,primary,1
-4041,8256,113.83,"['Rosal Street', 'Sampaguita Street']",tertiary,0
+4041,8256,113.83,"['Sampaguita Street', 'Rosal Street']",tertiary,0
 4042,401,31.67,Tandang Sora Avenue,secondary,0
 4042,2731,32.89,Tandang Sora Avenue,secondary,0
 4042,10382,71.98,Banlat Road,tertiary,0
@@ -11899,7 +11899,7 @@ source,target,length,name,highway,oneway
 4092,2734,66.45,Tandang Sora Avenue,secondary,0
 4092,3649,173.13,Doña Sotera Street,residential,0
 4093,4094,147.29,Igdalig Street,residential,0
-4093,1623,218.12,"['Panalturan Street', 'Ragang Street']",residential,0
+4093,1623,218.12,"['Ragang Street', 'Panalturan Street']",residential,0
 4093,1600,76.73,Panalturan Street,residential,0
 4094,1623,70.77,Mauban Street,tertiary,0
 4094,2775,76.23,Mauban Street,tertiary,0
@@ -11925,7 +11925,7 @@ source,target,length,name,highway,oneway
 4101,10872,11.23,Rugnan Street,residential,0
 4101,10872,244.91,Magat Street,residential,1
 4102,11314,6.83,Rugnan Street,residential,0
-4102,4126,138.51,"['Pantabangan Street', 'Linum Street']",residential,0
+4102,4126,138.51,"['Linum Street', 'Pantabangan Street']",residential,0
 4102,3642,79.19,Pantabangan Street,residential,0
 4103,4126,63.69,Linum Street,residential,0
 4104,4105,223.73,Calaca Street,residential,0
@@ -11969,13 +11969,13 @@ source,target,length,name,highway,oneway
 4115,4111,91.86,Fuschia Street,residential,0
 4116,7943,90.06,Fuschia Street,residential,0
 4116,4117,119.24,Lobella Street,residential,0
-4116,4119,174.36,"['Aster Street', 'Fuschia Street']",residential,0
+4116,4119,174.36,"['Fuschia Street', 'Aster Street']",residential,0
 4117,4116,119.24,Lobella Street,residential,0
 4117,4120,108.83,Lupinus Street,residential,0
 4117,4119,51.29,Lupinus Street,residential,0
 4118,8586,56.62,Lupinus Street,residential,0
 4119,4117,51.29,Lupinus Street,residential,0
-4119,4116,174.36,"['Aster Street', 'Fuschia Street']",residential,0
+4119,4116,174.36,"['Fuschia Street', 'Aster Street']",residential,0
 4119,8316,51.03,Aster Street,residential,0
 4120,7943,45.79,Rugosa Street,residential,0
 4120,4122,45.79,Rugosa Street,residential,0
@@ -11998,7 +11998,7 @@ source,target,length,name,highway,oneway
 4125,4110,56.78,Primula Street,residential,0
 4126,4103,63.69,Linum Street,residential,0
 4126,4125,49.94,Aster Street,residential,0
-4126,4102,138.51,"['Pantabangan Street', 'Linum Street']",residential,0
+4126,4102,138.51,"['Linum Street', 'Pantabangan Street']",residential,0
 4127,8675,16.96,Jade Street,residential,0
 4128,7814,134.76,Quirino Highway,primary,0
 4128,8284,20.59,Quirino Highway,primary,0
@@ -12040,7 +12040,7 @@ source,target,length,name,highway,oneway
 4141,8637,76.72,Visayas Avenue Extension,residential,0
 4142,3312,272.5,Ilang-Ilang Street,tertiary,0
 4142,5214,31.5,Champaca Street,residential,0
-4142,5233,363.24,"['Lily Street', 'Champaca Street']",tertiary,0
+4142,5233,363.24,"['Champaca Street', 'Lily Street']",tertiary,0
 4143,12980,3.01,Dahlia Avenue,tertiary,0
 4143,13344,2.55,Dahlia Avenue,tertiary,0
 4143,4278,87.67,Chestnut Street,tertiary,0
@@ -12068,7 +12068,7 @@ source,target,length,name,highway,oneway
 4151,4394,58.98,Narra Avenue,residential,0
 4151,5003,92.25,Dao Street,residential,0
 4151,4508,65.17,Narra Avenue,residential,0
-4151,4560,196.18,"['Dao Street', 'Apitong Street']",residential,0
+4151,4560,196.18,"['Apitong Street', 'Dao Street']",residential,0
 4152,6915,14.42,Marlboro Street,residential,0
 4152,4485,79.04,Marlboro Street,residential,0
 4152,12087,200.37,Commonwealth Avenue,primary,1
@@ -12097,11 +12097,11 @@ source,target,length,name,highway,oneway
 4160,4159,23.98,Santo Niño Street,residential,0
 4160,6558,223.2,Santo Niño Street,residential,0
 4161,12476,8.84,Pratt Street,residential,0
-4161,4162,281.46,"['Pratt Street', 'Pius Street']",residential,0
+4161,4162,281.46,"['Pius Street', 'Pratt Street']",residential,0
 4161,12477,36.53,Palma Street,tertiary,1
 4162,4163,173.09,Palma Street,tertiary,0
 4162,9324,42.36,Palma Street,tertiary,0
-4162,4161,281.46,"['Pratt Street', 'Pius Street']",residential,0
+4162,4161,281.46,"['Pius Street', 'Pratt Street']",residential,0
 4163,4164,155.4,Palma Street,tertiary,0
 4163,4162,173.09,Palma Street,tertiary,0
 4163,9130,36.68,Pele Street,residential,0
@@ -12133,7 +12133,7 @@ source,target,length,name,highway,oneway
 4172,4173,81.53,Pratt Street,residential,0
 4172,4171,180.77,Pratt Street,residential,0
 4173,4993,80.58,Atlas Street,residential,0
-4173,5009,158.85,"['Pratt Street', 'Gandhi Street']",residential,0
+4173,5009,158.85,"['Gandhi Street', 'Pratt Street']",residential,0
 4173,4172,81.53,Pratt Street,residential,0
 4174,4993,66.7,Jensen Street,residential,0
 4174,4980,56.48,Jensen Street,residential,0
@@ -12699,7 +12699,7 @@ source,target,length,name,highway,oneway
 4370,4359,81.56,Maria Fatima Street,residential,0
 4371,4435,35.28,Actuary Street,residential,0
 4371,4351,21.82,Actuary Street,residential,0
-4371,4344,119.1,"['Accounting Street', 'Legal Street']",residential,0
+4371,4344,119.1,"['Legal Street', 'Accounting Street']",residential,0
 4372,4431,60.6,Antonio Barrion Street,residential,0
 4372,6927,59.18,Antonio Barrion Street,residential,0
 4372,4416,348.22,Francisco Ventura Street,residential,0
@@ -12931,7 +12931,7 @@ source,target,length,name,highway,oneway
 4448,4399,66.22,Pall Mall Street,residential,0
 4448,4486,64.24,Pall Mall Street,residential,0
 4448,4347,352.29,Cavalier Street,residential,0
-4449,4477,165.87,"['Santo Niño Street Extension', 'Republic Avenue']",secondary,0
+4449,4477,165.87,"['Republic Avenue', 'Santo Niño Street Extension']",secondary,0
 4449,9521,170.98,Republic Avenue,secondary,0
 4449,4436,79.41,Juan Ortega Street,residential,0
 4450,4525,36.01,Internal Audit Street,residential,0
@@ -12975,7 +12975,7 @@ source,target,length,name,highway,oneway
 4463,4461,34.23,Legal Street,residential,0
 4463,4465,36.32,Loans Street,residential,0
 4463,4522,103.67,Legal Street,residential,0
-4463,4522,167.56,"['Investment Street', 'Pension Street', 'Loans Street']",residential,0
+4463,4522,167.56,"['Investment Street', 'Loans Street', 'Pension Street']",residential,0
 4464,4359,63.5,Don Adaucto Street,residential,0
 4464,4515,139.03,Maria Alegria Street,residential,0
 4464,4540,86.65,Don Adaucto Street,residential,0
@@ -13011,7 +13011,7 @@ source,target,length,name,highway,oneway
 4475,4471,56.89,Ophel Street,residential,1
 4476,4484,99.05,Collection Street,residential,0
 4477,7793,117.16,Santo Niño Street Extension,secondary,0
-4477,4449,165.87,"['Santo Niño Street Extension', 'Republic Avenue']",secondary,0
+4477,4449,165.87,"['Republic Avenue', 'Santo Niño Street Extension']",secondary,0
 4477,7783,86.78,Martinez Street,residential,0
 4478,4456,64.21,J. B. Romero Street,residential,0
 4478,4504,137.61,J. M. Aruego Street,residential,0
@@ -13046,7 +13046,7 @@ source,target,length,name,highway,oneway
 4488,8591,9.03,Bulova Street,residential,0
 4488,4458,236.7,Bulova Street,residential,0
 4488,4341,66.82,Regalado Avenue,secondary,1
-4489,2868,247.08,"['Avon Street', 'Astor Street']",residential,0
+4489,2868,247.08,"['Astor Street', 'Avon Street']",residential,0
 4489,3014,52.34,Avon Street,residential,0
 4489,11796,50.32,Aspen Street,residential,0
 4490,13314,23.79,Winston Street,residential,0
@@ -13063,7 +13063,7 @@ source,target,length,name,highway,oneway
 4493,4514,284.39,Chelsea Street,residential,0
 4494,4467,68.93,Jesus Paredes Street,residential,0
 4494,9518,30.82,Jesus Paredes Street,residential,0
-4494,4483,252.84,"['F. Chioco Street', 'F. Sotto Street']",residential,0
+4494,4483,252.84,"['F. Sotto Street', 'F. Chioco Street']",residential,0
 4495,4421,65.48,Paxton Street,residential,0
 4495,4534,215.95,Pall Mall Street,residential,0
 4495,4337,143.87,Paxton Street,residential,0
@@ -13105,7 +13105,7 @@ source,target,length,name,highway,oneway
 4507,4437,59.67,,residential,0
 4507,4444,104.33,Saint Catherine Street,residential,0
 4508,12750,22.85,Mulawin Street,residential,0
-4508,4506,332.44,"['Lawaan Street', 'Molave Street', 'Mulawin Street']",residential,0
+4508,4506,332.44,"['Lawaan Street', 'Mulawin Street', 'Molave Street']",residential,0
 4508,4506,200.51,Narra Avenue,residential,0
 4508,4151,65.17,Narra Avenue,residential,0
 4509,9938,56.83,Carmel Street,residential,0
@@ -13144,7 +13144,7 @@ source,target,length,name,highway,oneway
 4521,4567,57.49,Olive Street,residential,1
 4521,11935,56.55,Olive Street,residential,0
 4522,4463,103.67,Legal Street,residential,0
-4522,4463,167.56,"['Investment Street', 'Pension Street', 'Loans Street']",residential,0
+4522,4463,167.56,"['Pension Street', 'Loans Street', 'Investment Street']",residential,0
 4522,4445,383.88,"['Pension Street', 'Loans Street']",residential,0
 4523,4564,379.51,Lira Street,residential,0
 4523,2506,49.89,Peseta Street,residential,0
@@ -13259,7 +13259,7 @@ source,target,length,name,highway,oneway
 4559,4398,169.56,Computer Street,residential,0
 4560,4394,137.45,Tanguile Street,residential,0
 4560,4452,44.67,Apitong Street,residential,0
-4560,4151,196.18,"['Dao Street', 'Apitong Street']",residential,0
+4560,4151,196.18,"['Apitong Street', 'Dao Street']",residential,0
 4561,4499,33.96,Engineering Street,residential,0
 4561,10798,14.82,Engineering Street,residential,0
 4561,4517,36.27,Engineering Street,residential,0
@@ -14023,15 +14023,15 @@ source,target,length,name,highway,oneway
 4826,4828,125.5,Acacia Street,residential,0
 4827,4826,46.05,Acacia Street,residential,0
 4827,2306,30.1,Narra Street,residential,0
-4827,4836,79.3,"['Ilang-ilang Street', 'Narra Street']",residential,0
-4828,4829,97.4,"['Acacia Street', 'Kamagong Street']",residential,0
+4827,4836,79.3,"['Narra Street', 'Ilang-ilang Street']",residential,0
+4828,4829,97.4,"['Kamagong Street', 'Acacia Street']",residential,0
 4828,4826,125.5,Acacia Street,residential,0
-4828,11186,132.56,"['Lagoon Street', 'Pook Dela Paz']",residential,0
-4829,4828,97.4,"['Acacia Street', 'Kamagong Street']",residential,0
+4828,11186,132.56,"['Pook Dela Paz', 'Lagoon Street']",residential,0
+4829,4828,97.4,"['Kamagong Street', 'Acacia Street']",residential,0
 4830,11830,33.93,Almaciga Street,residential,0
 4830,4825,15.54,Tanguile Street,residential,0
 4830,11275,25.51,Tanguile Street,residential,0
-4831,11830,100.73,"['Tindalo Street', 'Almaciga Street']",residential,0
+4831,11830,100.73,"['Almaciga Street', 'Tindalo Street']",residential,0
 4832,11694,113.94,,residential,0
 4832,738,117.01,Lakas Street,residential,0
 4832,4833,142.25,Lakas Street,residential,0
@@ -14044,7 +14044,7 @@ source,target,length,name,highway,oneway
 4835,10042,62.03,Don Sergio Extension,residential,0
 4835,2307,143.1,Don Q. Samonte Street,residential,0
 4836,11132,38.8,Ilang-ilang Street,residential,0
-4836,4827,79.3,"['Ilang-ilang Street', 'Narra Street']",residential,0
+4836,4827,79.3,"['Narra Street', 'Ilang-ilang Street']",residential,0
 4836,9362,414.39,"['Liwanag Street', 'Pook Dela Paz Street']",residential,0
 4837,8220,86.49,Doña Carmen Street,residential,0
 4837,4901,84.09,Doña Carmen Street,residential,0
@@ -14079,7 +14079,7 @@ source,target,length,name,highway,oneway
 4849,4848,28.71,Ernestito Street,residential,0
 4849,4893,309.48,Ocampo Street,residential,0
 4849,4850,60.78,Ernestito Street,residential,0
-4849,8001,139.69,"['Pinadama Street', 'Ocampo Street']",residential,0
+4849,8001,139.69,"['Ocampo Street', 'Pinadama Street']",residential,0
 4850,4894,306.69,Doña Carmen Street,residential,0
 4850,10502,79.0,Doña Carmen Street,residential,0
 4850,4897,63.72,Ernestito Street,residential,0
@@ -14259,14 +14259,14 @@ source,target,length,name,highway,oneway
 4908,4907,133.09,Benedicto Street,residential,0
 4908,4934,138.85,Doña Candelaria Street,residential,0
 4909,4853,54.77,Benedicto Street,residential,0
-4909,4911,152.65,"['Liszt Street', 'Handel Street']",residential,0
+4909,4911,152.65,"['Handel Street', 'Liszt Street']",residential,0
 4909,4910,87.74,Handel Street,residential,0
 4910,4858,184.49,Handel Street,residential,0
 4910,4925,56.54,Verdi Street,residential,0
 4910,4909,87.74,Handel Street,residential,0
 4911,4932,61.66,Mozart Street,residential,0
 4911,10491,119.77,Liszt Street,residential,0
-4911,4909,152.65,"['Liszt Street', 'Handel Street']",residential,0
+4911,4909,152.65,"['Handel Street', 'Liszt Street']",residential,0
 4912,4916,77.59,Liszt Street,residential,0
 4912,10491,42.07,Liszt Street,residential,0
 4912,4918,40.73,Abelardo Street,residential,0
@@ -14354,7 +14354,7 @@ source,target,length,name,highway,oneway
 4940,7988,4.57,Santo Niño Street,residential,0
 4941,12008,177.8,Gold Street,residential,0
 4941,4861,47.84,Ecols Street,residential,0
-4941,8221,184.24,"['Sanchez Street', 'Ecols Street']",residential,0
+4941,8221,184.24,"['Ecols Street', 'Sanchez Street']",residential,0
 4942,10501,39.1,Tabigo Street,residential,0
 4942,4943,83.57,Ecols Street,residential,0
 4942,4861,53.78,Ecols Street,residential,0
@@ -14452,7 +14452,7 @@ source,target,length,name,highway,oneway
 4975,5051,117.95,,residential,0
 4975,12156,45.6,,residential,0
 4976,4970,53.1,Denver Loop,residential,0
-4976,12953,42.26,Davis Street,"['residential', 'unclassified']",0
+4976,12953,42.26,Davis Street,"['unclassified', 'residential']",0
 4976,4995,72.3,Davis Street,residential,0
 4976,5104,46.2,Denver Street,residential,0
 4977,5035,189.0,Dalton Street,residential,0
@@ -14551,7 +14551,7 @@ source,target,length,name,highway,oneway
 5008,5046,72.92,Frost Street,residential,0
 5009,5055,58.71,Jensen Street,residential,0
 5009,5054,180.56,Gandhi Street,residential,0
-5009,4173,158.85,"['Pratt Street', 'Gandhi Street']",residential,0
+5009,4173,158.85,"['Gandhi Street', 'Pratt Street']",residential,0
 5010,5103,73.55,Defol Street,residential,0
 5010,5037,58.97,Denver Street,residential,0
 5010,5104,94.53,Denver Street,residential,0
@@ -14710,7 +14710,7 @@ source,target,length,name,highway,oneway
 5062,5063,51.76,Curtis Street,residential,0
 5062,4969,58.58,Curtis Street,residential,0
 5062,5324,159.29,Crane Street,residential,0
-5063,5065,146.86,"['Cash Street', 'Curtis Street']",residential,0
+5063,5065,146.86,"['Curtis Street', 'Cash Street']",residential,0
 5063,5062,51.76,Curtis Street,residential,0
 5063,5320,144.41,Chase Street,residential,0
 5064,10641,13.5,Cash Street,residential,0
@@ -14781,11 +14781,11 @@ source,target,length,name,highway,oneway
 5084,5087,118.4,Macopa Street,residential,0
 5084,5102,40.87,Chico Street,residential,0
 5085,5084,46.03,Molave Street,residential,0
-5085,5086,155.27,"['Uranium Street', 'Molave Street', 'Narra Street']",residential,0
+5085,5086,155.27,"['Molave Street', 'Uranium Street', 'Narra Street']",residential,0
 5085,5086,94.07,Mabolo Street,residential,0
 5086,5087,37.31,Uranium Street,residential,0
 5086,5085,94.07,Mabolo Street,residential,0
-5086,5085,155.27,"['Uranium Street', 'Molave Street', 'Narra Street']",residential,0
+5086,5085,155.27,"['Molave Street', 'Narra Street', 'Uranium Street']",residential,0
 5087,5086,37.31,Uranium Street,residential,0
 5087,5084,118.4,Macopa Street,residential,0
 5087,5089,38.01,Uranium Street,residential,0
@@ -14841,9 +14841,9 @@ source,target,length,name,highway,oneway
 5104,5010,94.53,Denver Street,residential,0
 5104,5103,78.33,Dali Street,residential,0
 5105,5106,168.2,Lanzones Street,residential,0
-5105,5106,234.8,"['Yakal Street', 'Tamarind Street', 'Tanguile Street']",residential,0
+5105,5106,234.8,"['Tanguile Street', 'Yakal Street', 'Tamarind Street']",residential,0
 5105,5097,38.31,Yakal Street,residential,0
-5106,5105,234.8,"['Tanguile Street', 'Tamarind Street', 'Yakal Street']",residential,0
+5106,5105,234.8,"['Tanguile Street', 'Yakal Street', 'Tamarind Street']",residential,0
 5106,5105,168.2,Lanzones Street,residential,0
 5106,5107,37.69,Tamarind Street,residential,0
 5107,5106,37.69,Tamarind Street,residential,0
@@ -14938,14 +14938,14 @@ source,target,length,name,highway,oneway
 5140,10343,69.1,Camia Street,residential,0
 5141,404,81.19,Junji Street,residential,0
 5141,12683,137.83,Main Street,residential,0
-5141,12682,187.99,"['2nd Street', 'Junji Street']",residential,0
+5141,12682,187.99,"['Junji Street', '2nd Street']",residential,0
 5142,11951,37.93,Main Street,residential,0
 5142,5143,46.0,Main Street,residential,0
 5142,9991,28.89,,residential,0
 5143,12682,127.55,2nd Street,residential,0
 5143,11600,26.1,Main Street,residential,0
 5143,5142,46.0,Main Street,residential,0
-5144,5146,358.63,"['T. S. Evalle Drive', 'Zabarte Sr. Avenue']",residential,0
+5144,5146,358.63,"['Zabarte Sr. Avenue', 'T. S. Evalle Drive']",residential,0
 5144,5145,43.78,T. S. Evalle Drive,residential,0
 5144,10812,178.03,King Fisher Street,residential,0
 5145,5144,43.78,T. S. Evalle Drive,residential,0
@@ -15001,7 +15001,7 @@ source,target,length,name,highway,oneway
 5163,5174,40.36,Mount Apo Street,residential,0
 5163,5184,137.5,Cresta Verde Avenue,residential,0
 5164,5171,17.93,Mount Fuji Street,residential,0
-5164,5170,238.48,"['Mount Apo Street', 'Filomena Street']",residential,0
+5164,5170,238.48,"['Filomena Street', 'Mount Apo Street']",residential,0
 5164,5392,131.73,Mount Sajama Street,residential,0
 5165,5180,39.97,Mount Apo Street,residential,0
 5165,5166,14.67,Mount Apo Street,residential,0
@@ -15016,7 +15016,7 @@ source,target,length,name,highway,oneway
 5168,5169,51.5,Mount Apo Street,residential,0
 5169,5168,51.5,Mount Apo Street,residential,0
 5170,5173,37.91,Mount Apo Street,residential,0
-5170,5164,238.48,"['Mount Apo Street', 'Filomena Street']",residential,0
+5170,5164,238.48,"['Filomena Street', 'Mount Apo Street']",residential,0
 5170,5171,218.25,Mount Elgon Street,residential,0
 5171,5172,37.37,Mount Fuji Street,residential,0
 5171,5164,17.93,Mount Fuji Street,residential,0
@@ -15064,7 +15064,7 @@ source,target,length,name,highway,oneway
 5185,5175,41.19,Mount Arayat Street,residential,0
 5185,5184,39.72,Mount Everest Street,tertiary,0
 5185,5167,129.01,Mount Everest Street,tertiary,0
-5186,5401,147.8,"['Doña Adela Street', 'Doña Victoria Street']",tertiary,1
+5186,5401,147.8,"['Doña Victoria Street', 'Doña Adela Street']",tertiary,1
 5186,5402,48.17,Saint Claire Street,residential,0
 5186,5167,57.8,Saint Claire Street,tertiary,0
 5187,13259,5.12,Mount Apo Street,residential,0
@@ -15165,7 +15165,7 @@ source,target,length,name,highway,oneway
 5233,5213,80.42,Lily Street,residential,0
 5233,8919,60.22,Gladiolus Street,residential,0
 5233,5236,64.32,Gladiolus Street,tertiary,0
-5233,4142,363.24,"['Lily Street', 'Champaca Street']",tertiary,0
+5233,4142,363.24,"['Champaca Street', 'Lily Street']",tertiary,0
 5234,5239,133.3,Catleya Street,tertiary,0
 5234,5238,50.87,Gladiolus Street,tertiary,0
 5234,5240,172.68,Catleya Street,residential,0
@@ -15251,7 +15251,7 @@ source,target,length,name,highway,oneway
 5263,5262,149.05,Santa Trinidad Street,tertiary,0
 5263,5480,55.63,Santa Trinidad Street,tertiary,0
 5263,5500,111.77,"['Santa Eleuteria Street', 'Sumilang Street']",residential,0
-5263,13284,123.79,"['Marcela', 'Sumilang Street']",residential,0
+5263,13284,123.79,"['Sumilang Street', 'Marcela']",residential,0
 5264,5265,204.57,Gomez Street,residential,0
 5264,5249,39.84,Jose Abad Santos Street,residential,0
 5264,5248,42.0,Jose Abad Santos Street,residential,0
@@ -15306,14 +15306,14 @@ source,target,length,name,highway,oneway
 5280,5451,189.09,F. Agoncillo Street,residential,0
 5280,5528,41.95,P. Paterno Street,residential,0
 5281,5280,39.68,P. Paterno Street,residential,0
-5281,5604,168.89,"['Raja Suliman Street', 'Rajah Soliman Extension']",residential,0
+5281,5604,168.89,"['Rajah Soliman Extension', 'Raja Suliman Street']",residential,0
 5281,5271,88.36,P. Paterno Street,residential,0
 5282,5285,39.84,Major Marcos Street,residential,0
 5282,5286,258.07,Captain F. L. Facia Street,residential,0
 5282,5289,62.45,Major Marcos Street,residential,0
 5283,5284,47.17,7th Street,residential,0
 5284,5283,47.17,7th Street,residential,0
-5284,5303,288.17,"['7th Street', 'Major T. P. Buncay Street']",residential,0
+5284,5303,288.17,"['Major T. P. Buncay Street', '7th Street']",residential,0
 5284,5285,352.32,Colonel S. D. Tolentino Street,residential,0
 5285,5282,39.84,Major Marcos Street,residential,0
 5285,5284,352.32,Colonel S. D. Tolentino Street,residential,0
@@ -15328,7 +15328,7 @@ source,target,length,name,highway,oneway
 5289,5282,62.45,Major Marcos Street,residential,0
 5290,5293,46.3,Major Marcos Street,residential,0
 5290,5295,46.27,Major Marcos Street,residential,0
-5290,11417,382.11,"['2nd Street', 'Aurora Street']",residential,0
+5290,11417,382.11,"['Aurora Street', '2nd Street']",residential,0
 5291,5294,111.94,Emilio Street,residential,0
 5291,8524,137.21,"['Bella Vita Street', 'Apo Street']",residential,0
 5291,11622,150.51,Apo Street,residential,0
@@ -15364,7 +15364,7 @@ source,target,length,name,highway,oneway
 5302,5303,46.37,8th Street,residential,0
 5303,5302,46.37,8th Street,residential,0
 5303,5301,111.08,Major T. P. Buncay Street,residential,0
-5303,5284,288.17,"['7th Street', 'Major T. P. Buncay Street']",residential,0
+5303,5284,288.17,"['Major T. P. Buncay Street', '7th Street']",residential,0
 5304,5368,24.63,Saturn Street,residential,0
 5304,5313,77.86,Mercury Street,residential,0
 5304,13215,29.39,Saturn Street,residential,0
@@ -15372,7 +15372,7 @@ source,target,length,name,highway,oneway
 5306,5363,80.21,Venus Street,residential,0
 5306,5360,149.71,Venus Street,residential,0
 5306,5310,27.25,Pluto Street,residential,0
-5306,5356,173.77,"['Jupiter Street', 'Pluto Street']",residential,0
+5306,5356,173.77,"['Pluto Street', 'Jupiter Street']",residential,0
 5307,5336,140.43,Nehemiah Street,residential,0
 5307,5330,73.5,Nehemiah Street,residential,0
 5307,5340,81.49,Joshua Street,tertiary,1
@@ -15498,7 +15498,7 @@ source,target,length,name,highway,oneway
 5355,5369,40.55,Amos Street,residential,0
 5355,5307,48.19,Joshua Street,tertiary,1
 5356,5360,24.87,Riosa Street,residential,0
-5356,5306,173.77,"['Jupiter Street', 'Pluto Street']",residential,0
+5356,5306,173.77,"['Pluto Street', 'Jupiter Street']",residential,0
 5356,3852,35.24,Riosa Street,residential,0
 5357,5361,84.24,Nickel Street,residential,0
 5357,5056,147.95,Gold Street,tertiary,0
@@ -15610,12 +15610,12 @@ source,target,length,name,highway,oneway
 5398,12266,256.78,Quirino Highway,primary,0
 5398,7008,37.13,Sarmiento Street,tertiary,1
 5399,5400,89.12,Don Santiago Avenue,tertiary,0
-5399,5400,164.34,"['Saint Claire Street', 'Saint James Street', 'Doña Victoria Street']",residential,0
+5399,5400,164.34,"['Doña Victoria Street', 'Saint Claire Street', 'Saint James Street']",residential,0
 5399,8253,65.26,Sarmiento Street,tertiary,0
 5400,10474,36.24,Don Santiago Avenue,tertiary,0
 5400,5402,41.76,Saint Claire Street,residential,0
 5400,5399,89.12,Don Santiago Avenue,tertiary,0
-5400,5399,164.34,"['Saint Claire Street', 'Doña Victoria Street', 'Saint James Street']",residential,0
+5400,5399,164.34,"['Doña Victoria Street', 'Saint Claire Street', 'Saint James Street']",residential,0
 5401,5399,51.75,Doña Victoria Street,tertiary,1
 5401,5402,88.79,Saint Francis Street,residential,0
 5402,5400,41.76,Saint Claire Street,residential,0
@@ -15637,7 +15637,7 @@ source,target,length,name,highway,oneway
 5408,5407,244.06,Dumalay Street,residential,1
 5408,5406,87.2,Sarmiento Street,tertiary,1
 5409,7007,88.0,Pearl Street,residential,0
-5409,7007,170.99,"['Topaz Street', 'Sapphire Street']",residential,0
+5409,7007,170.99,"['Sapphire Street', 'Topaz Street']",residential,0
 5409,7906,52.09,Topaz Street,residential,0
 5410,12886,56.77,Gold Street,residential,0
 5410,5490,119.2,General Luis Street,primary,0
@@ -15689,7 +15689,7 @@ source,target,length,name,highway,oneway
 5428,11282,117.7,Ramirez Street,residential,0
 5428,11592,92.07,Susano Road,secondary,0
 5429,5740,109.76,San Lazaro Street,residential,0
-5429,5740,206.31,"['Granada Street', 'San Pablo Street', 'Senading Street']",residential,0
+5429,5740,206.31,"['Senading Street', 'San Pablo Street', 'Granada Street']",residential,0
 5429,7500,47.53,Granada Street,residential,0
 5430,5611,38.06,Saint Lukes Street,residential,0
 5430,5627,76.06,Saint Peter Street,residential,0
@@ -15731,12 +15731,12 @@ source,target,length,name,highway,oneway
 5444,5671,52.19,Mary Town Circle,residential,0
 5444,6248,53.11,Pines Street,residential,0
 5444,5514,173.97,Mary Town Circle,residential,0
-5445,5734,514.38,"['Riverside Street', 'Jamaica Street']",residential,0
+5445,5734,514.38,"['Jamaica Street', 'Riverside Street']",residential,0
 5445,5734,97.38,Forest Hills Drive,tertiary,0
 5445,5640,84.78,Forest Hills Drive,tertiary,0
 5446,5557,85.14,Saint Matthew Street,residential,0
 5446,5704,24.63,Saint Matthew Street,residential,0
-5446,5611,221.55,"['Saint Lukes Street', 'Saint John Street']",residential,0
+5446,5611,221.55,"['Saint John Street', 'Saint Lukes Street']",residential,0
 5447,5567,44.46,M. Agoncillo Street,residential,0
 5447,5613,60.95,F. Balagtas Street,residential,0
 5447,5741,136.75,M. Agoncillo Street,residential,0
@@ -15750,7 +15750,7 @@ source,target,length,name,highway,oneway
 5450,6247,66.06,Sampaloc Street,residential,0
 5451,5528,151.36,F. Agoncillo Street,residential,0
 5451,5280,189.09,F. Agoncillo Street,residential,0
-5451,5721,289.74,"['Castro Street', 'Castro']",residential,0
+5451,5721,289.74,"['Castro', 'Castro Street']",residential,0
 5452,5626,105.46,Kadalagahan Street,residential,0
 5453,7492,60.26,Teachers Street,residential,0
 5453,5558,74.84,Teachers Street,residential,0
@@ -15864,7 +15864,7 @@ source,target,length,name,highway,oneway
 5490,410,91.49,General Luis Street,primary,0
 5490,5410,119.2,General Luis Street,primary,0
 5491,7501,46.47,Florentina Street,residential,0
-5491,5532,177.54,"['Kabagong Tauhan Street', 'Florentina Street']",residential,0
+5491,5532,177.54,"['Florentina Street', 'Kabagong Tauhan Street']",residential,0
 5491,5626,134.87,Kadalagahan Street,residential,0
 5492,5544,208.54,Prinsipe Tupaz Street,residential,0
 5492,5732,353.95,Prinsipe Tupaz Street,residential,0
@@ -15878,7 +15878,7 @@ source,target,length,name,highway,oneway
 5495,409,86.53,General Luis Street,primary,0
 5496,5610,55.67,Aries Street,residential,0
 5496,5663,46.79,Taurus Street,residential,0
-5496,7468,116.41,"['Gemini Street', 'Taurus Street']",residential,0
+5496,7468,116.41,"['Taurus Street', 'Gemini Street']",residential,0
 5497,5664,47.53,Santa Barbara Street,residential,0
 5497,5498,47.9,Santa Barbara Street,residential,0
 5497,5510,73.41,Lolita Street,residential,0
@@ -15900,7 +15900,7 @@ source,target,length,name,highway,oneway
 5502,8588,118.8,Ramos Street,residential,0
 5503,5592,30.92,Mahogany Street,residential,0
 5503,5648,74.0,Acacia Street,residential,0
-5503,10169,71.29,"['Tanguile Street', 'Mahogany Street']",residential,0
+5503,10169,71.29,"['Mahogany Street', 'Tanguile Street']",residential,0
 5504,10462,221.43,London Drive,residential,0
 5504,5664,107.84,Quirino Highway,primary,0
 5504,5566,101.61,Quirino Highway,primary,0
@@ -15983,7 +15983,7 @@ source,target,length,name,highway,oneway
 5532,5626,46.28,Don Crispulo Street,residential,0
 5532,5559,45.44,Don Crispulo Street,residential,0
 5532,5641,104.61,Kabagong Tauhan Street,residential,0
-5532,5491,177.54,"['Kabagong Tauhan Street', 'Florentina Street']",residential,0
+5532,5491,177.54,"['Florentina Street', 'Kabagong Tauhan Street']",residential,0
 5533,5702,42.82,Pangaral Street,residential,0
 5534,5681,41.22,Amethyst Street,residential,1
 5534,5700,40.47,Amethyst Street,residential,0
@@ -15997,7 +15997,7 @@ source,target,length,name,highway,oneway
 5537,5753,151.87,Saint James Street,tertiary,0
 5538,5705,122.54,San Agustin Street,residential,0
 5538,10170,8.44,Ester Street,tertiary,0
-5538,5505,45.49,"['Ester Street', 'Senading Street']",tertiary,0
+5538,5505,45.49,"['Senading Street', 'Ester Street']",tertiary,0
 5539,5686,174.69,Saint Thaddeus Street,residential,0
 5539,5743,76.87,Saint Thaddeus Street,residential,0
 5539,5607,222.52,Saint Simon Street,residential,0
@@ -16039,7 +16039,7 @@ source,target,length,name,highway,oneway
 5552,5468,73.2,Rhombus Street,residential,0
 5553,5647,48.8,Santan Street,residential,0
 5553,5455,126.74,Camia Street,residential,0
-5553,5586,192.48,"['Dahlia Street', 'Santan Street']",residential,0
+5553,5586,192.48,"['Santan Street', 'Dahlia Street']",residential,0
 5554,5670,130.02,Magdiwang Street,residential,0
 5554,5702,46.42,Pangaral Street,residential,0
 5554,5724,91.87,Pangaral Street,residential,0
@@ -16087,7 +16087,7 @@ source,target,length,name,highway,oneway
 5569,5482,107.83,Pili Street,residential,0
 5569,6886,55.02,Molave Street,residential,0
 5569,5513,248.42,Pili Street,residential,1
-5570,11269,208.91,"['Broadway Street', 'Queens Avenue']",residential,0
+5570,11269,208.91,"['Queens Avenue', 'Broadway Street']",residential,0
 5570,5867,41.31,Northwind Avenue,tertiary,0
 5570,10454,93.44,"['General Ricarte Street', 'Northwind Avenue']",tertiary,0
 5570,5546,198.76,Broadway Street,residential,0
@@ -16132,7 +16132,7 @@ source,target,length,name,highway,oneway
 5585,10362,154.59,Susano Road,secondary,0
 5586,5730,53.24,Dahlia Street,residential,0
 5586,5455,51.06,Franciscan Street,residential,0
-5586,5553,192.48,"['Dahlia Street', 'Santan Street']",residential,0
+5586,5553,192.48,"['Santan Street', 'Dahlia Street']",residential,0
 5587,5569,210.75,Anonas Street,residential,1
 5587,11465,48.17,Duhat Street,residential,0
 5588,5756,12.67,Doctor Villareal Street,residential,0
@@ -16176,10 +16176,10 @@ source,target,length,name,highway,oneway
 5602,10172,308.44,Donafield Street,residential,0
 5603,5548,31.47,Greccio Street,residential,0
 5603,5748,214.92,Greccio Street,tertiary,1
-5603,5667,88.1,"['Assisi Street', 'Saint John Street']",tertiary,0
+5603,5667,88.1,"['Saint John Street', 'Assisi Street']",tertiary,0
 5604,5568,92.12,Rajah Soliman Extension,residential,0
 5604,5568,139.65,Natividad Drive,residential,0
-5604,5281,168.89,"['Raja Suliman Street', 'Rajah Soliman Extension']",residential,0
+5604,5281,168.89,"['Rajah Soliman Extension', 'Raja Suliman Street']",residential,0
 5604,5751,48.17,Natividad Drive,residential,0
 5605,11201,145.9,Margarita Street,residential,0
 5605,10480,121.4,Asuncion Street,residential,0
@@ -16199,7 +16199,7 @@ source,target,length,name,highway,oneway
 5610,7468,16.09,Gemini Street,residential,0
 5610,5469,45.95,Gemini Street,residential,0
 5611,5430,38.06,Saint Lukes Street,residential,0
-5611,5446,221.55,"['Saint Lukes Street', 'Saint John Street']",residential,0
+5611,5446,221.55,"['Saint John Street', 'Saint Lukes Street']",residential,0
 5611,5557,94.59,Saint Matthew Street,residential,0
 5612,5737,205.35,Topaz Street,residential,0
 5613,5447,60.95,F. Balagtas Street,residential,0
@@ -16361,7 +16361,7 @@ source,target,length,name,highway,oneway
 5667,9848,41.85,Saint Thaddeus Street,residential,0
 5667,5441,153.64,Saint John Street,tertiary,1
 5667,5686,43.54,Saint Thaddeus Street,tertiary,0
-5667,5603,88.1,"['Assisi Street', 'Saint John Street']",tertiary,0
+5667,5603,88.1,"['Saint John Street', 'Assisi Street']",tertiary,0
 5668,5740,90.79,Senading Street,residential,0
 5668,7500,26.43,Granada Street,residential,0
 5668,5433,48.29,Senading Street,residential,0
@@ -16496,7 +16496,7 @@ source,target,length,name,highway,oneway
 5714,5522,61.96,Jewel Street,residential,0
 5714,5542,63.76,Jewel Street,residential,0
 5715,12175,164.79,Biglang Awa Street,residential,0
-5715,5673,94.79,"['Queens Avenue', 'Pasacola Road']",tertiary,0
+5715,5673,94.79,"['Pasacola Road', 'Queens Avenue']",tertiary,0
 5715,11188,29.88,Pasacola Road,tertiary,0
 5716,10460,92.76,Temple Street,residential,0
 5716,5566,73.97,Forest Hills Drive,tertiary,0
@@ -16515,7 +16515,7 @@ source,target,length,name,highway,oneway
 5720,5571,108.48,Queens Street,residential,0
 5721,10174,92.39,Santa Marcela Street,residential,0
 5721,5746,45.98,Nenita Street,residential,0
-5721,5451,289.74,"['Castro Street', 'Castro']",residential,0
+5721,5451,289.74,"['Castro', 'Castro Street']",residential,0
 5722,5565,31.69,,residential,0
 5723,5660,27.71,,residential,0
 5723,5461,36.23,,residential,0
@@ -16530,7 +16530,7 @@ source,target,length,name,highway,oneway
 5725,10480,201.55,Virginia Street,residential,0
 5726,5439,77.49,Kabuhayan Interior,residential,0
 5726,5462,191.47,Masaya Interior,residential,0
-5726,10166,276.46,"['Nenita Interior', 'Masaya Interior']",residential,0
+5726,10166,276.46,"['Masaya Interior', 'Nenita Interior']",residential,0
 5727,5450,116.76,Yakal Street,residential,0
 5727,5598,106.46,Yakal Street,residential,0
 5727,6248,119.76,Narra Street,residential,0
@@ -16555,7 +16555,7 @@ source,target,length,name,highway,oneway
 5733,5560,100.5,Kalinisan Street,residential,0
 5733,5499,40.49,Masaya Street,tertiary,0
 5733,5515,25.72,Masaya Street,tertiary,0
-5734,5445,514.38,"['Riverside Street', 'Jamaica Street']",residential,0
+5734,5445,514.38,"['Jamaica Street', 'Riverside Street']",residential,0
 5734,5445,97.38,Forest Hills Drive,tertiary,0
 5734,5638,186.76,Forest Hills Drive,tertiary,0
 5735,5514,47.61,Mary Town Circle,residential,0
@@ -16570,7 +16570,7 @@ source,target,length,name,highway,oneway
 5738,5730,30.15,Dahlia Street,residential,0
 5739,5449,90.54,Panday Pira Extension,residential,0
 5740,5429,109.76,San Lazaro Street,residential,0
-5740,5429,206.31,"['Granada Street', 'Senading Street', 'San Pablo Street']",residential,0
+5740,5429,206.31,"['Senading Street', 'San Pablo Street', 'Granada Street']",residential,0
 5740,5668,90.79,Senading Street,residential,0
 5741,5447,136.75,M. Agoncillo Street,residential,0
 5741,5708,127.81,Princess Urduja Street,tertiary,0
@@ -16586,7 +16586,7 @@ source,target,length,name,highway,oneway
 5745,5648,31.42,Rainbow Avenue,residential,0
 5745,5592,71.61,Kamagong Street,residential,0
 5745,12192,36.43,Kamagong Street,residential,0
-5746,10175,128.94,"['Luzviminda Street', 'Luzviminda']",residential,0
+5746,10175,128.94,"['Luzviminda', 'Luzviminda Street']",residential,0
 5746,5555,44.61,Nenita Street,residential,0
 5746,5721,45.98,Nenita Street,residential,0
 5747,5590,248.46,St. Anthony Street,residential,0
@@ -16671,18 +16671,18 @@ source,target,length,name,highway,oneway
 5772,10458,76.91,Santa Veronica Street,residential,0
 5773,11211,50.73,San Ignacio,residential,0
 5773,5759,111.76,San Ignacio,residential,0
-5773,5774,241.7,"['Kabaitan Street', 'Santa Veronica Street']",residential,0
+5773,5774,241.7,"['Santa Veronica Street', 'Kabaitan Street']",residential,0
 5773,10459,98.54,Santa Veronica Street,residential,0
 5774,5758,54.2,Villareal Street,residential,0
 5774,5760,36.11,Villareal Street,residential,0
-5774,5773,241.7,"['Kabaitan Street', 'Santa Veronica Street']",residential,0
+5774,5773,241.7,"['Santa Veronica Street', 'Kabaitan Street']",residential,0
 5775,5776,44.05,San Ignacio,residential,0
 5775,5761,47.24,San Ignacio,residential,0
 5775,9007,57.53,Maganda Street,residential,0
 5775,9009,100.19,Maganda Street,residential,0
 5776,5775,44.05,San Ignacio,residential,0
 5776,9007,62.26,Bigasan Street,residential,0
-5776,9008,128.57,"['San Ignacio', 'Mariposa Street']",residential,0
+5776,9008,128.57,"['Mariposa Street', 'San Ignacio']",residential,0
 5776,9008,65.47,Bigasan Street,residential,0
 5777,5778,166.65,Santa Maxima Street,residential,0
 5777,10456,35.04,San Luis Street,residential,0
@@ -16692,7 +16692,7 @@ source,target,length,name,highway,oneway
 5778,5757,94.16,San Martin Street,residential,0
 5778,10450,75.08,Santa Maxima Street,residential,0
 5779,5780,136.63,Nazario Street,residential,0
-5779,10456,23.86,"['San Luis Street', 'Nazario Street']",residential,0
+5779,10456,23.86,"['Nazario Street', 'San Luis Street']",residential,0
 5779,5763,143.74,Bayabasan Street,residential,0
 5780,5778,47.05,San Martin Street,residential,0
 5780,13581,30.94,San Martin Street,residential,0
@@ -16718,7 +16718,7 @@ source,target,length,name,highway,oneway
 5787,5791,118.55,Premier Street,residential,0
 5788,5789,26.64,Premier Street,residential,0
 5788,5793,46.71,Senator Street,residential,0
-5788,8025,138.11,"['Governor Street', 'Senator Street']",residential,0
+5788,8025,138.11,"['Senator Street', 'Governor Street']",residential,0
 5789,5788,26.64,Premier Street,residential,0
 5789,5791,97.6,Premier Street,residential,0
 5789,5790,123.67,Commissioner Street,residential,0
@@ -16929,7 +16929,7 @@ source,target,length,name,highway,oneway
 5867,11269,176.43,Windy Avenue,residential,0
 5867,5570,41.31,Northwind Avenue,tertiary,0
 5868,11853,72.75,Yellowstone Street,residential,0
-5869,5871,164.29,"['San Luis Street', 'Payapa Street']",residential,0
+5869,5871,164.29,"['Payapa Street', 'San Luis Street']",residential,0
 5870,5871,107.61,Severino Street,residential,0
 5871,5767,43.91,San Luis Street,residential,0
 5871,5869,164.29,"['Payapa Street', 'San Luis Street']",residential,0
@@ -16975,11 +16975,11 @@ source,target,length,name,highway,oneway
 5884,5882,119.15,Saint Mark Street,residential,0
 5884,5883,55.27,Saint James Street,residential,0
 5885,4198,29.02,Katipunan Avenue,secondary,0
-5885,5886,296.89,"['Santa Cruz Street', 'East Los Angeles Street']",residential,0
-5885,10443,150.05,"['Katipunan Extension', 'Katipunan Avenue']",secondary,0
+5885,5886,296.89,"['East Los Angeles Street', 'Santa Cruz Street']",residential,0
+5885,10443,150.05,"['Katipunan Avenue', 'Katipunan Extension']",secondary,0
 5886,7562,113.8,East Berkely Street,tertiary,0
 5886,5874,208.84,East Berkely Street,tertiary,0
-5886,5885,296.89,"['Santa Cruz Street', 'East Los Angeles Street']",residential,0
+5886,5885,296.89,"['East Los Angeles Street', 'Santa Cruz Street']",residential,0
 5887,5897,70.16,Lapu-lapu Street,residential,0
 5888,5893,49.58,Magsaysay Avenue,tertiary,0
 5888,5894,31.37,Magsaysay Extension,residential,0
@@ -17127,11 +17127,11 @@ source,target,length,name,highway,oneway
 5938,7459,59.74,Sinforosa Street,residential,0
 5939,11011,124.07,Armando Street,residential,0
 5939,11010,63.17,Pagkabuhay Road,tertiary,0
-5939,7456,58.29,"['Biglang Awa Street', 'Pagkabuhay Road']",tertiary,0
+5939,7456,58.29,"['Pagkabuhay Road', 'Biglang Awa Street']",tertiary,0
 5940,12552,171.73,Sinforosa Street,residential,0
 5941,5955,31.99,Noah Street,tertiary,0
 5941,5953,133.87,Moses Street,residential,0
-5941,7458,48.14,"['Noah Street', 'Capricorn Street']",tertiary,0
+5941,7458,48.14,"['Capricorn Street', 'Noah Street']",tertiary,0
 5942,7197,33.05,Jasmin Street,residential,0
 5942,5943,46.46,Moses Street,residential,0
 5942,5968,20.24,Moses Street,residential,0
@@ -17161,7 +17161,7 @@ source,target,length,name,highway,oneway
 5950,5971,46.21,Noemi Street,residential,0
 5951,5972,25.16,Mark Street,residential,0
 5951,5976,119.08,Ruth Street,residential,0
-5951,5970,101.84,"['Esther Street', 'Mark Street']",residential,0
+5951,5970,101.84,"['Mark Street', 'Esther Street']",residential,0
 5952,5979,12.09,Job Street,residential,0
 5953,5954,35.49,Job Street,residential,0
 5953,5941,133.87,Moses Street,residential,0
@@ -17220,7 +17220,7 @@ source,target,length,name,highway,oneway
 5969,11808,35.26,Esau Street,residential,0
 5970,5958,33.15,Matthew Street,residential,0
 5970,5977,78.13,Esther Street,residential,0
-5970,5951,101.84,"['Esther Street', 'Mark Street']",residential,0
+5970,5951,101.84,"['Mark Street', 'Esther Street']",residential,0
 5971,5976,60.07,Noemi Street,residential,0
 5971,5950,46.21,Noemi Street,residential,0
 5971,5977,137.58,Esther Street,residential,0
@@ -17534,7 +17534,7 @@ source,target,length,name,highway,oneway
 6080,6083,35.4,Mozart Street,residential,0
 6081,6082,195.47,Schubert Street,residential,0
 6081,6078,35.7,Jerusalem Street,residential,0
-6081,6153,65.79,"['Jerusalem Street', 'Schumann Street']",residential,0
+6081,6153,65.79,"['Schumann Street', 'Jerusalem Street']",residential,0
 6082,6073,35.69,Beethoven Street,residential,0
 6082,6079,35.13,Beethoven Street,residential,0
 6082,6083,106.45,Schubert Street,residential,0
@@ -17596,10 +17596,10 @@ source,target,length,name,highway,oneway
 6100,6095,31.1,Acropolis Drive,residential,0
 6100,6102,33.17,Greccia Street,residential,0
 6101,6099,31.68,Arcadia Street,residential,0
-6101,6102,155.55,"['Greccia Street', 'Arcadia Street']",residential,0
+6101,6102,155.55,"['Arcadia Street', 'Greccia Street']",residential,0
 6101,6102,156.51,Victoria Street,residential,0
 6102,6100,33.17,Greccia Street,residential,0
-6102,6101,155.55,"['Greccia Street', 'Arcadia Street']",residential,0
+6102,6101,155.55,"['Arcadia Street', 'Greccia Street']",residential,0
 6102,6101,156.51,Victoria Street,residential,0
 6103,6099,27.45,Arcadia Street,residential,0
 6103,6105,29.4,Arcadia Street,residential,0
@@ -17754,7 +17754,7 @@ source,target,length,name,highway,oneway
 6152,11940,44.07,Wagner Street,residential,0
 6153,6073,162.55,Schumann Street,residential,0
 6153,6162,34.97,Vivaldi Street,residential,0
-6153,6081,65.79,"['Jerusalem Street', 'Schumann Street']",residential,0
+6153,6081,65.79,"['Schumann Street', 'Jerusalem Street']",residential,0
 6154,6157,30.55,Vivaldi Street,residential,0
 6154,11940,102.76,Wagner Street,residential,0
 6154,6155,67.23,"['Verdi Street', 'Wagner Street']",residential,0
@@ -17955,13 +17955,13 @@ source,target,length,name,highway,oneway
 6220,6227,96.89,Diamond Drive,tertiary,0
 6221,5157,19.0,Carmen Drive,tertiary,0
 6221,9631,39.34,Carmen Drive,tertiary,0
-6221,6223,126.39,"['Rachel Lane', 'Regina Lane']",residential,0
+6221,6223,126.39,"['Regina Lane', 'Rachel Lane']",residential,0
 6222,6223,29.78,Rowena Lane,residential,0
 6222,12679,8.59,,residential,0
 6222,12680,5.73,,residential,0
 6223,6220,38.79,Regina Lane,residential,0
 6223,6222,29.78,Rowena Lane,residential,0
-6223,6221,126.39,"['Rachel Lane', 'Regina Lane']",residential,0
+6223,6221,126.39,"['Regina Lane', 'Rachel Lane']",residential,0
 6224,6225,86.73,Cristina Lane,residential,0
 6225,5159,46.62,Camarin Avenue,residential,0
 6225,6224,86.73,Cristina Lane,residential,0
@@ -18098,7 +18098,7 @@ source,target,length,name,highway,oneway
 6272,6267,42.29,Doña Engracia Street,residential,0
 6272,6271,14.75,Doña Engracia Street,residential,0
 6273,6272,47.74,Emmanuel Street,residential,0
-6273,7002,173.11,"['Emmanuel Street', 'Fatima Street']",residential,0
+6273,7002,173.11,"['Fatima Street', 'Emmanuel Street']",residential,0
 6273,6274,102.41,Joselito Street,residential,0
 6274,12675,47.64,Don Mariano Street,residential,0
 6274,7003,34.38,Don Mariano Street,residential,0
@@ -18160,7 +18160,7 @@ source,target,length,name,highway,oneway
 6293,6292,135.22,Diego Silang Street,residential,0
 6294,6284,51.7,S. Osmeña Sr. Street,unclassified,0
 6294,6301,302.94,"['J. P. Laurel Street', 'P. Rivera Street']",residential,0
-6294,6333,114.57,"['S. Osmeña Sr. Street', 'Saint Jude Street']",unclassified,0
+6294,6333,114.57,"['Saint Jude Street', 'S. Osmeña Sr. Street']",unclassified,0
 6295,6297,71.08,M. Roxas Street,residential,0
 6295,6296,152.77,J. P. Laurel Street,tertiary,0
 6295,6301,59.48,J. P. Laurel Street,tertiary,0
@@ -18199,7 +18199,7 @@ source,target,length,name,highway,oneway
 6306,6304,54.45,Fidel Cruz,residential,0
 6307,6306,52.21,Ambrosia Street,tertiary,0
 6307,6300,56.11,Ambrosia Street,tertiary,0
-6307,6321,48.86,"['Sampaguita Street', 'Sampaguita']",residential,0
+6307,6321,48.86,"['Sampaguita', 'Sampaguita Street']",residential,0
 6308,6314,159.88,Llano Road,secondary,0
 6308,5754,261.26,General Luis Street,primary,0
 6308,5581,64.74,General Luis Street,primary,0
@@ -18223,13 +18223,13 @@ source,target,length,name,highway,oneway
 6315,6314,97.41,Roxas Compound,residential,0
 6316,9810,22.02,Llano Road,secondary,0
 6316,7871,92.53,Llano Road,secondary,0
-6316,6318,394.17,"['Juan Street', 'Gerry Ville Road']",residential,0
+6316,6318,394.17,"['Gerry Ville Road', 'Juan Street']",residential,0
 6317,6318,52.25,Eduardo Street,residential,0
 6317,7869,139.91,Domingo Street,residential,0
 6317,7869,209.58,Eduardo Street,residential,0
 6318,6317,52.25,Eduardo Street,residential,0
 6318,7895,46.43,Juan Street,residential,0
-6318,6316,394.17,"['Juan Street', 'Gerry Ville Road']",residential,0
+6318,6316,394.17,"['Gerry Ville Road', 'Juan Street']",residential,0
 6319,6320,9.68,Sampaguita Street,residential,0
 6319,7895,46.12,Col Street,residential,0
 6319,7945,138.09,Sampaguita Street,residential,0
@@ -18238,7 +18238,7 @@ source,target,length,name,highway,oneway
 6320,6321,136.47,"['Rosal', 'Ilang-ilang']",residential,0
 6321,6320,95.59,Sampaguita Street,residential,0
 6321,6320,136.47,"['Rosal', 'Ilang-ilang']",residential,0
-6321,6307,48.86,"['Sampaguita Street', 'Sampaguita']",residential,0
+6321,6307,48.86,"['Sampaguita', 'Sampaguita Street']",residential,0
 6322,6323,64.98,Carmencita Road,residential,0
 6322,10471,13.08,Elenita Road,residential,0
 6322,6325,121.4,Elenita Road,residential,0
@@ -18253,7 +18253,7 @@ source,target,length,name,highway,oneway
 6325,6324,60.65,General Luis Street,primary,0
 6326,7896,6.26,Llano Road,secondary,0
 6326,11479,134.15,Llano Road,secondary,0
-6326,7119,21.42,Villa Nova Avenue,"['residential', 'unclassified']",0
+6326,7119,21.42,Villa Nova Avenue,"['unclassified', 'residential']",0
 6327,6329,161.64,Dominga Street,unclassified,0
 6327,7896,67.67,Cabesa Andres Street,unclassified,0
 6327,7898,53.06,Dominga Street,residential,0
@@ -18263,7 +18263,7 @@ source,target,length,name,highway,oneway
 6329,6328,59.72,Dominga Street,unclassified,0
 6329,6327,161.64,Dominga Street,unclassified,0
 6329,6332,170.15,Terio Street,residential,0
-6330,7902,105.12,"['Dominga Street', 'Saint Joseph Street']",unclassified,0
+6330,7902,105.12,"['Saint Joseph Street', 'Dominga Street']",unclassified,0
 6330,6328,64.75,Dominga Street,unclassified,0
 6330,6331,186.51,Maria Street,residential,0
 6331,6328,146.87,Pablo Street,residential,0
@@ -18272,7 +18272,7 @@ source,target,length,name,highway,oneway
 6332,6329,170.15,Terio Street,residential,0
 6332,7898,63.48,Maria Street,residential,0
 6332,6331,69.87,Maria Street,residential,0
-6333,6294,114.57,"['S. Osmeña Sr. Street', 'Saint Jude Street']",unclassified,0
+6333,6294,114.57,"['Saint Jude Street', 'S. Osmeña Sr. Street']",unclassified,0
 6333,6335,287.7,"['Saint Joseph Street', 'San Roque Street']",unclassified,0
 6333,6336,75.29,Saint Jude Street,residential,0
 6334,10440,147.85,"['Urbien Street', 'Dolmar Street']",residential,0
@@ -18290,7 +18290,7 @@ source,target,length,name,highway,oneway
 6339,10401,31.95,Llano Road,secondary,0
 6339,6340,113.19,Katipunan Avenue,residential,0
 6340,6339,113.19,Katipunan Avenue,residential,0
-6340,6341,225.29,"['Salvador Street', 'Katipunan Avenue']",residential,0
+6340,6341,225.29,"['Katipunan Avenue', 'Salvador Street']",residential,0
 6340,6342,119.67,Jordan Street,residential,0
 6341,6342,161.21,Gethsemane Street,residential,0
 6341,6340,225.29,"['Katipunan Avenue', 'Salvador Street']",residential,0
@@ -18485,7 +18485,7 @@ source,target,length,name,highway,oneway
 6406,6549,143.61,Palmera Street,residential,0
 6407,6657,95.87,Flower Pickle Street,residential,0
 6408,6516,108.91,Nobel Street,residential,0
-6408,6512,186.1,"['Norton Street', 'Miller Street']",tertiary,1
+6408,6512,186.1,"['Miller Street', 'Norton Street']",tertiary,1
 6409,8487,47.05,,residential,0
 6409,6592,67.24,Clemente Street,residential,0
 6409,6739,151.29,Clemente Street,residential,0
@@ -18513,7 +18513,7 @@ source,target,length,name,highway,oneway
 6416,6567,32.08,Ivory Street,residential,0
 6417,6617,35.75,Morning Star Street,residential,0
 6417,6606,154.64,Acacia Street,residential,0
-6417,9161,228.36,"['Morning Star Street', 'Talisay Street']",residential,0
+6417,9161,228.36,"['Talisay Street', 'Morning Star Street']",residential,0
 6418,6386,149.16,Mason Street,residential,0
 6418,6491,41.37,Mason Street,residential,0
 6418,4168,61.92,Miller Street,residential,0
@@ -18596,7 +18596,7 @@ source,target,length,name,highway,oneway
 6446,6722,56.33,Davao Street,residential,0
 6446,6478,251.67,Visayas Street,residential,0
 6447,6676,31.45,Matthew Street,residential,0
-6447,6482,265.72,"['Titus Street', 'James Street']",residential,0
+6447,6482,265.72,"['James Street', 'Titus Street']",residential,0
 6447,12944,109.77,Matthew Street,residential,0
 6448,6640,74.12,Empire Road,residential,0
 6448,9190,395.5,Empire Road,residential,0
@@ -18687,7 +18687,7 @@ source,target,length,name,highway,oneway
 6477,6392,208.63,Hanna Street,residential,0
 6478,6446,251.67,Visayas Street,residential,0
 6478,6722,323.69,"['Palawan Street', 'Mindanao Street', 'Davao Street']",residential,0
-6478,10623,302.08,"['Palawan Street', 'Luzon Street']",residential,0
+6478,10623,302.08,"['Luzon Street', 'Palawan Street']",residential,0
 6479,6397,61.56,Purok 10,residential,0
 6480,7324,52.16,General Geronimo Street,residential,0
 6480,6501,42.9,General Geronimo Street,residential,0
@@ -18697,7 +18697,7 @@ source,target,length,name,highway,oneway
 6481,6679,39.22,Iriga Street,residential,0
 6481,6583,166.43,Malaya Street,residential,0
 6482,12944,7.24,Matthew Street,residential,0
-6482,6447,265.72,"['Titus Street', 'James Street']",residential,0
+6482,6447,265.72,"['James Street', 'Titus Street']",residential,0
 6482,12945,16.66,Spring Country Avenue,residential,1
 6483,10669,70.98,San Juan Evangelista Street,residential,0
 6483,6531,108.52,San Juan Evangelista Street,residential,0
@@ -18727,11 +18727,11 @@ source,target,length,name,highway,oneway
 6491,6613,145.31,Mason Street,residential,0
 6491,6546,195.91,Hilton Street,residential,0
 6492,6382,263.62,Phase 3 Block 7,residential,0
-6492,6876,430.14,"['Phase 3 Block 7', 'Phase 3 Block 7 Extension']",residential,0
+6492,6876,430.14,"['Phase 3 Block 7 Extension', 'Phase 3 Block 7']",residential,0
 6492,9144,60.45,Phase 3 Block 1,residential,0
 6492,11843,92.45,Phase 3 Block 1,residential,0
 6493,6485,33.69,Banaba Street,residential,0
-6493,10547,188.29,"['Malasakit Street', 'Banaba Street']",residential,0
+6493,10547,188.29,"['Banaba Street', 'Malasakit Street']",residential,0
 6493,6730,119.61,Poinsettia Street,residential,0
 6494,6465,96.4,Knox Street,residential,0
 6494,6680,67.4,Palma Street,tertiary,0
@@ -18741,7 +18741,7 @@ source,target,length,name,highway,oneway
 6495,6475,32.48,Ipil Street,residential,0
 6496,10545,29.99,Ipil-ipil Street,residential,0
 6496,6399,67.98,Ipil-ipil Street,residential,0
-6496,8426,243.43,"['Narra Street', 'Duhat Street']",residential,0
+6496,8426,243.43,"['Duhat Street', 'Narra Street']",residential,0
 6496,9289,83.02,Duhat Street,residential,0
 6497,6620,98.37,Venus Street,residential,0
 6497,13334,11.31,Saturn Street,residential,0
@@ -18785,11 +18785,11 @@ source,target,length,name,highway,oneway
 6510,4174,147.96,Hailey Street,residential,0
 6511,6625,37.84,Makiling Street,residential,0
 6511,6385,78.49,Lunas Street,residential,0
-6511,6721,234.04,"['Kanlaon Street', 'Lunas Street']",residential,0
+6511,6721,234.04,"['Lunas Street', 'Kanlaon Street']",residential,0
 6512,6731,42.92,Nervi Street,residential,0
 6512,6516,74.45,Nervi Street,tertiary,1
 6513,6405,43.49,Makiling Street,residential,0
-6513,6679,210.21,"['Samat Street', 'Iriga Street']",residential,0
+6513,6679,210.21,"['Iriga Street', 'Samat Street']",residential,0
 6513,6658,256.75,"['Sierra Madre Street', 'Makiling Street']",residential,0
 6514,6528,50.19,Peter Street,residential,0
 6514,6442,44.96,Peter Street,residential,0
@@ -18828,7 +18828,7 @@ source,target,length,name,highway,oneway
 6525,6533,48.93,Eagle Street,residential,0
 6526,6424,43.1,Halcon Street,residential,0
 6526,6658,166.01,Diwata Street,residential,0
-6526,12161,242.82,"['Arayat Street', 'Diwata Street']",residential,0
+6526,12161,242.82,"['Diwata Street', 'Arayat Street']",residential,0
 6527,10633,36.46,Jericho Street,residential,0
 6527,6677,14.65,Jericho Street,residential,0
 6527,10632,86.65,Jeremiah Street,residential,0
@@ -18837,7 +18837,7 @@ source,target,length,name,highway,oneway
 6528,6671,30.77,David Street,residential,0
 6529,6710,117.15,San Lorenzo Ruiz Street,residential,0
 6529,6643,17.32,Santo Niño de Payatas Street,residential,0
-6529,6665,308.91,"['Santo Niño de Payatas Street', 'San Miguel Street']",residential,0
+6529,6665,308.91,"['San Miguel Street', 'Santo Niño de Payatas Street']",residential,0
 6530,6519,191.78,Phase 3 Area B,residential,0
 6530,6445,176.93,Phase 3 Area B,residential,0
 6530,11843,74.95,Phase 3 Block 1,residential,0
@@ -18860,7 +18860,7 @@ source,target,length,name,highway,oneway
 6536,6419,60.53,Purok 5,residential,0
 6537,6609,185.64,Santo Tomas Street,residential,0
 6537,6708,217.24,"['Taal Street', 'Wayan Street']",residential,0
-6537,6594,227.65,"['Wayan Street', 'Silay Street']",residential,0
+6537,6594,227.65,"['Silay Street', 'Wayan Street']",residential,0
 6538,6457,119.76,Broadbill Road,residential,0
 6539,6592,64.56,Leyte Street,residential,0
 6539,12696,80.64,Legaspi,residential,0
@@ -18880,7 +18880,7 @@ source,target,length,name,highway,oneway
 6544,11501,142.86,Fantail Street,residential,0
 6544,10675,300.39,Fantail Street,residential,0
 6545,6728,146.52,Bougainvillea Street,residential,0
-6545,6660,310.82,"['Aloe Vera', 'Acapulco']",residential,0
+6545,6660,310.82,"['Acapulco', 'Aloe Vera']",residential,0
 6545,6456,206.13,Pinagkaisa Street,residential,0
 6546,6613,59.95,Mark Street,residential,0
 6546,6491,195.91,Hilton Street,residential,0
@@ -18948,7 +18948,7 @@ source,target,length,name,highway,oneway
 6566,6599,156.77,Violago Road,tertiary,0
 6567,11469,169.09,Fortune Street,residential,0
 6567,6416,32.08,Ivory Street,residential,0
-6567,6571,215.9,"['Ivory Street', 'Everlasting Street']",residential,0
+6567,6571,215.9,"['Everlasting Street', 'Ivory Street']",residential,0
 6568,6572,32.14,Gemilina Street,residential,0
 6569,6443,62.27,Molave Street,residential,0
 6569,6455,36.37,Molave Street,residential,0
@@ -18960,7 +18960,7 @@ source,target,length,name,highway,oneway
 6571,9204,89.23,Jasmine Street,residential,0
 6571,6685,65.91,Jasmine Street,residential,0
 6571,6486,223.29,Everlasting Street,residential,0
-6571,6567,215.9,"['Ivory Street', 'Everlasting Street']",residential,0
+6571,6567,215.9,"['Everlasting Street', 'Ivory Street']",residential,0
 6572,6568,32.14,Gemilina Street,residential,0
 6572,11751,11.55,Gemilina Street,residential,0
 6572,6425,108.16,,residential,0
@@ -18999,7 +18999,7 @@ source,target,length,name,highway,oneway
 6584,6413,100.58,Leyte,residential,0
 6584,6387,70.94,Leyte,residential,0
 6584,9228,41.42,Bicol,residential,0
-6584,12721,69.83,"['Bicol Extension', 'Bicol']",residential,0
+6584,12721,69.83,"['Bicol', 'Bicol Extension']",residential,0
 6585,6380,43.35,J. P. Rizal Street,residential,0
 6585,6555,46.04,Road № 1,residential,0
 6585,6460,127.0,J. P. Rizal Street,residential,0
@@ -19017,7 +19017,7 @@ source,target,length,name,highway,oneway
 6589,6627,76.52,Jericho Street,residential,0
 6590,4171,44.87,Price Street,residential,0
 6590,9150,106.28,Peron Street,residential,0
-6590,4163,158.32,"['Pele Street', 'Price Street']",residential,0
+6590,4163,158.32,"['Price Street', 'Pele Street']",residential,0
 6591,6671,75.54,Jeremiah Street,residential,0
 6591,13501,31.09,Jeremiah Street,residential,0
 6591,6514,58.78,Hosea Street,residential,0
@@ -19029,7 +19029,7 @@ source,target,length,name,highway,oneway
 6593,6719,50.88,,residential,0
 6594,6609,38.51,Sierra Madre Street,residential,0
 6594,6658,46.6,Sierra Madre Street,residential,0
-6594,6537,227.65,"['Wayan Street', 'Silay Street']",residential,0
+6594,6537,227.65,"['Silay Street', 'Wayan Street']",residential,0
 6595,6461,28.74,Dove Street,residential,0
 6595,9077,16.29,Dove Street,residential,0
 6595,9140,180.1,Helpful Street,residential,0
@@ -19210,7 +19210,7 @@ source,target,length,name,highway,oneway
 6657,6458,46.2,Eagle Street,residential,0
 6657,6407,95.87,Flower Pickle Street,residential,0
 6658,6594,46.6,Sierra Madre Street,residential,0
-6658,6513,256.75,"['Makiling Street', 'Sierra Madre Street']",residential,0
+6658,6513,256.75,"['Sierra Madre Street', 'Makiling Street']",residential,0
 6658,6526,166.01,Diwata Street,residential,0
 6659,7324,111.32,General Geronimo Street,residential,0
 6659,6404,45.75,General Geronimo Street,residential,0
@@ -19232,7 +19232,7 @@ source,target,length,name,highway,oneway
 6664,13303,7.32,Violago Road,tertiary,0
 6664,13301,15.2,Judicial Street,residential,1
 6665,11887,76.62,San Miguel Exterior,residential,0
-6665,6529,308.91,"['Santo Niño de Payatas Street', 'San Miguel Street']",residential,0
+6665,6529,308.91,"['San Miguel Street', 'Santo Niño de Payatas Street']",residential,0
 6665,6696,43.99,San Miguel Street,residential,0
 6666,6576,39.88,Pampanga,residential,0
 6666,6522,92.23,Alley E,residential,0
@@ -19333,7 +19333,7 @@ source,target,length,name,highway,oneway
 6700,12939,10.78,Filheights Avenue,residential,0
 6700,6645,43.88,Filheights Avenue,residential,0
 6700,6580,252.38,Joshua Street,residential,0
-6700,10624,113.99,"['Joshua Street', 'Jericho Street']",residential,1
+6700,10624,113.99,"['Jericho Street', 'Joshua Street']",residential,1
 6701,6419,38.27,Purok 5,residential,0
 6701,6541,28.59,Clemente Street,residential,0
 6701,6592,39.8,Clemente Street,residential,0
@@ -19392,7 +19392,7 @@ source,target,length,name,highway,oneway
 6720,6367,34.71,Violago Road,tertiary,0
 6721,6385,42.28,Halcon Street,residential,0
 6721,6424,62.8,Halcon Street,residential,0
-6721,6511,234.04,"['Kanlaon Street', 'Lunas Street']",residential,0
+6721,6511,234.04,"['Lunas Street', 'Kanlaon Street']",residential,0
 6722,6446,56.33,Davao Street,residential,0
 6722,6478,323.69,"['Palawan Street', 'Mindanao Street', 'Davao Street']",residential,0
 6722,6619,370.9,Aklan Street,residential,0
@@ -19491,7 +19491,7 @@ source,target,length,name,highway,oneway
 6759,6760,44.52,San Lorenzo Street,residential,0
 6760,6759,44.52,San Lorenzo Street,residential,0
 6760,12116,24.78,Daisy Street,residential,0
-6760,9339,97.91,"['San Lorenzo Street', 'Santa Veronica Street']",residential,0
+6760,9339,97.91,"['Santa Veronica Street', 'San Lorenzo Street']",residential,0
 6761,10668,24.19,,residential,0
 6761,6752,88.45,Daisy Street,residential,0
 6761,6762,36.73,,residential,0
@@ -19621,7 +19621,7 @@ source,target,length,name,highway,oneway
 6804,11448,25.14,Kalusugan Street,residential,0
 6804,9247,40.79,Kagandahan Street,residential,0
 6805,9910,18.63,Kalusugan Street,residential,0
-6805,6807,187.6,"['Kalayaan A', 'Kalinisan Street']",residential,0
+6805,6807,187.6,"['Kalinisan Street', 'Kalayaan A']",residential,0
 6805,9246,48.22,Kalinisan Street,residential,0
 6805,6814,42.05,Kalusugan Street,residential,0
 6806,9238,63.62,Kagandahan Street,residential,0
@@ -19658,12 +19658,12 @@ source,target,length,name,highway,oneway
 6816,8147,92.21,Pangasinan Street,residential,0
 6817,6828,19.42,Luzon Street,residential,0
 6817,6820,43.12,Antique Street,residential,1
-6818,6827,187.87,"['Antique Street', 'Digos Street']",residential,0
+6818,6827,187.87,"['Digos Street', 'Antique Street']",residential,0
 6818,6820,36.46,Antique Street,residential,0
 6818,6826,158.21,Tarlac Street,residential,0
 6819,6826,46.04,Tarlac Street,residential,0
 6819,6823,37.66,Catbalogan Street,residential,0
-6819,6827,70.18,"['Digos Street', 'Catbalogan Street']",residential,0
+6819,6827,70.18,"['Catbalogan Street', 'Digos Street']",residential,0
 6820,6818,36.46,Antique Street,residential,0
 6820,6825,160.39,Cotabato Street,residential,1
 6821,6830,78.66,Pangasinan Street,residential,0
@@ -19682,8 +19682,8 @@ source,target,length,name,highway,oneway
 6826,6825,36.79,Aklan Street,residential,0
 6826,6818,158.21,Tarlac Street,residential,0
 6827,6826,32.95,Aklan Street,residential,0
-6827,6819,70.18,"['Digos Street', 'Catbalogan Street']",residential,0
-6827,6818,187.87,"['Antique Street', 'Digos Street']",residential,0
+6827,6819,70.18,"['Catbalogan Street', 'Digos Street']",residential,0
+6827,6818,187.87,"['Digos Street', 'Antique Street']",residential,0
 6828,10773,93.21,Luzon Street,residential,0
 6828,6817,19.42,Luzon Street,residential,0
 6828,6829,47.94,Visayas Street,residential,0
@@ -19772,9 +19772,9 @@ source,target,length,name,highway,oneway
 6862,8983,36.81,New Orleans Street,residential,0
 6863,4425,205.93,Ruby Street,tertiary,0
 6863,13296,66.18,Narra Street,residential,0
-6863,4542,94.95,"['Camaro Street', 'Ruby Street']",tertiary,0
+6863,4542,94.95,"['Ruby Street', 'Camaro Street']",tertiary,0
 6864,4425,111.3,Ruby Street,tertiary,0
-6864,9326,215.19,"['Fairlane Street', 'Ruby Street']",tertiary,0
+6864,9326,215.19,"['Ruby Street', 'Fairlane Street']",tertiary,0
 6864,6866,68.05,Narra Street,residential,0
 6865,13296,5.04,Narra Street,residential,0
 6865,9327,40.65,Narra Street,residential,0
@@ -19785,7 +19785,7 @@ source,target,length,name,highway,oneway
 6867,10808,26.13,Kamagong Street,residential,0
 6867,6868,157.7,"['Kamagong Street', 'Yakal Street']",residential,0
 6867,6865,74.77,Molave Street,residential,0
-6868,6867,157.7,"['Yakal Street', 'Kamagong Street']",residential,0
+6868,6867,157.7,"['Kamagong Street', 'Yakal Street']",residential,0
 6868,6866,59.85,Yakal Street,residential,0
 6868,10795,39.01,Ipil-ipil Street,residential,0
 6868,11585,133.13,Ipil-ipil Street,residential,0
@@ -19811,7 +19811,7 @@ source,target,length,name,highway,oneway
 6875,6870,38.97,Agoho Street,residential,0
 6875,6874,32.54,Agoho Street,residential,0
 6875,9322,111.65,Durian Street,residential,0
-6876,6492,430.14,"['Phase 3 Block 7', 'Phase 3 Block 7 Extension']",residential,0
+6876,6492,430.14,"['Phase 3 Block 7 Extension', 'Phase 3 Block 7']",residential,0
 6877,1878,56.92,Oriole Street,residential,0
 6878,6094,57.45,Acropolis Drive,residential,0
 6878,6110,27.72,Acropolis Drive,residential,0
@@ -20091,7 +20091,7 @@ source,target,length,name,highway,oneway
 7001,7000,17.34,,primary_link,0
 7001,9349,204.03,E. Rodriguez Jr. Avenue,primary,1
 7002,7004,41.36,Fatima Street,residential,0
-7002,6273,173.11,"['Emmanuel Street', 'Fatima Street']",residential,0
+7002,6273,173.11,"['Fatima Street', 'Emmanuel Street']",residential,0
 7002,7003,109.79,Gerardo Street,residential,0
 7003,6274,34.38,Don Mariano Street,residential,0
 7003,7002,109.79,Gerardo Street,residential,0
@@ -20106,7 +20106,7 @@ source,target,length,name,highway,oneway
 7006,7005,40.69,Don Mariano Street,residential,0
 7006,10254,92.15,Alfonso Street,residential,0
 7007,5409,88.0,Pearl Street,residential,0
-7007,5409,170.99,"['Topaz Street', 'Sapphire Street']",residential,0
+7007,5409,170.99,"['Sapphire Street', 'Topaz Street']",residential,0
 7007,8333,57.94,Sapphire Street,residential,0
 7008,12267,253.08,Ramirez Street,residential,1
 7008,5408,143.66,Sarmiento Street,tertiary,1
@@ -20115,7 +20115,7 @@ source,target,length,name,highway,oneway
 7009,10797,43.46,,residential,0
 7010,12729,10.65,Pension Street,residential,0
 7010,7011,68.24,Registration Street,residential,0
-7010,10519,164.02,"['Treasury Street', 'Pension Street', 'Personnel Street']",residential,0
+7010,10519,164.02,"['Pension Street', 'Treasury Street', 'Personnel Street']",residential,0
 7011,10519,30.31,Personnel Street,residential,0
 7011,7012,33.91,Personnel Street,residential,0
 7011,10517,33.25,Registration Street,residential,0
@@ -20344,7 +20344,7 @@ source,target,length,name,highway,oneway
 7090,6393,28.35,General Canon Street,residential,0
 7091,8468,116.48,"['Abraham Lane', 'General Canon Street']",residential,0
 7091,6393,105.17,General Canon Street,residential,0
-7091,8477,309.13,"['Abraham Lane', 'Street № 1', 'Street № 9']",residential,0
+7091,8477,309.13,"['Abraham Lane', 'Street № 9', 'Street № 1']",residential,0
 7092,11268,15.72,Quirino Highway,primary,0
 7092,8330,58.02,Quirino Highway,primary,0
 7092,11267,217.37,The Junction Parkway,tertiary,1
@@ -20394,7 +20394,7 @@ source,target,length,name,highway,oneway
 7109,7172,158.5,P. Macapagal Street,residential,0
 7109,5917,55.98,Magsaysay Avenue,tertiary,0
 7109,8323,33.29,Magsaysay Avenue,tertiary,0
-7110,9459,563.82,"['Reliance Road', 'Lozada Street']",unclassified,0
+7110,9459,563.82,"['Lozada Street', 'Reliance Road']",unclassified,0
 7110,10441,81.41,General Luis Street,primary,0
 7110,7564,105.48,General Luis Street,primary,0
 7111,411,102.94,General Luis Street,primary,0
@@ -20423,7 +20423,7 @@ source,target,length,name,highway,oneway
 7118,7119,157.1,"['Ruby Street', 'Amethyst Street']",residential,0
 7119,7117,25.83,Villa Nova Avenue,residential,0
 7119,7118,157.1,"['Ruby Street', 'Amethyst Street']",residential,0
-7119,6326,21.42,Villa Nova Avenue,"['residential', 'unclassified']",0
+7119,6326,21.42,Villa Nova Avenue,"['unclassified', 'residential']",0
 7119,7116,102.26,"['Aquamarine Street', 'Saint Anthony Street']",residential,0
 7120,7116,27.89,Saint Anthony Street,residential,0
 7120,7113,29.32,Saint Anthony Street,residential,0
@@ -20464,11 +20464,11 @@ source,target,length,name,highway,oneway
 7131,7133,28.93,Saint Anthony Street,residential,0
 7131,7130,74.71,Saint Paul Street,residential,0
 7132,7133,58.69,Saint Thomas Street,residential,0
-7132,7133,98.34,"['Saint Gabriel Street', 'Saint Anthony Street', 'Saint John Street']",residential,0
+7132,7133,98.34,"['Saint John Street', 'Saint Gabriel Street', 'Saint Anthony Street']",residential,0
 7132,7130,31.28,Saint John Street,residential,0
 7133,7131,28.93,Saint Anthony Street,residential,0
 7133,7132,58.69,Saint Thomas Street,residential,0
-7133,7132,98.34,"['Saint John Street', 'Saint Anthony Street', 'Saint Gabriel Street']",residential,0
+7133,7132,98.34,"['Saint John Street', 'Saint Gabriel Street', 'Saint Anthony Street']",residential,0
 7134,7115,26.57,San Lorenzo Ruiz Street,residential,0
 7134,7136,29.48,San Lorenzo Ruiz Street,residential,0
 7134,7135,173.58,Saint James Street,residential,0
@@ -20570,7 +20570,7 @@ source,target,length,name,highway,oneway
 7170,7269,190.15,Samonte Road,residential,0
 7170,10830,33.49,General Luis Street,primary,0
 7171,5889,88.05,Katipunan Avenue,secondary,0
-7171,9767,268.71,"['West San Jose Street', 'San Jose Street']",residential,0
+7171,9767,268.71,"['San Jose Street', 'West San Jose Street']",residential,0
 7171,10834,152.55,Katipunan Avenue,secondary,0
 7172,5895,68.08,Marcos Street,residential,0
 7172,7109,158.5,P. Macapagal Street,residential,0
@@ -20632,7 +20632,7 @@ source,target,length,name,highway,oneway
 7192,7190,35.63,Rosewood Street,residential,0
 7193,5393,45.11,Doctor Villareal Street,residential,0
 7193,8182,46.27,Doctor Villareal Street,residential,0
-7193,8183,166.45,"['Ginintuang Landas Street', 'Luisito Street']",residential,0
+7193,8183,166.45,"['Luisito Street', 'Ginintuang Landas Street']",residential,0
 7193,5389,244.62,"['Asuncion Street', 'Ginintuang Landas Street']",residential,0
 7194,13129,9.67,First Street,residential,0
 7194,4233,128.49,Holy Cross Road,unclassified,0
@@ -20649,12 +20649,12 @@ source,target,length,name,highway,oneway
 7198,6375,66.01,King Ferdinand Street,secondary,0
 7198,12635,42.14,King Christian Street Extension,residential,0
 7198,7199,48.46,King Christian Street,residential,0
-7198,7200,241.9,"['King Christopher Street', 'King Ferdinand Street']",secondary,0
+7198,7200,241.9,"['King Ferdinand Street', 'King Christopher Street']",secondary,0
 7199,12035,27.63,King Christian Street,residential,0
 7199,7200,153.88,King Edward Street,residential,0
 7199,7198,48.46,King Christian Street,residential,0
 7200,7199,153.88,King Edward Street,residential,0
-7200,7198,241.9,"['King Christopher Street', 'King Ferdinand Street']",secondary,0
+7200,7198,241.9,"['King Ferdinand Street', 'King Christopher Street']",secondary,0
 7200,11800,65.1,King Christopher Street,secondary,0
 7201,10996,8.16,T. Carreon Street,residential,0
 7201,12550,213.67,Quirino Highway,primary,1
@@ -20993,7 +20993,7 @@ source,target,length,name,highway,oneway
 7346,511,105.53,K-10th Street,residential,1
 7346,7768,148.24,K-10th Street,residential,0
 7346,275,52.79,K-J Street,tertiary,0
-7346,360,266.6,"['K-J Street', 'Miami Street']",tertiary,0
+7346,360,266.6,"['Miami Street', 'K-J Street']",tertiary,0
 7347,469,12.25,M. Jocson Street,residential,0
 7347,12829,16.96,M. Jocson Street,residential,1
 7348,10917,148.15,Congressional Avenue Extension,primary,1
@@ -21066,13 +21066,13 @@ source,target,length,name,highway,oneway
 7374,7366,31.84,Payatas Road,primary,0
 7374,9025,109.77,,residential,0
 7374,9025,46.99,Payatas Road,primary,0
-7375,7380,116.79,"['O. P. Mapalo Drive', 'Olympus Drive']",residential,0
+7375,7380,116.79,"['Olympus Drive', 'O. P. Mapalo Drive']",residential,0
 7376,12952,21.01,V. Afulugencia Avenue,residential,0
 7376,6904,57.04,V. Afulugencia Avenue,residential,0
 7376,10648,110.47,Aphrodite Drive,residential,0
 7377,6903,34.59,V. Afulugencia Avenue,residential,0
 7377,6903,138.37,Venus Drive,residential,0
-7377,10341,82.49,"['Pontevedra Street', 'V. Afulugencia Avenue']",residential,0
+7377,10341,82.49,"['V. Afulugencia Avenue', 'Pontevedra Street']",residential,0
 7378,10647,32.49,Davis Street,unclassified,0
 7378,10647,124.0,Athena Drive,residential,0
 7378,10647,115.92,Apollo Drive,residential,0
@@ -21082,8 +21082,8 @@ source,target,length,name,highway,oneway
 7379,10649,87.71,Pembroke Street,residential,0
 7380,6899,33.35,V. Afulugencia Avenue,residential,0
 7380,6900,31.22,V. Afulugencia Avenue,residential,0
-7380,12953,214.84,"['O. P. Mapalo Drive', 'P. D. Buendia Avenue']",residential,0
-7380,7375,116.79,"['O. P. Mapalo Drive', 'Olympus Drive']",residential,0
+7380,12953,214.84,"['P. D. Buendia Avenue', 'O. P. Mapalo Drive']",residential,0
+7380,7375,116.79,"['Olympus Drive', 'O. P. Mapalo Drive']",residential,0
 7381,12702,25.27,Pontevedra Street,residential,0
 7381,8465,48.92,Compostela Street,residential,0
 7381,8470,25.27,Sevilla Street,residential,0
@@ -21114,7 +21114,7 @@ source,target,length,name,highway,oneway
 7393,11028,681.56,Trinity Drive,unclassified,0
 7394,7395,81.34,DANR Street,residential,0
 7394,7748,299.95,Visayas Avenue,secondary,1
-7394,2573,13.16,"['Lands Street', 'DANR Street']",residential,0
+7394,2573,13.16,"['DANR Street', 'Lands Street']",residential,0
 7395,7394,81.34,DANR Street,residential,0
 7395,2589,147.69,Plant Industry Street,residential,1
 7395,9939,53.51,DANR Street,residential,0
@@ -21174,7 +21174,7 @@ source,target,length,name,highway,oneway
 7425,4807,73.23,New Castle Street,residential,0
 7425,8761,52.53,Wellington Street,residential,0
 7425,7426,90.38,New Castle Street,residential,0
-7425,7426,295.96,"['Wellington Street', 'Cambridge Street']",residential,0
+7425,7426,295.96,"['Cambridge Street', 'Wellington Street']",residential,0
 7426,7425,90.38,New Castle Street,residential,0
 7426,7425,295.96,"['Wellington Street', 'Cambridge Street']",residential,0
 7426,8762,177.77,Cambridge Street,residential,0
@@ -21244,7 +21244,7 @@ source,target,length,name,highway,oneway
 7455,1265,86.59,Justice Lourdes Paredes San Diego Avenue,tertiary,0
 7455,7314,157.36,EDSA,trunk,1
 7456,9762,36.73,Biglang Awa Street,residential,0
-7456,5939,58.29,"['Biglang Awa Street', 'Pagkabuhay Road']",tertiary,0
+7456,5939,58.29,"['Pagkabuhay Road', 'Biglang Awa Street']",tertiary,0
 7456,7457,63.39,Capricorn Street,tertiary,0
 7457,8356,26.32,Taurus Alley,residential,0
 7457,7456,63.39,Capricorn Street,tertiary,0
@@ -21374,7 +21374,7 @@ source,target,length,name,highway,oneway
 7511,1315,67.64,Conchu Street,residential,1
 7511,1316,111.08,Inocencio Street,residential,0
 7512,2476,61.26,Kalantiaw Street,residential,0
-7512,1295,294.92,"['Magat Salamat', 'E. Evangelista']",residential,0
+7512,1295,294.92,"['E. Evangelista', 'Magat Salamat']",residential,0
 7512,557,132.29,Magat Salamat Street,residential,0
 7513,7610,186.24,Road 13,residential,0
 7513,2440,256.04,Road 13,residential,0
@@ -21411,7 +21411,7 @@ source,target,length,name,highway,oneway
 7527,9377,10.2,General Roxas Avenue,unclassified,1
 7527,13071,88.09,General Aguinaldo Avenue,tertiary,1
 7528,11177,80.73,Times Square Avenue,unclassified,0
-7528,7529,50.59,Times Square Avenue,"['tertiary', 'unclassified']",1
+7528,7529,50.59,Times Square Avenue,"['unclassified', 'tertiary']",1
 7528,13071,87.34,General Malvar Avenue,tertiary,0
 7528,13040,170.74,General Malvar Avenue,unclassified,0
 7529,2472,11.47,Cambridge Street,tertiary,1
@@ -21514,18 +21514,18 @@ source,target,length,name,highway,oneway
 7570,11027,187.89,Mindanao Avenue,primary,1
 7571,7433,82.71,Mindanao Avenue,primary,1
 7572,8051,74.67,Makabayan,residential,0
-7572,7573,178.45,"['Parkway', 'Makabayan']",residential,0
+7572,7573,178.45,"['Makabayan', 'Parkway']",residential,0
 7572,7573,196.54,Rolling Road,residential,0
 7573,6982,105.29,Rolling Road,residential,0
 7573,7572,196.54,Rolling Road,residential,0
-7573,7572,178.45,"['Parkway', 'Makabayan']",residential,0
+7573,7572,178.45,"['Makabayan', 'Parkway']",residential,0
 7573,7576,130.36,Parkway,residential,0
 7574,1043,28.76,K-8th Street,residential,0
 7574,9391,300.21,K-8th Street,residential,0
 7574,9055,101.48,K-6th Street,residential,0
 7575,9391,5.68,T. Gener Street,tertiary,0
 7575,1071,48.95,T. Gener Street,tertiary,0
-7576,6982,123.27,"['Rolling Road Extension', 'Parkway Extension']",residential,0
+7576,6982,123.27,"['Parkway Extension', 'Rolling Road Extension']",residential,0
 7576,7573,130.36,Parkway,residential,0
 7577,9805,261.39,Tomas Morato Avenue,secondary,0
 7577,10016,72.18,Tomas Morato Avenue,secondary,1
@@ -21619,7 +21619,7 @@ source,target,length,name,highway,oneway
 7616,4075,57.41,Araneta Street,residential,0
 7616,7620,27.41,SB Road,residential,0
 7617,7619,122.39,Meralco Sibol Street,residential,1
-7617,3827,170.97,"['Fema Road', 'SB Road']",residential,0
+7617,3827,170.97,"['SB Road', 'Fema Road']",residential,0
 7618,7617,91.83,SB Road,residential,1
 7618,7619,52.72,Sitio Pajo Plaza,residential,0
 7619,7620,206.54,"['H. Bautista Street', 'Meralco Sibol Street']",residential,1
@@ -21716,7 +21716,7 @@ source,target,length,name,highway,oneway
 7654,7658,52.41,EDSA,trunk,1
 7654,7520,152.72,Fernando Poe Jr. Avenue,secondary,1
 7655,7638,125.67,Samat Road,tertiary,0
-7655,10329,522.1,"['Corregidor Street', 'AFP Road', 'Bataan Street']",residential,0
+7655,10329,522.1,"['Corregidor Street', 'Bataan Street', 'AFP Road']",residential,0
 7655,3354,29.66,AFP Road,tertiary,0
 7656,11732,30.94,Maayusin Extension,residential,0
 7656,7950,137.16,Fatima Street,residential,0
@@ -21863,7 +21863,7 @@ source,target,length,name,highway,oneway
 7719,485,9.68,General Santos Avenue,unclassified,0
 7719,7720,80.0,General Roxas Avenue,unclassified,1
 7720,7721,7.37,General Roxas Avenue,unclassified,1
-7720,7525,235.12,General Araneta Avenue,"['residential', 'unclassified']",1
+7720,7525,235.12,General Araneta Avenue,"['unclassified', 'residential']",1
 7721,479,9.92,General Araneta Avenue,unclassified,1
 7721,7722,172.79,General Roxas Avenue,unclassified,1
 7722,10305,10.19,General Roxas Avenue,unclassified,1
@@ -22042,7 +22042,7 @@ source,target,length,name,highway,oneway
 7792,7786,65.07,Lawin Street,residential,0
 7792,9832,75.46,Kilyawan Street,residential,0
 7792,7777,37.51,Lawin Street,residential,0
-7793,9409,326.36,"['Santo Niño Street Extension', 'Santo Niño Street']",secondary,0
+7793,9409,326.36,"['Santo Niño Street', 'Santo Niño Street Extension']",secondary,0
 7793,4477,117.16,Santo Niño Street Extension,secondary,0
 7793,9534,47.19,Kulasisi Street,residential,0
 7794,9399,53.59,Riverside Street,residential,0
@@ -22277,7 +22277,7 @@ source,target,length,name,highway,oneway
 7899,6361,70.12,B. Arayat Street,residential,0
 7900,6313,113.7,Dantes,residential,0
 7901,6291,112.09,Camia Street,residential,0
-7902,6330,105.12,"['Dominga Street', 'Saint Joseph Street']",unclassified,0
+7902,6330,105.12,"['Saint Joseph Street', 'Dominga Street']",unclassified,0
 7902,6335,33.91,Saint Joseph Street,unclassified,0
 7902,6334,229.3,Urbien Street,residential,0
 7903,4231,32.31,Honesty Street,residential,0
@@ -22299,7 +22299,7 @@ source,target,length,name,highway,oneway
 7909,2246,62.57,Valencia Street,residential,0
 7909,7907,44.04,Edades Drive,residential,0
 7909,7908,44.14,Edades Drive,residential,0
-7910,7910,294.48,"['Martina Street', 'Martina', 'Saturnina']",residential,1
+7910,7910,294.48,"['Martina Street', 'Saturnina', 'Martina']",residential,1
 7910,3882,79.74,"['Martina Street', 'Martina']",residential,0
 7911,3736,60.59,San Beda Road,residential,0
 7912,9006,77.93,Aster Street,residential,0
@@ -22340,7 +22340,7 @@ source,target,length,name,highway,oneway
 7925,7926,48.95,MIT,residential,0
 7925,7923,86.6,Philippine Union College,residential,0
 7926,8550,70.65,MIT,residential,0
-7926,8550,182.4,"['MIT', 'San Beda']",residential,0
+7926,8550,182.4,"['San Beda', 'MIT']",residential,0
 7926,7925,48.95,MIT,residential,0
 7927,1364,32.81,Macaraig Street,residential,0
 7928,7929,65.35,Dose 36,residential,0
@@ -22440,7 +22440,7 @@ source,target,length,name,highway,oneway
 7972,7970,251.29,Ilang-Ilang Street,residential,0
 7973,7795,68.78,Saint Florence Street,residential,0
 7973,9533,61.07,Jasmin Interior,residential,0
-7973,9829,134.8,"['Jasmin Interior', 'San Roque Interior']",residential,0
+7973,9829,134.8,"['San Roque Interior', 'Jasmin Interior']",residential,0
 7974,7795,36.36,Saint Florence Street,residential,0
 7974,8132,114.99,Sampaguita Street,residential,0
 7974,8131,177.62,Sampaguita Street,residential,0
@@ -22514,7 +22514,7 @@ source,target,length,name,highway,oneway
 7999,7787,76.02,Pilot Drive,residential,0
 7999,11693,137.75,Pinadama Street,residential,0
 8000,7998,22.41,Damayan Street,residential,0
-8001,4849,139.69,"['Pinadama Street', 'Ocampo Street']",residential,0
+8001,4849,139.69,"['Ocampo Street', 'Pinadama Street']",residential,0
 8001,11693,41.05,Pinadama Street,residential,0
 8001,7997,74.27,Sumapi Street,residential,0
 8002,11929,40.28,,residential,0
@@ -22565,7 +22565,7 @@ source,target,length,name,highway,oneway
 8023,5793,41.49,President Street,residential,0
 8023,8025,93.98,Congressman Street,residential,0
 8024,5790,25.17,Minister,residential,0
-8025,5788,138.11,"['Governor Street', 'Senator Street']",residential,0
+8025,5788,138.11,"['Senator Street', 'Governor Street']",residential,0
 8025,5795,54.42,Governor Street,residential,0
 8025,8023,93.98,Congressman Street,residential,0
 8026,7931,77.49,Saint Joseph Street,residential,0
@@ -22619,7 +22619,7 @@ source,target,length,name,highway,oneway
 8046,7679,55.43,Madre Silva Street,residential,0
 8046,7648,88.6,Madre Silva Street,residential,0
 8047,2872,90.27,Dahlia Street,residential,1
-8047,7647,263.5,"['Gladiola Street', 'Begonia Street']",residential,1
+8047,7647,263.5,"['Begonia Street', 'Gladiola Street']",residential,1
 8048,7924,88.22,Maximina Drive,unclassified,0
 8048,134,134.82,Quirino Highway,primary,0
 8048,7750,40.55,Quirino Highway,primary,0
@@ -22691,7 +22691,7 @@ source,target,length,name,highway,oneway
 8080,1243,118.61,J. Perez,residential,1
 8081,549,93.82,Rajah Matanda Street,tertiary,0
 8081,10246,240.46,Katipunan Avenue,primary,1
-8082,6987,1143.07,"['Colonel Bonny Serrano Avenue', 'C-5-Bonny Serrano Flyover', 'Katipunan Avenue']",primary,1
+8082,6987,1143.07,"['Katipunan Avenue', 'Colonel Bonny Serrano Avenue', 'C-5-Bonny Serrano Flyover']",primary,1
 8082,8081,80.94,Katipunan Avenue,primary,1
 8083,7107,339.31,Katipunan Avenue,primary,1
 8084,1322,94.97,Rajah Matanda Street,residential,0
@@ -22705,7 +22705,7 @@ source,target,length,name,highway,oneway
 8088,1958,23.27,Harvard Street,residential,0
 8089,11145,289.86,Katipunan Avenue,tertiary,0
 8089,10894,74.77,Katipunan Avenue,tertiary,1
-8090,8083,608.44,"['Colonel Bonny Serrano Avenue', 'Katipunan Avenue']",primary,1
+8090,8083,608.44,"['Katipunan Avenue', 'Colonel Bonny Serrano Avenue']",primary,1
 8090,8091,71.04,Colonel Bonny Serrano Avenue,primary,1
 8091,7725,75.47,Colonel Bonny Serrano Avenue,primary,1
 8092,8093,10.78,Katipunan Avenue,primary,1
@@ -22922,7 +22922,7 @@ source,target,length,name,highway,oneway
 8182,8183,118.81,Tatlong Hari Street,residential,0
 8183,8182,118.81,Tatlong Hari Street,residential,0
 8183,8491,45.86,Luisito Street,residential,0
-8183,7193,166.45,"['Ginintuang Landas Street', 'Luisito Street']",residential,0
+8183,7193,166.45,"['Luisito Street', 'Ginintuang Landas Street']",residential,0
 8184,12956,7.51,Sunnyside Drive,residential,1
 8184,1220,247.1,San Mateo Road,primary,1
 8185,8186,12.38,,tertiary_link,1
@@ -22935,11 +22935,11 @@ source,target,length,name,highway,oneway
 8188,8214,24.61,Belfast Street,residential,0
 8188,8192,65.03,Cairo Street,residential,0
 8189,8214,24.66,Belfast Street,residential,0
-8189,8792,54.36,"['Rome Street', 'Belfast Street']",residential,0
+8189,8792,54.36,"['Belfast Street', 'Rome Street']",residential,0
 8189,8191,68.89,Edinburgh Street,residential,0
 8190,8200,26.73,Berlin Street,residential,0
 8190,8194,31.93,Brazil Street,residential,0
-8190,8203,110.41,"['Beirut Street', 'Brazil Street']",residential,0
+8190,8203,110.41,"['Brazil Street', 'Beirut Street']",residential,0
 8191,8204,15.1,Bucharest Street,residential,0
 8191,8187,24.18,Bucharest Street,residential,0
 8191,8189,68.89,Edinburgh Street,residential,0
@@ -22969,12 +22969,12 @@ source,target,length,name,highway,oneway
 8201,8204,18.56,Copenhagen Street,residential,0
 8201,8202,103.72,Budapest Street,residential,0
 8201,8217,45.93,Copenhagen Street,residential,0
-8202,2502,57.26,"['Bucharest Street', 'Melbourne Street']",residential,0
+8202,2502,57.26,"['Melbourne Street', 'Bucharest Street']",residential,0
 8202,8197,24.18,Melbourne Street,residential,0
 8202,8201,103.72,Budapest Street,residential,0
 8203,8200,77.74,Birmingham Street,residential,0
 8203,8207,29.92,Beirut Street,residential,0
-8203,8190,110.41,"['Beirut Street', 'Brazil Street']",residential,0
+8203,8190,110.41,"['Brazil Street', 'Beirut Street']",residential,0
 8204,8191,15.1,Bucharest Street,residential,0
 8204,8201,18.56,Copenhagen Street,residential,0
 8204,8195,19.87,Copenhagen Street,residential,0
@@ -22995,7 +22995,7 @@ source,target,length,name,highway,oneway
 8209,8205,31.55,Vancouver Avenue,residential,0
 8210,8193,171.56,Algiers Street,residential,0
 8210,8791,30.9,London Street,residential,0
-8210,12177,44.05,"['Amsterdam Street', 'London Street']",residential,0
+8210,12177,44.05,"['London Street', 'Amsterdam Street']",residential,0
 8211,8198,31.3,Beirut Street,residential,0
 8211,10475,6.16,Beirut Street,residential,0
 8211,8208,47.17,Berlin Street,residential,0
@@ -23017,7 +23017,7 @@ source,target,length,name,highway,oneway
 8220,10758,8.66,Commonwealth Avenue,primary,1
 8220,4837,86.49,Doña Carmen Street,residential,0
 8221,8003,39.85,Jade Street,residential,0
-8221,4941,184.24,"['Sanchez Street', 'Ecols Street']",residential,0
+8221,4941,184.24,"['Ecols Street', 'Sanchez Street']",residential,0
 8221,10498,46.69,Sanchez Street,residential,0
 8222,13525,19.32,,residential,0
 8222,11175,202.48,Commonwealth Avenue,primary,1
@@ -23103,7 +23103,7 @@ source,target,length,name,highway,oneway
 8255,8310,217.27,Quirino Highway,primary,0
 8255,134,90.56,Quirino Highway,primary,0
 8256,8257,42.33,Santan Street,residential,0
-8256,4041,113.83,"['Rosal Street', 'Sampaguita Street']",tertiary,0
+8256,4041,113.83,"['Sampaguita Street', 'Rosal Street']",tertiary,0
 8256,3808,37.75,Sampaguita Street,tertiary,0
 8257,8256,42.33,Santan Street,residential,0
 8258,3743,55.86,MWSS Service Road,residential,0
@@ -23195,9 +23195,9 @@ source,target,length,name,highway,oneway
 8297,9752,17.73,Quirino Highway,primary,0
 8297,7814,52.53,Quirino Highway,primary,0
 8297,8296,78.35,Salazar Street,residential,0
-8298,9757,285.64,"['Jojo Street', 'Banana Island']",residential,0
+8298,9757,285.64,"['Banana Island', 'Jojo Street']",residential,0
 8298,9758,46.6,Jojo Street,residential,0
-8298,9754,154.4,"['Dizon Street', 'Jojo Extension']",residential,0
+8298,9754,154.4,"['Jojo Extension', 'Dizon Street']",residential,0
 8299,8295,89.27,Liwanag Street,residential,0
 8299,8291,43.91,Luwalhati Street,residential,0
 8299,8293,50.92,Luwalhati Street,residential,0
@@ -23283,7 +23283,7 @@ source,target,length,name,highway,oneway
 8336,4192,140.91,King Constantine Street,residential,0
 8337,3961,44.9,Estrella Street,residential,0
 8338,3891,102.57,Visayas Avenue,secondary,1
-8338,9854,300.76,"['Vargas Lane', 'A. Limqueco Street']",residential,0
+8338,9854,300.76,"['A. Limqueco Street', 'Vargas Lane']",residential,0
 8339,8354,36.15,Dolores Street,residential,0
 8340,9112,24.74,Quirino Highway,primary,1
 8340,10397,201.17,Mindanao Avenue,primary,1
@@ -23750,12 +23750,12 @@ source,target,length,name,highway,oneway
 8531,8530,10.11,Samonte Road,residential,0
 8532,12804,5.18,Don Raymundo Street,residential,0
 8532,4035,74.95,Candido Street,tertiary,0
-8532,3934,83.84,"['Tamban Street', 'Don Raymundo Street']",tertiary,0
+8532,3934,83.84,"['Don Raymundo Street', 'Tamban Street']",tertiary,0
 8533,8529,70.85,Philand Drive,residential,0
 8533,13226,60.96,Philand Drive,residential,0
 8533,4064,144.89,Philand Drive,residential,0
 8534,4146,39.13,Narra Avenue,residential,0
-8534,8613,372.94,"['Diamond Street', 'Fernville Street']",residential,0
+8534,8613,372.94,"['Fernville Street', 'Diamond Street']",residential,0
 8534,6894,65.19,Fernville Street,residential,0
 8535,8423,18.99,Congressional Avenue,primary,1
 8535,7416,31.15,Mindanao Avenue,primary,1
@@ -23928,7 +23928,7 @@ source,target,length,name,highway,oneway
 8612,8611,65.86,Antonia Street,residential,0
 8612,8611,128.99,Roxasville Street,residential,0
 8612,3674,86.65,Antonia Street,residential,0
-8613,8534,372.94,"['Diamond Street', 'Fernville Street']",residential,0
+8613,8534,372.94,"['Fernville Street', 'Diamond Street']",residential,0
 8614,8539,3.7,Maria Luisa Street,residential,0
 8615,52,116.96,EDSA,primary,1
 8615,1530,74.83,Mapagmahal Street,tertiary,0
@@ -24254,7 +24254,7 @@ source,target,length,name,highway,oneway
 8760,6931,31.85,Caracas Street,residential,0
 8761,7425,52.53,Wellington Street,residential,0
 8761,8776,38.15,Lisbon Street,residential,0
-8761,8762,229.29,"['Wellington Street', 'Cambridge Street']",residential,0
+8761,8762,229.29,"['Cambridge Street', 'Wellington Street']",residential,0
 8762,7426,177.77,Cambridge Street,residential,0
 8762,8761,229.29,"['Wellington Street', 'Cambridge Street']",residential,0
 8762,4786,72.29,Melbourne Street,residential,0
@@ -24648,7 +24648,7 @@ source,target,length,name,highway,oneway
 8919,8645,16.74,Gladiolus Street,residential,0
 8919,8916,67.45,Camia Street,residential,0
 8920,8918,152.4,Luis Pariñas Street,residential,0
-8921,2680,241.46,"['Rafael Pariñas Street', 'July Extension']",residential,0
+8921,2680,241.46,"['July Extension', 'Rafael Pariñas Street']",residential,0
 8922,2648,72.47,October Street,residential,0
 8923,7642,120.04,BMA Avenue,residential,0
 8923,605,141.75,BMA Avenue,residential,0
@@ -24718,7 +24718,7 @@ source,target,length,name,highway,oneway
 8950,3062,146.97,G. Sanciangco Street,residential,0
 8951,2920,108.01,San Cristobal Street,residential,0
 8951,2165,154.52,Union Civica Street,residential,0
-8951,3163,157.55,"['San Cristobal Street', 'Bustamante Street']",residential,0
+8951,3163,157.55,"['Bustamante Street', 'San Cristobal Street']",residential,0
 8952,7662,13.2,Santol Street,tertiary,0
 8952,2990,217.65,"['Liberation Street', 'Madias-as Street']",residential,0
 8952,2920,40.94,Santol Street,tertiary,0
@@ -24780,7 +24780,7 @@ source,target,length,name,highway,oneway
 8980,3407,20.49,Bulacan Street,residential,0
 8981,3397,22.94,Bonifacio Drive,residential,0
 8982,11718,18.6,California Street,residential,0
-8982,11719,67.54,"['Nevada Street', 'New York Street']",residential,0
+8982,11719,67.54,"['New York Street', 'Nevada Street']",residential,0
 8982,11717,55.58,"['Chicago Street', 'Nevada Street']",residential,0
 8983,8984,48.83,New Orleans Street,residential,0
 8983,6862,36.81,New Orleans Street,residential,0
@@ -24846,7 +24846,7 @@ source,target,length,name,highway,oneway
 9007,5776,62.26,Bigasan Street,residential,0
 9007,5775,57.53,Maganda Street,residential,0
 9008,9009,57.35,Mariposa Street,residential,0
-9008,5776,128.57,"['San Ignacio', 'Mariposa Street']",residential,0
+9008,5776,128.57,"['Mariposa Street', 'San Ignacio']",residential,0
 9008,5776,65.47,Bigasan Street,residential,0
 9009,9011,43.66,Mariposa Street,residential,0
 9009,9008,57.35,Mariposa Street,residential,0
@@ -24906,7 +24906,7 @@ source,target,length,name,highway,oneway
 9034,9036,44.29,San Vicente Street,residential,0
 9034,1012,51.0,P. Santillan Street,residential,0
 9034,1021,55.6,P. Santillan Street,residential,0
-9034,1004,283.43,"['San Jose Street', 'San Vicente Street']",residential,0
+9034,1004,283.43,"['San Vicente Street', 'San Jose Street']",residential,0
 9035,965,49.37,Morato Street,residential,0
 9035,959,47.93,Morato Street,residential,0
 9035,973,91.46,G. Felipe Sr. Avenue,tertiary,0
@@ -25182,7 +25182,7 @@ source,target,length,name,highway,oneway
 9158,6433,35.47,Eagle Extension,residential,0
 9159,6582,52.45,Oriole Street,residential,0
 9160,11505,82.05,Calachuchi,residential,0
-9161,6417,228.36,"['Morning Star Street', 'Talisay Street']",residential,0
+9161,6417,228.36,"['Talisay Street', 'Morning Star Street']",residential,0
 9161,6603,124.91,Talisay Street,residential,0
 9161,8426,112.93,Lower Narra Street,residential,0
 9162,8488,49.28,,residential,0
@@ -25246,7 +25246,7 @@ source,target,length,name,highway,oneway
 9187,3783,48.44,Pearl Street,residential,0
 9187,3921,151.19,Pearl Street,residential,0
 9187,9186,77.17,Ruby Street,residential,0
-9188,10623,303.67,"['Empire Road', 'Luzon Street']",residential,0
+9188,10623,303.67,"['Luzon Street', 'Empire Road']",residential,0
 9188,9190,56.68,Empire Road,residential,0
 9188,9189,93.51,,residential,0
 9189,9188,93.51,,residential,0
@@ -25585,7 +25585,7 @@ source,target,length,name,highway,oneway
 9311,8406,273.66,Cherry Blossom Street,residential,0
 9312,9313,51.96,Secreto de Amor,residential,0
 9312,11216,28.51,Sampaguita,residential,0
-9312,6727,104.71,"['Cadena de Amor', 'Sampaguita']",residential,0
+9312,6727,104.71,"['Sampaguita', 'Cadena de Amor']",residential,0
 9313,6439,51.38,Bulacan,residential,0
 9313,9312,51.96,Secreto de Amor,residential,0
 9313,6727,41.25,Bulacan,residential,0
@@ -25619,11 +25619,11 @@ source,target,length,name,highway,oneway
 9324,4162,42.36,Palma Street,tertiary,0
 9325,9132,85.69,San Beatriz Extension,residential,0
 9326,13297,10.86,Pearl Street,residential,0
-9326,6864,215.19,"['Fairlane Street', 'Ruby Street']",tertiary,0
+9326,6864,215.19,"['Ruby Street', 'Fairlane Street']",tertiary,0
 9326,4459,70.86,Fairlane Street,tertiary,0
 9327,10807,31.83,Narra Street,residential,0
 9327,6865,40.65,Narra Street,residential,0
-9328,10937,115.98,"['Lower Molave GK', 'Lower Molave Street']",residential,0
+9328,10937,115.98,"['Lower Molave Street', 'Lower Molave GK']",residential,0
 9328,9176,65.51,,residential,0
 9328,9177,57.09,Lower Molave GK,residential,0
 9329,4697,20.72,Singkil Street,residential,0
@@ -25654,7 +25654,7 @@ source,target,length,name,highway,oneway
 9338,13072,27.27,EDSA,primary,1
 9339,6711,57.26,Santa Veronica Street,residential,0
 9339,9315,84.44,Saint Paul Street,residential,0
-9339,6760,97.91,"['San Lorenzo Street', 'Santa Veronica Street']",residential,0
+9339,6760,97.91,"['Santa Veronica Street', 'San Lorenzo Street']",residential,0
 9340,8393,39.13,Ilang-ilang Street,tertiary,0
 9340,6742,175.93,Ilang-ilang Street,tertiary,0
 9340,6758,191.96,Dahlia Street,residential,0
@@ -25712,7 +25712,7 @@ source,target,length,name,highway,oneway
 9363,8902,143.48,Bansalangin Street,residential,0
 9363,11922,77.73,Macopa Street,residential,0
 9364,8426,44.01,Macopa Street,residential,0
-9364,9179,45.84,"['Macopa Street', 'Narra Street']",residential,0
+9364,9179,45.84,"['Narra Street', 'Macopa Street']",residential,0
 9364,9178,105.2,"['Camia 3 Street', 'Camia 1 Street']",residential,0
 9365,9179,53.33,Narra Street,residential,0
 9365,12692,70.75,Narra Street,residential,0
@@ -25822,7 +25822,7 @@ source,target,length,name,highway,oneway
 9408,13137,6.24,Mahusay Street,residential,0
 9408,13138,53.69,Maginhawa Street,tertiary,1
 9409,4346,305.13,Santo Niño Street,secondary,0
-9409,7793,326.36,"['Santo Niño Street Extension', 'Santo Niño Street']",secondary,0
+9409,7793,326.36,"['Santo Niño Street', 'Santo Niño Street Extension']",secondary,0
 9409,9410,142.62,Kalapati Street,residential,0
 9409,9400,75.88,Santa Catalina Street,residential,0
 9410,9399,38.59,Adarna Street,residential,0
@@ -25926,7 +25926,7 @@ source,target,length,name,highway,oneway
 9458,9404,134.74,Vicente S. Encarnation Street,residential,0
 9458,9404,261.93,Hilario Moncado Street,residential,0
 9458,4456,64.38,Hilario Moncado Street,residential,0
-9459,7110,563.82,"['Reliance Road', 'Lozada Street']",unclassified,0
+9459,7110,563.82,"['Lozada Street', 'Reliance Road']",unclassified,0
 9460,10546,78.28,Kalamiong Street,residential,0
 9460,6615,31.69,San Isidro Labrador Street,residential,0
 9460,6463,50.92,San Isidro Labrador Street,residential,0
@@ -25984,7 +25984,7 @@ source,target,length,name,highway,oneway
 9483,1660,35.48,Lydia Street,residential,0
 9483,5386,112.12,Lydia Street,residential,0
 9484,2941,202.98,Adrian Street,residential,0
-9484,2868,200.69,"['Adrian Street', 'Astor Street']",residential,0
+9484,2868,200.69,"['Astor Street', 'Adrian Street']",residential,0
 9484,9485,51.31,,residential,0
 9485,9484,51.31,,residential,0
 9485,2494,293.69,Commonwealth Avenue,primary,1
@@ -26068,7 +26068,7 @@ source,target,length,name,highway,oneway
 9518,4494,30.82,Jesus Paredes Street,residential,0
 9519,12582,28.48,Saint Paul Street,residential,0
 9519,9508,68.95,Saint Anthony Street,residential,0
-9519,9515,126.7,"['Saint Anthony Street', 'Nawasa Lane']",residential,0
+9519,9515,126.7,"['Nawasa Lane', 'Saint Anthony Street']",residential,0
 9519,9516,90.55,Saint Paul Street,residential,0
 9520,9506,105.89,Santo Rosario Street,residential,0
 9520,13252,9.02,Santo Rosario Street,residential,0
@@ -26248,7 +26248,7 @@ source,target,length,name,highway,oneway
 9587,9589,49.88,,residential,0
 9588,9587,131.78,Masagana Street,residential,0
 9588,9590,46.76,,residential,0
-9588,9591,183.4,"['Mabuhay Street', 'Masagana Street']",residential,0
+9588,9591,183.4,"['Masagana Street', 'Mabuhay Street']",residential,0
 9589,9585,64.09,Kapisanan Street,residential,0
 9589,9587,49.88,,residential,0
 9589,12027,88.58,Kapisanan Street,residential,0
@@ -26257,7 +26257,7 @@ source,target,length,name,highway,oneway
 9590,9588,46.76,,residential,0
 9590,11844,118.93,,residential,0
 9591,9590,141.67,Kapisanan Street,residential,0
-9591,9588,183.4,"['Mabuhay Street', 'Masagana Street']",residential,0
+9591,9588,183.4,"['Masagana Street', 'Mabuhay Street']",residential,0
 9591,9592,19.51,Mabuhay Street,residential,0
 9592,11834,96.89,,residential,0
 9592,11590,35.74,,residential,0
@@ -26590,10 +26590,10 @@ source,target,length,name,highway,oneway
 9753,9752,24.32,Dizon Street,residential,0
 9754,8380,27.92,Jojo Extension,residential,0
 9754,9753,67.73,Kulas Francisco,residential,0
-9754,8298,154.4,"['Dizon Street', 'Jojo Extension']",residential,0
+9754,8298,154.4,"['Jojo Extension', 'Dizon Street']",residential,0
 9755,9753,171.92,Dizon Street,residential,0
 9756,7819,83.13,Marikit Street,residential,0
-9757,8298,285.64,"['Jojo Street', 'Banana Island']",residential,0
+9757,8298,285.64,"['Banana Island', 'Jojo Street']",residential,0
 9757,4129,352.4,Mendez Road,tertiary,0
 9757,10933,117.15,Mendez Road,tertiary,0
 9758,7821,15.63,Quirino Highway,primary,0
@@ -26613,7 +26613,7 @@ source,target,length,name,highway,oneway
 9766,5967,13.8,Ezra Street,residential,0
 9767,11431,31.32,West San Francisco Street,residential,0
 9767,5889,195.82,West San Francisco Street,residential,0
-9767,7171,268.71,"['West San Jose Street', 'San Jose Street']",residential,0
+9767,7171,268.71,"['San Jose Street', 'West San Jose Street']",residential,0
 9768,4182,12.62,King Constantine Street Extension,residential,0
 9768,12634,94.35,King Constantine Street Extension,residential,0
 9768,9769,42.16,,residential,0
@@ -26818,11 +26818,11 @@ source,target,length,name,highway,oneway
 9852,2806,330.7,Commonwealth Avenue,primary,1
 9853,9678,13.92,Cagayan Street,tertiary,0
 9853,7514,253.28,Congressional Avenue,secondary,1
-9854,8338,300.76,"['Vargas Lane', 'A. Limqueco Street']",residential,0
+9854,8338,300.76,"['A. Limqueco Street', 'Vargas Lane']",residential,0
 9855,4083,13.31,Cenacle Drive,tertiary,0
 9855,8663,150.33,Cenacle Drive,tertiary,0
 9855,8126,18.11,,residential,0
-9856,3629,246.88,"['Renowned Lane', 'Hizon Drive']",residential,0
+9856,3629,246.88,"['Hizon Drive', 'Renowned Lane']",residential,0
 9857,760,90.24,Bagobo Street,residential,0
 9858,782,120.72,Fitzgerald Street,residential,0
 9858,7503,232.17,"['Heizer Street', 'Fitzgerald Street']",residential,0
@@ -27237,7 +27237,7 @@ source,target,length,name,highway,oneway
 10067,2976,147.53,Monte de Piedad Street,tertiary,0
 10067,3019,148.2,Aurora Boulevard,primary,1
 10068,2442,181.51,Planas Ⅰ,residential,0
-10068,3099,256.74,"['Planas Ⅲ', 'Planas Ⅰ']",residential,0
+10068,3099,256.74,"['Planas Ⅰ', 'Planas Ⅲ']",residential,0
 10068,2892,144.79,Planas Ⅱ,residential,0
 10069,45,4.85,Kamuning Road,secondary,0
 10069,9800,140.81,Kamuning Road,secondary,0
@@ -27356,7 +27356,7 @@ source,target,length,name,highway,oneway
 10121,3497,126.48,Narra Street,residential,0
 10122,3490,215.33,Berlin Avenue,residential,0
 10123,2799,70.21,Kamias Road,secondary,0
-10123,44,39.11,"['Kamias Road', 'Kamuning Road']",secondary,0
+10123,44,39.11,"['Kamuning Road', 'Kamias Road']",secondary,0
 10123,8615,120.9,EDSA,primary,1
 10124,7673,167.04,EDSA,primary,1
 10124,10125,36.49,,primary_link,0
@@ -27406,7 +27406,7 @@ source,target,length,name,highway,oneway
 10145,7723,127.71,Commonwealth Avenue,primary,1
 10146,10154,262.76,Commonwealth Avenue,primary,1
 10147,8756,268.53,Luzon Avenue,primary,1
-10147,10141,576.73,"['Luzon Avenue', 'Tandang Sora Avenue']",primary,1
+10147,10141,576.73,"['Tandang Sora Avenue', 'Luzon Avenue']",primary,1
 10148,3297,76.8,Tandang Sora Avenue,residential,0
 10148,3262,111.81,Road 1,residential,0
 10148,10247,115.59,Tandang Sora Avenue,residential,0
@@ -27438,7 +27438,7 @@ source,target,length,name,highway,oneway
 10165,8108,129.3,,primary_link,1
 10166,5595,196.92,Nenita Street,residential,0
 10166,5617,56.07,Nenita Street,residential,0
-10166,5726,276.46,"['Nenita Interior', 'Masaya Interior']",residential,0
+10166,5726,276.46,"['Masaya Interior', 'Nenita Interior']",residential,0
 10167,5675,19.83,Tanguile Street,residential,0
 10168,10169,28.35,Yakal Street,residential,0
 10169,10168,28.35,Yakal Street,residential,0
@@ -27740,7 +27740,7 @@ source,target,length,name,highway,oneway
 10305,7527,9.17,General Aguinaldo Avenue,tertiary,1
 10305,2443,116.61,General Roxas Avenue,unclassified,1
 10306,10307,6.74,Aurora Boulevard,primary,1
-10306,12833,7.48,General Araneta Avenue,"['residential', 'unclassified']",1
+10306,12833,7.48,General Araneta Avenue,"['unclassified', 'residential']",1
 10307,13076,9.13,General Araneta Avenue,residential,1
 10307,12285,166.92,Aurora Boulevard,primary,1
 10308,8994,574.8,Commonwealth Avenue,primary,1
@@ -27792,7 +27792,7 @@ source,target,length,name,highway,oneway
 10328,3354,158.94,AFP Road,tertiary,0
 10328,11383,36.67,AFP Road,tertiary,0
 10329,11153,44.72,Tirad Pass Street,residential,0
-10329,7655,522.1,"['Corregidor Street', 'AFP Road', 'Bataan Street']",residential,0
+10329,7655,522.1,"['Corregidor Street', 'Bataan Street', 'AFP Road']",residential,0
 10329,3355,160.38,Corregidor Street,residential,0
 10330,10331,44.99,Artillery Street,residential,0
 10330,9650,48.13,Artillery Street,residential,0
@@ -27823,7 +27823,7 @@ source,target,length,name,highway,oneway
 10340,10339,54.04,,residential,0
 10341,8485,48.69,Pontevedra Street,residential,0
 10341,10342,31.4,Tobias Street,residential,0
-10341,7377,82.49,"['Pontevedra Street', 'V. Afulugencia Avenue']",residential,0
+10341,7377,82.49,"['V. Afulugencia Avenue', 'Pontevedra Street']",residential,0
 10342,7382,56.13,Segovia Street,residential,0
 10342,10341,31.4,Tobias Street,residential,0
 10342,8464,63.14,Segovia Street,residential,0
@@ -28017,7 +28017,7 @@ source,target,length,name,highway,oneway
 10442,8668,10.67,Sierra Vista Street,residential,0
 10442,10444,99.55,Katipunan Extension,secondary,1
 10443,10445,11.37,Katipunan Extension,secondary,1
-10443,5885,150.05,"['Katipunan Extension', 'Katipunan Avenue']",secondary,0
+10443,5885,150.05,"['Katipunan Avenue', 'Katipunan Extension']",secondary,0
 10444,10443,11.09,Katipunan Extension,secondary,1
 10444,11348,8.84,Victoria Road,residential,0
 10444,10445,10.63,Victoria Road,residential,0
@@ -28042,7 +28042,7 @@ source,target,length,name,highway,oneway
 10455,10453,165.86,Goldmine Street,residential,0
 10456,5777,35.04,San Luis Street,residential,0
 10456,11875,99.61,Bayabasan Street,residential,0
-10456,5779,23.86,"['San Luis Street', 'Nazario Street']",residential,0
+10456,5779,23.86,"['Nazario Street', 'San Luis Street']",residential,0
 10457,5769,124.87,Genoveva Street,residential,0
 10458,5772,76.91,Santa Veronica Street,residential,0
 10459,5773,98.54,Santa Veronica Street,residential,0
@@ -28164,7 +28164,7 @@ source,target,length,name,highway,oneway
 10518,10517,57.67,Secretariat Street,residential,0
 10519,7011,30.31,Personnel Street,residential,0
 10519,10520,40.56,Personnel Extension,residential,0
-10519,7010,164.02,"['Treasury Street', 'Personnel Street', 'Pension Street']",residential,0
+10519,7010,164.02,"['Pension Street', 'Treasury Street', 'Personnel Street']",residential,0
 10520,10519,40.56,Personnel Extension,residential,0
 10521,6456,8.46,Pinagkaisa Street,residential,0
 10521,10670,196.69,Niñada Street,residential,0
@@ -28217,10 +28217,10 @@ source,target,length,name,highway,oneway
 10543,9288,56.22,,residential,0
 10544,9289,35.85,,residential,0
 10545,6496,29.99,Ipil-ipil Street,residential,0
-10546,6660,117.12,"['Saint Paullia Street', 'Kalamiong Street']",residential,0
+10546,6660,117.12,"['Kalamiong Street', 'Saint Paullia Street']",residential,0
 10546,9460,78.28,Kalamiong Street,residential,0
 10546,10767,33.97,,residential,0
-10547,6493,188.29,"['Malasakit Street', 'Banaba Street']",residential,0
+10547,6493,188.29,"['Banaba Street', 'Malasakit Street']",residential,0
 10547,5115,91.87,Matapang Street,residential,0
 10547,5114,108.87,Matapang Street,residential,0
 10548,10551,39.98,Lansones Street,residential,0
@@ -28447,8 +28447,8 @@ source,target,length,name,highway,oneway
 10622,10607,37.83,,residential,0
 10622,4971,36.05,,residential,0
 10623,6446,57.78,Davao Street,residential,0
-10623,6478,302.08,"['Palawan Street', 'Luzon Street']",residential,0
-10623,9188,303.67,"['Empire Road', 'Luzon Street']",residential,0
+10623,6478,302.08,"['Luzon Street', 'Palawan Street']",residential,0
+10623,9188,303.67,"['Luzon Street', 'Empire Road']",residential,0
 10624,6391,69.99,Jericho Street,residential,0
 10624,6645,63.37,Ezra Street,residential,0
 10625,12028,123.22,Love Bird Street,residential,0
@@ -28892,7 +28892,7 @@ source,target,length,name,highway,oneway
 10836,5883,27.34,Saint Joseph Street,residential,0
 10837,10820,10.02,Scout Borromeo Street,tertiary,0
 10837,8965,321.27,Quezon Avenue,primary,1
-10837,11160,19.83,"['West 4th Street', 'Scout Borromeo Street']",tertiary,0
+10837,11160,19.83,"['Scout Borromeo Street', 'West 4th Street']",tertiary,0
 10838,6171,66.99,Zabarte Road,secondary,0
 10838,12567,8.66,San Diego Drive,residential,0
 10838,6070,149.06,Zabarte Road,secondary,0
@@ -28902,7 +28902,7 @@ source,target,length,name,highway,oneway
 10840,10839,115.36,Talisayan Street,residential,0
 10841,9463,5.19,New Jersey Village,residential,0
 10842,12542,8.95,,residential,0
-10842,13118,223.31,"['Atlas Road', 'Northwind Avenue']",tertiary,0
+10842,13118,223.31,"['Northwind Avenue', 'Atlas Road']",tertiary,0
 10842,10844,162.65,Atlas Road,tertiary,0
 10843,7180,31.07,Aratilis Street,residential,0
 10843,10844,16.85,Atlas Road,tertiary,0
@@ -29038,7 +29038,7 @@ source,target,length,name,highway,oneway
 10909,7278,87.48,E. Rodriguez Jr. Avenue,primary,1
 10910,401,5.72,G. C. Compound,residential,0
 10911,2275,48.81,Ignacio Street,residential,0
-10911,2280,196.1,"['Ignacio Street', 'Filomena Street']",residential,0
+10911,2280,196.1,"['Filomena Street', 'Ignacio Street']",residential,0
 10911,11271,65.73,Luzon Avenue,residential,0
 10912,10913,14.58,,primary_link,0
 10912,12211,103.43,Congressional Avenue Extension,primary,1
@@ -29088,7 +29088,7 @@ source,target,length,name,highway,oneway
 10934,9504,17.73,,tertiary_link,0
 10936,10812,51.76,Don Mariano Street,residential,0
 10937,11681,23.78,,residential,0
-10937,9328,115.98,"['Lower Molave GK', 'Lower Molave Street']",residential,0
+10937,9328,115.98,"['Lower Molave Street', 'Lower Molave GK']",residential,0
 10937,6550,32.55,Lower Molave Street,residential,0
 10939,3569,137.63,Ilongot Street,residential,0
 10940,6916,295.95,Quezon Avenue,primary,1
@@ -29516,7 +29516,7 @@ source,target,length,name,highway,oneway
 11158,11107,24.86,,tertiary_link,1
 11159,7658,101.59,Fernando Poe Jr. Avenue,secondary,1
 11159,2142,50.72,Dangay Street,residential,0
-11160,10837,19.83,"['West 4th Street', 'Scout Borromeo Street']",tertiary,0
+11160,10837,19.83,"['Scout Borromeo Street', 'West 4th Street']",tertiary,0
 11160,8964,173.29,Quezon Avenue,primary,1
 11160,1862,132.59,West 4th Street,residential,0
 11161,11162,23.95,,residential,0
@@ -29566,12 +29566,12 @@ source,target,length,name,highway,oneway
 11184,1143,220.18,Manggahan Street,unclassified,0
 11185,12246,71.36,EDSA,primary,1
 11185,10284,17.23,P. A. Bernardo Avenue,tertiary,0
-11186,4828,132.56,"['Lagoon Street', 'Pook Dela Paz']",residential,0
+11186,4828,132.56,"['Pook Dela Paz', 'Lagoon Street']",residential,0
 11187,2160,67.89,Phodaca Street,residential,0
 11188,5715,29.88,Pasacola Road,tertiary,0
 11188,11872,90.52,Pasacola Road,tertiary,0
 11188,12565,105.16,Bartolome Drive,residential,0
-11189,3795,86.14,"['Prudent Lane', 'Peaceful Lane']",residential,0
+11189,3795,86.14,"['Peaceful Lane', 'Prudent Lane']",residential,0
 11189,3907,156.42,Peaceful Lane,residential,0
 11189,8731,116.27,Prudent Lane,residential,0
 11190,1046,31.05,Magsaysay Avenue,residential,0
@@ -29588,7 +29588,7 @@ source,target,length,name,highway,oneway
 11196,10676,60.22,,residential,0
 11196,12822,74.96,,residential,0
 11197,9362,69.93,Road 44 Dupax,residential,0
-11198,2075,219.71,"['Andrade Street', 'Andrade Extension']",residential,0
+11198,2075,219.71,"['Andrade Extension', 'Andrade Street']",residential,0
 11199,13320,351.12,Visayas Avenue Extension,unclassified,0
 11200,8659,129.98,New Barangay Road,residential,0
 11200,8526,74.15,,residential,0
@@ -29732,7 +29732,7 @@ source,target,length,name,highway,oneway
 11268,3862,16.77,Quirino Highway,primary,0
 11269,5867,176.43,Windy Avenue,residential,0
 11269,9107,209.05,Queens Avenue,residential,0
-11269,5570,208.91,"['Broadway Street', 'Queens Avenue']",residential,0
+11269,5570,208.91,"['Queens Avenue', 'Broadway Street']",residential,0
 11270,8540,110.33,,residential,0
 11271,12202,18.97,Luzon Avenue,secondary,0
 11271,3586,127.77,Luzon Avenue,secondary,0
@@ -29853,7 +29853,7 @@ source,target,length,name,highway,oneway
 11344,4144,20.85,Dahlia Extension,residential,0
 11345,4144,14.76,Victorian Avenue,residential,0
 11346,4268,9.87,Walnut Street,residential,0
-11347,2516,124.78,"['Acacia Street', 'N. Labayani Street']",residential,0
+11347,2516,124.78,"['N. Labayani Street', 'Acacia Street']",residential,0
 11348,10444,8.84,Victoria Road,residential,0
 11349,11350,59.47,Road 3,residential,0
 11350,9654,55.94,Road 2,residential,1
@@ -29952,7 +29952,7 @@ source,target,length,name,highway,oneway
 11388,7907,80.53,Edades Drive,residential,0
 11389,2259,64.77,Josefa Street,residential,0
 11389,11388,41.2,Edades Drive,residential,0
-11389,2246,183.79,"['Ignacio Street', 'Josefa Street']",residential,0
+11389,2246,183.79,"['Josefa Street', 'Ignacio Street']",residential,0
 11390,3352,37.72,East de Leon Drive,residential,0
 11390,3353,76.8,East de Leon Drive,residential,0
 11390,3353,78.99,East de Leon Drive,residential,0
@@ -30020,7 +30020,7 @@ source,target,length,name,highway,oneway
 11416,731,229.78,IBP Road,primary,1
 11416,9237,90.18,Kalusugan Street,residential,0
 11417,9063,38.23,Army Street,residential,0
-11417,5290,382.11,"['2nd Street', 'Aurora Street']",residential,0
+11417,5290,382.11,"['Aurora Street', '2nd Street']",residential,0
 11417,9064,54.08,Olivas Street,residential,0
 11418,9903,19.36,Katarungan Street,residential,0
 11418,9244,58.37,Katarungan Street,residential,0
@@ -30138,7 +30138,7 @@ source,target,length,name,highway,oneway
 11469,6567,169.09,Fortune Street,residential,0
 11470,8326,178.19,Saint Dominic Drive,residential,0
 11471,7823,125.18,Argao Drive,residential,0
-11472,11473,69.06,"['Sapphire Street', 'Emerald Street']",residential,0
+11472,11473,69.06,"['Emerald Street', 'Sapphire Street']",residential,0
 11473,12093,60.26,Jade Street,residential,0
 11473,3921,44.42,Jade Street,residential,0
 11473,11472,69.06,"['Sapphire Street', 'Emerald Street']",residential,0
@@ -30169,7 +30169,7 @@ source,target,length,name,highway,oneway
 11487,8808,53.5,,residential,0
 11487,11486,85.25,Gregorio Street,residential,0
 11488,8648,32.96,Diamond Lane,residential,0
-11489,3665,243.53,"['Cadaing Street', 'Dela Cruz Street']",residential,0
+11489,3665,243.53,"['Dela Cruz Street', 'Cadaing Street']",residential,0
 11490,11492,23.38,,residential,0
 11491,11492,9.26,,residential,0
 11492,11490,23.38,,residential,0
@@ -30636,7 +30636,7 @@ source,target,length,name,highway,oneway
 11718,11719,48.78,Texas Street,residential,0
 11719,8984,20.02,New York Street,residential,0
 11719,11718,48.78,Texas Street,residential,0
-11719,8982,67.54,"['Nevada Street', 'New York Street']",residential,0
+11719,8982,67.54,"['New York Street', 'Nevada Street']",residential,0
 11720,12792,15.63,Kasunduan Street,residential,0
 11720,11909,8.57,Kasunduan Street,residential,0
 11720,9341,91.9,,residential,0
@@ -30839,7 +30839,7 @@ source,target,length,name,highway,oneway
 11829,11830,31.25,,residential,0
 11830,4830,33.93,Almaciga Street,residential,0
 11830,11829,31.25,,residential,0
-11830,4831,100.73,"['Tindalo Street', 'Almaciga Street']",residential,0
+11830,4831,100.73,"['Almaciga Street', 'Tindalo Street']",residential,0
 11831,11124,60.49,,residential,0
 11831,11123,97.17,,residential,0
 11831,11832,108.34,,residential,0
@@ -30953,7 +30953,7 @@ source,target,length,name,highway,oneway
 11879,11608,63.85,,residential,0
 11879,11878,46.58,,residential,0
 11880,987,189.58,San Pedro Bautista Road,residential,0
-11880,987,263.58,"['Bernardo Street', 'Morato Street']",residential,0
+11880,987,263.58,"['Morato Street', 'Bernardo Street']",residential,0
 11880,968,2.22,San Pedro Bautista Road,residential,0
 11881,2023,128.14,Florencia Street,residential,0
 11881,2030,4.51,Valencia Street,tertiary,0
@@ -31432,7 +31432,7 @@ source,target,length,name,highway,oneway
 12160,11033,10.6,,tertiary_link,0
 12160,11029,87.5,Bridgetowne Boulevard,tertiary,1
 12161,6731,10.18,Arayat Street,residential,0
-12161,6526,242.82,"['Arayat Street', 'Diwata Street']",residential,0
+12161,6526,242.82,"['Diwata Street', 'Arayat Street']",residential,0
 12161,6683,214.65,"['Cordillera Street', 'Cresta Street']",residential,0
 12162,10684,61.73,,residential,0
 12163,11589,259.78,Arboretum Road,residential,0
@@ -31457,7 +31457,7 @@ source,target,length,name,highway,oneway
 12176,6981,92.61,E. Rodriguez Sr. Avenue,secondary,0
 12177,8792,28.56,Amsterdam Street,residential,0
 12177,12178,29.17,,residential,0
-12177,8210,44.05,"['Amsterdam Street', 'London Street']",residential,0
+12177,8210,44.05,"['London Street', 'Amsterdam Street']",residential,0
 12178,12177,29.17,,residential,0
 12179,9759,6.44,Pablo dela Cruz Street,tertiary,0
 12179,13614,14.09,,residential,0
@@ -31508,7 +31508,7 @@ source,target,length,name,highway,oneway
 12208,1266,134.73,5th Avenue,residential,1
 12209,2311,128.87,Don Primitivo Street,residential,0
 12211,12222,6.44,,residential,0
-12211,10923,397.04,"['Luzon Avenue', 'Congressional Avenue Extension']",primary,1
+12211,10923,397.04,"['Congressional Avenue Extension', 'Luzon Avenue']",primary,1
 12212,12213,13.57,,residential,0
 12213,3245,33.18,Luzon Avenue,primary,1
 12213,12212,13.57,,residential,0
@@ -31900,7 +31900,7 @@ source,target,length,name,highway,oneway
 12454,485,131.45,General Santos Avenue,unclassified,0
 12454,12833,82.95,,primary_link,1
 12455,1725,115.58,Gregorio Araneta Avenue,primary,1
-12456,1726,370.84,"['Talayan Road', 'P. Florentino Extension', 'P. Florentino Street']",residential,0
+12456,1726,370.84,"['P. Florentino Extension', 'P. Florentino Street', 'Talayan Road']",residential,0
 12456,12455,86.45,Gregorio Araneta Avenue,primary,1
 12457,3351,119.77,Agno Street,residential,0
 12457,621,21.85,Gregorio Araneta Avenue,primary,1
@@ -32150,7 +32150,7 @@ source,target,length,name,highway,oneway
 12616,6029,7.43,Genesis Street,residential,0
 12617,12592,10.48,Santa Cruz Street,residential,1
 12618,6028,4.7,Malachi Street,residential,0
-12619,6026,66.23,"['Mozart Extension', 'Mozart Street']",residential,0
+12619,6026,66.23,"['Mozart Street', 'Mozart Extension']",residential,0
 12620,11504,9.28,,residential,0
 12621,4245,39.06,Libra Street,residential,0
 12622,4189,63.37,King Alexander Street,residential,0
@@ -32201,7 +32201,7 @@ source,target,length,name,highway,oneway
 12646,5448,49.94,Carlos Street,tertiary,0
 12647,3919,3.15,Perlas Street,residential,0
 12647,9058,53.42,Diamante Street,residential,0
-12647,3970,142.47,"['Esmeralda Street', 'Perlas Street']",residential,0
+12647,3970,142.47,"['Perlas Street', 'Esmeralda Street']",residential,0
 12648,12084,79.44,,residential,0
 12649,4024,9.39,Philand Extension Street,residential,0
 12650,9472,116.69,Windgate Villas,residential,0
@@ -32251,7 +32251,7 @@ source,target,length,name,highway,oneway
 12680,6222,5.73,,residential,0
 12681,9628,23.62,,residential,0
 12682,5143,127.55,2nd Street,residential,0
-12682,5141,187.99,"['2nd Street', 'Junji Street']",residential,0
+12682,5141,187.99,"['Junji Street', '2nd Street']",residential,0
 12682,12683,69.84,,residential,0
 12683,11951,56.59,Main Street,residential,0
 12683,5141,137.83,Main Street,residential,0
@@ -32330,7 +32330,7 @@ source,target,length,name,highway,oneway
 12719,10611,24.93,,residential,0
 12719,12718,44.61,,residential,0
 12720,10550,49.03,,residential,0
-12721,6584,69.83,"['Bicol Extension', 'Bicol']",residential,0
+12721,6584,69.83,"['Bicol', 'Bicol Extension']",residential,0
 12721,8489,74.55,Bicol Extension,residential,0
 12721,8489,150.14,,residential,0
 12722,11643,43.43,Union Civica Street,residential,0
@@ -32737,8 +32737,8 @@ source,target,length,name,highway,oneway
 12952,7376,21.01,V. Afulugencia Avenue,residential,0
 12952,10647,23.01,Davis Street,unclassified,0
 12953,7378,22.48,Davis Street,unclassified,0
-12953,4976,42.26,Davis Street,"['residential', 'unclassified']",0
-12953,7380,214.84,"['O. P. Mapalo Drive', 'P. D. Buendia Avenue']",residential,0
+12953,4976,42.26,Davis Street,"['unclassified', 'residential']",0
+12953,7380,214.84,"['P. D. Buendia Avenue', 'O. P. Mapalo Drive']",residential,0
 12955,8184,30.47,Sunnyside Drive,residential,1
 12956,11421,6.16,San Mateo Road,primary,1
 12957,8362,13.27,,residential,0
@@ -33034,7 +33034,7 @@ source,target,length,name,highway,oneway
 13117,13116,18.81,,residential,0
 13118,5857,53.04,Blueridge Avenue,residential,0
 13118,5858,81.22,Blueridge Avenue,residential,0
-13118,10842,223.31,"['Atlas Road', 'Northwind Avenue']",tertiary,0
+13118,10842,223.31,"['Northwind Avenue', 'Atlas Road']",tertiary,0
 13118,5861,36.45,Northwind Avenue,tertiary,0
 13119,9773,21.64,,residential,0
 13119,9778,84.89,Riverside Street,residential,0
@@ -33299,7 +33299,7 @@ source,target,length,name,highway,oneway
 13283,12190,32.83,Temple Street,residential,0
 13284,5580,3.86,Belen Street,residential,0
 13284,5458,77.78,Belen Street,residential,0
-13284,5263,123.79,"['Marcela', 'Sumilang Street']",residential,0
+13284,5263,123.79,"['Sumilang Street', 'Marcela']",residential,0
 13285,757,6.98,Marymount,residential,0
 13286,13283,14.55,Nenita Extension,residential,0
 13286,7495,128.78,Nenita Extension,residential,0

@@ -4,6 +4,7 @@ import json
 import os
 from typing import Dict, List, Tuple, Optional
 from road_name_mapper import RoadNameMapper
+from road_geometry_loader import RoadGeometryLoader
 from config import Config
 from geometry_utils import enhance_route_geometry
 
@@ -25,7 +26,16 @@ class DHLRouter:
         # Initialize road name mapper for turn-by-turn directions using config
         self.road_mapper = RoadNameMapper(str(Config.EDGES_CSV))
         
+        # Initialize road geometry loader for accurate path visualization
+        mapping_path = str(Config.NODES_CSV).replace('quezon_city_nodes.csv', 'node_id_mapping.csv')
+        self.geometry_loader = RoadGeometryLoader(
+            str(Config.EDGES_CSV), 
+            str(Config.NODES_CSV),
+            mapping_path
+        )
+        
         print(f"✅ Using DHL routing executable: {self.cpp_executable}")
+        print(f"✅ Road geometry loader initialized")
     
     def compute_route(self, start_lat: float, start_lng: float, 
                      dest_lat: float, dest_lng: float, use_disruptions: bool = False,
@@ -127,21 +137,27 @@ class DHLRouter:
     def _convert_dhl_to_route_format(self, dhl_data: Dict) -> Dict:
         """Convert DHL JSON API output to our standard route format"""
         
-        # Extract coordinates from the node mapping
-        coordinates = []
+        # Extract path nodes from DHL output
         path_nodes = dhl_data.get('route', {}).get('path_nodes', [])
         
-        # JSON API provides better coordinate data
-        complete_trace = dhl_data.get('route', {}).get('complete_trace', '')
-        if complete_trace and path_nodes:
-            coordinates = self._extract_coordinates_from_trace(complete_trace, path_nodes)
-        
-        # Fallback: Load coordinate mapping from CSV file if trace parsing failed
-        # JSON API provides the actual file paths used
-        if not coordinates:
-            coord_file = dhl_data.get('data_sources', {}).get('coordinates_file', '')
-            if coord_file and path_nodes:
-                coordinates = self._load_coordinates_for_nodes(coord_file, path_nodes)
+        # Use road geometry loader to get coordinates following actual road network
+        coordinates = []
+        if path_nodes:
+            print(f"📍 Getting road network coordinates for {len(path_nodes)} DHL nodes")
+            
+            # Get coordinates following actual edges with OSM geometry (includes curves)
+            coordinates = self.geometry_loader.get_path_coordinates(path_nodes, use_osm_geometry=True)
+            
+            print(f"📍 DHL route has {len(coordinates)} points following road network (with curves)")
+            
+            # Validate the path
+            is_valid, validation_message = self.geometry_loader.validate_path(path_nodes)
+            if not is_valid:
+                print(f"⚠️  Warning: DHL path validation: {validation_message}")
+            
+            # Get path summary
+            path_summary = self.geometry_loader.get_path_summary(path_nodes)
+            print(f"📊 DHL path summary: {path_summary['total_distance_m']:.1f}m over {path_summary['num_segments']} segments")
         
         # Create route data structure with enhanced metrics from API
         route_data = {
@@ -170,7 +186,7 @@ class DHLRouter:
                 'start_node': dhl_data.get('gps_mapping', {}).get('start_node', 0),
                 'dest_node': dhl_data.get('gps_mapping', {}).get('dest_node', 0),
                 'route_summary': dhl_data.get('route', {}).get('complete_trace', ''),
-                'road_segments': self._create_road_segments(coordinates)
+                'road_segments': []
             },
             'gps_mapping': dhl_data.get('gps_mapping', {}),
             'disruptions': dhl_data.get('disruptions', {}),
@@ -180,13 +196,17 @@ class DHLRouter:
         
         # Create polylines from coordinates
         if len(coordinates) >= 2:
-            print(f"📍 DHL route has {len(coordinates)} original node coordinates")
+            print(f"📍 DHL route has {len(coordinates)} coordinate points")
             
-            # Interpolate intermediate points for smoother visualization
-            # This adds points every ~30 meters to make routes follow roads better
-            interpolated_coordinates = enhance_route_geometry(coordinates, max_distance=30.0)
+            # Since OSM geometry already includes curve points, only do minimal interpolation
+            # Only interpolate if there are still very long gaps (>100m)
+            interpolated_coordinates = enhance_route_geometry(
+                coordinates, 
+                max_distance=100.0,  # Higher threshold since OSM already provides curves
+                preserve_node_ids=False  # OSM curve points don't have node IDs
+            )
             
-            print(f"✅ Enhanced DHL route with {len(interpolated_coordinates)} GPS coordinates (interpolated from {len(coordinates)} nodes)")
+            print(f"✅ Final DHL route with {len(interpolated_coordinates)} GPS coordinates")
             
             # Update coordinates with interpolated version
             route_data['route']['coordinates'] = interpolated_coordinates
