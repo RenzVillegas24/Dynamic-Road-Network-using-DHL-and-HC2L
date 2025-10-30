@@ -307,7 +307,7 @@ generate_data() {
     echo ""
     echo "[Step 1/3] Activating conda environment..."
     source "$(conda info --base)/etc/profile.d/conda.sh"
-    conda activate $ENV_NAME
+    conda activate "$CONDA_ENV_PATH"
 
     echo "[Step 2/3] Generating OSM data (this takes time)..."
     cd "$MAIN_DIR"

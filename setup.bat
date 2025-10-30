@@ -323,7 +323,7 @@ if /i not "!confirm!"=="y" exit /b 0
 
 echo.
 echo [Step 1/3] Activating conda environment...
-call conda activate %ENV_NAME%
+call conda activate "%CONDA_ENV_PATH%"
 
 echo [Step 2/3] Generating OSM data (this takes time)...
 cd /d "%MAIN_DIR%"
