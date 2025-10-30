@@ -43,6 +43,7 @@ venv/
 ENV/
 env/
 venv.bak/
+cache/
 
 # Java / Maven / Gradle
 target/

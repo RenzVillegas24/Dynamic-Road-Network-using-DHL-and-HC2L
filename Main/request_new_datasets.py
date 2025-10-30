@@ -7,6 +7,7 @@ import osmnx as ox
 from math import radians, sin, cos, sqrt, atan2
 from pathlib import Path
 from dotenv import load_dotenv
+from config import Config
 
 # Load environment variables from .env file
 env_path = Path(__file__).parent / '.env'
@@ -20,9 +21,9 @@ load_dotenv(dotenv_path=env_path)
 def get_config():
     """
     Returns all project configuration constants and paths.
+    Uses Config class for directory paths to ensure consistency.
     """
     ox.settings.requests_timeout = 600
-    BASE_DIR = '../data'
     
     # Get HERE API key from environment variable
     here_api_key = os.getenv('HERE_API_KEY', '')
@@ -38,15 +39,14 @@ def get_config():
         'MIN_SPEED_KPH': 1,
         'DISRUPTION_PERCENTAGE': 0.15,
 
-        # File paths
-
-        'BASE_GRAPH_CSV': f'{BASE_DIR}/raw/quezon_city_edges.csv',
-        'BASE_NODES_CSV': f'{BASE_DIR}/raw/quezon_city_nodes.csv',
-        'OUTPUT_DIR': f'{BASE_DIR}/disruptions/',
-        'PROCESSED_DIR': f'{BASE_DIR}/processed/',
-        'DISRUPTED_SCENARIO_GR' : 'qc_disrupted_scenario_1.gr',
-        'OUTPUT_FILE_TEMPLATE': f'{BASE_DIR}/disruptions/qc_scenario_for_cpp_1.csv',
-        'OUTPUT_FOLDER': f'{BASE_DIR}/raw',
+        # File paths - using Config class for consistency
+        'BASE_GRAPH_CSV': str(Config.EDGES_CSV),
+        'BASE_NODES_CSV': str(Config.NODES_CSV),
+        'OUTPUT_DIR': str(Config.DISRUPTIONS_DIR),
+        'PROCESSED_DIR': str(Config.PROCESSED_DATA_DIR),
+        'DISRUPTED_SCENARIO_GR': 'qc_disrupted_scenario_1.gr',
+        'OUTPUT_FILE_TEMPLATE': str(Config.DISRUPTIONS_DIR / 'qc_scenario_for_cpp_{}.csv'),
+        'OUTPUT_FOLDER': str(Config.RAW_DATA_DIR),
         'EDGES_FILENAME': 'quezon_city_edges.csv',
         'NODES_FILENAME': 'quezon_city_nodes.csv',
         'MAPPING_FILENAME': 'node_id_mapping.csv',
@@ -279,10 +279,9 @@ def generate_gr_file_from_disruption_csv():
     """
     cfg = get_config()
 
-    # Use paths relative to this script
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    base_graph_csv = os.path.join(script_dir, cfg['BASE_GRAPH_CSV'])
-    output_gr_file = os.path.join(script_dir, cfg['PROCESSED_DIR'], 'qc_disrupted_scenario_1.gr')
+    # Use paths from Config class
+    base_graph_csv = cfg['BASE_GRAPH_CSV']
+    output_gr_file = os.path.join(cfg['PROCESSED_DIR'], cfg['DISRUPTED_SCENARIO_GR'])
 
     print("\n--- Starting disrupted graph generation ---")
     print(f"Attempting to load base graph from: {base_graph_csv}")
