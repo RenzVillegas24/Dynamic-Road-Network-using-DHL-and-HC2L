@@ -79,19 +79,46 @@ else
 fi
 
 echo ""
+print_status "Setting up Python virtual environment..."
+
+# 5. Setup virtual environment
+VENV_DIR="$PROJECT_ROOT/.venv"
+
+if [ -d "$VENV_DIR" ]; then
+    print_success "Virtual environment already exists at .venv/"
+else
+    print_status "Creating virtual environment..."
+    if python3 -m venv "$VENV_DIR"; then
+        print_success "Virtual environment created at .venv/"
+    else
+        print_error "Failed to create virtual environment"
+        exit 1
+    fi
+fi
+
+# 6. Activate virtual environment and install dependencies
 print_status "Installing Python dependencies..."
 
-# 5. Install Python dependencies
-if pip3 install -r "$PROJECT_ROOT/requirements.txt" > /dev/null 2>&1; then
-    print_success "Python dependencies installed"
+# Activate virtual environment
+source "$VENV_DIR/bin/activate"
+
+# Upgrade pip
+pip install --upgrade pip > /dev/null 2>&1
+
+# Install dependencies
+if pip install -r "$PROJECT_ROOT/requirements.txt" > /dev/null 2>&1; then
+    print_success "Python dependencies installed in virtual environment"
 else
     print_warning "Some dependencies may have failed to install. Check manually."
 fi
 
+# Deactivate for now
+deactivate
+
 echo ""
 print_status "Checking data files..."
 
-# 6. Check for required data files
+# 7. Check for required data files
 MISSING_FILES=()
 
 if [ ! -f "$MAIN_DIR/data/raw/quezon_city_nodes.csv" ]; then
@@ -124,7 +151,7 @@ fi
 echo ""
 print_status "Verifying configuration..."
 
-# 7. Verify configuration using Python
+# 8. Verify configuration using Python
 cd "$MAIN_DIR"
 python3 -c "from config import Config; print(Config.get_config_summary())" 2>/dev/null || {
     print_warning "Could not verify configuration. Run manually: cd Main && python config.py"
@@ -136,6 +163,7 @@ echo "  Setup Status"
 echo "════════════════════════════════════════════════════════════════"
 echo ""
 print_status "Directory structure: ✓ Created"
+print_status "Virtual environment: ✓ Ready at .venv/"
 print_status "Python dependencies: ✓ Installed"
 print_status "Environment file: ✓ Created"
 
@@ -155,8 +183,10 @@ echo "  2. Place your data files in Main/data/"
 echo "  3. Build the C++ executables:"
 echo "     ./build_all.sh"
 echo "  4. Run the Flask application:"
-echo "     cd Main"
-echo "     python flask_server.py"
+echo "     ./run_server.sh"
+echo ""
+echo "  To manually activate the virtual environment:"
+echo "     source .venv/bin/activate"
 echo ""
 echo "For more information, see README.md"
 echo ""
