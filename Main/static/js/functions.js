@@ -464,6 +464,98 @@ function showAllDisruptionsOnMap(disruptionData) {
     
     console.log(`Added ${disruptionMarkers.length} disruption markers to map`);
 }
+
+// ------------------------------------------------------------------
+// Node display utilities — show / hide all graph nodes on the map
+// ------------------------------------------------------------------
+function toggleAllNodes() {
+  if (!map) {
+    showUpdateToast('Map not available', 'warning');
+    return;
+  }
+
+  if (allNodesLayer && map.hasLayer(allNodesLayer)) {
+    hideAllNodes();
+  } else {
+    showAllNodes();
+  }
+}
+
+async function showAllNodes() {
+  if (!map) {
+    showUpdateToast('Map not available', 'warning');
+    return;
+  }
+
+  // If already created and removed, just add back to map
+  if (allNodesLayer && !map.hasLayer(allNodesLayer)) {
+    map.addLayer(allNodesLayer);
+    showUpdateToast('Showing all nodes (cached)', 'success');
+    return;
+  }
+
+  try {
+    showUpdateToast('Loading nodes...', 'info');
+    const resp = await fetch('/get_all_nodes');
+    const data = await resp.json();
+
+    if (!data.success) {
+      showUpdateToast('Failed to load nodes: ' + (data.error || 'unknown'), 'warning');
+      return;
+    }
+
+    const nodes = data.nodes || [];
+    const total = nodes.length;
+
+    if (total === 0) {
+      showUpdateToast('No nodes available in dataset', 'warning');
+      return;
+    }
+
+    // Performance guard: cap number of markers to 10k by sampling
+    const MAX_MARKERS = 10000;
+    let step = 1;
+    if (total > MAX_MARKERS) {
+      step = Math.ceil(total / MAX_MARKERS);
+      console.warn(`Nodes count ${total} exceeds ${MAX_MARKERS}, sampling every ${step}th node`);
+    }
+
+    const markers = [];
+    for (let i = 0; i < nodes.length; i += step) {
+      const n = nodes[i];
+      if (!n) continue;
+      const m = L.circleMarker([n.lat, n.lng], {
+        radius: 2,
+        color: '#2b6cb0',
+        weight: 0.6,
+        fillOpacity: 0.9
+      });
+      // Lightweight popup with id
+      m.bindTooltip(String(n.node_id), {permanent: false, direction: 'top', opacity: 0.8});
+      markers.push(m);
+    }
+
+    allNodesLayer = L.layerGroup(markers);
+    allNodesLayer.addTo(map);
+
+    showUpdateToast(`Showing ${Math.min(total, MAX_MARKERS)} / ${total} nodes`, 'success');
+    console.log(`✅ Added ${Math.min(total, MAX_MARKERS)} node markers to map (total nodes: ${total})`);
+
+  } catch (err) {
+    console.error('Error loading nodes:', err);
+    showUpdateToast('Error loading nodes: ' + err.message, 'warning');
+  }
+}
+
+function hideAllNodes() {
+  if (!map) return;
+  if (allNodesLayer && map.hasLayer(allNodesLayer)) {
+    map.removeLayer(allNodesLayer);
+    showUpdateToast('All nodes hidden', 'info');
+  } else {
+    showUpdateToast('No node layer to hide', 'warning');
+  }
+}
   
 function updateRouteHeaderMetrics(route, metrics) {
     try {

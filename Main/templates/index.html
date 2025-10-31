@@ -220,6 +220,9 @@
         <button id="report-toggle" class="px-6 py-3 glass-effect hover:shadow-xl border-2 border-red-200 rounded-2xl font-bold text-red-600 whitespace-nowrap transition-all duration-300 transform hover:scale-105">
           Report Incident
         </button>
+        <button id="nodes-toggle" class="px-4 py-3 bg-gradient-to-r from-sky-600 to-cyan-600 hover:from-sky-700 hover:to-cyan-700 text-white rounded-2xl font-bold shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 whitespace-nowrap">
+          Show Nodes
+        </button>
       </div>
     </div>
   </div>
@@ -1671,6 +1674,17 @@
   // Initialize map when DOM is ready
   document.addEventListener('DOMContentLoaded', function() {
     initMap();
+    // Wire up Show Nodes toggle button (if present)
+    const nodesBtn = document.getElementById('nodes-toggle');
+    if (nodesBtn) {
+      nodesBtn.addEventListener('click', () => {
+        // Toggle label for clarity
+        const currentlyShown = nodesBtn.textContent && nodesBtn.textContent.trim().toLowerCase().includes('hide');
+        toggleAllNodes();
+        // Optimistically toggle button label (actual state may be cached)
+        nodesBtn.textContent = currentlyShown ? 'Show Nodes' : 'Hide Nodes';
+      });
+    }
   });
 </script>
 
