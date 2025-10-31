@@ -64,6 +64,31 @@ function clearRoutes() {
         console.log('Cleared destination marker');
     }
 
+    // Clear snap markers and connector lines
+    if (window.startSnapMarker && map) {
+        map.removeLayer(window.startSnapMarker);
+        window.startSnapMarker = null;
+        console.log('Cleared start snap marker');
+    }
+
+    if (window.destSnapMarker && map) {
+        map.removeLayer(window.destSnapMarker);
+        window.destSnapMarker = null;
+        console.log('Cleared dest snap marker');
+    }
+
+    if (window.startConnectorLine && map) {
+        map.removeLayer(window.startConnectorLine);
+        window.startConnectorLine = null;
+        console.log('Cleared start connector line');
+    }
+
+    if (window.destConnectorLine && map) {
+        map.removeLayer(window.destConnectorLine);
+        window.destConnectorLine = null;
+        console.log('Cleared dest connector line');
+    }
+
     // Clear report marker if exists (Leaflet)
     if (reportMarker && map) {
         map.removeLayer(reportMarker);

@@ -395,7 +395,7 @@ function updateRouteHeaderMetrics(route, metrics) {
 }
 
   
-function updateBottomInfoBar(distanceKm, estimatedMinutes, routeData) {
+function updateBottomInfoBar(distanceKm, estimatedMinutes, routeData, walkingDistanceM = 0, drivingDistanceM = 0) {
     const etaElement = document.getElementById('bottom-info-eta');
     const distanceElement = document.getElementById('bottom-info-distance');
     const metricLabelElement = document.getElementById('bottom-info-metric-label');
@@ -414,10 +414,19 @@ function updateBottomInfoBar(distanceKm, estimatedMinutes, routeData) {
       }
     }
     
-    // Update Distance
+    // Update Distance with walking/driving breakdown
     if (distanceElement) {
       if (distanceKm > 0) {
-        distanceElement.textContent = `${distanceKm.toFixed(1)} km`;
+        let distanceText = `${distanceKm.toFixed(1)} km`;
+        
+        // Add breakdown if there's walking distance
+        if (walkingDistanceM > 5) {
+          const walkingKm = (walkingDistanceM / 1000).toFixed(2);
+          const drivingKm = (drivingDistanceM / 1000).toFixed(1);
+          distanceText = `${distanceKm.toFixed(1)} km (🚶${walkingKm}km + 🚗${drivingKm}km)`;
+        }
+        
+        distanceElement.textContent = distanceText;
         distanceElement.classList.remove('text-slate-400');
         distanceElement.classList.add('text-slate-800');
       } else {
@@ -577,6 +586,15 @@ function updateRouteMetrics(routeData) {
     const metrics = routeData.metrics || {};
     const route = routeData.route || {};
     
+    // Calculate walking distance from establishment snap points
+    let walkingDistanceM = 0;
+    if (startLocation && startLocation.snap_distance) {
+      walkingDistanceM += startLocation.snap_distance;
+    }
+    if (destLocation && destLocation.snap_distance) {
+      walkingDistanceM += destLocation.snap_distance;
+    }
+    
     // Calculate distance and time using the same strategy as Route Panel
     let distanceM = 0;
     let estimatedMinutes = 0;
@@ -629,20 +647,33 @@ function updateRouteMetrics(routeData) {
       }
     }
     
-    const distanceKm = distanceM / 1000;
+    // Calculate driving distance (road network distance)
+    const drivingDistanceM = distanceM;
+    
+    // Calculate total distance including walking
+    const totalDistanceM = drivingDistanceM + walkingDistanceM;
+    const totalDistanceKm = totalDistanceM / 1000;
+    const drivingDistanceKm = drivingDistanceM / 1000;
+    const walkingDistanceKm = walkingDistanceM / 1000;
     
     // Calculate estimated time
+    // Walking: 5 km/h = 12 min/km
+    // Driving: 30 km/h average in urban areas = 2 min/km
+    const walkingMinutes = walkingDistanceKm * 12;
+    let drivingMinutes = 0;
+    
     if (metrics.estimated_time_minutes) {
-      estimatedMinutes = metrics.estimated_time_minutes;
-    } else if (distanceKm > 0) {
-      // Estimate: 30 km/h average in urban areas
-      estimatedMinutes = Math.round((distanceKm / 30) * 60);
+      drivingMinutes = metrics.estimated_time_minutes;
+    } else if (drivingDistanceKm > 0) {
+      drivingMinutes = drivingDistanceKm * 2; // 30 km/h = 2 min/km
     }
     
-    console.log(`📊 Bottom info final: ${distanceKm.toFixed(1)}km (${distanceM}m) from ${distanceSource}, ${estimatedMinutes}min`);
+    estimatedMinutes = Math.round(walkingMinutes + drivingMinutes);
     
-    // Update bottom info bar
-    updateBottomInfoBar(distanceKm, estimatedMinutes, routeData);
+    console.log(`📊 Bottom info final: Total ${totalDistanceKm.toFixed(1)}km (Walking: ${walkingDistanceKm.toFixed(2)}km, Driving: ${drivingDistanceKm.toFixed(1)}km), ${estimatedMinutes}min`);
+    
+    // Update bottom info bar with walking/driving breakdown
+    updateBottomInfoBar(totalDistanceKm, estimatedMinutes, routeData, walkingDistanceM, drivingDistanceM);
     
     // Update performance metrics in admin panel
     updatePerformanceMetrics(metrics);

@@ -221,6 +221,52 @@ def find_nearest_node():
         })
 
 
+@app.route('/find_nearest_road_segment', methods=['POST'])
+def find_nearest_road_segment():
+    """
+    Find nearest road segment and project point onto it
+    This provides better snap-to-road functionality than find_nearest_node
+    """
+    data = request.json
+    
+    try:
+        lat = float(data['lat'])
+        lng = float(data['lng'])
+        max_distance = float(data.get('max_distance', 500))
+        
+        # Use mapper's snap function
+        result = mapper.snap_to_nearest_road(lat, lng, max_distance=max_distance)
+        
+        if result is None:
+            return jsonify({
+                'success': False,
+                'error': f'No road within {max_distance}m of this location',
+                'lat': lat,
+                'lng': lng
+            })
+        
+        # Return enhanced result
+        return jsonify({
+            'success': True,
+            'edge': {
+                'source': result['edge'][0],
+                'target': result['edge'][1]
+            },
+            'projection_point': result['projection_point'],
+            'original_point': result['original_point'],
+            'distance_m': round(result['distance_m'], 1),
+            'road_name': result['road_name'],
+            'segment_length_m': round(result['segment_length_m'], 1),
+            'validation': result['validation']
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f"Error finding nearest road segment: {str(e)}"
+        })
+
+
 @app.route('/compute_dhc2l_route', methods=['POST'])
 def compute_dhc2l_route():
     """Compute optimal route using GPS HC2L algorithm"""
