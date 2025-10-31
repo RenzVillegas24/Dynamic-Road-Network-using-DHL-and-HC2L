@@ -64,35 +64,36 @@ function clearRoutes() {
         console.log('Cleared destination marker');
     }
 
-    // Clear snap markers and connector lines
-    if (window.startSnapMarker && map) {
-        map.removeLayer(window.startSnapMarker);
-        window.startSnapMarker = null;
-        console.log('Cleared start snap marker');
-    }
+    // DO NOT clear OSM snap markers - they should remain visible to show user's selected points
+    // and the walking distance from pin to snapped road location
+    // if (window.startSnapMarker && map) {
+    //     map.removeLayer(window.startSnapMarker);
+    //     window.startSnapMarker = null;
+    //     console.log('Cleared start snap marker');
+    // }
 
-    if (window.destSnapMarker && map) {
-        map.removeLayer(window.destSnapMarker);
-        window.destSnapMarker = null;
-        console.log('Cleared dest snap marker');
-    }
+    // if (window.destSnapMarker && map) {
+    //     map.removeLayer(window.destSnapMarker);
+    //     window.destSnapMarker = null;
+    //     console.log('Cleared dest snap marker');
+    // }
 
-    if (window.startConnectorLine && map) {
-        map.removeLayer(window.startConnectorLine);
-        window.startConnectorLine = null;
-        console.log('Cleared start connector line');
-    }
+    // if (window.startConnectorLine && map) {
+    //     map.removeLayer(window.startConnectorLine);
+    //     window.startConnectorLine = null;
+    //     console.log('Cleared start connector line');
+    // }
 
-    if (window.destConnectorLine && map) {
-        map.removeLayer(window.destConnectorLine);
-        window.destConnectorLine = null;
-        console.log('Cleared dest connector line');
-    }
+    // if (window.destConnectorLine && map) {
+    //     map.removeLayer(window.destConnectorLine);
+    //     window.destConnectorLine = null;
+    //     console.log('Cleared dest connector line');
+    // }
 
-    // Clear OSM snap markers (new road-aware snapping)
-    if (typeof clearAllOSMSnapMarkers === 'function') {
-        clearAllOSMSnapMarkers();
-    }
+    // DO NOT clear OSM snap markers - keep them visible to show user's selections
+    // if (typeof clearAllOSMSnapMarkers === 'function') {
+    //     clearAllOSMSnapMarkers();
+    // }
 
     // Clear report marker if exists (Leaflet)
     if (reportMarker && map) {
@@ -518,7 +519,7 @@ async function showAllNodes() {
     }
 
     // Performance guard: cap number of markers to 10k by sampling
-    const MAX_MARKERS = 10000;
+    const MAX_MARKERS = 100000;
     let step = 1;
     if (total > MAX_MARKERS) {
       step = Math.ceil(total / MAX_MARKERS);

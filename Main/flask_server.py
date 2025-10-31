@@ -395,7 +395,7 @@ def get_osm_graph_edges():
         
         # Get limit from query params (default 500 for performance)
         limit = request.args.get('limit', type=int, default=500)
-        max_limit = 2000  # Safety cap
+        max_limit = float('inf')  #2000  # Safety cap
         limit = min(limit, max_limit)
         
         # Extract edge geometries with metadata

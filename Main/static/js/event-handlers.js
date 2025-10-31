@@ -569,7 +569,7 @@ document.getElementById('show-osm-graph-btn').onclick = async () => {
         button.disabled = true;
         
         try {
-            const response = await fetch('/get_osm_graph_edges?limit=1000');
+            const response = await fetch('/get_osm_graph_edges?limit=1000000');
             const data = await response.json();
             
             if (data.success) {

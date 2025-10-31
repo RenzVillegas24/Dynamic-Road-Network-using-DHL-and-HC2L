@@ -39,6 +39,21 @@
     .leaflet-control { z-index: 10 !important; }
     .leaflet-popup { z-index: 10 !important; }
     .leaflet-tooltip { z-index: 10 !important; }
+    
+    /* Walking distance label styling */
+    .walking-distance-label {
+      background: rgba(117, 117, 117, 0.95) !important;
+      color: white !important;
+      border: 2px solid white !important;
+      border-radius: 8px !important;
+      padding: 4px 10px !important;
+      font-weight: 600 !important;
+      font-size: 12px !important;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3) !important;
+    }
+    .walking-distance-label::before {
+      border-top-color: rgba(117, 117, 117, 0.95) !important;
+    }
   </style>
 </head>
 <body class="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
@@ -1276,8 +1291,14 @@
         console.log('Using polyline coordinates for connectors');
       }
       
+      // Check if OSM snapping is being used
+      const usingOSMStart = window.osmSnapMarkers?.start?.data != null;
+      const usingOSMDest = window.osmSnapMarkers?.dest?.data != null;
+      
+      // Only add connector lines if NOT using OSM snapping
+      // (OSM snapping already shows walking path with gray dashed line)
       // Add connector from start pin to route start node
-      if (window.startLocation && routeStartCoord) {
+      if (window.startLocation && routeStartCoord && !usingOSMStart) {
         const startDistance = calculateHaversineDistance(
           window.startLocation.lat, window.startLocation.lng,
           routeStartCoord.lat, routeStartCoord.lng
@@ -1296,10 +1317,12 @@
         }).addTo(map);
         
         routePolylines.push(startConnector);
+      } else if (usingOSMStart) {
+        console.log('⏭️  Skipping start connector (using OSM snapping with walking path)');
       }
       
       // Add connector from route end node to destination pin
-      if (window.destLocation && routeEndCoord) {
+      if (window.destLocation && routeEndCoord && !usingOSMDest) {
         const endDistance = calculateHaversineDistance(
           routeEndCoord.lat, routeEndCoord.lng,
           window.destLocation.lat, window.destLocation.lng
@@ -1318,6 +1341,8 @@
         }).addTo(map);
         
         routePolylines.push(endConnector);
+      } else if (usingOSMDest) {
+        console.log('⏭️  Skipping dest connector (using OSM snapping with walking path)');
       }
       
       console.log('D-HC2L connector polylines added successfully');
@@ -1374,8 +1399,14 @@
         console.log('Using DHL polyline coordinates for connectors');
       }
       
+      // Check if OSM snapping is being used
+      const usingOSMStart = window.osmSnapMarkers?.start?.data != null;
+      const usingOSMDest = window.osmSnapMarkers?.dest?.data != null;
+      
+      // Only add connector lines if NOT using OSM snapping
+      // (OSM snapping already shows walking path with gray dashed line)
       // Add connector from start pin to route start node
-      if (window.startLocation && routeStartCoord) {
+      if (window.startLocation && routeStartCoord && !usingOSMStart) {
         const startDistance = calculateHaversineDistance(
           window.startLocation.lat, window.startLocation.lng,
           routeStartCoord.lat, routeStartCoord.lng
@@ -1394,10 +1425,12 @@
         }).addTo(map);
         
         routePolylines.push(startConnector);
+      } else if (usingOSMStart) {
+        console.log('⏭️  Skipping start connector (using OSM snapping with walking path)');
       }
       
       // Add connector from route end node to destination pin
-      if (window.destLocation && routeEndCoord) {
+      if (window.destLocation && routeEndCoord && !usingOSMDest) {
         const endDistance = calculateHaversineDistance(
           routeEndCoord.lat, routeEndCoord.lng,
           window.destLocation.lat, window.destLocation.lng
@@ -1416,6 +1449,8 @@
         }).addTo(map);
         
         routePolylines.push(endConnector);
+      } else if (usingOSMDest) {
+        console.log('⏭️  Skipping dest connector (using OSM snapping with walking path)');
       }
       
       console.log('DHL connector polylines added successfully');

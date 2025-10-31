@@ -164,10 +164,22 @@ function createOSMSnapMarkers(clickedLat, clickedLng, snapData, role) {
             zIndexOffset: 0
         }).addTo(map);
         
+        // Add popup for detailed info
         window.osmSnapMarkers[role].connector.bindPopup(
             `<b>Walking Distance</b><br>` +
             `${distance.toFixed(1)}m to road<br>` +
             `<small>From clicked point to ${snapData.road_name}</small>`
+        );
+        
+        // Add permanent tooltip showing distance
+        window.osmSnapMarkers[role].connector.bindTooltip(
+            `🚶 ${distance.toFixed(0)}m walk`,
+            {
+                permanent: true,
+                direction: 'center',
+                className: 'walking-distance-label',
+                opacity: 0.9
+            }
         );
     }
     
