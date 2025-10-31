@@ -185,34 +185,78 @@ def get_scenario_data():
 
 @app.route('/find_nearest_node', methods=['POST'])
 def find_nearest_node():
-    """Find nearest node to clicked coordinates"""
+    """
+    Find nearest node to clicked coordinates
+    
+    Enhanced to support one-way street awareness:
+    - Pass is_start_point=true for start location selection
+    - Pass is_start_point=false for destination selection
+    - Omit is_start_point for legacy behavior (no one-way awareness)
+    """
     data = request.json
     
     try:
-        # Find nearest node
-        node_id, distance = mapper.find_nearest_node(
-            data['lat'], data['lng'], max_distance_m=1000  # Increased range
+        lat = data['lat']
+        lng = data['lng']
+        
+        # Get optional is_start_point parameter
+        is_start_point = data.get('is_start_point', None)
+        if is_start_point is not None:
+            is_start_point = bool(is_start_point)
+        
+        # Find nearest node (with or without one-way awareness)
+        result = mapper.find_nearest_node(
+            lat, lng, 
+            max_distance_m=1000,  # Increased range
+            is_start_point=is_start_point
         )
         
+        # Handle different return formats
+        if is_start_point is not None and len(result) == 3:
+            node_id, distance, metadata = result
+        else:
+            node_id, distance = result
+            metadata = None
+        
         if not node_id:
+            error_msg = f'No nodes within 1km. Nearest is {distance:.1f}m away.'
+            if metadata:
+                error_msg = metadata.get('selection_reason', error_msg)
+            
             return jsonify({
                 'success': False,
-                'error': f'No nodes within 1km. Nearest is {distance:.1f}m away.'
+                'error': error_msg
             })
         
         # Get node details using config
         nodes_df = pd.read_csv(Config.NODES_CSV)
         node_data = nodes_df[nodes_df['node_id'] == node_id].iloc[0]
         
-        return jsonify({
+        response = {
             'success': True,
             'node_id': int(node_id),
             'lat': float(node_data['latitude']),
             'lng': float(node_data['longitude']),
             'distance_m': round(distance, 1),
-            'clicked_lat': data['lat'],
-            'clicked_lng': data['lng']
-        })
+            'clicked_lat': lat,
+            'clicked_lng': lng
+        }
+        
+        # Add metadata if available (one-way aware selection)
+        if metadata:
+            response['metadata'] = {
+                'accessible': metadata['accessible'],
+                'outgoing_edges': metadata['outgoing_count'],
+                'incoming_edges': metadata['incoming_count'],
+                'selection_reason': metadata['selection_reason'],
+                'role': metadata['role']
+            }
+            
+            # Add warning if not accessible
+            if not metadata['accessible']:
+                response['warning'] = metadata['selection_reason']
+        
+        return jsonify(response)
         
     except Exception as e:
         return jsonify({

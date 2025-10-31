@@ -811,21 +811,36 @@
         window.startConnectorLine = null;
       }
       
-      // Find nearest road segment
-      const response = await fetch('/find_nearest_road_segment', {
+      // Find nearest accessible NODE (one-way aware for start point)
+      const nodeResponse = await fetch('/find_nearest_node', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lat, lng, max_distance: 500 })
+        body: JSON.stringify({ lat, lng, is_start_point: true })
       });
       
-      const snapData = await response.json();
+      const nodeData = await nodeResponse.json();
       
-      if (!snapData.success) {
-        showUpdateToast(snapData.error || 'Location too far from road', 'warning');
+      if (!nodeData.success) {
+        showUpdateToast(nodeData.error || 'No accessible start node found', 'warning');
         return;
       }
       
-      // Create semi-transparent marker at clicked location
+      // Log accessibility info
+      if (nodeData.metadata) {
+        console.log('✅ Start node selection:', {
+          node_id: nodeData.node_id,
+          outgoing_edges: nodeData.metadata.outgoing_edges,
+          accessible: nodeData.metadata.accessible,
+          reason: nodeData.metadata.selection_reason
+        });
+        
+        // Show warning if node isn't optimal
+        if (nodeData.warning) {
+          showUpdateToast(nodeData.warning, 'warning');
+        }
+      }
+      
+      // Create semi-transparent marker at clicked location (establishment)
       const greenIcon = L.icon({
         iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
         shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
@@ -842,7 +857,7 @@
         opacity: 0.6
       }).addTo(map);
       
-      // Create solid snap marker at road entry point
+      // Create solid snap marker at accessible road node
       const snapIcon = L.divIcon({
         className: 'snap-marker',
         html: '<div style="background: #4CAF50; border: 3px solid white; border-radius: 50%; width: 16px; height: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.4);"></div>',
@@ -851,15 +866,19 @@
       });
       
       window.startSnapMarker = L.marker(
-        [snapData.projection_point.lat, snapData.projection_point.lng],
-        { icon: snapIcon, title: "Road Entry Point" }
+        [nodeData.lat, nodeData.lng],
+        { 
+          icon: snapIcon, 
+          title: `Road Entry Point (Node ${nodeData.node_id})${nodeData.metadata ? ` - ${nodeData.metadata.outgoing_edges} outgoing edges` : ''}` 
+        }
       ).addTo(map);
       
-      // Draw connector line if snap distance > 5m
-      if (snapData.distance_m > 5) {
+      // Draw connector line if distance > 5m
+      const distance = nodeData.distance_m;
+      if (distance > 5) {
         window.startConnectorLine = L.polyline([
           [lat, lng],
-          [snapData.projection_point.lat, snapData.projection_point.lng]
+          [nodeData.lat, nodeData.lng]
         ], {
           color: '#808080',
           weight: 2,
@@ -868,18 +887,21 @@
         }).addTo(map);
         
         window.startConnectorLine.bindPopup(
-          `Walking distance: ${snapData.distance_m.toFixed(0)}m`
+          `Walking distance: ${distance.toFixed(0)}m<br>` +
+          `Node: ${nodeData.node_id}` +
+          (nodeData.metadata ? `<br>Outgoing roads: ${nodeData.metadata.outgoing_edges}` : '')
         );
       }
       
       // Store both original and snapped locations
       startLocation = { 
-        lat: snapData.projection_point.lat, 
-        lng: snapData.projection_point.lng,
+        lat: nodeData.lat, 
+        lng: nodeData.lng,
+        node_id: nodeData.node_id,
         original_lat: lat,
         original_lng: lng,
-        snap_distance: snapData.distance_m,
-        road_name: snapData.road_name
+        snap_distance: distance,
+        metadata: nodeData.metadata
       };
       
       // Get establishment name
@@ -887,14 +909,14 @@
         .then(response => response.json())
         .then(data => {
           const locationText = data.display_name || `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-          const displayText = snapData.distance_m > 5 
-            ? `${locationText.substring(0, 40)}... → ${snapData.road_name} (${snapData.distance_m.toFixed(0)}m)`
+          const displayText = distance > 5 
+            ? `${locationText.substring(0, 40)}... → Road Node (${distance.toFixed(0)}m)`
             : locationText;
           document.getElementById('start-location-text').textContent = displayText;
         })
         .catch(() => {
-          const displayText = snapData.distance_m > 5
-            ? `Location → ${snapData.road_name} (${snapData.distance_m.toFixed(0)}m)`
+          const displayText = distance > 5
+            ? `Location → Road Node ${nodeData.node_id} (${distance.toFixed(0)}m)`
             : `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
           document.getElementById('start-location-text').textContent = displayText;
         });
@@ -902,10 +924,10 @@
       document.getElementById('start-location-text').classList.remove('text-slate-500');
       document.getElementById('start-location-text').classList.add('text-slate-900', 'font-semibold');
       
-      const message = snapData.distance_m > 5 
-        ? `Start location set (${snapData.distance_m.toFixed(0)}m from road)`
+      const message = distance > 5 
+        ? `Start location set (${distance.toFixed(0)}m from road)`
         : 'Start location set';
-      showUpdateToast(message, snapData.validation.warning_level === 'warning' ? 'warning' : 'success');
+      showUpdateToast(message, 'success');
       
     } catch (error) {
       console.error('Error pinning start location:', error);
@@ -916,7 +938,7 @@
     map.getContainer().style.cursor = 'default';
   }
   
-  // Helper function to handle destination location pin with snap-to-road
+  // Helper function to handle destination location pin with one-way awareness
   async function handleDestLocationPin(lat, lng) {
     try {
       // Clear existing markers and connectors
@@ -930,21 +952,36 @@
         window.destConnectorLine = null;
       }
       
-      // Find nearest road segment
-      const response = await fetch('/find_nearest_road_segment', {
+      // Find nearest accessible NODE (one-way aware for destination point)
+      const nodeResponse = await fetch('/find_nearest_node', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lat, lng, max_distance: 500 })
+        body: JSON.stringify({ lat, lng, is_start_point: false })
       });
       
-      const snapData = await response.json();
+      const nodeData = await nodeResponse.json();
       
-      if (!snapData.success) {
-        showUpdateToast(snapData.error || 'Location too far from road', 'warning');
+      if (!nodeData.success) {
+        showUpdateToast(nodeData.error || 'No accessible destination node found', 'warning');
         return;
       }
       
-      // Create semi-transparent marker at clicked location
+      // Log accessibility info
+      if (nodeData.metadata) {
+        console.log('✅ Destination node selection:', {
+          node_id: nodeData.node_id,
+          incoming_edges: nodeData.metadata.incoming_edges,
+          accessible: nodeData.metadata.accessible,
+          reason: nodeData.metadata.selection_reason
+        });
+        
+        // Show warning if node isn't optimal
+        if (nodeData.warning) {
+          showUpdateToast(nodeData.warning, 'warning');
+        }
+      }
+      
+      // Create semi-transparent marker at clicked location (establishment)
       const redIcon = L.icon({
         iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
         shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
@@ -961,7 +998,7 @@
         opacity: 0.6
       }).addTo(map);
       
-      // Create solid snap marker at road exit point
+      // Create solid snap marker at accessible road node
       const snapIcon = L.divIcon({
         className: 'snap-marker',
         html: '<div style="background: #F44336; border: 3px solid white; border-radius: 50%; width: 16px; height: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.4);"></div>',
@@ -970,14 +1007,18 @@
       });
       
       window.destSnapMarker = L.marker(
-        [snapData.projection_point.lat, snapData.projection_point.lng],
-        { icon: snapIcon, title: "Road Exit Point" }
+        [nodeData.lat, nodeData.lng],
+        { 
+          icon: snapIcon, 
+          title: `Road Exit Point (Node ${nodeData.node_id})${nodeData.metadata ? ` - ${nodeData.metadata.incoming_edges} incoming edges` : ''}` 
+        }
       ).addTo(map);
       
-      // Draw connector line if snap distance > 5m
-      if (snapData.distance_m > 5) {
+      // Draw connector line if distance > 5m
+      const distance = nodeData.distance_m;
+      if (distance > 5) {
         window.destConnectorLine = L.polyline([
-          [snapData.projection_point.lat, snapData.projection_point.lng],
+          [nodeData.lat, nodeData.lng],
           [lat, lng]
         ], {
           color: '#808080',
@@ -987,18 +1028,21 @@
         }).addTo(map);
         
         window.destConnectorLine.bindPopup(
-          `Walking distance: ${snapData.distance_m.toFixed(0)}m`
+          `Walking distance: ${distance.toFixed(0)}m<br>` +
+          `Node: ${nodeData.node_id}` +
+          (nodeData.metadata ? `<br>Incoming roads: ${nodeData.metadata.incoming_edges}` : '')
         );
       }
       
       // Store both original and snapped locations
       destLocation = { 
-        lat: snapData.projection_point.lat, 
-        lng: snapData.projection_point.lng,
+        lat: nodeData.lat, 
+        lng: nodeData.lng,
+        node_id: nodeData.node_id,
         original_lat: lat,
         original_lng: lng,
-        snap_distance: snapData.distance_m,
-        road_name: snapData.road_name
+        snap_distance: distance,
+        metadata: nodeData.metadata
       };
       
       // Get establishment name
@@ -1006,14 +1050,14 @@
         .then(response => response.json())
         .then(data => {
           const locationText = data.display_name || `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-          const displayText = snapData.distance_m > 5 
-            ? `${locationText.substring(0, 40)}... → ${snapData.road_name} (${snapData.distance_m.toFixed(0)}m)`
+          const displayText = distance > 5 
+            ? `${locationText.substring(0, 40)}... → Road Node (${distance.toFixed(0)}m)`
             : locationText;
           document.getElementById('dest-location-text').textContent = displayText;
         })
         .catch(() => {
-          const displayText = snapData.distance_m > 5
-            ? `Location → ${snapData.road_name} (${snapData.distance_m.toFixed(0)}m)`
+          const displayText = distance > 5
+            ? `Location → Road Node ${nodeData.node_id} (${distance.toFixed(0)}m)`
             : `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
           document.getElementById('dest-location-text').textContent = displayText;
         });
@@ -1021,10 +1065,10 @@
       document.getElementById('dest-location-text').classList.remove('text-slate-500');
       document.getElementById('dest-location-text').classList.add('text-slate-900', 'font-semibold');
       
-      const message = snapData.distance_m > 5 
-        ? `Destination set (${snapData.distance_m.toFixed(0)}m from road)`
+      const message = distance > 5 
+        ? `Destination set (${distance.toFixed(0)}m from road)`
         : 'Destination set';
-      showUpdateToast(message, snapData.validation.warning_level === 'warning' ? 'warning' : 'success');
+      showUpdateToast(message, 'success');
       
     } catch (error) {
       console.error('Error pinning destination:', error);

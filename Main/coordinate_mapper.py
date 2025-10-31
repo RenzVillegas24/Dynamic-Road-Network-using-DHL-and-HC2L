@@ -2,6 +2,7 @@
 import pandas as pd
 import numpy as np
 from math import radians, cos, sin, asin, sqrt
+import os
 
 def haversine(lon1, lat1, lon2, lat2):
     """Calculate distance between two points on Earth"""
@@ -19,8 +20,47 @@ class NodeMapper:
         self.nodes_df = pd.read_csv(nodes_csv_path)
         self.nodes_csv_path = nodes_csv_path
         
-    def find_nearest_node(self, lat, lng, max_distance_m=500):
-        """Find nearest graph node to given coordinates"""
+        # Initialize accessible node finder for one-way aware selection
+        edges_csv_path = nodes_csv_path.replace('nodes.csv', 'edges.csv')
+        if os.path.exists(edges_csv_path):
+            try:
+                from accessible_node_finder import AccessibleNodeFinder
+                self.accessible_finder = AccessibleNodeFinder(nodes_csv_path, edges_csv_path)
+                print("✅ One-way street aware node finding enabled")
+            except Exception as e:
+                print(f"⚠️  Could not initialize one-way aware finder: {e}")
+                self.accessible_finder = None
+        else:
+            print(f"⚠️  Edges file not found, one-way awareness disabled")
+            self.accessible_finder = None
+        
+    def find_nearest_node(self, lat, lng, max_distance_m=500, is_start_point=None):
+        """
+        Find nearest graph node to given coordinates
+        
+        Args:
+            lat, lng: GPS coordinates
+            max_distance_m: Maximum acceptable distance in meters
+            is_start_point: If True, find accessible start node. If False, find accessible destination.
+                           If None, use legacy simple distance-based selection (no one-way awareness)
+        
+        Returns:
+            tuple: (node_id, distance) or (node_id, distance, metadata)
+        """
+        # Use one-way aware selection if enabled and role specified
+        if self.accessible_finder is not None and is_start_point is not None:
+            node_id, distance, metadata = self.accessible_finder.find_nearest_accessible_node(
+                lat, lng, 
+                is_start_point=is_start_point, 
+                max_distance_m=max_distance_m
+            )
+            
+            if not metadata['accessible']:
+                print(f"⚠️  {metadata['selection_reason']}")
+            
+            return node_id, distance, metadata
+        
+        # Fallback to legacy simple distance-based selection
         distances = []
         for _, node in self.nodes_df.iterrows():
             dist = haversine(lng, lat, node['longitude'], node['latitude'])
