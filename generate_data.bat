@@ -1,12 +1,15 @@
 @echo off
-REM Generate Graph Indexes Script (Windows)
-REM This script generates the binary graph and index files needed by the routing APIs
+REM Generate Graph Data Script (Windows)
+REM This script generates all necessary data files including:
+REM - CSV files from OSM data
+REM - OSM geometry cache for smooth road curves
+REM - Binary graph and index files for routing APIs
 REM Note: Run build_all.bat first to compile the index executables
 
 setlocal enabledelayedexpansion
 
 echo ========================================================================
-echo   Generating Graph Indexes (Windows)
+echo   Generating Graph Data ^& Indexes (Windows)
 echo ========================================================================
 echo.
 
@@ -15,21 +18,64 @@ set "SCRIPT_DIR=%~dp0"
 cd /d "%SCRIPT_DIR%"
 
 REM Directories (absolute paths)
-set "BUILD_DIR=%SCRIPT_DIR%Main\build"
-set "DATA_DIR=%SCRIPT_DIR%Main\data"
+set "MAIN_DIR=%SCRIPT_DIR%Main"
+set "BUILD_DIR=%MAIN_DIR%\build"
+set "DATA_DIR=%MAIN_DIR%\data"
 set "RAW_DIR=%DATA_DIR%\raw"
 set "PROCESSED_DIR=%DATA_DIR%\processed"
 
-REM Check if data files exist
+REM Check for Python
+set "PYTHON_CMD=python"
+where python >nul 2>nul
+if errorlevel 1 (
+    where python3 >nul 2>nul
+    if errorlevel 1 (
+        echo ERROR: Python not found in PATH
+        pause
+        exit /b 1
+    )
+    set "PYTHON_CMD=python3"
+)
+
+echo [OK] Using Python: %PYTHON_CMD%
+echo.
+
+REM Step 0: Generate OSM datasets and geometry cache
+echo Step 0: Generating OSM datasets and geometry cache...
+echo.
+
+cd /d "%MAIN_DIR%"
+
+echo   Running request_new_datasets.py to generate:
+echo     - CSV files (nodes, edges, mapping)
+echo     - Graph files (.gr format)
+echo     - OSM geometry cache for smooth curves
+echo.
+
+%PYTHON_CMD% request_new_datasets.py
+if errorlevel 1 (
+    echo ERROR: Failed to generate datasets
+    echo   Please check the error messages above and ensure:
+    echo     - Python dependencies are installed (osmnx, pandas, etc.)
+    echo     - Internet connection is available for OSM data download
+    pause
+    exit /b 1
+)
+
+echo [OK] OSM datasets and geometry cache generated successfully
+echo.
+
+REM Return to script directory
+cd /d "%SCRIPT_DIR%"
+
+REM Check if data files were created
 if not exist "%RAW_DIR%\quezon_city_nodes.csv" (
-    echo ERROR: CSV data files not found
-    echo   Please run 'python request_new_datasets.py' first to generate data files
+    echo ERROR: CSV data files not found after generation
     pause
     exit /b 1
 )
 if not exist "%RAW_DIR%\quezon_city_edges.csv" (
-    echo ERROR: CSV data files not found
-    echo   Please run 'python request_new_datasets.py' first to generate data files
+    echo ERROR: CSV data files not found after generation
     pause
     exit /b 1
 )
@@ -39,12 +85,21 @@ echo [OK] CSV data files found
 REM Check if .gr files exist
 if not exist "%PROCESSED_DIR%\qc_from_csv.gr" (
     echo ERROR: Graph file not found: %PROCESSED_DIR%\qc_from_csv.gr
-    echo   Please run 'python request_new_datasets.py' first to generate .gr files
     pause
     exit /b 1
 )
 
 echo [OK] Graph files found
+
+REM Check if OSM geometry cache was created
+if not exist "%DATA_DIR%\osm_geometry.graphml" (
+    echo WARNING: OSM geometry cache not found at: %DATA_DIR%\osm_geometry.graphml
+    echo          Smooth road curves may not be available
+) else (
+    for %%A in ("%DATA_DIR%\osm_geometry.graphml") do set "CACHE_SIZE=%%~zA"
+    echo [OK] OSM geometry cache created: !CACHE_SIZE! bytes
+)
+
 echo.
 
 REM Check if index executables exist
@@ -155,14 +210,20 @@ echo.
 echo ========================================================================
 
 if "%ALL_OK%"=="true" (
-    echo [OK] Index generation completed successfully!
+    echo [OK] Data generation completed successfully!
+    echo.
+    echo Generated files:
+    echo   * OSM geometry cache (for smooth curves^)
+    echo   * CSV datasets (nodes, edges, mapping^)
+    echo   * Binary graph files
+    echo   * DHL and HC2L indexes
     echo.
     echo You can now run the routing APIs:
     echo   run_server.bat
 ) else (
-    echo WARNING: Index generation completed with warnings
+    echo WARNING: Data generation completed with warnings
     echo.
-    echo Note: Some index files may not have been created.
+    echo Note: Some files may not have been created.
     echo This might be due to graph format compatibility.
     echo You may need to adjust the graph conversion process.
 )

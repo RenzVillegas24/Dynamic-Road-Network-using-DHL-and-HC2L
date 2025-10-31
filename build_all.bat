@@ -139,7 +139,7 @@ echo   * HC2L: %BUILD_DIR%\hc2l\index.exe
 echo.
 echo Next steps:
 echo   1. Generate data: cd Main ^&^& python request_new_datasets.py
-echo   2. Build indexes: generate_indexes.bat
+echo   2. Build indexes: generate_data.bat
 echo   3. Run server: run_server.bat
 echo ========================================================================
 echo.

@@ -1,7 +1,10 @@
 #!/bin/bash
 
-# Generate Graph Indexes Script
-# This script generates the binary graph and index files needed by the routing APIs
+# Generate Graph Data Script
+# This script generates all necessary data files including:
+# - CSV files from OSM data
+# - OSM geometry cache for smooth road curves
+# - Binary graph and index files for routing APIs
 # Note: Run build_all.sh first to compile the index executables
 
 set -e  # Exit on error
@@ -14,7 +17,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 echo -e "${BLUE}========================================${NC}"
-echo -e "${BLUE}  Generating Graph Indexes${NC}"
+echo -e "${BLUE}  Generating Graph Data & Indexes${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 
@@ -23,15 +26,54 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 # Directories (absolute paths)
-BUILD_DIR="$SCRIPT_DIR/Main/build"
-DATA_DIR="$SCRIPT_DIR/Main/data"
+MAIN_DIR="$SCRIPT_DIR/Main"
+BUILD_DIR="$MAIN_DIR/build"
+DATA_DIR="$MAIN_DIR/data"
 RAW_DIR="$DATA_DIR/raw"
 PROCESSED_DIR="$DATA_DIR/processed"
 
-# Check if data files exist
+# Python executable
+PYTHON_CMD="python"
+if ! command -v python &> /dev/null; then
+    if command -v python3 &> /dev/null; then
+        PYTHON_CMD="python3"
+    else
+        echo -e "${RED}✗ Error: Python not found in PATH${NC}"
+        exit 1
+    fi
+fi
+
+echo -e "${GREEN}✓ Using Python: $PYTHON_CMD${NC}"
+
+# Step 0: Generate OSM datasets and geometry cache
+echo -e "${BLUE}Step 0: Generating OSM datasets and geometry cache...${NC}"
+echo ""
+
+cd "$MAIN_DIR"
+
+echo -e "${YELLOW}  Running request_new_datasets.py to generate:${NC}"
+echo -e "${YELLOW}    - CSV files (nodes, edges, mapping)${NC}"
+echo -e "${YELLOW}    - Graph files (.gr format)${NC}"
+echo -e "${YELLOW}    - OSM geometry cache for smooth curves${NC}"
+echo ""
+
+if ! $PYTHON_CMD request_new_datasets.py; then
+    echo -e "${RED}✗ Error: Failed to generate datasets${NC}"
+    echo -e "${YELLOW}  Please check the error messages above and ensure:${NC}"
+    echo -e "${YELLOW}    - Python dependencies are installed (osmnx, pandas, etc.)${NC}"
+    echo -e "${YELLOW}    - Internet connection is available for OSM data download${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}✓ OSM datasets and geometry cache generated successfully${NC}"
+echo ""
+
+# Return to script directory
+cd "$SCRIPT_DIR"
+
+# Check if data files were created
 if [ ! -f "$RAW_DIR/quezon_city_nodes.csv" ] || [ ! -f "$RAW_DIR/quezon_city_edges.csv" ]; then
-    echo -e "${RED}✗ Error: CSV data files not found${NC}"
-    echo -e "${YELLOW}  Please run 'python request_new_datasets.py' first to generate data files${NC}"
+    echo -e "${RED}✗ Error: CSV data files not found after generation${NC}"
     exit 1
 fi
 
@@ -40,11 +82,20 @@ echo -e "${GREEN}✓ CSV data files found${NC}"
 # Check if .gr files exist
 if [ ! -f "$PROCESSED_DIR/qc_from_csv.gr" ]; then
     echo -e "${RED}✗ Error: Graph file not found: $PROCESSED_DIR/qc_from_csv.gr${NC}"
-    echo -e "${YELLOW}  Please run 'python request_new_datasets.py' first to generate .gr files${NC}"
     exit 1
 fi
 
 echo -e "${GREEN}✓ Graph files found${NC}"
+
+# Check if OSM geometry cache was created
+if [ ! -f "$DATA_DIR/osm_geometry.graphml" ]; then
+    echo -e "${YELLOW}  ⚠ OSM geometry cache not found at: $DATA_DIR/osm_geometry.graphml${NC}"
+    echo -e "${YELLOW}    Smooth road curves may not be available${NC}"
+else
+    CACHE_SIZE=$(du -h "$DATA_DIR/osm_geometry.graphml" | cut -f1)
+    echo -e "${GREEN}✓ OSM geometry cache created: $CACHE_SIZE${NC}"
+fi
+
 echo ""
 
 # Check if index executables exist
@@ -141,14 +192,20 @@ echo ""
 echo -e "${BLUE}========================================${NC}"
 
 if [ "$ALL_OK" = true ]; then
-    echo -e "${GREEN}✓ Index generation completed successfully!${NC}"
+    echo -e "${GREEN}✓ Data generation completed successfully!${NC}"
+    echo ""
+    echo -e "${GREEN}Generated files:${NC}"
+    echo -e "${GREEN}  • OSM geometry cache (for smooth curves)${NC}"
+    echo -e "${GREEN}  • CSV datasets (nodes, edges, mapping)${NC}"
+    echo -e "${GREEN}  • Binary graph files${NC}"
+    echo -e "${GREEN}  • DHL and HC2L indexes${NC}"
     echo ""
     echo -e "${GREEN}You can now run the routing APIs:${NC}"
     echo -e "  ${YELLOW}./run_server.sh${NC}"
 else
-    echo -e "${YELLOW}⚠ Index generation completed with warnings${NC}"
+    echo -e "${YELLOW}⚠ Data generation completed with warnings${NC}"
     echo ""
-    echo -e "${YELLOW}Note: Some index files may not have been created.${NC}"
+    echo -e "${YELLOW}Note: Some files may not have been created.${NC}"
     echo -e "${YELLOW}This might be due to graph format compatibility.${NC}"
     echo -e "${YELLOW}You may need to adjust the graph conversion process.${NC}"
 fi

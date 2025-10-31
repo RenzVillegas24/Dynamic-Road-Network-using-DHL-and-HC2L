@@ -352,6 +352,22 @@ def generate_all_datasets():
     # Step 1: Generate base OSM datasets
     generate_osm_graph_datasets()
 
+    # Step 1.5: Generate OSM geometry cache for smooth road curves
+    print("\n🗺️  Generating OSM geometry cache for smooth road curves...")
+    try:
+        from osm_geometry_loader import OSMGeometryLoader
+        geometry_cache_path = str(Config.OSM_GEOMETRY_CACHE)
+        print(f"   Cache location: {geometry_cache_path}")
+        
+        # Initialize loader - this will download and cache the geometry data
+        loader = OSMGeometryLoader(cache_file=geometry_cache_path)
+        print(f"✅ OSM geometry cache generated successfully")
+        print(f"   Location: {geometry_cache_path}")
+        print(f"   Edges with geometry: {len(loader.edge_geometries)}")
+    except Exception as e:
+        print(f"⚠️  Warning: Could not generate OSM geometry cache: {e}")
+        print("   Continuing without geometry cache...")
+
     # Step 2: Create GR file
     base_edges_path = cfg['BASE_GRAPH_CSV']
     gr_output_path = os.path.join(cfg['PROCESSED_DIR'], 'qc_from_csv.gr')
@@ -412,6 +428,7 @@ def generate_all_datasets():
     print(f"   - Edges CSV:      {cfg['OUTPUT_FOLDER']}/{cfg['EDGES_FILENAME']}")
     print(f"   - Nodes CSV:      {cfg['OUTPUT_FOLDER']}/{cfg['NODES_FILENAME']}")
     print(f"   - Mapping CSV:    {cfg['OUTPUT_FOLDER']}/{cfg['MAPPING_FILENAME']}")
+    print(f"   - OSM Geometry Cache: {Config.OSM_GEOMETRY_CACHE}")
     print(f"   - Base Graph (.gr): {os.path.join(cfg['PROCESSED_DIR'], 'qc_from_csv.gr')}")
 
     # List generated scenario files

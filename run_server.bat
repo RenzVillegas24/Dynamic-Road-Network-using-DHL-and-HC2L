@@ -122,7 +122,7 @@ if "%choice%"=="2" (
     echo   Building Graph Indexes
     echo ========================================================================
     echo.
-    call "%SCRIPT_DIR%generate_indexes.bat"
+    call "%SCRIPT_DIR%generate_data.bat"
     if errorlevel 1 (
         echo.
         echo   ERROR: Index building failed
@@ -221,7 +221,7 @@ echo   Step 2: Building Graph Indexes
 echo ========================================================================
 echo.
 
-call "%SCRIPT_DIR%generate_indexes.bat"
+call "%SCRIPT_DIR%generate_data.bat"
 
 if errorlevel 1 (
     echo.

@@ -87,7 +87,7 @@ function generate_data
     echo "════════════════════════════════════════════════════════════════"
     echo ""
     
-    ./generate_indexes.fish
+    ./generate_data.fish
     
     if test $status -ne 0
         echo ""
@@ -153,7 +153,7 @@ if test "$DATA_EXISTS" = false; or test "$INDEX_EXISTS" = false
                 echo "  Building Graph Indexes"
                 echo "════════════════════════════════════════════════════════════════"
                 echo ""
-                ./generate_indexes.fish
+                ./generate_data.fish
                 if test $status -ne 0
                     echo ""
                     echo "  ✗ Error: Index building failed"

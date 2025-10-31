@@ -336,7 +336,7 @@ if %errorlevel% neq 0 (
 
 cd /d "%PROJECT_ROOT%"
 echo [Step 3/3] Building indexes...
-call generate_indexes.bat
+call generate_data.bat
 if %errorlevel% neq 0 (
     echo [ERROR] Index building failed
     exit /b 1

@@ -348,8 +348,8 @@ function generate_data
 
     cd "$PROJECT_ROOT"
     echo "[Step 3/3] Building indexes..."
-    chmod +x generate_indexes.fish
-    ./generate_indexes.fish
+    chmod +x generate_data.fish
+    ./generate_data.fish
     if test $status -ne 0
         printf "%b[ERROR]%b Index building failed\n" $RED $NC
         return 1

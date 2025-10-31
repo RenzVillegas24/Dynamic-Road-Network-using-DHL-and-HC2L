@@ -1,6 +1,9 @@
 #!/usr/bin/env fish
-# Generate Graph Indexes Script (Fish Shell)
-# This script generates the binary graph and index files needed by the routing APIs
+# Generate Graph Data Script (Fish Shell)
+# This script generates all necessary data files including:
+# - CSV files from OSM data
+# - OSM geometry cache for smooth road curves
+# - Binary graph and index files for routing APIs
 # Note: Run build_all.sh first to compile the index executables
 
 # Helper functions for colored output
@@ -21,7 +24,7 @@ function print_step
 end
 
 print_step "========================================"
-print_step "  Generating Graph Indexes"
+print_step "  Generating Graph Data & Indexes"
 print_step "========================================"
 echo ""
 
@@ -30,15 +33,59 @@ set SCRIPT_DIR (dirname (status --current-filename))
 cd $SCRIPT_DIR
 
 # Directories (absolute paths)
-set BUILD_DIR "$SCRIPT_DIR/Main/build"
-set DATA_DIR "$SCRIPT_DIR/Main/data"
+set MAIN_DIR "$SCRIPT_DIR/Main"
+set BUILD_DIR "$MAIN_DIR/build"
+set DATA_DIR "$MAIN_DIR/data"
 set RAW_DIR "$DATA_DIR/raw"
 set PROCESSED_DIR "$DATA_DIR/processed"
 
-# Check if data files exist
+# Python executable (use configured environment)
+set PYTHON_CMD python
+
+# Check if Python is available
+if not type -q python
+    if type -q python3
+        set PYTHON_CMD python3
+    else
+        print_error "✗" "Error: Python not found in PATH"
+        exit 1
+    end
+end
+
+print_ok "✓" "Using Python: $PYTHON_CMD"
+
+# Step 0: Generate OSM datasets and geometry cache
+print_step "Step 0: Generating OSM datasets and geometry cache..."
+echo ""
+
+cd "$MAIN_DIR"
+
+print_warning " " "Running request_new_datasets.py to generate:"
+print_warning " " "  - CSV files (nodes, edges, mapping)"
+print_warning " " "  - Graph files (.gr format)"
+print_warning " " "  - OSM geometry cache for smooth curves"
+echo ""
+
+$PYTHON_CMD request_new_datasets.py
+set REQUEST_STATUS $status
+
+if test $REQUEST_STATUS -ne 0
+    print_error "✗" "Error: Failed to generate datasets"
+    print_warning " " "Please check the error messages above and ensure:"
+    print_warning " " "  - Python dependencies are installed (osmnx, pandas, etc.)"
+    print_warning " " "  - Internet connection is available for OSM data download"
+    exit 1
+end
+
+print_ok "✓" "OSM datasets and geometry cache generated successfully"
+echo ""
+
+# Return to script directory
+cd "$SCRIPT_DIR"
+
+# Check if data files were created
 if not test -f "$RAW_DIR/quezon_city_nodes.csv"; or not test -f "$RAW_DIR/quezon_city_edges.csv"
-    print_error "✗" "Error: CSV data files not found"
-    print_warning " " "Please run 'python request_new_datasets.py' first to generate data files"
+    print_error "✗" "Error: CSV data files not found after generation"
     exit 1
 end
 
@@ -47,11 +94,20 @@ print_ok "✓" "CSV data files found"
 # Check if .gr files exist
 if not test -f "$PROCESSED_DIR/qc_from_csv.gr"
     print_error "✗" "Error: Graph file not found: $PROCESSED_DIR/qc_from_csv.gr"
-    print_warning " " "Please run 'python request_new_datasets.py' first to generate .gr files"
     exit 1
 end
 
 print_ok "✓" "Graph files found"
+
+# Check if OSM geometry cache was created
+if not test -f "$DATA_DIR/osm_geometry.graphml"
+    print_warning " " "⚠ OSM geometry cache not found at: $DATA_DIR/osm_geometry.graphml"
+    print_warning " " "  Smooth road curves may not be available"
+else
+    set CACHE_SIZE (du -h "$DATA_DIR/osm_geometry.graphml" | cut -f1)
+    print_ok "✓" "OSM geometry cache created: $CACHE_SIZE"
+end
+
 echo ""
 
 # Check if index executables exist
@@ -135,25 +191,31 @@ for file in $FILES_TO_CHECK
         set SIZE (du -h "$file" | cut -f1)
         print_ok "✓" "$file ($SIZE)"
     else
-        printf "$RED  ✗ Missing or empty: $file$NC"
+        print_error "✗" "Missing or empty: $file"
         set ALL_OK false
     end
 end
 
 echo ""
-printf "$BLUE========================================$NC"
+print_step "========================================"
 
 if test "$ALL_OK" = true
-    print_ok "✓" "Index generation completed successfully!"
+    print_ok "✓" "Data generation completed successfully!"
     echo ""
-    printf "$GREEN You can now run the routing APIs:$NC"
-    printf "  $YELLOW./run_server.fish$NC"
+    print_ok " " "Generated files:"
+    print_ok " " "  • OSM geometry cache (for smooth curves)"
+    print_ok " " "  • CSV datasets (nodes, edges, mapping)"
+    print_ok " " "  • Binary graph files"
+    print_ok " " "  • DHL and HC2L indexes"
+    echo ""
+    print_ok " " "You can now run the routing APIs:"
+    print_warning " " "  ./run_server.fish"
 else
-    printf "$YELLOW⚠ Index generation completed with warnings$NC"
+    print_warning "⚠" "Data generation completed with warnings"
     echo ""
-    printf "$YELLOW Note: Some index files may not have been created.$NC"
-    printf "$YELLOW This might be due to graph format compatibility.$NC"
-    printf "$YELLOW You may need to adjust the graph conversion process.$NC"
+    print_warning " " "Note: Some files may not have been created."
+    print_warning " " "This might be due to graph format compatibility."
+    print_warning " " "You may need to adjust the graph conversion process."
 end
 
-printf "$BLUE========================================$NC"
+print_step "========================================"

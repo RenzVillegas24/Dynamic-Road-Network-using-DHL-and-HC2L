@@ -27,7 +27,15 @@ class OSMGeometryLoader:
         Args:
             cache_file: Path to cache file for storing downloaded OSM data
         """
-        self.cache_file = cache_file or "cache/quezon_city_drive.graphml"
+        # Import here to avoid circular dependency
+        if cache_file is None:
+            try:
+                from config import Config
+                cache_file = str(Config.OSM_GEOMETRY_CACHE)
+            except ImportError:
+                cache_file = "data/osm_geometry.graphml"
+        
+        self.cache_file = cache_file
         self.graph = None
         self.edge_geometries: Dict[Tuple[int, int], List[Tuple[float, float]]] = {}
         

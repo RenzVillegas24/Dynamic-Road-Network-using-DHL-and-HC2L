@@ -21,7 +21,7 @@ function activate_env
     echo ""
     echo "You can now use:"
     echo "  ./run_server.fish     - Start the Flask server"
-    echo "  ./generate_indexes.sh - Generate graph indexes"
+    echo "  ./generate_data.sh - Generate graph data and indexes"
     echo "  ./build_all.sh        - Build all executables"
     echo ""
 end
