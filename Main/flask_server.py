@@ -311,6 +311,132 @@ def find_nearest_road_segment():
         })
 
 
+@app.route('/find_nearest_osm_road', methods=['POST'])
+def find_nearest_osm_road():
+    """
+    Find nearest OSM road using actual road geometries (road-aware snapping).
+    
+    This endpoint uses the OSM GraphML data to snap points to real road
+    geometries rather than just intersection nodes, providing more accurate
+    and road-aware location selection.
+    
+    The system will automatically expand the search radius up to 1000m to
+    always find the nearest road (never falls back to node-based selection).
+    """
+    data = request.json
+    
+    try:
+        lat = float(data['lat'])
+        lng = float(data['lng'])
+        max_distance = float(data.get('max_distance', 25.0))  # Default 25m initial search
+        consider_hierarchy = data.get('consider_hierarchy', True)
+        
+        # Use mapper's OSM snapping function
+        # Note: fallback_to_node parameter is deprecated and ignored
+        result = mapper.snap_to_osm_road(
+            lat, lng, 
+            max_distance_m=max_distance,
+            consider_hierarchy=consider_hierarchy
+        )
+        
+        if result is None:
+            return jsonify({
+                'success': False,
+                'error': f'Critical error: Could not find any road even with expanded search',
+                'original_point': {'lat': lat, 'lng': lng}
+            })
+        
+        # Prepare metadata without geometry (not JSON serializable)
+        metadata = result.get('metadata', {})
+        if 'geometry' in metadata:
+            del metadata['geometry']
+        
+        # Return comprehensive result (excluding non-serializable fields)
+        return jsonify({
+            'success': True,
+            'method': result['method'],
+            'original_point': result['original_point'],
+            'snapped_point': result['snapped_point'],
+            'distance_m': round(result['distance_m'], 1),
+            'road_name': result['road_name'],
+            'highway_type': result['highway_type'],
+            'oneway': result['oneway'],
+            'osm_nodes': result['osm_nodes'],
+            'routing_nodes': result['routing_nodes'],
+            'edge_length_m': round(result['edge_length_m'], 1),
+            'snap_position': round(result['snap_position'], 3),
+            'validation': result['validation'],
+            'metadata': metadata
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': f"Error finding nearest OSM road: {str(e)}",
+            'original_point': {'lat': lat, 'lng': lng}
+        })
+
+
+@app.route('/get_osm_graph_edges', methods=['GET'])
+def get_osm_graph_edges():
+    """Get all OSM road edges for map visualization"""
+    try:
+        # Check if OSM road snapper is available
+        if not hasattr(mapper, 'osm_snapper') or mapper.osm_snapper is None:
+            return jsonify({
+                'success': False,
+                'error': 'OSM road snapper not initialized'
+            })
+        
+        snapper = mapper.osm_snapper
+        edges_data = []
+        
+        # Get limit from query params (default 500 for performance)
+        limit = request.args.get('limit', type=int, default=500)
+        max_limit = 2000  # Safety cap
+        limit = min(limit, max_limit)
+        
+        # Extract edge geometries with metadata
+        for metadata in snapper.edge_metadata[:limit]:
+            try:
+                geom = metadata['geometry']
+                coords = [(lat, lng) for lng, lat in geom.coords]  # Convert to lat/lng
+                
+                edges_data.append({
+                    'coordinates': coords,
+                    'u': int(metadata['u']),
+                    'v': int(metadata['v']),
+                    'name': metadata.get('name', 'Unnamed Road'),
+                    'highway': metadata.get('highway', 'unknown'),
+                    'oneway': metadata.get('oneway', False),
+                    'length': round(metadata.get('length', 0), 2)
+                })
+            except Exception as e:
+                # Skip edges with invalid geometry
+                continue
+        
+        return jsonify({
+            'success': True,
+            'edges': edges_data,
+            'count': len(edges_data),
+            'total_edges': len(snapper.edge_metadata),
+            'message': f'Showing {len(edges_data)} of {len(snapper.edge_metadata)} total edges (limit: {limit})'
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': f"Error getting OSM graph edges: {str(e)}"
+        })
+
+
+@app.route('/find_nearest_node', methods=['POST'])
+
+
 @app.route('/compute_dhc2l_route', methods=['POST'])
 def compute_dhc2l_route():
     """Compute optimal route using GPS HC2L (Hierarchical Cut Labelling) algorithm"""

@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 from math import radians, cos, sin, asin, sqrt
 import os
+from typing import Optional, Dict, Tuple
 
 def haversine(lon1, lat1, lon2, lat2):
     """Calculate distance between two points on Earth"""
@@ -19,6 +20,20 @@ class NodeMapper:
         """Load node coordinates from CSV"""
         self.nodes_df = pd.read_csv(nodes_csv_path)
         self.nodes_csv_path = nodes_csv_path
+        
+        # Initialize OSM road snapper for geometry-aware selection
+        try:
+            from osm_road_snapper import OSMRoadSnapper
+            osm_graphml_path = nodes_csv_path.replace('raw/quezon_city_nodes.csv', 'osm_geometry.graphml')
+            if os.path.exists(osm_graphml_path):
+                self.osm_snapper = OSMRoadSnapper(osm_graphml_path, nodes_csv_path)
+                print("✅ OSM road-aware snapping enabled")
+            else:
+                print(f"⚠️  OSM geometry file not found at {osm_graphml_path}")
+                self.osm_snapper = None
+        except Exception as e:
+            print(f"⚠️  Could not initialize OSM road snapper: {e}")
+            self.osm_snapper = None
         
         # Initialize accessible node finder for one-way aware selection
         edges_csv_path = nodes_csv_path.replace('nodes.csv', 'edges.csv')
@@ -122,3 +137,86 @@ class NodeMapper:
             import traceback
             traceback.print_exc()
             return None
+    
+    def snap_to_osm_road(
+        self, 
+        lat: float, 
+        lng: float, 
+        max_distance_m: float = 25.0,
+        consider_hierarchy: bool = True,
+        fallback_to_node: bool = False  # Changed default to False
+    ) -> Optional[Dict]:
+        """
+        Snap point to nearest OSM road geometry (road-aware snapping).
+        
+        This method uses actual OSM road geometries from the GraphML file
+        to provide more accurate snapping that follows real road shapes.
+        If no road is found within max_distance_m, it progressively increases
+        the search radius to always find a road (never falls back to nodes).
+        
+        Args:
+            lat: Latitude of point to snap
+            lng: Longitude of point to snap
+            max_distance_m: Initial maximum snapping distance in meters
+            consider_hierarchy: Whether to weight by road hierarchy
+            fallback_to_node: DEPRECATED - System always finds nearest road
+        
+        Returns:
+            dict or None: {
+                'method': 'osm_geometry',
+                'original_point': {'lat': float, 'lng': float},
+                'snapped_point': {'lat': float, 'lng': float},
+                'distance_m': float,
+                'road_name': str,
+                'highway_type': str,
+                'oneway': bool,
+                'osm_nodes': [u, v],
+                'routing_nodes': [node_id1, node_id2],
+                'edge_length_m': float,
+                'snap_position': float,
+                'metadata': dict,
+                'validation': dict
+            }
+        """
+        # Try OSM-based snapping first if available
+        if self.osm_snapper is not None:
+            # Progressive search with increasing radius
+            search_distances = [max_distance_m, 50, 100, 200, 500, 1000]
+            
+            for search_dist in search_distances:
+                try:
+                    result = self.osm_snapper.snap_to_nearest_road(
+                        lat, lng, 
+                        max_distance_m=search_dist,
+                        consider_hierarchy=consider_hierarchy
+                    )
+                    
+                    if result is not None:
+                        # Add validation
+                        from road_segment_utils import validate_road_connection
+                        road_point = (result['snapped_point']['lat'], result['snapped_point']['lng'])
+                        validation = validate_road_connection(
+                            (lat, lng), 
+                            road_point, 
+                            search_dist
+                        )
+                        
+                        result['method'] = 'osm_geometry'
+                        result['validation'] = validation
+                        
+                        # Add warning if we had to expand search
+                        if search_dist > max_distance_m:
+                            result['metadata']['warning'] = f'Expanded search to {search_dist}m to find nearest road'
+                            print(f"⚠️  Expanded search to {search_dist}m to find road: {result['road_name']}")
+                        
+                        return result
+                except Exception as e:
+                    print(f"⚠️  OSM snapping failed at {search_dist}m: {e}")
+                    continue
+            
+            # If we still haven't found anything, log error
+            print(f"❌ Critical: Could not find any OSM road even with 1000m radius")
+        else:
+            print(f"❌ OSM snapper not initialized - cannot perform road-aware snapping")
+        
+        return None

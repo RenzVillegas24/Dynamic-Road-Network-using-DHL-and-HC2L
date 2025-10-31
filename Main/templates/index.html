@@ -120,6 +120,14 @@
         </div>
         <span id="new-dataset-text" class="font-bold text-slate-700">New Dataset</span>
       </button>
+      <button id="show-osm-graph-btn" class="flex items-center space-x-3 px-6 py-3 glass-effect hover:shadow-lg rounded-2xl transition-all duration-300 border border-slate-200/50">
+        <div class="bg-gradient-to-br from-purple-600 to-purple-700 rounded-xl p-2">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path>
+          </svg>
+        </div>
+        <span id="show-osm-graph-text" class="font-bold text-slate-700">Show OSM Graph</span>
+      </button>
       <button id="admin-toggle" class="flex items-center space-x-3 px-6 py-3 glass-effect hover:shadow-lg rounded-2xl transition-all duration-300 border border-slate-200/50">
         <div class="bg-gradient-to-br from-slate-600 to-slate-700 rounded-xl p-2">
           <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -766,6 +774,7 @@
 <script src="{{ url_for('static', filename='js/functions.js') }}"></script>
 <script src="{{ url_for('static', filename='js/disruptions.js') }}"></script>
 <script src="{{ url_for('static', filename='js/metrics.js') }}"></script>
+<script src="{{ url_for('static', filename='js/osm-snapping.js') }}"></script>
 <script src="{{ url_for('static', filename='js/event-handlers.js') }}"></script>
 
 <script>
@@ -897,7 +906,7 @@
       }
       
       // Store both original and snapped locations
-      startLocation = { 
+      window.startLocation = { 
         lat: nodeData.lat, 
         lng: nodeData.lng,
         node_id: nodeData.node_id,
@@ -1038,7 +1047,7 @@
       }
       
       // Store both original and snapped locations
-      destLocation = { 
+      window.destLocation = { 
         lat: nodeData.lat, 
         lng: nodeData.lng,
         node_id: nodeData.node_id,
@@ -1092,10 +1101,12 @@
       console.log(`Map clicked at: ${lat}, ${lng}`);
       
       if (pinningMode === 'start') {
-        await handleStartLocationPin(lat, lng);
+        // Use OSM road-aware snapping
+        await handleOSMStartLocationPin(lat, lng);
         
       } else if (pinningMode === 'dest') {
-        await handleDestLocationPin(lat, lng);
+        // Use OSM road-aware snapping
+        await handleOSMDestLocationPin(lat, lng);
         
       } else if (pinningMode === 'report') {
         if (reportMarker) map.removeLayer(reportMarker);
@@ -1141,8 +1152,15 @@
   
   // D-HC2L Route Display Functions
   function displayDHC2LRoute(routeData) {
-    // Clear any existing D-HC2L routes
-    clearRoutes();
+    // Clear only route polylines, keep location markers
+    if (routePolylines && routePolylines.length > 0) {
+        routePolylines.forEach(polyline => {
+            if (polyline && map) {
+                map.removeLayer(polyline);
+            }
+        });
+        routePolylines = [];
+    }
     
     // Display route polylines
     if (routeData.route && routeData.route.polylines) {
@@ -1185,8 +1203,8 @@
         const bounds = L.latLngBounds();
         
         // Include start and destination markers
-        if (startLocation) bounds.extend([startLocation.lat, startLocation.lng]);
-        if (destLocation) bounds.extend([destLocation.lat, destLocation.lng]);
+        if (window.startLocation) bounds.extend([window.startLocation.lat, window.startLocation.lng]);
+        if (window.destLocation) bounds.extend([window.destLocation.lat, window.destLocation.lng]);
         
         // Include route points
         routeData.route.polylines.forEach(polylineData => {
@@ -1259,16 +1277,16 @@
       }
       
       // Add connector from start pin to route start node
-      if (startLocation && routeStartCoord) {
+      if (window.startLocation && routeStartCoord) {
         const startDistance = calculateHaversineDistance(
-          startLocation.lat, startLocation.lng,
+          window.startLocation.lat, window.startLocation.lng,
           routeStartCoord.lat, routeStartCoord.lng
         );
         
         console.log(`Adding D-HC2L start connector: ${startDistance.toFixed(0)}m`);
         
         const startConnector = L.polyline([
-          [startLocation.lat, startLocation.lng],
+          [window.startLocation.lat, window.startLocation.lng],
           [routeStartCoord.lat, routeStartCoord.lng]
         ], {
           color: '#FF0000', // Red to match D-HC2L algorithm
@@ -1281,17 +1299,17 @@
       }
       
       // Add connector from route end node to destination pin
-      if (destLocation && routeEndCoord) {
+      if (window.destLocation && routeEndCoord) {
         const endDistance = calculateHaversineDistance(
           routeEndCoord.lat, routeEndCoord.lng,
-          destLocation.lat, destLocation.lng
+          window.destLocation.lat, window.destLocation.lng
         );
         
         console.log(`Adding D-HC2L end connector: ${endDistance.toFixed(0)}m`);
         
         const endConnector = L.polyline([
           [routeEndCoord.lat, routeEndCoord.lng],
-          [destLocation.lat, destLocation.lng]
+          [window.destLocation.lat, window.destLocation.lng]
         ], {
           color: '#FF0000', // Red to match D-HC2L algorithm
           opacity: 0.8,
@@ -1357,16 +1375,16 @@
       }
       
       // Add connector from start pin to route start node
-      if (startLocation && routeStartCoord) {
+      if (window.startLocation && routeStartCoord) {
         const startDistance = calculateHaversineDistance(
-          startLocation.lat, startLocation.lng,
+          window.startLocation.lat, window.startLocation.lng,
           routeStartCoord.lat, routeStartCoord.lng
         );
         
         console.log(`Adding DHL start connector: ${startDistance.toFixed(0)}m`);
         
         const startConnector = L.polyline([
-          [startLocation.lat, startLocation.lng],
+          [window.startLocation.lat, window.startLocation.lng],
           [routeStartCoord.lat, routeStartCoord.lng]
         ], {
           color: '#0066FF', // Blue to match DHL algorithm
@@ -1379,17 +1397,17 @@
       }
       
       // Add connector from route end node to destination pin
-      if (destLocation && routeEndCoord) {
+      if (window.destLocation && routeEndCoord) {
         const endDistance = calculateHaversineDistance(
           routeEndCoord.lat, routeEndCoord.lng,
-          destLocation.lat, destLocation.lng
+          window.destLocation.lat, window.destLocation.lng
         );
         
         console.log(`Adding DHL end connector: ${endDistance.toFixed(0)}m`);
         
         const endConnector = L.polyline([
           [routeEndCoord.lat, routeEndCoord.lng],
-          [destLocation.lat, destLocation.lng]
+          [window.destLocation.lat, window.destLocation.lng]
         ], {
           color: '#0066FF', // Blue to match DHL algorithm
           opacity: 0.8,
@@ -1573,7 +1591,7 @@
 
   // Function to compute DHL route
   async function computeDHLRoute(useDisruptions = false) {
-    if (!startLocation || !destLocation) {
+    if (!window.startLocation || !window.destLocation) {
       showUpdateToast("Please pin both starting location and destination", 'warning');
       return null;
     }
@@ -1587,10 +1605,10 @@
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          start_lat: startLocation.lat,
-          start_lng: startLocation.lng,
-          dest_lat: destLocation.lat,
-          dest_lng: destLocation.lng,
+          start_lat: window.startLocation.lat,
+          start_lng: window.startLocation.lng,
+          dest_lat: window.destLocation.lat,
+          dest_lng: window.destLocation.lng,
           use_disruptions: useDisruptions
         })
       });
@@ -1620,7 +1638,7 @@
   
   // Function to compute D-HC2L route  
   async function computeDHC2LRoute(useDisruptions = false, threshold = 0.5) {
-    if (!startLocation || !destLocation) {
+    if (!window.startLocation || !window.destLocation) {
       showUpdateToast("Please pin both starting location and destination", 'warning');
       return null;
     }
@@ -1635,10 +1653,10 @@
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          start_lat: startLocation.lat,
-          start_lng: startLocation.lng,
-          dest_lat: destLocation.lat,
-          dest_lng: destLocation.lng,
+          start_lat: window.startLocation.lat,
+          start_lng: window.startLocation.lng,
+          dest_lat: window.destLocation.lat,
+          dest_lng: window.destLocation.lng,
           threshold: actualThreshold,
           use_disruptions: useDisruptions
         })

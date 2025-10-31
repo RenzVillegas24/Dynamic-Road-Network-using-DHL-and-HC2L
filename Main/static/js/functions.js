@@ -89,6 +89,11 @@ function clearRoutes() {
         console.log('Cleared dest connector line');
     }
 
+    // Clear OSM snap markers (new road-aware snapping)
+    if (typeof clearAllOSMSnapMarkers === 'function') {
+        clearAllOSMSnapMarkers();
+    }
+
     // Clear report marker if exists (Leaflet)
     if (reportMarker && map) {
         map.removeLayer(reportMarker);
@@ -977,8 +982,15 @@ function resetComparisonMetrics() {
 function displayDHLRoute(routeData) {
     console.log('Displaying DHL route:', routeData);
     
-    // Clear existing routes first
-    clearRoutes();
+    // Clear only route polylines, keep location markers
+    if (routePolylines && routePolylines.length > 0) {
+        routePolylines.forEach(polyline => {
+            if (polyline && map) {
+                map.removeLayer(polyline);
+            }
+        });
+        routePolylines = [];
+    }
     
     if (!routeData.success || !routeData.route) {
       console.error('Invalid DHL route data:', routeData);

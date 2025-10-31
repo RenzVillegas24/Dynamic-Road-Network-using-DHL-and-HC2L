@@ -15,7 +15,7 @@ document.querySelectorAll('.threshold-btn').forEach(btn => {
         showUpdateToast(`Threshold updated to τ = ${currentThreshold}`, 'info');
         
         // If we have active routes, offer to recalculate
-        if (routePolylines.length > 0 && startLocation && destLocation) {
+        if (routePolylines.length > 0 && window.startLocation && window.destLocation) {
         setTimeout(() => {
             showUpdateToast("Threshold changed. Click 'Go' to recalculate route.", 'warning');
         }, 1500);
@@ -55,7 +55,14 @@ document.getElementById('pin-disruption-btn').addEventListener('click', () => {
 
 
 document.getElementById("go-button").onclick = async () => {
-    if (!startLocation || !destLocation) {
+    // Debug logging
+    console.log('Go button clicked');
+    console.log('startLocation:', window.startLocation);
+    console.log('destLocation:', window.destLocation);
+    console.log('OSM start data:', window.osmSnapMarkers?.start?.data);
+    console.log('OSM dest data:', window.osmSnapMarkers?.dest?.data);
+    
+    if (!window.startLocation || !window.destLocation) {
       showUpdateToast("Please pin both starting location and destination", 'warning');
       return;
     }
@@ -75,7 +82,7 @@ document.getElementById("go-button").onclick = async () => {
     // Get Google Maps route data for Fréchet distance computation (runs in background)
     let googleRouteData = null;
     try {
-        googleRouteData = await getGoogleMapsRouteWithCoordinates(startLocation.lat, startLocation.lng, destLocation.lat, destLocation.lng);
+        googleRouteData = await getGoogleMapsRouteWithCoordinates(window.startLocation.lat, window.startLocation.lng, window.destLocation.lat, window.destLocation.lng);
         console.log('Google Maps route data obtained for Fréchet distance computation');
         // Store Google route for comparison calculations
         window.googleRouteMetadata = googleRouteData;
@@ -138,10 +145,10 @@ document.getElementById("go-button").onclick = async () => {
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
-                start_lat: startLocation.lat,
-                start_lng: startLocation.lng,
-                dest_lat: destLocation.lat,
-                dest_lng: destLocation.lng,
+                start_lat: window.startLocation.lat,
+                start_lng: window.startLocation.lng,
+                dest_lat: window.destLocation.lat,
+                dest_lng: window.destLocation.lng,
                 use_disruptions: false,
                 threshold: currentThreshold
               })
@@ -236,10 +243,10 @@ document.getElementById("go-button").onclick = async () => {
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
-                start_lat: startLocation.lat,
-                start_lng: startLocation.lng,
-                dest_lat: destLocation.lat,
-                dest_lng: destLocation.lng,
+                start_lat: window.startLocation.lat,
+                start_lng: window.startLocation.lng,
+                dest_lat: window.destLocation.lat,
+                dest_lng: window.destLocation.lng,
                 use_disruptions: true
               })
             });
@@ -547,6 +554,110 @@ comparisonModal.onclick = (e) => {
 //     }
 // };
 
+
+// OSM Graph Visualization Toggle
+let osmGraphLayer = null;
+let osmGraphVisible = false;
+
+document.getElementById('show-osm-graph-btn').onclick = async () => {
+    const button = document.getElementById('show-osm-graph-btn');
+    const buttonText = document.getElementById('show-osm-graph-text');
+    
+    if (!osmGraphVisible) {
+        // Show OSM graph
+        buttonText.textContent = 'Loading...';
+        button.disabled = true;
+        
+        try {
+            const response = await fetch('/get_osm_graph_edges?limit=1000');
+            const data = await response.json();
+            
+            if (data.success) {
+                // Create layer group for OSM edges
+                osmGraphLayer = L.layerGroup();
+                
+                // Add each edge as a polyline
+                data.edges.forEach(edge => {
+                    const polyline = L.polyline(edge.coordinates, {
+                        color: getHighwayColor(edge.highway),
+                        weight: getHighwayWeight(edge.highway),
+                        opacity: 0.4,
+                        className: 'osm-graph-edge'
+                    });
+                    
+                    // Add popup with edge info
+                    polyline.bindPopup(
+                        `<b>${edge.name}</b><br>` +
+                        `Type: ${edge.highway}<br>` +
+                        `${edge.oneway ? '⚠️ One-way<br>' : ''}` +
+                        `Length: ${edge.length}m<br>` +
+                        `<small>Nodes: ${edge.u} → ${edge.v}</small>`
+                    );
+                    
+                    osmGraphLayer.addLayer(polyline);
+                });
+                
+                osmGraphLayer.addTo(map);
+                osmGraphVisible = true;
+                buttonText.textContent = 'Hide OSM Graph';
+                showUpdateToast(`Showing ${data.count} road segments`, 'success');
+                
+                if (data.count < data.total_edges) {
+                    setTimeout(() => {
+                        showUpdateToast(`${data.message}`, 'info');
+                    }, 1500);
+                }
+            } else {
+                throw new Error(data.error || 'Failed to load OSM graph');
+            }
+        } catch (error) {
+            console.error('Error loading OSM graph:', error);
+            showUpdateToast(`Error: ${error.message}`, 'warning');
+            buttonText.textContent = 'Show OSM Graph';
+        }
+        
+        button.disabled = false;
+    } else {
+        // Hide OSM graph
+        if (osmGraphLayer) {
+            map.removeLayer(osmGraphLayer);
+            osmGraphLayer = null;
+        }
+        osmGraphVisible = false;
+        buttonText.textContent = 'Show OSM Graph';
+        showUpdateToast('OSM graph hidden', 'info');
+    }
+};
+
+// Helper function to get color based on highway type
+function getHighwayColor(type) {
+    const colors = {
+        'motorway': '#e74c3c',
+        'trunk': '#e67e22',
+        'primary': '#3498db',
+        'secondary': '#2ecc71',
+        'tertiary': '#9b59b6',
+        'residential': '#95a5a6',
+        'service': '#bdc3c7',
+        'unclassified': '#7f8c8d'
+    };
+    return colors[type] || '#34495e';
+}
+
+// Helper function to get weight based on highway type
+function getHighwayWeight(type) {
+    const weights = {
+        'motorway': 4,
+        'trunk': 3.5,
+        'primary': 3,
+        'secondary': 2.5,
+        'tertiary': 2,
+        'residential': 1.5,
+        'service': 1,
+        'unclassified': 1
+    };
+    return weights[type] || 1;
+}
 
 
 
