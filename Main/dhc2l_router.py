@@ -1,4 +1,10 @@
-# dhc2l_router.py - D-HC2L Routing Integration
+# dhc2l_router.py - HC2L (Hierarchical Cut Labelling) Routing Integration
+"""
+Routing service using the Hierarchical Cut 2-Hop Labelling (HC2L) algorithm.
+
+HC2L uses hierarchical graph cuts to create efficient 2-hop distance labels.
+Based on: https://github.com/henningkoehlernz/road-networks
+"""
 import subprocess
 import json
 import os
@@ -7,7 +13,7 @@ from typing import Dict, List, Tuple, Optional
 
 class DHC2LRouter:
     def __init__(self, cpp_executable_path: str):
-        """Initialize D-HC2L router with path to C++ executable"""
+        """Initialize HC2L router with path to C++ executable"""
         self.cpp_executable = cpp_executable_path
         if not os.path.exists(cpp_executable_path):
             raise FileNotFoundError(f"C++ executable not found: {cpp_executable_path}")
@@ -16,7 +22,7 @@ class DHC2LRouter:
                      dest_lat: float, dest_lng: float, threshold: float = 0.5, 
                      use_disruptions: bool = False) -> Dict:
         """
-        Compute route using D-HC2L algorithm via GPS JSON API
+        Compute route using HC2L (Hierarchical Cut Labelling) algorithm via GPS JSON API
         Returns route data with polylines and metrics
         """
         try:

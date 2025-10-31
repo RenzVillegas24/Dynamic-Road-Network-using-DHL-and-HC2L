@@ -232,7 +232,7 @@ setup.sh → Option 2 → Option 5 (Generate Data and Indexes)
    - Outputs to `Main/build/dhl/`
 
 2. **HC2L Routing API**
-   - Compiles from `HighCardinalityTwoLevel/src/`
+   - Compiles from `HierarchicalCutLabelling/src/`
    - Outputs to `Main/build/hc2l/`
 
 ### Server Integration

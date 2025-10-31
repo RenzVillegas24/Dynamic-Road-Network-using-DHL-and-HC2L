@@ -103,6 +103,10 @@ credentials
 .cache/
 dist/
 public/
+Documentation/
 
-# AI Generated .md files
+# AI Generated .md files and chat documentation
 *.ai.md
+.chat-docs/
+
+

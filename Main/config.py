@@ -1,11 +1,15 @@
 """
 Configuration Management for Dynamic Road Network Application
 
-This module provides centralized configuration management for:
+This module provides centralized configuration for:
 - File paths and directories
-- Algorithm executables
+- Algorithm executables (DHL and HC2L)
 - Environment variables
 - API keys and sensitive data
+
+Algorithms:
+- DHL: Dual-Hierarchy Labelling
+- HC2L: Hierarchical Cut 2-Hop Labelling (based on https://github.com/henningkoehlernz/road-networks)
 
 Usage:
     from config import Config
@@ -46,7 +50,8 @@ class Config:
     
     # Algorithm source directories
     DHL_SRC_DIR = PROJECT_ROOT / 'DualHierarchyLabelling'
-    HC2L_SRC_DIR = PROJECT_ROOT / 'HighCardinalityTwoLevel'
+    # HC2L = Hierarchical Cut 2-Hop Labelling (based on https://github.com/henningkoehlernz/road-networks)
+    HC2L_SRC_DIR = PROJECT_ROOT / 'HierarchicalCutLabelling'
     
     # Data directories (all data should be in Main/data/)
     DATA_DIR = MAIN_DIR / 'data'
@@ -160,8 +165,8 @@ class Config:
         Priority:
         1. Environment variable HC2L_EXECUTABLE
         2. Main/build/hc2l/hc2l_routing_api[.exe]
-        3. HighCardinalityTwoLevel/build/hc2l_routing_api[.exe]
-        4. HighCardinalityTwoLevel/hc2l_routing_api[.exe]
+        3. HierarchicalCutLabelling/build/hc2l_routing_api[.exe]
+        4. HierarchicalCutLabelling/hc2l_routing_api[.exe]
         
         Returns:
             Path to HC2L executable

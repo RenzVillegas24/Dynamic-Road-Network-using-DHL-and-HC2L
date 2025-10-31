@@ -1,4 +1,13 @@
 # gps_hc2l_router.py - Enhanced GPS HC2L Routing Integration with Road Names
+"""
+GPS-based routing service using the Hierarchical Cut 2-Hop Labelling (HC2L) algorithm.
+
+HC2L uses hierarchical graph cuts to create efficient 2-hop distance labels for 
+fast shortest path queries in road networks.
+
+Based on: https://github.com/henningkoehlernz/road-networks
+Algorithm: Hierarchical Cut Labelling for distance queries
+"""
 import subprocess
 import json
 import os
@@ -130,7 +139,7 @@ class GPSRoutingService:
                         'error': 'No JSON output found',
                         'debug_info': json.dumps({
                             'success': True,
-                            'algorithm': 'HC2L (High-Cardinality Two-Level)',
+                            'algorithm': 'HC2L (Hierarchical Cut 2-Hop Labelling)',
                             'input': {
                                 'start_lat': start_lat,
                                 'start_lng': start_lng,
@@ -386,7 +395,7 @@ class GPSRoutingService:
     def get_network_stats(self) -> Dict:
         """Get network statistics"""
         return {
-            'algorithm': 'HC2L Dynamic with GPS Integration',
+            'algorithm': 'HC2L Hierarchical Cut Labelling with GPS Integration',
             'dataset': 'Quezon City, Philippines',
             'nodes': len(self.nodes_data) if self.nodes_data is not None else 13649,
             'coverage': 'Real GPS coordinates with traffic disruption support'

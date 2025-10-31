@@ -1,4 +1,4 @@
-# flask_server.py - Enhanced with D-HC2L Routing
+# flask_server.py - Enhanced with HC2L (Hierarchical Cut Labelling) Routing
 from flask import Flask, request, jsonify, render_template
 import pandas as pd
 import time
@@ -269,7 +269,7 @@ def find_nearest_road_segment():
 
 @app.route('/compute_dhc2l_route', methods=['POST'])
 def compute_dhc2l_route():
-    """Compute optimal route using GPS HC2L algorithm"""
+    """Compute optimal route using GPS HC2L (Hierarchical Cut Labelling) algorithm"""
     data = request.json
     
     try:
@@ -681,7 +681,7 @@ def compare_dhl_routes():
 
 @app.route('/compare_algorithms', methods=['POST'])
 def compare_algorithms():
-    """Compare D-HC2L and DHL algorithms side by side"""
+    """Compare HC2L (Hierarchical Cut Labelling) and DHL algorithms side by side"""
     data = request.json
     
     try:

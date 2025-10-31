@@ -72,9 +72,9 @@ if %errorlevel% equ 0 (
 REM Build HC2L Routing API
 echo.
 echo ========================================================================
-echo   Building HC2L (High-Cardinality Two-Level) Routing API...
+echo   Building HC2L (Hierarchical Cut 2-Hop Labelling) Routing API...
 echo ========================================================================
-cd /d "%PROJECT_ROOT%HighCardinalityTwoLevel"
+cd /d "%PROJECT_ROOT%HierarchicalCutLabelling"
 
 REM Compile directly to Main\build\hc2l\
 g++ -std=c++20 -O3 -Wall -Wextra -o "%BUILD_DIR%\hc2l\hc2l_routing_api.exe" src\hc2l_routing_api.cpp src\road_network.cpp src\util.cpp
@@ -110,7 +110,7 @@ echo.
 echo ========================================================================
 echo   Building HC2L Index Executable...
 echo ========================================================================
-cd /d "%PROJECT_ROOT%HighCardinalityTwoLevel"
+cd /d "%PROJECT_ROOT%HierarchicalCutLabelling"
 
 REM Compile directly to Main\build\hc2l\
 g++ -std=c++20 -O3 -Wall -Wextra -o "%BUILD_DIR%\hc2l\index.exe" src\index.cpp src\road_network.cpp src\util.cpp

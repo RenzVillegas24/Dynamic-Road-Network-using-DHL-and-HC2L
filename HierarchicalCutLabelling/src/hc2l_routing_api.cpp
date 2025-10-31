@@ -1,7 +1,11 @@
 /*
  * HC2L Routing JSON API
  * 
- * Provides a JSON-based API for HC2L (High-Cardinality Two-Level) routing algorithm
+ * Provides a JSON-based API for HC2L (Hierarchical Cut 2-Hop Labelling) routing algorithm
+ * 
+ * Algorithm: Hierarchical Cut Labelling
+ * Based on: https://github.com/henningkoehlernz/road-networks
+ * Description: Uses hierarchical graph cuts to create efficient 2-hop distance labels
  * 
  * Usage:
  *   ./hc2l_routing_api <start_lat> <start_lng> <dest_lat> <dest_lng> <use_disruptions> <nodes_csv> <edges_csv> <graph_file> <index_file>
@@ -247,7 +251,7 @@ void output_json_response(bool success, const string& error_message = "",
     if (!success) {
         cout << "  \"error\": \"" << error_message << "\"" << endl;
     } else {
-        cout << "  \"algorithm\": \"HC2L (High-Cardinality Two-Level)\"," << endl;
+        cout << "  \"algorithm\": \"HC2L (Hierarchical Cut 2-Hop Labelling)\"," << endl;
         cout << "  \"input\": {" << endl;
         cout << "    \"start_lat\": " << fixed << setprecision(6) << start_lat << "," << endl;
         cout << "    \"start_lng\": " << fixed << setprecision(6) << start_lng << "," << endl;

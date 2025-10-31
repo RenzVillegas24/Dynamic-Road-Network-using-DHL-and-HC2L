@@ -2,7 +2,7 @@
 
 A high-performance routing system that uses two cutting-edge algorithms for dynamic road network pathfinding:
 - **DHL (Dual-Hierarchy Labelling)**: Optimized for static shortest path queries with support for traffic disruptions
-- **HC2L (High-Cardinality Two-Level)**: Advanced hierarchical approach for balanced partitioning
+- **HC2L (Hierarchical Cut 2-Hop Labelling)**: Advanced hierarchical graph partitioning using balanced cuts for distance queries
 
 ## 🌟 Features
 
@@ -96,7 +96,7 @@ The application will be available at `http://localhost:5000`
 │   │   └── ...
 │   └── Makefile                  # Build configuration
 │
-├── HighCardinalityTwoLevel/      # HC2L algorithm implementation
+├── HierarchicalCutLabelling/     # HC2L algorithm implementation
 │   ├── src/
 │   │   ├── hc2l_routing_api.cpp # JSON API wrapper (NEW)
 │   │   ├── road_network.cpp/.h   # Core algorithm
@@ -243,7 +243,7 @@ make dhl_routing_api
 ### Build HC2L Only
 
 ```bash
-cd HighCardinalityTwoLevel
+cd HierarchicalCutLabelling
 make hc2l_routing_api
 ```
 
@@ -367,13 +367,16 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## 🙏 Acknowledgments
 
 - DHL Algorithm: Based on research by [Authors]
-- HC2L Algorithm: Based on research by [Authors]
+- HC2L Algorithm: Hierarchical Cut Labelling based on https://github.com/henningkoehlernz/road-networks
 - Road network data: OpenStreetMap contributors
 
 ## 📖 References
 
-1. **Dual-Hierarchy Labelling**: [Add paper reference]
-2. **High-Cardinality Two-Level**: [Add paper reference]
+1. **Dual-Hierarchy Labelling (DHL)**: [Add paper reference]
+2. **Hierarchical Cut Labelling (HC2L)**: 
+   - Repository: https://github.com/henningkoehlernz/road-networks
+   - Description: Hierarchical graph partitioning using balanced cuts for distance queries in road networks
+   - Algorithm: 2-hop labelling with hierarchical cut vertices
 
 ---
 

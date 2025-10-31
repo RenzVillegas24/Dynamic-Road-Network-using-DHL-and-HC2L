@@ -45,9 +45,9 @@ fi
 
 # Build HC2L Routing API
 echo ""
-echo "🏗️  Building HC2L (High-Cardinality Two-Level) Routing API..."
+echo "🏗️  Building HC2L (Hierarchical Cut 2-Hop Labelling) Routing API..."
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-cd "$PROJECT_ROOT/HighCardinalityTwoLevel"
+cd "$PROJECT_ROOT/HierarchicalCutLabelling"
 
 # Compile directly to Main/build/hc2l/
 if g++ -std=c++20 -O3 -Wall -Wextra -o "$BUILD_DIR/hc2l/hc2l_routing_api" \
@@ -77,9 +77,9 @@ fi
 
 # Build HC2L Index Executable
 echo ""
-echo "�️  Building HC2L Index Executable..."
+echo "🔧 Building HC2L Index Executable..."
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-cd "$PROJECT_ROOT/HighCardinalityTwoLevel"
+cd "$PROJECT_ROOT/HierarchicalCutLabelling"
 
 # Compile directly to Main/build/hc2l/
 if g++ -std=c++20 -O3 -Wall -Wextra -o "$BUILD_DIR/hc2l/index" \
