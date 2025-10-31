@@ -434,9 +434,6 @@ def get_osm_graph_edges():
         })
 
 
-@app.route('/find_nearest_node', methods=['POST'])
-
-
 @app.route('/compute_dhc2l_route', methods=['POST'])
 def compute_dhc2l_route():
     """Compute optimal route using GPS HC2L (Hierarchical Cut Labelling) algorithm"""
@@ -966,9 +963,6 @@ def compare_algorithms():
         })
 
 
-
-
-
 if __name__ == '__main__':
     # Print configuration summary
     print(Config.get_config_summary())
@@ -977,5 +971,6 @@ if __name__ == '__main__':
     app.run(
         debug=Config.FLASK_DEBUG,
         host=Config.FLASK_HOST,
-        port=Config.FLASK_PORT
+        port=Config.FLASK_PORT,
+        use_reloader=False  # Disable auto-reloader to prevent unwanted restarts
     )

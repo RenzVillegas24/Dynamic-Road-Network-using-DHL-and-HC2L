@@ -56,13 +56,21 @@ class OSMGeometryLoader:
                 print(f"⚠️  Failed to load cache: {e}")
                 print("   Downloading fresh data...")
         
+        # Get network type from config
+        try:
+            from config import Config
+            network_type = Config.NETWORK_TYPE
+        except ImportError:
+            network_type = "all"
+        
         # Download from OSM
         print("🌍 Downloading OSM road network for Quezon City, Philippines...")
+        print(f"   Network type: {network_type}")
         print("   This may take a few minutes...")
         
         self.graph = ox.graph_from_place(
             "Quezon City, Philippines",
-            network_type="drive"
+            network_type=network_type
         )
         
         print(f"✅ Downloaded {len(self.graph.nodes)} nodes, {len(self.graph.edges)} edges")

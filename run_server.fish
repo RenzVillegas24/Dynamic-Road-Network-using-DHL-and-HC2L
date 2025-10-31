@@ -56,7 +56,7 @@ end
 function generate_data
     echo ""
     echo "════════════════════════════════════════════════════════════════"
-    echo "  Step 1: Generating OSM Data (15-20 minutes)"
+    echo "  Generating OSM Data and Building Indexes (15-20 minutes)"
     echo "════════════════════════════════════════════════════════════════"
     echo ""
     
@@ -75,25 +75,11 @@ function generate_data
     
     if test $status -ne 0
         echo ""
-        echo "  ✗ Error: Data generation failed"
+        echo "  ✗ Error: Data generation and index building failed"
         exit 1
     end
     
     cd "$SCRIPT_DIR"
-    
-    echo ""
-    echo "════════════════════════════════════════════════════════════════"
-    echo "  Step 2: Building Graph Indexes"
-    echo "════════════════════════════════════════════════════════════════"
-    echo ""
-    
-    ./generate_data.fish
-    
-    if test $status -ne 0
-        echo ""
-        echo "  ✗ Error: Index building failed"
-        exit 1
-    end
     
     echo ""
     echo "  ✓ Data generation and index building completed!"
@@ -134,38 +120,19 @@ if test "$DATA_EXISTS" = false; or test "$INDEX_EXISTS" = false
         echo ""
         echo "  Would you like to:"
         echo "    1) Generate data and build indexes now (recommended, takes 15-20 min)"
-        echo "    2) Build indexes only (if CSV files already exist)"
-        echo "    3) Continue without data (server will start but routing won't work)"
-        echo "    4) Exit"
+        echo "    2) Continue without data (server will start but routing won't work)"
+        echo "    3) Exit"
         echo ""
-        read -P "  Enter your choice (1-4): " choice
+        read -P "  Enter your choice (1-3): " choice
         echo ""
         
         switch $choice
             case 1
                 generate_data
             case 2
-                if test "$DATA_EXISTS" = false
-                    echo "  ✗ Error: Cannot build indexes without CSV data files"
-                    exit 1
-                end
-                echo "════════════════════════════════════════════════════════════════"
-                echo "  Building Graph Indexes"
-                echo "════════════════════════════════════════════════════════════════"
-                echo ""
-                ./generate_data.fish
-                if test $status -ne 0
-                    echo ""
-                    echo "  ✗ Error: Index building failed"
-                    exit 1
-                end
-                echo ""
-                echo "  ✓ Index building completed!"
-                echo ""
-            case 3
                 echo "  ⚠ Continuing without data - routing will not work!"
                 echo ""
-            case 4
+            case 3
                 echo "  Exiting..."
                 exit 0
             case '*'

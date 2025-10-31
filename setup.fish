@@ -333,28 +333,20 @@ function generate_data
     end
 
     echo ""
-    echo "[Step 1/3] Activating conda environment..."
+    echo "[Step 1/2] Activating conda environment..."
     source (conda info --base)/etc/fish/conf.d/conda.fish
     conda activate "$CONDA_ENV_PATH"
 
-    echo "[Step 2/3] Generating OSM data (this takes time)..."
+    echo "[Step 2/2] Generating OSM data and building indexes (this takes time)..."
     cd "$MAIN_DIR"
     python request_new_datasets.py
     if test $status -ne 0
-        printf "%b[ERROR]%b Data generation failed\n" $RED $NC
+        printf "%b[ERROR]%b Data generation and index building failed\n" $RED $NC
         cd "$PROJECT_ROOT"
         return 1
     end
 
     cd "$PROJECT_ROOT"
-    echo "[Step 3/3] Building indexes..."
-    chmod +x generate_data.fish
-    ./generate_data.fish
-    if test $status -ne 0
-        printf "%b[ERROR]%b Index building failed\n" $RED $NC
-        return 1
-    end
-
     echo ""
     printf "%b[OK]%b Data generation and indexing complete!\n" $GREEN $NC
     echo ""

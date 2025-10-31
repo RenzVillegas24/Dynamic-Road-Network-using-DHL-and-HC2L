@@ -101,11 +101,10 @@ if "%INDEX_EXISTS%"=="false" (
 echo.
 echo   Would you like to:
 echo     1^) Generate data and build indexes now (recommended, takes 15-20 min^)
-echo     2^) Build indexes only (if CSV files already exist^)
-echo     3^) Continue without data (server will start but routing won't work^)
-echo     4^) Exit
+echo     2^) Continue without data (server will start but routing won't work^)
+echo     3^) Exit
 echo.
-set /p "choice=  Enter your choice (1-4): "
+set /p "choice=  Enter your choice (1-3): "
 echo.
 
 if "%choice%"=="1" (
@@ -113,33 +112,11 @@ if "%choice%"=="1" (
     goto start_server
 )
 if "%choice%"=="2" (
-    if "%DATA_EXISTS%"=="false" (
-        echo   ERROR: Cannot build indexes without CSV data files
-        pause
-        exit /b 1
-    )
-    echo ========================================================================
-    echo   Building Graph Indexes
-    echo ========================================================================
-    echo.
-    call "%SCRIPT_DIR%generate_data.bat"
-    if errorlevel 1 (
-        echo.
-        echo   ERROR: Index building failed
-        pause
-        exit /b 1
-    )
-    echo.
-    echo   Index building completed!
-    echo.
-    goto start_server
-)
-if "%choice%"=="3" (
     echo   WARNING: Continuing without data - routing will not work!
     echo.
     goto start_server
 )
-if "%choice%"=="4" (
+if "%choice%"=="3" (
     echo   Exiting...
     exit /b 0
 )
@@ -185,7 +162,7 @@ goto :eof
 :generate_data
 echo.
 echo ========================================================================
-echo   Step 1: Generating OSM Data (15-20 minutes^)
+echo   Generating OSM Data and Building Indexes (15-20 minutes^)
 echo ========================================================================
 echo.
 
@@ -208,27 +185,12 @@ python request_new_datasets.py
 
 if errorlevel 1 (
     echo.
-    echo   ERROR: Data generation failed
+    echo   ERROR: Data generation and index building failed
     pause
     exit /b 1
 )
 
 cd /d "%SCRIPT_DIR%"
-
-echo.
-echo ========================================================================
-echo   Step 2: Building Graph Indexes
-echo ========================================================================
-echo.
-
-call "%SCRIPT_DIR%generate_data.bat"
-
-if errorlevel 1 (
-    echo.
-    echo   ERROR: Index building failed
-    pause
-    exit /b 1
-)
 
 echo.
 echo   Data generation and index building completed!

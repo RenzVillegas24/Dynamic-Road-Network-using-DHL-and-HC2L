@@ -57,51 +57,36 @@ if [ ! -f "$MAIN_DIR/.env" ]; then
 fi
 
 # Function to generate data
-generate_data() {
+:generate_data
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+echo "  Generating OSM Data and Building Indexes (15-20 minutes)"
+echo "════════════════════════════════════════════════════════════════"
+echo ""
+
+# Activate virtual environment if it exists
+CONDA_ENV_PATH="$SCRIPT_DIR/.conda"
+if [ -d "$CONDA_ENV_PATH" ]; then
+    source "$(conda info --base)/etc/profile.d/conda.sh"
+    conda activate "$CONDA_ENV_PATH"
+elif [ -d "$SCRIPT_DIR/.venv" ]; then
+    source "$SCRIPT_DIR/.venv/bin/activate"
+fi
+
+cd "$MAIN_DIR"
+python request_new_datasets.py
+
+if [ $? -ne 0 ]; then
     echo ""
-    echo "════════════════════════════════════════════════════════════════"
-    echo "  Step 1: Generating OSM Data (15-20 minutes)"
-    echo "════════════════════════════════════════════════════════════════"
-    echo ""
-    
-    # Activate virtual environment if it exists
-    CONDA_ENV_PATH="$SCRIPT_DIR/.conda"
-    if [ -d "$CONDA_ENV_PATH" ]; then
-        source "$(conda info --base)/etc/profile.d/conda.sh"
-        conda activate "$CONDA_ENV_PATH"
-    elif [ -d "$SCRIPT_DIR/.venv" ]; then
-        source "$SCRIPT_DIR/.venv/bin/activate"
-    fi
-    
-    cd "$MAIN_DIR"
-    python request_new_datasets.py
-    
-    if [ $? -ne 0 ]; then
-        echo ""
-        echo "  ✗ Error: Data generation failed"
-        exit 1
-    fi
-    
-    cd "$SCRIPT_DIR"
-    
-    echo ""
-    echo "════════════════════════════════════════════════════════════════"
-    echo "  Step 2: Building Graph Indexes"
-    echo "════════════════════════════════════════════════════════════════"
-    echo ""
-    
-    ./generate_data.sh
-    
-    if [ $? -ne 0 ]; then
-        echo ""
-        echo "  ✗ Error: Index building failed"
-        exit 1
-    fi
-    
-    echo ""
-    echo "  ✓ Data generation and index building completed!"
-    echo ""
-}
+    echo "  ✗ Error: Data generation and index building failed"
+    exit 1
+fi
+
+cd "$SCRIPT_DIR"
+
+echo ""
+echo "  ✓ Data generation and index building completed!"
+echo ""
 
 # Check if data files exist
 DATA_EXISTS=true
@@ -138,11 +123,10 @@ if [ "$DATA_EXISTS" = false ] || [ "$INDEX_EXISTS" = false ]; then
         echo ""
         echo "  Would you like to:"
         echo "    1) Generate data and build indexes now (recommended, takes 15-20 min)"
-        echo "    2) Build indexes only (if CSV files already exist)"
-        echo "    3) Continue without data (server will start but routing won't work)"
-        echo "    4) Exit"
+        echo "    2) Continue without data (server will start but routing won't work)"
+        echo "    3) Exit"
         echo ""
-        read -p "  Enter your choice (1-4): " choice
+        read -p "  Enter your choice (1-3): " choice
         echo ""
         
         case $choice in
@@ -150,29 +134,10 @@ if [ "$DATA_EXISTS" = false ] || [ "$INDEX_EXISTS" = false ]; then
                 generate_data
                 ;;
             2)
-                if [ "$DATA_EXISTS" = false ]; then
-                    echo "  ✗ Error: Cannot build indexes without CSV data files"
-                    exit 1
-                fi
-                echo "════════════════════════════════════════════════════════════════"
-                echo "  Building Graph Indexes"
-                echo "════════════════════════════════════════════════════════════════"
-                echo ""
-                ./generate_data.sh
-                if [ $? -ne 0 ]; then
-                    echo ""
-                    echo "  ✗ Error: Index building failed"
-                    exit 1
-                fi
-                echo ""
-                echo "  ✓ Index building completed!"
-                echo ""
-                ;;
-            3)
                 echo "  ⚠ Continuing without data - routing will not work!"
                 echo ""
                 ;;
-            4)
+            3)
                 echo "  Exiting..."
                 exit 0
                 ;;

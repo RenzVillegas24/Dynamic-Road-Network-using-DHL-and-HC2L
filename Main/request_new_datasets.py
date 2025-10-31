@@ -4,6 +4,8 @@ import requests
 import pandas as pd
 import numpy as np
 import osmnx as ox
+import subprocess
+import shutil
 from math import radians, sin, cos, sqrt, atan2
 from pathlib import Path
 from dotenv import load_dotenv
@@ -102,7 +104,7 @@ def generate_osm_graph_datasets():
     output_folder = cfg['OUTPUT_FOLDER']
 
     print(f"Fetching road network for '{place_name}' from OpenStreetMap...")
-    G = ox.graph_from_place(place_name, network_type='drive')
+    G = ox.graph_from_place(place_name, network_type=Config.NETWORK_TYPE)
 
     print("Converting graph data to DataFrames...")
     gdf_nodes, gdf_edges = ox.graph_to_gdfs(G, nodes=True, edges=True)
@@ -342,6 +344,157 @@ def generate_gr_file_from_disruption_csv():
 
 
 # ============================================================
+# INDEX FILE BUILDING
+# ============================================================
+
+def build_index_files():
+    """Build DHL and HC2L index files from the generated graph."""
+    cfg = get_config()
+    
+    # Get project root (parent of Main directory)
+    main_dir = Path(__file__).parent
+    project_root = main_dir.parent
+    build_dir = main_dir / 'build'
+    processed_dir = Path(cfg['PROCESSED_DIR'])
+    
+    # File paths
+    gr_input = processed_dir / 'qc_from_csv.gr'
+    graph_output = processed_dir / 'quezon_city.graph'
+    dhl_index_base = processed_dir / 'quezon_city'
+    hc2l_index_output = processed_dir / 'quezon_city.hc2l.index'
+    
+    # Check if index executables exist
+    dhl_index_exe = build_dir / 'dhl' / 'index'
+    hc2l_index_exe = build_dir / 'hc2l' / 'index'
+    
+    # Check for Windows executables
+    if not dhl_index_exe.exists():
+        dhl_index_exe = build_dir / 'dhl' / 'index.exe'
+    if not hc2l_index_exe.exists():
+        hc2l_index_exe = build_dir / 'hc2l' / 'index.exe'
+    
+    if not dhl_index_exe.exists() or not hc2l_index_exe.exists():
+        print("\n⚠️  Warning: Index executables not found!")
+        print(f"   Expected locations:")
+        print(f"     - DHL: {build_dir / 'dhl' / 'index'}")
+        print(f"     - HC2L: {build_dir / 'hc2l' / 'index'}")
+        print("\n   Please run the build script first:")
+        print("     Linux/Mac: ./build_all.sh")
+        print("     Windows:   build_all.bat")
+        print("\n   Skipping index building...")
+        return False
+    
+    print("\n" + "="*70)
+    print("  Building Graph Indexes")
+    print("="*70)
+    
+    # Step 1: Create binary graph file
+    print("\n📊 Step 1: Converting .gr to binary graph format...")
+    print(f"   Input:  {gr_input}")
+    print(f"   Output: {graph_output}")
+    
+    try:
+        shutil.copy(str(gr_input), str(graph_output))
+        print("   ✅ Graph file created")
+    except Exception as e:
+        print(f"   ❌ Error creating graph file: {e}")
+        return False
+    
+    # Step 2: Build DHL index
+    print("\n📊 Step 2: Building DHL index...")
+    print(f"   Input:  {graph_output}")
+    print(f"   Output: {dhl_index_base}.dhl.index")
+    
+    try:
+        # Run DHL index builder
+        result = subprocess.run(
+            [str(dhl_index_exe), str(graph_output), str(dhl_index_base)],
+            capture_output=True,
+            text=True,
+            timeout=600  # 10 minute timeout
+        )
+        
+        # The DHL builder creates files with _dhl and _ch suffixes
+        # Rename them to match API expectations
+        dhl_file = Path(f"{dhl_index_base}_dhl")
+        ch_file = Path(f"{dhl_index_base}_ch")
+        
+        if dhl_file.exists():
+            dhl_file.rename(f"{dhl_index_base}.dhl.index")
+            print("   ✅ DHL index built successfully")
+        else:
+            print("   ⚠️  DHL index file not found at expected location")
+        
+        if ch_file.exists():
+            ch_file.rename(f"{dhl_index_base}.dhl.ch")
+            print("   ✅ DHL contraction hierarchy built")
+            
+    except subprocess.TimeoutExpired:
+        print("   ❌ DHL index building timed out")
+        return False
+    except Exception as e:
+        print(f"   ❌ Error building DHL index: {e}")
+        return False
+    
+    # Step 3: Build HC2L index
+    print("\n📊 Step 3: Building HC2L index...")
+    print(f"   Input:  {graph_output}")
+    print(f"   Output: {hc2l_index_output}")
+    
+    try:
+        # Run HC2L index builder (reads from stdin, writes to stdout)
+        with open(graph_output, 'r') as input_file:
+            with open(hc2l_index_output, 'w') as output_file:
+                result = subprocess.run(
+                    [str(hc2l_index_exe)],
+                    stdin=input_file,
+                    stdout=output_file,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    timeout=600  # 10 minute timeout
+                )
+        
+        if hc2l_index_output.exists() and hc2l_index_output.stat().st_size > 0:
+            print("   ✅ HC2L index built successfully")
+        else:
+            print("   ⚠️  HC2L index file not found or empty")
+            
+    except subprocess.TimeoutExpired:
+        print("   ❌ HC2L index building timed out")
+        return False
+    except Exception as e:
+        print(f"   ❌ Error building HC2L index: {e}")
+        return False
+    
+    # Step 4: Verify all files
+    print("\n📊 Step 4: Verifying created files...")
+    
+    files_to_check = [
+        graph_output,
+        Path(f"{dhl_index_base}.dhl.index"),
+        hc2l_index_output
+    ]
+    
+    all_ok = True
+    for file_path in files_to_check:
+        if file_path.exists() and file_path.stat().st_size > 0:
+            size_mb = file_path.stat().st_size / (1024 * 1024)
+            print(f"   ✅ {file_path.name} ({size_mb:.2f} MB)")
+        else:
+            print(f"   ❌ Missing or empty: {file_path.name}")
+            all_ok = False
+    
+    print("\n" + "="*70)
+    if all_ok:
+        print("✅ Index building completed successfully!")
+    else:
+        print("⚠️  Index building completed with warnings")
+    print("="*70 + "\n")
+    
+    return all_ok
+
+
+# ============================================================
 # MAIN CONTROLLER
 # ============================================================
 
@@ -437,7 +590,24 @@ def generate_all_datasets():
         scenario_path = cfg['OUTPUT_FILE_TEMPLATE'].format(i)
         print(f"       • {scenario_path}")
 
-    print("\n--- All datasets generated successfully! ---")
+    print("\n--- Dataset generation completed successfully! ---")
+    
+    # Step 6: Build index files
+    print("\n🔧 Building index files for routing algorithms...")
+    index_success = build_index_files()
+    
+    if index_success:
+        print("\n✅ All datasets and indexes generated successfully!")
+        print("\n🚀 You can now start the Flask server:")
+        print("   Linux/Mac: ./run_server.sh")
+        print("   Fish Shell: ./run_server.fish")
+        print("   Windows: run_server.bat")
+    else:
+        print("\n⚠️  Dataset generation completed, but index building had issues.")
+        print("   You may need to build the indexes manually using:")
+        print("   Linux/Mac: ./generate_data.sh")
+        print("   Fish Shell: ./generate_data.fish")
+        print("   Windows: generate_data.bat")
 
     return True
 

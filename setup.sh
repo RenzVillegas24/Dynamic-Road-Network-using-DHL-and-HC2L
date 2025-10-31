@@ -305,26 +305,19 @@ generate_data() {
     fi
 
     echo ""
-    echo "[Step 1/3] Activating conda environment..."
+    echo "[Step 1/2] Activating conda environment..."
     source "$(conda info --base)/etc/profile.d/conda.sh"
     conda activate "$CONDA_ENV_PATH"
 
-    echo "[Step 2/3] Generating OSM data (this takes time)..."
+    echo "[Step 2/2] Generating OSM data and building indexes (this takes time)..."
     cd "$MAIN_DIR"
     python request_new_datasets.py || {
-        echo -e "${RED}[ERROR]${NC} Data generation failed"
+        echo -e "${RED}[ERROR]${NC} Data generation and index building failed"
         cd "$PROJECT_ROOT"
         return 1
     }
 
     cd "$PROJECT_ROOT"
-    echo "[Step 3/3] Building indexes..."
-    chmod +x generate_data.sh
-    ./generate_data.sh || {
-        echo -e "${RED}[ERROR]${NC} Index building failed"
-        return 1
-    }
-
     echo ""
     echo -e "${GREEN}[OK]${NC} Data generation and indexing complete!"
     echo ""

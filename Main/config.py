@@ -225,6 +225,11 @@ class Config:
     # ALGORITHM PARAMETERS
     # ========================================================================
     
+    # Network type for OSM data fetching
+    # Options: 'all', 'drive', 'walk', 'bike'
+    # 'all' includes all road types (motorways, residential, etc.)
+    NETWORK_TYPE = os.getenv('NETWORK_TYPE', 'all')
+    
     # Default tau threshold for HC2L
     DEFAULT_TAU_THRESHOLD = 0.5
     
