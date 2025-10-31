@@ -1295,54 +1295,72 @@
       const usingOSMStart = window.osmSnapMarkers?.start?.data != null;
       const usingOSMDest = window.osmSnapMarkers?.dest?.data != null;
       
-      // Only add connector lines if NOT using OSM snapping
-      // (OSM snapping already shows walking path with gray dashed line)
       // Add connector from start pin to route start node
-      if (window.startLocation && routeStartCoord && !usingOSMStart) {
+      if (window.startLocation && routeStartCoord) {
+        let startPoint = window.startLocation;
+        
+        // If using OSM snapping, connect from the snapped point instead
+        if (usingOSMStart && window.osmSnapMarkers.start.data.snapped_point) {
+          startPoint = window.osmSnapMarkers.start.data.snapped_point;
+        }
+        
         const startDistance = calculateHaversineDistance(
-          window.startLocation.lat, window.startLocation.lng,
+          startPoint.lat, startPoint.lng,
           routeStartCoord.lat, routeStartCoord.lng
         );
         
-        console.log(`Adding D-HC2L start connector: ${startDistance.toFixed(0)}m`);
-        
-        const startConnector = L.polyline([
-          [window.startLocation.lat, window.startLocation.lng],
-          [routeStartCoord.lat, routeStartCoord.lng]
-        ], {
-          color: '#FF0000', // Red to match D-HC2L algorithm
-          opacity: 0.8,
-          weight: 5,
-          dashArray: '10, 5' // Dashed line to distinguish from main route
-        }).addTo(map);
-        
-        routePolylines.push(startConnector);
-      } else if (usingOSMStart) {
-        console.log('⏭️  Skipping start connector (using OSM snapping with walking path)');
+        // Only draw connector if there's a meaningful distance (>5m)
+        if (startDistance > 5) {
+          console.log(`Adding start connector: ${startDistance.toFixed(0)}m (OSM: ${usingOSMStart})`);
+          
+          const startConnector = L.polyline([
+            [startPoint.lat, startPoint.lng],
+            [routeStartCoord.lat, routeStartCoord.lng]
+          ], {
+            color: usingOSMStart ? '#757575' : '#FF0000', // Gray for OSM snap, Red for regular
+            opacity: 0.7,
+            weight: usingOSMStart ? 3 : 5,
+            dashArray: usingOSMStart ? '5, 8' : '10, 5' // Shorter dash for OSM
+          }).addTo(map);
+          
+          routePolylines.push(startConnector);
+        } else {
+          console.log(`⏭️  Skipping start connector (distance too small: ${startDistance.toFixed(1)}m)`);
+        }
       }
       
       // Add connector from route end node to destination pin
-      if (window.destLocation && routeEndCoord && !usingOSMDest) {
+      if (window.destLocation && routeEndCoord) {
+        let endPoint = window.destLocation;
+        
+        // If using OSM snapping, connect from the snapped point instead
+        if (usingOSMDest && window.osmSnapMarkers.dest.data.snapped_point) {
+          endPoint = window.osmSnapMarkers.dest.data.snapped_point;
+        }
+        
         const endDistance = calculateHaversineDistance(
           routeEndCoord.lat, routeEndCoord.lng,
-          window.destLocation.lat, window.destLocation.lng
+          endPoint.lat, endPoint.lng
         );
         
-        console.log(`Adding D-HC2L end connector: ${endDistance.toFixed(0)}m`);
-        
-        const endConnector = L.polyline([
-          [routeEndCoord.lat, routeEndCoord.lng],
-          [window.destLocation.lat, window.destLocation.lng]
-        ], {
-          color: '#FF0000', // Red to match D-HC2L algorithm
-          opacity: 0.8,
-          weight: 5,
-          dashArray: '10, 5' // Dashed line to distinguish from main route
-        }).addTo(map);
-        
-        routePolylines.push(endConnector);
-      } else if (usingOSMDest) {
-        console.log('⏭️  Skipping dest connector (using OSM snapping with walking path)');
+        // Only draw connector if there's a meaningful distance (>5m)
+        if (endDistance > 5) {
+          console.log(`Adding end connector: ${endDistance.toFixed(0)}m (OSM: ${usingOSMDest})`);
+          
+          const endConnector = L.polyline([
+            [routeEndCoord.lat, routeEndCoord.lng],
+            [endPoint.lat, endPoint.lng]
+          ], {
+            color: usingOSMDest ? '#757575' : '#FF0000', // Gray for OSM snap, Red for regular
+            opacity: 0.7,
+            weight: usingOSMDest ? 3 : 5,
+            dashArray: usingOSMDest ? '5, 8' : '10, 5' // Shorter dash for OSM
+          }).addTo(map);
+          
+          routePolylines.push(endConnector);
+        } else {
+          console.log(`⏭️  Skipping end connector (distance too small: ${endDistance.toFixed(1)}m)`);
+        }
       }
       
       console.log('D-HC2L connector polylines added successfully');
@@ -1403,54 +1421,72 @@
       const usingOSMStart = window.osmSnapMarkers?.start?.data != null;
       const usingOSMDest = window.osmSnapMarkers?.dest?.data != null;
       
-      // Only add connector lines if NOT using OSM snapping
-      // (OSM snapping already shows walking path with gray dashed line)
       // Add connector from start pin to route start node
-      if (window.startLocation && routeStartCoord && !usingOSMStart) {
+      if (window.startLocation && routeStartCoord) {
+        let startPoint = window.startLocation;
+        
+        // If using OSM snapping, connect from the snapped point instead
+        if (usingOSMStart && window.osmSnapMarkers.start.data.snapped_point) {
+          startPoint = window.osmSnapMarkers.start.data.snapped_point;
+        }
+        
         const startDistance = calculateHaversineDistance(
-          window.startLocation.lat, window.startLocation.lng,
+          startPoint.lat, startPoint.lng,
           routeStartCoord.lat, routeStartCoord.lng
         );
         
-        console.log(`Adding DHL start connector: ${startDistance.toFixed(0)}m`);
-        
-        const startConnector = L.polyline([
-          [window.startLocation.lat, window.startLocation.lng],
-          [routeStartCoord.lat, routeStartCoord.lng]
-        ], {
-          color: '#0066FF', // Blue to match DHL algorithm
-          opacity: 0.8,
-          weight: 5,
-          dashArray: '10, 5' // Dashed line to distinguish from main route
-        }).addTo(map);
-        
-        routePolylines.push(startConnector);
-      } else if (usingOSMStart) {
-        console.log('⏭️  Skipping start connector (using OSM snapping with walking path)');
+        // Only draw connector if there's a meaningful distance (>5m)
+        if (startDistance > 5) {
+          console.log(`Adding DHL start connector: ${startDistance.toFixed(0)}m (OSM: ${usingOSMStart})`);
+          
+          const startConnector = L.polyline([
+            [startPoint.lat, startPoint.lng],
+            [routeStartCoord.lat, routeStartCoord.lng]
+          ], {
+            color: usingOSMStart ? '#757575' : '#0066FF', // Gray for OSM snap, Blue for regular
+            opacity: 0.7,
+            weight: usingOSMStart ? 3 : 5,
+            dashArray: usingOSMStart ? '5, 8' : '10, 5' // Shorter dash for OSM
+          }).addTo(map);
+          
+          routePolylines.push(startConnector);
+        } else {
+          console.log(`⏭️  Skipping DHL start connector (distance too small: ${startDistance.toFixed(1)}m)`);
+        }
       }
       
       // Add connector from route end node to destination pin
-      if (window.destLocation && routeEndCoord && !usingOSMDest) {
+      if (window.destLocation && routeEndCoord) {
+        let endPoint = window.destLocation;
+        
+        // If using OSM snapping, connect from the snapped point instead
+        if (usingOSMDest && window.osmSnapMarkers.dest.data.snapped_point) {
+          endPoint = window.osmSnapMarkers.dest.data.snapped_point;
+        }
+        
         const endDistance = calculateHaversineDistance(
           routeEndCoord.lat, routeEndCoord.lng,
-          window.destLocation.lat, window.destLocation.lng
+          endPoint.lat, endPoint.lng
         );
         
-        console.log(`Adding DHL end connector: ${endDistance.toFixed(0)}m`);
-        
-        const endConnector = L.polyline([
-          [routeEndCoord.lat, routeEndCoord.lng],
-          [window.destLocation.lat, window.destLocation.lng]
-        ], {
-          color: '#0066FF', // Blue to match DHL algorithm
-          opacity: 0.8,
-          weight: 5,
-          dashArray: '10, 5' // Dashed line to distinguish from main route
-        }).addTo(map);
-        
-        routePolylines.push(endConnector);
-      } else if (usingOSMDest) {
-        console.log('⏭️  Skipping dest connector (using OSM snapping with walking path)');
+        // Only draw connector if there's a meaningful distance (>5m)
+        if (endDistance > 5) {
+          console.log(`Adding DHL end connector: ${endDistance.toFixed(0)}m (OSM: ${usingOSMDest})`);
+          
+          const endConnector = L.polyline([
+            [routeEndCoord.lat, routeEndCoord.lng],
+            [endPoint.lat, endPoint.lng]
+          ], {
+            color: usingOSMDest ? '#757575' : '#0066FF', // Gray for OSM snap, Blue for regular
+            opacity: 0.7,
+            weight: usingOSMDest ? 3 : 5,
+            dashArray: usingOSMDest ? '5, 8' : '10, 5' // Shorter dash for OSM
+          }).addTo(map);
+          
+          routePolylines.push(endConnector);
+        } else {
+          console.log(`⏭️  Skipping DHL end connector (distance too small: ${endDistance.toFixed(1)}m)`);
+        }
       }
       
       console.log('DHL connector polylines added successfully');
@@ -1634,18 +1670,42 @@
     showUpdateToast(`Computing DHL route ${useDisruptions ? 'with disruptions' : ''}...`, 'info');
     
     try {
+      // Prepare routing request with OSM edge data if available
+      const requestBody = {
+        start_lat: window.startLocation.lat,
+        start_lng: window.startLocation.lng,
+        dest_lat: window.destLocation.lat,
+        dest_lng: window.destLocation.lng,
+        use_disruptions: useDisruptions
+      };
+      
+      // Add OSM edge-based routing if snapping was used
+      if (window.osmSnapMarkers?.start?.data) {
+        requestBody.start_osm_edge = {
+          routing_nodes: window.osmSnapMarkers.start.data.routing_nodes,
+          osm_nodes: window.osmSnapMarkers.start.data.osm_nodes,
+          snap_position: window.osmSnapMarkers.start.data.snap_position,
+          road_name: window.osmSnapMarkers.start.data.road_name
+        };
+        console.log('📍 Using OSM edge for start (DHL):', requestBody.start_osm_edge);
+      }
+      
+      if (window.osmSnapMarkers?.dest?.data) {
+        requestBody.dest_osm_edge = {
+          routing_nodes: window.osmSnapMarkers.dest.data.routing_nodes,
+          osm_nodes: window.osmSnapMarkers.dest.data.osm_nodes,
+          snap_position: window.osmSnapMarkers.dest.data.snap_position,
+          road_name: window.osmSnapMarkers.dest.data.road_name
+        };
+        console.log('📍 Using OSM edge for destination (DHL):', requestBody.dest_osm_edge);
+      }
+      
       const response = await fetch('/compute_dhl_route', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          start_lat: window.startLocation.lat,
-          start_lng: window.startLocation.lng,
-          dest_lat: window.destLocation.lat,
-          dest_lng: window.destLocation.lng,
-          use_disruptions: useDisruptions
-        })
+        body: JSON.stringify(requestBody)
       });
       
       if (!response.ok) {
@@ -1682,19 +1742,43 @@
     showUpdateToast(`Computing D-HC2L route (τ=${actualThreshold}) ${useDisruptions ? 'with disruptions' : ''}...`, 'info');
     
     try {
+      // Prepare routing request with OSM edge data if available
+      const requestBody = {
+        start_lat: window.startLocation.lat,
+        start_lng: window.startLocation.lng,
+        dest_lat: window.destLocation.lat,
+        dest_lng: window.destLocation.lng,
+        threshold: actualThreshold,
+        use_disruptions: useDisruptions
+      };
+      
+      // Add OSM edge-based routing if snapping was used
+      if (window.osmSnapMarkers?.start?.data) {
+        requestBody.start_osm_edge = {
+          routing_nodes: window.osmSnapMarkers.start.data.routing_nodes,
+          osm_nodes: window.osmSnapMarkers.start.data.osm_nodes,
+          snap_position: window.osmSnapMarkers.start.data.snap_position,
+          road_name: window.osmSnapMarkers.start.data.road_name
+        };
+        console.log('📍 Using OSM edge for start:', requestBody.start_osm_edge);
+      }
+      
+      if (window.osmSnapMarkers?.dest?.data) {
+        requestBody.dest_osm_edge = {
+          routing_nodes: window.osmSnapMarkers.dest.data.routing_nodes,
+          osm_nodes: window.osmSnapMarkers.dest.data.osm_nodes,
+          snap_position: window.osmSnapMarkers.dest.data.snap_position,
+          road_name: window.osmSnapMarkers.dest.data.road_name
+        };
+        console.log('📍 Using OSM edge for destination:', requestBody.dest_osm_edge);
+      }
+      
       const response = await fetch('/compute_dhc2l_route', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          start_lat: window.startLocation.lat,
-          start_lng: window.startLocation.lng,
-          dest_lat: window.destLocation.lat,
-          dest_lng: window.destLocation.lng,
-          threshold: actualThreshold,
-          use_disruptions: useDisruptions
-        })
+        body: JSON.stringify(requestBody)
       });
       
       if (!response.ok) {

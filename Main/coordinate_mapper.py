@@ -220,3 +220,35 @@ class NodeMapper:
             print(f"❌ OSM snapper not initialized - cannot perform road-aware snapping")
         
         return None
+    
+    def get_routing_node_from_edge(
+        self,
+        routing_nodes: list,
+        snap_position: float,
+        is_start: bool
+    ) -> int:
+        """
+        Select best routing node from an OSM edge based on snap position.
+        
+        For start points: Choose the node closer to the snap position for better accuracy
+        For destinations: Choose the node that makes sense for arriving
+        
+        Args:
+            routing_nodes: [node_id1, node_id2] from the edge
+            snap_position: Position along edge (0.0 to 1.0)
+            is_start: True if this is a start point, False for destination
+            
+        Returns:
+            int: The best node ID to use for routing
+        """
+        if not routing_nodes or len(routing_nodes) != 2:
+            raise ValueError("routing_nodes must contain exactly 2 nodes")
+        
+        # Use snap position to pick the closer node
+        # snap_position 0.0 = closer to first node, 1.0 = closer to second node
+        if snap_position < 0.5:
+            # Closer to first node
+            return routing_nodes[0]
+        else:
+            # Closer to second node
+            return routing_nodes[1]

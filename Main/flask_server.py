@@ -453,6 +453,37 @@ def compute_dhc2l_route():
         dest_lng = float(data['dest_lng'])
         threshold = float(data.get('threshold', 0.0))
         
+        # Check if OSM edge-based routing should be used
+        start_osm_edge = data.get('start_osm_edge')
+        dest_osm_edge = data.get('dest_osm_edge')
+        
+        # If OSM edges provided, use geometry-based routing
+        if start_osm_edge and 'routing_nodes' in start_osm_edge:
+            routing_start_node = mapper.get_routing_node_from_edge(
+                start_osm_edge['routing_nodes'],
+                start_osm_edge.get('snap_position', 0.5),
+                is_start=True
+            )
+            print(f"🗺️  Using OSM edge-based start: {start_osm_edge['road_name']} -> Node {routing_start_node}")
+            # Override start coordinates with the routing node's coordinates
+            nodes_df = pd.read_csv(Config.NODES_CSV)
+            node_row = nodes_df[nodes_df['node_id'] == routing_start_node].iloc[0]
+            start_lat = float(node_row['latitude'])
+            start_lng = float(node_row['longitude'])
+        
+        if dest_osm_edge and 'routing_nodes' in dest_osm_edge:
+            routing_dest_node = mapper.get_routing_node_from_edge(
+                dest_osm_edge['routing_nodes'],
+                dest_osm_edge.get('snap_position', 0.5),
+                is_start=False
+            )
+            print(f"🗺️  Using OSM edge-based dest: {dest_osm_edge['road_name']} -> Node {routing_dest_node}")
+            # Override dest coordinates with the routing node's coordinates
+            nodes_df = pd.read_csv(Config.NODES_CSV)
+            node_row = nodes_df[nodes_df['node_id'] == routing_dest_node].iloc[0]
+            dest_lat = float(node_row['latitude'])
+            dest_lng = float(node_row['longitude'])
+        
         # Check if disruptions should be used
         use_disruptions = data.get('use_disruptions', False)
         
@@ -700,6 +731,37 @@ def compute_dhl_route():
         start_lng = float(data['start_lng'])
         dest_lat = float(data['dest_lat'])
         dest_lng = float(data['dest_lng'])
+        
+        # Check if OSM edge-based routing should be used
+        start_osm_edge = data.get('start_osm_edge')
+        dest_osm_edge = data.get('dest_osm_edge')
+        
+        # If OSM edges provided, use geometry-based routing
+        if start_osm_edge and 'routing_nodes' in start_osm_edge:
+            routing_start_node = mapper.get_routing_node_from_edge(
+                start_osm_edge['routing_nodes'],
+                start_osm_edge.get('snap_position', 0.5),
+                is_start=True
+            )
+            print(f"🗺️  Using OSM edge-based start (DHL): {start_osm_edge['road_name']} -> Node {routing_start_node}")
+            # Override start coordinates with the routing node's coordinates
+            nodes_df = pd.read_csv(Config.NODES_CSV)
+            node_row = nodes_df[nodes_df['node_id'] == routing_start_node].iloc[0]
+            start_lat = float(node_row['latitude'])
+            start_lng = float(node_row['longitude'])
+        
+        if dest_osm_edge and 'routing_nodes' in dest_osm_edge:
+            routing_dest_node = mapper.get_routing_node_from_edge(
+                dest_osm_edge['routing_nodes'],
+                dest_osm_edge.get('snap_position', 0.5),
+                is_start=False
+            )
+            print(f"🗺️  Using OSM edge-based dest (DHL): {dest_osm_edge['road_name']} -> Node {routing_dest_node}")
+            # Override dest coordinates with the routing node's coordinates
+            nodes_df = pd.read_csv(Config.NODES_CSV)
+            node_row = nodes_df[nodes_df['node_id'] == routing_dest_node].iloc[0]
+            dest_lat = float(node_row['latitude'])
+            dest_lng = float(node_row['longitude'])
         
         # Check if disruptions should be used
         use_disruptions = data.get('use_disruptions', False)
@@ -972,5 +1034,5 @@ if __name__ == '__main__':
         debug=Config.FLASK_DEBUG,
         host=Config.FLASK_HOST,
         port=Config.FLASK_PORT,
-        use_reloader=False  # Disable auto-reloader to prevent unwanted restarts
+        # use_reloader=False  # Disable auto-reloader to prevent unwanted restarts
     )
