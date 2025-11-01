@@ -3,6 +3,24 @@
  * 
  * Provides a JSON-based API for HC2L (Hierarchical Cut 2-Hop Labelling) routing algorithm
  * 
+ * ALGORITHM ARCHITECTURE:
+ *   HC2L is a LABELING-BASED algorithm, not a search-based algorithm.
+ *   It uses a two-phase approach for routing:
+ * 
+ *   Phase 1: DISTANCE COMPUTATION (Ultra-fast, O(1) typical)
+ *     - Uses precomputed hierarchical cut labels in ContractionIndex
+ *     - Computes shortest distance via 2-hop label intersection
+ *     - NO graph traversal required
+ * 
+ *   Phase 2: PATH RECONSTRUCTION (Standard Dijkstra)
+ *     - Uses actual road network edges
+ *     - Finds path with distance matching the label-computed distance
+ *     - Respects one-way roads and real topology
+ * 
+ *   This separation is INTENTIONAL and standard in labeling algorithms:
+ *     - Labels provide distances (what HC2L/DHL are designed for)
+ *     - Graph traversal provides paths (requires actual edges)
+ * 
  * Algorithm: Hierarchical Cut Labelling
  * Based on: https://github.com/henningkoehlernz/road-networks
  * Description: Uses hierarchical graph cuts to create efficient 2-hop distance labels
@@ -108,7 +126,34 @@ map<NodeID, GPSCoordinate> load_node_coordinates(const string& filename) {
     return coordinates;
 }
 
-// Load edges from CSV file
+// Helper function to parse CSV line with proper handling of quoted fields
+vector<string> parse_csv_line(const string& line) {
+    vector<string> fields;
+    string current_field;
+    bool in_quotes = false;
+    
+    for (size_t i = 0; i < line.length(); i++) {
+        char c = line[i];
+        
+        if (c == '"') {
+            in_quotes = !in_quotes;
+            // Keep the quotes in the field for consistency
+            current_field += c;
+        } else if (c == ',' && !in_quotes) {
+            fields.push_back(current_field);
+            current_field.clear();
+        } else {
+            current_field += c;
+        }
+    }
+    
+    // Add the last field
+    fields.push_back(current_field);
+    
+    return fields;
+}
+
+// Load edges from CSV file with one-way road support
 map<NodeID, vector<Neighbor>> load_edges(const string& filename) {
     map<NodeID, vector<Neighbor>> adj_list;
     ifstream file(filename);
@@ -122,24 +167,52 @@ map<NodeID, vector<Neighbor>> load_edges(const string& filename) {
     getline(file, line); // Skip header: source,target,length,name,highway,oneway
     
     while (getline(file, line)) {
-        stringstream ss(line);
-        string source_str, target_str, length_str;
+        // Use proper CSV parsing to handle quoted fields with commas
+        vector<string> fields = parse_csv_line(line);
         
-        // Read source,target,length (ignore rest)
-        if (getline(ss, source_str, ',') &&
-            getline(ss, target_str, ',') &&
-            getline(ss, length_str, ',')) {
+        // Expected: source,target,length,name,highway,oneway (6 fields)
+        if (fields.size() < 6) {
+            continue; // Skip malformed lines
+        }
+        
+        try {
+            NodeID source = stoul(fields[0]);
+            NodeID target = stoul(fields[1]);
+            distance_t length = static_cast<distance_t>(stod(fields[2]));
+            // fields[3] is name (ignored for routing)
+            // fields[4] is highway type (ignored for routing)
+            string oneway_str = fields[5];
             
+            // Trim whitespace from oneway value
+            oneway_str.erase(0, oneway_str.find_first_not_of(" \t\n\r"));
+            oneway_str.erase(oneway_str.find_last_not_of(" \t\n\r") + 1);
+            
+            // Parse oneway value as integer
+            // 0 = bidirectional
+            // 1 = one-way in direction of source -> target
+            // -1 = one-way in reverse direction (target -> source only)
+            int oneway = 0;
             try {
-                NodeID source = stoul(source_str);
-                NodeID target = stoul(target_str);
-                distance_t length = static_cast<distance_t>(stod(length_str));
-                
-                adj_list[source].push_back(Neighbor(target, length));
+                oneway = stoi(oneway_str);
             } catch (...) {
-                // Skip invalid lines
-                continue;
+                // If parsing fails, default to bidirectional
+                oneway = 0;
             }
+            
+            if (oneway == 1) {
+                // One-way: source -> target only
+                adj_list[source].push_back(Neighbor(target, length));
+            } else if (oneway == -1) {
+                // One-way reverse: target -> source only
+                adj_list[target].push_back(Neighbor(source, length));
+            } else {
+                // Bidirectional (oneway == 0 or any other value)
+                adj_list[source].push_back(Neighbor(target, length));
+                adj_list[target].push_back(Neighbor(source, length));
+            }
+        } catch (...) {
+            // Skip invalid lines
+            continue;
         }
     }
     

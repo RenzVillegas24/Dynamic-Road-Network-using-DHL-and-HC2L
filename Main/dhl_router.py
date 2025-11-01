@@ -1,4 +1,32 @@
 # dhl_router.py - DHL Routing Integration
+"""
+DHL (Dual-Hierarchy Labelling) Routing Service
+
+ALGORITHM ARCHITECTURE:
+    DHL is a LABELING-BASED algorithm designed for ultra-fast distance queries.
+    
+    Two-Phase Routing Process:
+    
+    Phase 1: Distance Computation (via Labels)
+        - Uses precomputed ContractionIndex labels
+        - Computes shortest distance via label intersection
+        - Time complexity: O(log n) typical
+        - NO graph search required
+    
+    Phase 2: Path Reconstruction (via Graph Traversal)
+        - Uses actual road network edges
+        - Runs Dijkstra to find path matching the label-computed distance
+        - Respects one-way roads, road closures, and real topology
+        - Time complexity: O(E log V) where E,V are local to the path
+    
+    Why This Design?
+        - Labeling algorithms (DHL, HC2L) are optimized for DISTANCE queries
+        - They do NOT store path information in labels (would be too expensive)
+        - Path reconstruction requires actual edge data
+        - This separation is standard in the field of distance oracles
+    
+    Reference: https://github.com/mufarhan/Dual-Hierarchy-Labelling
+"""
 import subprocess
 import json
 import os

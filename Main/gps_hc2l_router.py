@@ -2,11 +2,31 @@
 """
 GPS-based routing service using the Hierarchical Cut 2-Hop Labelling (HC2L) algorithm.
 
-HC2L uses hierarchical graph cuts to create efficient 2-hop distance labels for 
-fast shortest path queries in road networks.
-
-Based on: https://github.com/henningkoehlernz/road-networks
-Algorithm: Hierarchical Cut Labelling for distance queries
+ALGORITHM ARCHITECTURE:
+    HC2L is a LABELING-BASED algorithm designed for ultra-fast distance queries.
+    
+    Two-Phase Routing Process:
+    
+    Phase 1: Distance Computation (via Labels)
+        - Uses precomputed hierarchical cut labels in ContractionIndex
+        - Computes shortest distance via 2-hop label intersection
+        - Time complexity: O(1) typical, O(k) where k = label size
+        - NO graph search required
+    
+    Phase 2: Path Reconstruction (via Graph Traversal)
+        - Uses actual road network edges
+        - Runs Dijkstra to find path matching the label-computed distance
+        - Respects one-way roads, road closures, and real topology
+        - Time complexity: O(E log V) where E,V are local to the path
+    
+    Why This Design?
+        - Labeling algorithms (HC2L, DHL) are optimized for DISTANCE queries
+        - They do NOT store path information in labels (would be too expensive)
+        - Path reconstruction requires actual edge data
+        - This separation is standard in the field of distance oracles
+    
+    Reference: https://github.com/henningkoehlernz/road-networks
+    Algorithm: Hierarchical Cut Labelling for distance queries
 """
 import subprocess
 import json
