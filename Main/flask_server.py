@@ -446,52 +446,92 @@ def compute_dhc2l_route():
                 'error': 'GPS HC2L Router not initialized properly'
             })
         
-        # Extract coordinates
-        start_lat = float(data['start_lat'])
-        start_lng = float(data['start_lng'])
-        dest_lat = float(data['dest_lat'])
-        dest_lng = float(data['dest_lng'])
+        # Extract pin coordinates (original user click points)
+        start_pin_lat = float(data['start_lat'])
+        start_pin_lng = float(data['start_lng'])
+        dest_pin_lat = float(data['dest_lat'])
+        dest_pin_lng = float(data['dest_lng'])
         threshold = float(data.get('threshold', 0.0))
         
-        # Check if OSM edge-based routing should be used
+        # Check if OSM edge-based routing should be used (snap point data)
         start_osm_edge = data.get('start_osm_edge')
         dest_osm_edge = data.get('dest_osm_edge')
         
-        # If OSM edges provided, use geometry-based routing
-        if start_osm_edge and 'routing_nodes' in start_osm_edge:
-            routing_start_node = mapper.get_routing_node_from_edge(
-                start_osm_edge['routing_nodes'],
-                start_osm_edge.get('snap_position', 0.5),
-                is_start=True
-            )
-            print(f"🗺️  Using OSM edge-based start: {start_osm_edge['road_name']} -> Node {routing_start_node}")
-            # Override start coordinates with the routing node's coordinates
-            nodes_df = pd.read_csv(Config.NODES_CSV)
-            node_row = nodes_df[nodes_df['node_id'] == routing_start_node].iloc[0]
-            start_lat = float(node_row['latitude'])
-            start_lng = float(node_row['longitude'])
+        # Default to pin coordinates if no snap info
+        start_snap_lat = start_pin_lat
+        start_snap_lng = start_pin_lng
+        dest_snap_lat = dest_pin_lat
+        dest_snap_lng = dest_pin_lng
         
-        if dest_osm_edge and 'routing_nodes' in dest_osm_edge:
-            routing_dest_node = mapper.get_routing_node_from_edge(
-                dest_osm_edge['routing_nodes'],
-                dest_osm_edge.get('snap_position', 0.5),
-                is_start=False
-            )
-            print(f"🗺️  Using OSM edge-based dest: {dest_osm_edge['road_name']} -> Node {routing_dest_node}")
-            # Override dest coordinates with the routing node's coordinates
-            nodes_df = pd.read_csv(Config.NODES_CSV)
-            node_row = nodes_df[nodes_df['node_id'] == routing_dest_node].iloc[0]
-            dest_lat = float(node_row['latitude'])
-            dest_lng = float(node_row['longitude'])
+        # Default edge information (will be overridden if snap data available)
+        start_edge_source = 0
+        start_edge_target = 0
+        start_edge_oneway = 0
+        dest_edge_source = 0
+        dest_edge_target = 0
+        dest_edge_oneway = 0
+        
+        # Extract snap point and edge information from OSM snap result
+        if start_osm_edge:
+            # Get snapped coordinates
+            if 'snapped_point' in start_osm_edge:
+                start_snap_lat = float(start_osm_edge['snapped_point']['lat'])
+                start_snap_lng = float(start_osm_edge['snapped_point']['lng'])
+            
+            # Get edge information (CRITICAL: tells us which road the snap is on)
+            if 'osm_nodes' in start_osm_edge and len(start_osm_edge['osm_nodes']) >= 2:
+                start_edge_source = int(start_osm_edge['osm_nodes'][0])
+                start_edge_target = int(start_osm_edge['osm_nodes'][1])
+            
+            # Get one-way property
+            oneway_str = start_osm_edge.get('oneway', '0')
+            try:
+                start_edge_oneway = int(oneway_str)
+            except (ValueError, TypeError):
+                start_edge_oneway = 0
+            
+            print(f"🗺️  Start snap: {start_osm_edge.get('road_name', 'Unknown')} " +
+                  f"(Edge: {start_edge_source}→{start_edge_target}, oneway={start_edge_oneway})")
+        
+        if dest_osm_edge:
+            # Get snapped coordinates
+            if 'snapped_point' in dest_osm_edge:
+                dest_snap_lat = float(dest_osm_edge['snapped_point']['lat'])
+                dest_snap_lng = float(dest_osm_edge['snapped_point']['lng'])
+            
+            # Get edge information
+            if 'osm_nodes' in dest_osm_edge and len(dest_osm_edge['osm_nodes']) >= 2:
+                dest_edge_source = int(dest_osm_edge['osm_nodes'][0])
+                dest_edge_target = int(dest_osm_edge['osm_nodes'][1])
+            
+            # Get one-way property
+            oneway_str = dest_osm_edge.get('oneway', '0')
+            try:
+                dest_edge_oneway = int(oneway_str)
+            except (ValueError, TypeError):
+                dest_edge_oneway = 0
+            
+            print(f"🗺️  Dest snap: {dest_osm_edge.get('road_name', 'Unknown')} " +
+                  f"(Edge: {dest_edge_source}→{dest_edge_target}, oneway={dest_edge_oneway})")
         
         # Check if disruptions should be used
         use_disruptions = data.get('use_disruptions', False)
         
-        print(f"Computing GPS HC2L route: ({start_lat}, {start_lng}) -> ({dest_lat}, {dest_lng}) [Disruptions: {use_disruptions}]")
+        print(f"Computing GPS HC2L route with snap points:")
+        print(f"  Start: Pin({start_pin_lat}, {start_pin_lng}) → Snap({start_snap_lat}, {start_snap_lng})")
+        print(f"  Dest:  Pin({dest_pin_lat}, {dest_pin_lng}) → Snap({dest_snap_lat}, {dest_snap_lng})")
         
-        # Compute route using GPS HC2L
+        # Compute route using GPS HC2L with new argument structure
         start_time = time.time()
-        route_result = gps_router.compute_route(start_lat, start_lng, dest_lat, dest_lng, use_disruptions, threshold)
+        route_result = gps_router.compute_route(
+            start_pin_lat, start_pin_lng,
+            dest_pin_lat, dest_pin_lng,
+            start_snap_lat, start_snap_lng,
+            dest_snap_lat, dest_snap_lng,
+            start_edge_source, start_edge_target, start_edge_oneway,
+            dest_edge_source, dest_edge_target, dest_edge_oneway,
+            use_disruptions, threshold
+        )
         computation_time = time.time() - start_time
         
         if not route_result['success']:
@@ -523,8 +563,10 @@ def compute_dhc2l_route():
             'success': True,
             'route': {
                 'polylines': polylines,
-                'start_point': {'lat': start_lat, 'lng': start_lng},
-                'end_point': {'lat': dest_lat, 'lng': dest_lng},
+                'start_point': {'lat': start_snap_lat, 'lng': start_snap_lng},
+                'end_point': {'lat': dest_snap_lat, 'lng': dest_snap_lng},
+                'pin_start': {'lat': start_pin_lat, 'lng': start_pin_lng},
+                'pin_end': {'lat': dest_pin_lat, 'lng': dest_pin_lng},
                 'coordinates': route_result.get('route', {}).get('coordinates', []),
                 'path_nodes': route_result.get('route', {}).get('path_nodes', []),
                 'road_segments': route_result.get('route', {}).get('road_segments', []),
@@ -540,10 +582,13 @@ def compute_dhc2l_route():
             'mode_explanation': summary.get('mode_explanation', ''),
             'labels_status': summary.get('labels_status', 'original'),
             'gps_mapping': route_result.get('gps_mapping', {}),
+            'snap_edges': route_result.get('snap_edges', {}),
             'raw_output': route_result.get('raw_output', '')
         })
         
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({
             'success': False,
             'error': f"Route computation error: {str(e)}"
@@ -726,51 +771,91 @@ def compute_dhl_route():
                 'error': 'DHL Router not initialized properly'
             })
         
-        # Extract coordinates
-        start_lat = float(data['start_lat'])
-        start_lng = float(data['start_lng'])
-        dest_lat = float(data['dest_lat'])
-        dest_lng = float(data['dest_lng'])
+        # Extract pin coordinates (original user click points)
+        start_pin_lat = float(data['start_lat'])
+        start_pin_lng = float(data['start_lng'])
+        dest_pin_lat = float(data['dest_lat'])
+        dest_pin_lng = float(data['dest_lng'])
         
-        # Check if OSM edge-based routing should be used
+        # Check if OSM edge-based routing should be used (snap point data)
         start_osm_edge = data.get('start_osm_edge')
         dest_osm_edge = data.get('dest_osm_edge')
         
-        # If OSM edges provided, use geometry-based routing
-        if start_osm_edge and 'routing_nodes' in start_osm_edge:
-            routing_start_node = mapper.get_routing_node_from_edge(
-                start_osm_edge['routing_nodes'],
-                start_osm_edge.get('snap_position', 0.5),
-                is_start=True
-            )
-            print(f"🗺️  Using OSM edge-based start (DHL): {start_osm_edge['road_name']} -> Node {routing_start_node}")
-            # Override start coordinates with the routing node's coordinates
-            nodes_df = pd.read_csv(Config.NODES_CSV)
-            node_row = nodes_df[nodes_df['node_id'] == routing_start_node].iloc[0]
-            start_lat = float(node_row['latitude'])
-            start_lng = float(node_row['longitude'])
+        # Default to pin coordinates if no snap info
+        start_snap_lat = start_pin_lat
+        start_snap_lng = start_pin_lng
+        dest_snap_lat = dest_pin_lat
+        dest_snap_lng = dest_pin_lng
         
-        if dest_osm_edge and 'routing_nodes' in dest_osm_edge:
-            routing_dest_node = mapper.get_routing_node_from_edge(
-                dest_osm_edge['routing_nodes'],
-                dest_osm_edge.get('snap_position', 0.5),
-                is_start=False
-            )
-            print(f"🗺️  Using OSM edge-based dest (DHL): {dest_osm_edge['road_name']} -> Node {routing_dest_node}")
-            # Override dest coordinates with the routing node's coordinates
-            nodes_df = pd.read_csv(Config.NODES_CSV)
-            node_row = nodes_df[nodes_df['node_id'] == routing_dest_node].iloc[0]
-            dest_lat = float(node_row['latitude'])
-            dest_lng = float(node_row['longitude'])
+        # Default edge information (will be overridden if snap data available)
+        start_edge_source = 0
+        start_edge_target = 0
+        start_edge_oneway = 0
+        dest_edge_source = 0
+        dest_edge_target = 0
+        dest_edge_oneway = 0
+        
+        # Extract snap point and edge information from OSM snap result
+        if start_osm_edge:
+            # Get snapped coordinates
+            if 'snapped_point' in start_osm_edge:
+                start_snap_lat = float(start_osm_edge['snapped_point']['lat'])
+                start_snap_lng = float(start_osm_edge['snapped_point']['lng'])
+            
+            # Get edge information (CRITICAL: tells us which road the snap is on)
+            if 'osm_nodes' in start_osm_edge and len(start_osm_edge['osm_nodes']) >= 2:
+                start_edge_source = int(start_osm_edge['osm_nodes'][0])
+                start_edge_target = int(start_osm_edge['osm_nodes'][1])
+            
+            # Get one-way property
+            oneway_str = start_osm_edge.get('oneway', '0')
+            try:
+                start_edge_oneway = int(oneway_str)
+            except (ValueError, TypeError):
+                start_edge_oneway = 0
+            
+            print(f"🗺️  Start snap (DHL): {start_osm_edge.get('road_name', 'Unknown')} " +
+                  f"(Edge: {start_edge_source}→{start_edge_target}, oneway={start_edge_oneway})")
+        
+        if dest_osm_edge:
+            # Get snapped coordinates
+            if 'snapped_point' in dest_osm_edge:
+                dest_snap_lat = float(dest_osm_edge['snapped_point']['lat'])
+                dest_snap_lng = float(dest_osm_edge['snapped_point']['lng'])
+            
+            # Get edge information
+            if 'osm_nodes' in dest_osm_edge and len(dest_osm_edge['osm_nodes']) >= 2:
+                dest_edge_source = int(dest_osm_edge['osm_nodes'][0])
+                dest_edge_target = int(dest_osm_edge['osm_nodes'][1])
+            
+            # Get one-way property
+            oneway_str = dest_osm_edge.get('oneway', '0')
+            try:
+                dest_edge_oneway = int(oneway_str)
+            except (ValueError, TypeError):
+                dest_edge_oneway = 0
+            
+            print(f"🗺️  Dest snap (DHL): {dest_osm_edge.get('road_name', 'Unknown')} " +
+                  f"(Edge: {dest_edge_source}→{dest_edge_target}, oneway={dest_edge_oneway})")
         
         # Check if disruptions should be used
         use_disruptions = data.get('use_disruptions', False)
         
-        print(f"Computing DHL route: ({start_lat}, {start_lng}) -> ({dest_lat}, {dest_lng}) [Disruptions: {use_disruptions}]")
+        print(f"Computing DHL route with snap points:")
+        print(f"  Start: Pin({start_pin_lat}, {start_pin_lng}) → Snap({start_snap_lat}, {start_snap_lng})")
+        print(f"  Dest:  Pin({dest_pin_lat}, {dest_pin_lng}) → Snap({dest_snap_lat}, {dest_snap_lng})")
         
-        # Compute route using DHL
+        # Compute route using DHL with new argument structure
         start_time = time.time()
-        route_result = dhl_router.compute_route(start_lat, start_lng, dest_lat, dest_lng, use_disruptions)
+        route_result = dhl_router.compute_route(
+            start_pin_lat, start_pin_lng,
+            dest_pin_lat, dest_pin_lng,
+            start_snap_lat, start_snap_lng,
+            dest_snap_lat, dest_snap_lng,
+            start_edge_source, start_edge_target, start_edge_oneway,
+            dest_edge_source, dest_edge_target, dest_edge_oneway,
+            use_disruptions
+        )
         computation_time = time.time() - start_time
         
         if not route_result['success']:
@@ -795,8 +880,10 @@ def compute_dhl_route():
             'success': True,
             'route': {
                 'polylines': polylines,
-                'start_point': {'lat': start_lat, 'lng': start_lng},
-                'end_point': {'lat': dest_lat, 'lng': dest_lng},
+                'start_point': {'lat': start_snap_lat, 'lng': start_snap_lng},
+                'end_point': {'lat': dest_snap_lat, 'lng': dest_snap_lng},
+                'pin_start': {'lat': start_pin_lat, 'lng': start_pin_lng},
+                'pin_end': {'lat': dest_pin_lat, 'lng': dest_pin_lng},
                 'coordinates': route_result.get('route', {}).get('coordinates', []),
                 'path_nodes': route_result.get('route', {}).get('path_nodes', []),
                 'road_segments': route_result.get('route', {}).get('road_segments', []),
@@ -809,11 +896,14 @@ def compute_dhl_route():
             'metrics': summary,
             'algorithm': 'DHL (Dual-Hierarchy Labelling)',
             'gps_mapping': route_result.get('gps_mapping', {}),
+            'snap_edges': route_result.get('snap_edges', {}),
             'disruptions': route_result.get('disruptions', {}),
             'raw_dhl_output': route_result.get('raw_dhl_output', {})
         })
         
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({
             'success': False,
             'error': f"DHL route computation error: {str(e)}"

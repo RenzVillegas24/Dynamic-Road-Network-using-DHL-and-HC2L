@@ -65,29 +65,49 @@ class DHLRouter:
         print(f"✅ Using DHL routing executable: {self.cpp_executable}")
         print(f"✅ Road geometry loader initialized")
     
-    def compute_route(self, start_lat: float, start_lng: float, 
-                     dest_lat: float, dest_lng: float, use_disruptions: bool = False,
+    def compute_route(self, 
+                     start_pin_lat: float, start_pin_lng: float,
+                     dest_pin_lat: float, dest_pin_lng: float,
+                     start_snap_lat: float, start_snap_lng: float,
+                     dest_snap_lat: float, dest_snap_lng: float,
+                     start_edge_source: int, start_edge_target: int, start_edge_oneway: int,
+                     dest_edge_source: int, dest_edge_target: int, dest_edge_oneway: int,
+                     use_disruptions: bool = False,
                      tau_threshold: float = 0.5) -> Dict:
         """
-        Compute route using DHL algorithm via JSON API
+        Compute route using DHL algorithm via JSON API with snap point information
         Returns route data with polylines and metrics
         
         Args:
-            start_lat: Starting latitude
-            start_lng: Starting longitude
-            dest_lat: Destination latitude
-            dest_lng: Destination longitude
+            start_pin_lat: Starting pin point latitude (user click)
+            start_pin_lng: Starting pin point longitude (user click)
+            dest_pin_lat: Destination pin point latitude (user click)
+            dest_pin_lng: Destination pin point longitude (user click)
+            start_snap_lat: Starting snap point latitude (snapped to edge)
+            start_snap_lng: Starting snap point longitude (snapped to edge)
+            dest_snap_lat: Destination snap point latitude (snapped to edge)
+            dest_snap_lng: Destination snap point longitude (snapped to edge)
+            start_edge_source: Source node of edge where start snap occurred
+            start_edge_target: Target node of edge where start snap occurred
+            start_edge_oneway: One-way property of start edge (1=forward, -1=reverse, 0=bidirectional)
+            dest_edge_source: Source node of edge where dest snap occurred
+            dest_edge_target: Target node of edge where dest snap occurred
+            dest_edge_oneway: One-way property of dest edge (1=forward, -1=reverse, 0=bidirectional)
             use_disruptions: Whether to consider traffic disruptions
             tau_threshold: DHL threshold parameter (default: 0.5)
         """
         try:
             print(f"Executing DHL JSON API route computation...")
             
-            # Build command with file paths from config
+            # Build command with new argument structure
             cmd = [
                 self.cpp_executable,
-                str(start_lat), str(start_lng),
-                str(dest_lat), str(dest_lng),
+                str(start_pin_lat), str(start_pin_lng),
+                str(start_snap_lat), str(start_snap_lng),
+                str(start_edge_source), str(start_edge_target), str(start_edge_oneway),
+                str(dest_pin_lat), str(dest_pin_lng),
+                str(dest_snap_lat), str(dest_snap_lng),
+                str(dest_edge_source), str(dest_edge_target), str(dest_edge_oneway),
                 "true" if use_disruptions else "false",
                 str(tau_threshold),
                 str(Config.NODES_CSV),

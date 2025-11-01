@@ -1685,7 +1685,8 @@
           routing_nodes: window.osmSnapMarkers.start.data.routing_nodes,
           osm_nodes: window.osmSnapMarkers.start.data.osm_nodes,
           snap_position: window.osmSnapMarkers.start.data.snap_position,
-          road_name: window.osmSnapMarkers.start.data.road_name
+          road_name: window.osmSnapMarkers.start.data.road_name,
+          oneway: window.osmSnapMarkers.start.data.oneway
         };
         console.log('📍 Using OSM edge for start (DHL):', requestBody.start_osm_edge);
       }
@@ -1695,7 +1696,8 @@
           routing_nodes: window.osmSnapMarkers.dest.data.routing_nodes,
           osm_nodes: window.osmSnapMarkers.dest.data.osm_nodes,
           snap_position: window.osmSnapMarkers.dest.data.snap_position,
-          road_name: window.osmSnapMarkers.dest.data.road_name
+          road_name: window.osmSnapMarkers.dest.data.road_name,
+          oneway: window.osmSnapMarkers.dest.data.oneway
         };
         console.log('📍 Using OSM edge for destination (DHL):', requestBody.dest_osm_edge);
       }
@@ -1758,7 +1760,8 @@
           routing_nodes: window.osmSnapMarkers.start.data.routing_nodes,
           osm_nodes: window.osmSnapMarkers.start.data.osm_nodes,
           snap_position: window.osmSnapMarkers.start.data.snap_position,
-          road_name: window.osmSnapMarkers.start.data.road_name
+          road_name: window.osmSnapMarkers.start.data.road_name,
+          oneway: window.osmSnapMarkers.start.data.oneway
         };
         console.log('📍 Using OSM edge for start:', requestBody.start_osm_edge);
       }
@@ -1768,7 +1771,8 @@
           routing_nodes: window.osmSnapMarkers.dest.data.routing_nodes,
           osm_nodes: window.osmSnapMarkers.dest.data.osm_nodes,
           snap_position: window.osmSnapMarkers.dest.data.snap_position,
-          road_name: window.osmSnapMarkers.dest.data.road_name
+          road_name: window.osmSnapMarkers.dest.data.road_name,
+          oneway: window.osmSnapMarkers.dest.data.oneway
         };
         console.log('📍 Using OSM edge for destination:', requestBody.dest_osm_edge);
       }

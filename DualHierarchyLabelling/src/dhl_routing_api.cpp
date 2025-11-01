@@ -22,13 +22,25 @@
  *     - Graph traversal provides paths (requires actual edges)
  * 
  * Usage:
- *   ./dhl_routing_api <start_lat> <start_lng> <dest_lat> <dest_lng> <use_disruptions> <tau_threshold> <nodes_csv> <edges_csv> <index_file>
+ *   ./dhl_routing_api <start_pin_lat> <start_pin_lng> <start_snap_lat> <start_snap_lng> <start_edge_source> <start_edge_target> <start_edge_oneway> \
+ *                      <dest_pin_lat> <dest_pin_lng> <dest_snap_lat> <dest_snap_lng> <dest_edge_source> <dest_edge_target> <dest_edge_oneway> \
+ *                      <use_disruptions> <tau_threshold> <nodes_csv> <edges_csv> <index_file>
  * 
- * Arguments:
- *   start_lat: Starting point latitude
- *   start_lng: Starting point longitude
- *   dest_lat: Destination latitude
- *   dest_lng: Destination longitude
+ * Arguments:                       
+ *   start_pin_lat: Starting pin point latitude (user click)
+ *   start_pin_lng: Starting pin point longitude (user click)
+ *   start_snap_lat: Starting snap point latitude (snapped to edge)
+ *   start_snap_lng: Starting snap point longitude (snapped to edge)
+ *   start_edge_source: Source node of edge where start snap occurred
+ *   start_edge_target: Target node of edge where start snap occurred
+ *   start_edge_oneway: One-way property of start edge (1=forward, -1=reverse, 0=bidirectional)
+ *   dest_pin_lat: Destination pin point latitude (user click)
+ *   dest_pin_lng: Destination pin point longitude (user click)
+ *   dest_snap_lat: Destination snap point latitude (snapped to edge)
+ *   dest_snap_lng: Destination snap point longitude (snapped to edge)
+ *   dest_edge_source: Source node of edge where dest snap occurred
+ *   dest_edge_target: Target node of edge where dest snap occurred
+ *   dest_edge_oneway: One-way property of dest edge (1=forward, -1=reverse, 0=bidirectional)
  *   use_disruptions: "true" or "false" - whether to consider traffic disruptions
  *   tau_threshold: Float value (e.g., 0.5) - threshold parameter for routing
  *   nodes_csv: Path to nodes CSV file (node_id,latitude,longitude)
@@ -280,6 +292,188 @@ map<NodeID, vector<Neighbor>> load_edges(const string& filename, map<pair<NodeID
     return adj_list;
 }
 
+// Select routing nodes to ensure the snap edges are actually used in the route
+// CRITICAL: The route MUST start by traversing start_edge and END by arriving via dest_edge
+// This ensures we respect the exact road where the user's pin was snapped
+struct RoutingEndpoints {
+    NodeID start_node;  // Node where routing algorithm starts
+    NodeID dest_node;   // Node where routing algorithm ends
+    bool reverse_start_edge;  // Whether to reverse first edge in output
+    bool reverse_dest_edge;   // Whether to reverse last edge in output
+};
+
+RoutingEndpoints select_routing_endpoints(
+    NodeID start_edge_source, NodeID start_edge_target, int start_edge_oneway,
+    NodeID dest_edge_source, NodeID dest_edge_target, int dest_edge_oneway,
+    const map<NodeID, vector<Neighbor>>& adj_list,
+    double start_snap_lat, double start_snap_lng,
+    double dest_snap_lat, double dest_snap_lng,
+    const map<NodeID, GPSCoordinate>& node_coords) {
+    
+    RoutingEndpoints result;
+    result.reverse_start_edge = false;
+    result.reverse_dest_edge = false;
+    
+    // START EDGE: We route FROM one of the edge's nodes
+    // Priority: respect one-way direction, then choose node CLOSER to snap point
+    if (start_edge_oneway == 1) {
+        // One-way forward: must exit FROM source node (going toward target)
+        result.start_node = start_edge_source;
+    } else if (start_edge_oneway == -1) {
+        // One-way reverse: must exit FROM target node (going toward source)
+        result.start_node = start_edge_target;
+    } else {
+        // Bidirectional: choose node CLOSER to the snap point
+        if (node_coords.count(start_edge_source) && node_coords.count(start_edge_target)) {
+            double dist_to_source = haversine_distance(
+                start_snap_lat, start_snap_lng,
+                node_coords.at(start_edge_source).latitude,
+                node_coords.at(start_edge_source).longitude
+            );
+            double dist_to_target = haversine_distance(
+                start_snap_lat, start_snap_lng,
+                node_coords.at(start_edge_target).latitude,
+                node_coords.at(start_edge_target).longitude
+            );
+            // Choose the FARTHER node to route FROM (so we traverse the snap edge)
+            result.start_node = (dist_to_source > dist_to_target) ? start_edge_source : start_edge_target;
+        } else {
+            // Fallback: choose node with more outgoing connections
+            size_t source_neighbors = adj_list.count(start_edge_source) ? adj_list.at(start_edge_source).size() : 0;
+            size_t target_neighbors = adj_list.count(start_edge_target) ? adj_list.at(start_edge_target).size() : 0;
+            result.start_node = (source_neighbors >= target_neighbors) ? start_edge_source : start_edge_target;
+        }
+    }
+    
+    // DEST EDGE: We route TO one of the edge's nodes
+    // Priority: respect one-way direction, then choose node CLOSER to snap point
+    if (dest_edge_oneway == 1) {
+        // One-way forward: must arrive AT target node (coming from source)
+        result.dest_node = dest_edge_target;
+    } else if (dest_edge_oneway == -1) {
+        // One-way reverse: must arrive AT source node (coming from target)
+        result.dest_node = dest_edge_source;
+    } else {
+        // Bidirectional: choose node CLOSER to the snap point
+        if (node_coords.count(dest_edge_source) && node_coords.count(dest_edge_target)) {
+            double dist_to_source = haversine_distance(
+                dest_snap_lat, dest_snap_lng,
+                node_coords.at(dest_edge_source).latitude,
+                node_coords.at(dest_edge_source).longitude
+            );
+            double dist_to_target = haversine_distance(
+                dest_snap_lat, dest_snap_lng,
+                node_coords.at(dest_edge_target).latitude,
+                node_coords.at(dest_edge_target).longitude
+            );
+            // Choose the FARTHER node to route TO (so we traverse the snap edge)
+            result.dest_node = (dist_to_source > dist_to_target) ? dest_edge_source : dest_edge_target;
+        } else {
+            // Fallback: choose node with more incoming connections
+            size_t source_neighbors = adj_list.count(dest_edge_source) ? adj_list.at(dest_edge_source).size() : 0;
+            size_t target_neighbors = adj_list.count(dest_edge_target) ? adj_list.at(dest_edge_target).size() : 0;
+            result.dest_node = (target_neighbors >= source_neighbors) ? dest_edge_target : dest_edge_source;
+        }
+    }
+    
+    return result;
+}
+
+// Ensure snap edges are included in the path
+// Prepends start edge and appends dest edge to guarantee they're traversed
+vector<NodeID> ensure_snap_edges_in_path(
+    const vector<NodeID>& original_path,
+    NodeID start_edge_source, NodeID start_edge_target, int start_edge_oneway,
+    NodeID dest_edge_source, NodeID dest_edge_target, int dest_edge_oneway) {
+    
+    if (original_path.empty()) {
+        return original_path;
+    }
+    
+    vector<NodeID> enhanced_path;
+    NodeID first_node = original_path[0];
+    NodeID last_node = original_path[original_path.size() - 1];
+    
+    // PREPEND START EDGE if needed
+    // Check if the path starts with one of the start edge nodes
+    bool start_edge_included = false;
+    if (original_path.size() >= 2) {
+        // Check if first two nodes form the start edge
+        NodeID second_node = original_path[1];
+        if ((first_node == start_edge_source && second_node == start_edge_target) ||
+            (first_node == start_edge_target && second_node == start_edge_source)) {
+            start_edge_included = true;
+        }
+    }
+    
+    if (!start_edge_included) {
+        // Need to prepend the other node to create the start edge
+        // CRITICAL: Respect one-way direction!
+        if (start_edge_oneway == 1) {
+            // Forward: source→target, so we must start FROM source
+            if (first_node == start_edge_target) {
+                enhanced_path.push_back(start_edge_source);
+            }
+            // If first_node == source, edge is already correct (source→...)
+        } else if (start_edge_oneway == -1) {
+            // Reverse: target→source, so we must start FROM target
+            if (first_node == start_edge_source) {
+                enhanced_path.push_back(start_edge_target);
+            }
+            // If first_node == target, edge is already correct (target→...)
+        } else {
+            // Bidirectional: allow either direction
+            if (first_node == start_edge_source) {
+                enhanced_path.push_back(start_edge_target);
+            } else if (first_node == start_edge_target) {
+                enhanced_path.push_back(start_edge_source);
+            }
+        }
+    }
+    
+    // Add original path
+    enhanced_path.insert(enhanced_path.end(), original_path.begin(), original_path.end());
+    
+    // APPEND DEST EDGE if needed
+    // Check if the path ends with one of the dest edge nodes
+    bool dest_edge_included = false;
+    if (original_path.size() >= 2) {
+        // Check if last two nodes form the dest edge
+        NodeID second_last_node = original_path[original_path.size() - 2];
+        if ((second_last_node == dest_edge_source && last_node == dest_edge_target) ||
+            (second_last_node == dest_edge_target && last_node == dest_edge_source)) {
+            dest_edge_included = true;
+        }
+    }
+    
+    if (!dest_edge_included) {
+        // Need to append the other node to create the dest edge
+        // CRITICAL: Respect one-way direction!
+        if (dest_edge_oneway == 1) {
+            // Forward: source→target, so we must arrive AT target
+            if (last_node == dest_edge_source) {
+                enhanced_path.push_back(dest_edge_target);
+            }
+            // If last_node == target, edge is already correct (...→target)
+        } else if (dest_edge_oneway == -1) {
+            // Reverse: target→source, so we must arrive AT source
+            if (last_node == dest_edge_target) {
+                enhanced_path.push_back(dest_edge_source);
+            }
+            // If last_node == source, edge is already correct (...→source)
+        } else {
+            // Bidirectional: allow either direction
+            if (last_node == dest_edge_source) {
+                enhanced_path.push_back(dest_edge_target);
+            } else if (last_node == dest_edge_target) {
+                enhanced_path.push_back(dest_edge_source);
+            }
+        }
+    }
+    
+    return enhanced_path;
+}
+
 // Find nearest node to given GPS coordinates
 NodeID find_nearest_node(double lat, double lng, const map<NodeID, GPSCoordinate>& coordinates, double max_distance = 1000.0) {
     NodeID nearest = 0;
@@ -368,11 +562,61 @@ vector<NodeID> find_shortest_path(NodeID start, NodeID dest, const map<NodeID, v
     return path;
 }
 
+// Helper function to find closest point on geometry to a snap point and clip the geometry
+vector<pair<double, double>> clip_geometry_at_snap(
+    const vector<pair<double, double>>& coords,
+    double snap_lat, double snap_lng,
+    bool clip_start) {
+    
+    if (coords.empty()) return coords;
+    
+    // Find the closest point on the geometry to the snap point
+    double min_dist = numeric_limits<double>::max();
+    size_t closest_idx = 0;
+    
+    for (size_t i = 0; i < coords.size(); i++) {
+        double dist = haversine_distance(snap_lat, snap_lng, coords[i].second, coords[i].first);
+        if (dist < min_dist) {
+            min_dist = dist;
+            closest_idx = i;
+        }
+    }
+    
+    // Clip the geometry based on whether it's start or end
+    vector<pair<double, double>> clipped;
+    
+    if (clip_start) {
+        // For start edge: keep from closest point to end
+        for (size_t i = closest_idx; i < coords.size(); i++) {
+            clipped.push_back(coords[i]);
+        }
+        // Prepend the actual snap point
+        if (!clipped.empty()) {
+            clipped.insert(clipped.begin(), {snap_lng, snap_lat});
+        }
+    } else {
+        // For end edge: keep from start to closest point
+        for (size_t i = 0; i <= closest_idx && i < coords.size(); i++) {
+            clipped.push_back(coords[i]);
+        }
+        // Append the actual snap point
+        if (!clipped.empty()) {
+            clipped.push_back({snap_lng, snap_lat});
+        }
+    }
+    
+    return clipped.empty() ? coords : clipped;
+}
+
 // Output JSON response
 void output_json_response(bool success, const string& error_message = "",
                          NodeID start_node = 0, NodeID dest_node = 0,
-                         double start_lat = 0, double start_lng = 0,
-                         double dest_lat = 0, double dest_lng = 0,
+                         double start_pin_lat = 0, double start_pin_lng = 0,
+                         double start_snap_lat = 0, double start_snap_lng = 0,
+                         double dest_pin_lat = 0, double dest_pin_lng = 0,
+                         double dest_snap_lat = 0, double dest_snap_lng = 0,
+                         NodeID start_edge_source = 0, NodeID start_edge_target = 0, int start_edge_oneway = 0,
+                         NodeID dest_edge_source = 0, NodeID dest_edge_target = 0, int dest_edge_oneway = 0,
                          distance_t distance = 0, double query_time_ms = 0,
                          const vector<NodeID>& path = vector<NodeID>(),
                          const map<NodeID, GPSCoordinate>& coordinates = map<NodeID, GPSCoordinate>(),
@@ -387,12 +631,29 @@ void output_json_response(bool success, const string& error_message = "",
     } else {
         cout << "  \"algorithm\": \"DHL (Dual-Hierarchy Labelling)\"," << endl;
         cout << "  \"input\": {" << endl;
-        cout << "    \"start_lat\": " << fixed << setprecision(6) << start_lat << "," << endl;
-        cout << "    \"start_lng\": " << fixed << setprecision(6) << start_lng << "," << endl;
-        cout << "    \"dest_lat\": " << fixed << setprecision(6) << dest_lat << "," << endl;
-        cout << "    \"dest_lng\": " << fixed << setprecision(6) << dest_lng << "," << endl;
+        cout << "    \"start_pin_lat\": " << fixed << setprecision(6) << start_pin_lat << "," << endl;
+        cout << "    \"start_pin_lng\": " << fixed << setprecision(6) << start_pin_lng << "," << endl;
+        cout << "    \"start_snap_lat\": " << fixed << setprecision(6) << start_snap_lat << "," << endl;
+        cout << "    \"start_snap_lng\": " << fixed << setprecision(6) << start_snap_lng << "," << endl;
+        cout << "    \"dest_pin_lat\": " << fixed << setprecision(6) << dest_pin_lat << "," << endl;
+        cout << "    \"dest_pin_lng\": " << fixed << setprecision(6) << dest_pin_lng << "," << endl;
+        cout << "    \"dest_snap_lat\": " << fixed << setprecision(6) << dest_snap_lat << "," << endl;
+        cout << "    \"dest_snap_lng\": " << fixed << setprecision(6) << dest_snap_lng << "," << endl;
         cout << "    \"use_disruptions\": " << (use_disruptions ? "true" : "false") << "," << endl;
         cout << "    \"tau_threshold\": " << fixed << setprecision(2) << tau_threshold << endl;
+        cout << "  }," << endl;
+        
+        cout << "  \"snap_edges\": {" << endl;
+        cout << "    \"start_edge\": {" << endl;
+        cout << "      \"source\": " << start_edge_source << "," << endl;
+        cout << "      \"target\": " << start_edge_target << "," << endl;
+        cout << "      \"oneway\": " << start_edge_oneway << endl;
+        cout << "    }," << endl;
+        cout << "    \"dest_edge\": {" << endl;
+        cout << "      \"source\": " << dest_edge_source << "," << endl;
+        cout << "      \"target\": " << dest_edge_target << "," << endl;
+        cout << "      \"oneway\": " << dest_edge_oneway << endl;
+        cout << "    }" << endl;
         cout << "  }," << endl;
         
         cout << "  \"gps_mapping\": {" << endl;
@@ -418,7 +679,8 @@ void output_json_response(bool success, const string& error_message = "",
         cout << "    \"query_time_ms\": " << fixed << setprecision(3) << query_time_ms << "," << endl;
         cout << "    \"path_length\": " << path.size() << "," << endl;
         cout << "    \"uses_disruptions\": " << (use_disruptions ? "true" : "false") << "," << endl;
-        cout << "    \"tau_threshold\": " << fixed << setprecision(2) << tau_threshold << endl;
+        cout << "    \"tau_threshold\": " << fixed << setprecision(2) << tau_threshold << "," << endl;
+        cout << "    \"interpolation_used\": false" << endl;
         cout << "  }," << endl;
         
         cout << "  \"route\": {" << endl;
@@ -445,10 +707,14 @@ void output_json_response(bool success, const string& error_message = "",
         cout << ")\"," << endl;
         
         // Output detailed geometry for each edge in the path
+        // Clip first and last edges at snap points to avoid overflow
         cout << "    \"geometry\": [" << endl;
         for (size_t i = 0; i < path.size() - 1; i++) {
             NodeID from = path[i];
             NodeID to = path[i + 1];
+            
+            bool is_first_edge = (i == 0);
+            bool is_last_edge = (i == path.size() - 2);
             
             cout << "      {" << endl;
             cout << "        \"from\": " << from << "," << endl;
@@ -459,19 +725,42 @@ void output_json_response(bool success, const string& error_message = "",
             auto edge_key = make_pair(from, to);
             if (edge_geometries.count(edge_key)) {
                 const auto& geom = edge_geometries.at(edge_key);
-                for (size_t j = 0; j < geom.coords.size(); j++) {
-                    cout << "[" << fixed << setprecision(6) << geom.coords[j].first << ", " 
-                         << geom.coords[j].second << "]";
-                    if (j < geom.coords.size() - 1) cout << ", ";
+                vector<pair<double, double>> coords_to_output = geom.coords;
+                
+                // Clip geometry at snap points for first and last edges
+                if (is_first_edge) {
+                    coords_to_output = clip_geometry_at_snap(geom.coords, start_snap_lat, start_snap_lng, true);
+                } else if (is_last_edge) {
+                    coords_to_output = clip_geometry_at_snap(geom.coords, dest_snap_lat, dest_snap_lng, false);
+                }
+                
+                for (size_t j = 0; j < coords_to_output.size(); j++) {
+                    cout << "[" << fixed << setprecision(6) << coords_to_output[j].first << ", " 
+                         << coords_to_output[j].second << "]";
+                    if (j < coords_to_output.size() - 1) cout << ", ";
                 }
             } else {
                 // Fallback to node coordinates if no geometry available
                 if (coordinates.count(from) && coordinates.count(to)) {
                     const auto& from_coord = coordinates.at(from);
                     const auto& to_coord = coordinates.at(to);
-                    cout << "[" << fixed << setprecision(6) << from_coord.longitude << ", " 
-                         << from_coord.latitude << "], ";
-                    cout << "[" << to_coord.longitude << ", " << to_coord.latitude << "]";
+                    
+                    if (is_first_edge) {
+                        // Start from snap point
+                        cout << "[" << fixed << setprecision(6) << start_snap_lng << ", " 
+                             << start_snap_lat << "], ";
+                        cout << "[" << to_coord.longitude << ", " << to_coord.latitude << "]";
+                    } else if (is_last_edge) {
+                        // End at snap point
+                        cout << "[" << fixed << setprecision(6) << from_coord.longitude << ", " 
+                             << from_coord.latitude << "], ";
+                        cout << "[" << dest_snap_lng << ", " << dest_snap_lat << "]";
+                    } else {
+                        // Full edge
+                        cout << "[" << fixed << setprecision(6) << from_coord.longitude << ", " 
+                             << from_coord.latitude << "], ";
+                        cout << "[" << to_coord.longitude << ", " << to_coord.latitude << "]";
+                    }
                 }
             }
             
@@ -489,23 +778,38 @@ void output_json_response(bool success, const string& error_message = "",
 }
 
 int main(int argc, char* argv[]) {
-    // Check arguments
-    if (argc != 10) {
-        output_json_response(false, "Invalid arguments. Usage: dhl_routing_api <start_lat> <start_lng> <dest_lat> <dest_lng> <use_disruptions> <tau_threshold> <nodes_csv> <edges_csv> <index_file>");
+    // Check arguments: 19 total
+    // start_pin_lat, start_pin_lng, start_snap_lat, start_snap_lng, start_edge_source, start_edge_target, start_edge_oneway,
+    // dest_pin_lat, dest_pin_lng, dest_snap_lat, dest_snap_lng, dest_edge_source, dest_edge_target, dest_edge_oneway,
+    // use_disruptions, tau_threshold, nodes_csv, edges_csv, index_file
+    if (argc != 20) {
+        output_json_response(false, "Invalid arguments. Usage: dhl_routing_api <start_pin_lat> <start_pin_lng> <start_snap_lat> <start_snap_lng> <start_edge_source> <start_edge_target> <start_edge_oneway> <dest_pin_lat> <dest_pin_lng> <dest_snap_lat> <dest_snap_lng> <dest_edge_source> <dest_edge_target> <dest_edge_oneway> <use_disruptions> <tau_threshold> <nodes_csv> <edges_csv> <index_file>");
         return 1;
     }
     
     try {
         // Parse arguments
-        double start_lat = stod(argv[1]);
-        double start_lng = stod(argv[2]);
-        double dest_lat = stod(argv[3]);
-        double dest_lng = stod(argv[4]);
-        bool use_disruptions = string(argv[5]) == "true";
-        double tau_threshold = stod(argv[6]);
-        string nodes_csv = argv[7];
-        string edges_csv = argv[8];
-        string index_file = argv[9];
+        double start_pin_lat = stod(argv[1]);
+        double start_pin_lng = stod(argv[2]);
+        double start_snap_lat = stod(argv[3]);
+        double start_snap_lng = stod(argv[4]);
+        NodeID start_edge_source = stoul(argv[5]);
+        NodeID start_edge_target = stoul(argv[6]);
+        int start_edge_oneway = stoi(argv[7]);
+        
+        double dest_pin_lat = stod(argv[8]);
+        double dest_pin_lng = stod(argv[9]);
+        double dest_snap_lat = stod(argv[10]);
+        double dest_snap_lng = stod(argv[11]);
+        NodeID dest_edge_source = stoul(argv[12]);
+        NodeID dest_edge_target = stoul(argv[13]);
+        int dest_edge_oneway = stoi(argv[14]);
+        
+        bool use_disruptions = string(argv[15]) == "true";
+        double tau_threshold = stod(argv[16]);
+        string nodes_csv = argv[17];
+        string edges_csv = argv[18];
+        string index_file = argv[19];
         
         // Load node coordinates
         auto coordinates = load_node_coordinates(nodes_csv);
@@ -522,12 +826,40 @@ int main(int argc, char* argv[]) {
             return 1;
         }
         
-        // Find nearest nodes to start and destination
-        NodeID start_node = find_nearest_node(start_lat, start_lng, coordinates);
-        NodeID dest_node = find_nearest_node(dest_lat, dest_lng, coordinates);
+        // Select routing endpoints ensuring snap edges are actually used in the route
+        // CRITICAL: Route MUST start by traversing start_edge and end by arriving via dest_edge
+        // Uses snap coordinates to choose the endpoint farther from snap (to traverse the edge)
+        auto endpoints = select_routing_endpoints(
+            start_edge_source, start_edge_target, start_edge_oneway,
+            dest_edge_source, dest_edge_target, dest_edge_oneway,
+            adj_list,
+            start_snap_lat, start_snap_lng,
+            dest_snap_lat, dest_snap_lng,
+            coordinates
+        );
+        
+        NodeID start_node = endpoints.start_node;
+        NodeID dest_node = endpoints.dest_node;
         
         if (start_node == 0 || dest_node == 0) {
-            output_json_response(false, "Could not find nodes near given GPS coordinates");
+            output_json_response(false, "Invalid snap edge nodes provided");
+            return 1;
+        }
+        
+        // Validate that start edge exists in adjacency list
+        bool start_edge_exists = false;
+        if (adj_list.count(start_node)) {
+            NodeID expected_next = (start_node == start_edge_source) ? start_edge_target : start_edge_source;
+            for (const auto& neighbor : adj_list.at(start_node)) {
+                if (neighbor.node == expected_next) {
+                    start_edge_exists = true;
+                    break;
+                }
+            }
+        }
+        
+        if (!start_edge_exists) {
+            output_json_response(false, "Start snap edge does not exist in road network or violates one-way direction");
             return 1;
         }
         
@@ -550,9 +882,20 @@ int main(int argc, char* argv[]) {
         // Get path using Dijkstra on the actual road network edges
         vector<NodeID> path = find_shortest_path(start_node, dest_node, adj_list);
         
-        // Output JSON response with geometry
+        // CRITICAL: Ensure snap edges are included in the path
+        // This prepends/appends the snap edge nodes to guarantee the route uses those specific edges
+        path = ensure_snap_edges_in_path(
+            path,
+            start_edge_source, start_edge_target, start_edge_oneway,
+            dest_edge_source, dest_edge_target, dest_edge_oneway
+        );
+        
+        // Output JSON response with all snap point information
         output_json_response(true, "", start_node, dest_node,
-                           start_lat, start_lng, dest_lat, dest_lng,
+                           start_pin_lat, start_pin_lng, start_snap_lat, start_snap_lng,
+                           dest_pin_lat, dest_pin_lng, dest_snap_lat, dest_snap_lng,
+                           start_edge_source, start_edge_target, start_edge_oneway,
+                           dest_edge_source, dest_edge_target, dest_edge_oneway,
                            distance, query_time_ms, path, coordinates,
                            edge_geometries, use_disruptions, tau_threshold);
         

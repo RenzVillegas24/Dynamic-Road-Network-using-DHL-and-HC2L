@@ -100,28 +100,47 @@ class GPSRoutingService:
             print(f"❌ Error loading nodes data: {e}")
             self.nodes_data = None
     
-    def compute_route(self, start_lat: float, start_lng: float, 
-                     dest_lat: float, dest_lng: float, 
+    def compute_route(self, 
+                     start_pin_lat: float, start_pin_lng: float,
+                     dest_pin_lat: float, dest_pin_lng: float,
+                     start_snap_lat: float, start_snap_lng: float,
+                     dest_snap_lat: float, dest_snap_lng: float,
+                     start_edge_source: int, start_edge_target: int, start_edge_oneway: int,
+                     dest_edge_source: int, dest_edge_target: int, dest_edge_oneway: int,
                      use_disruptions: bool = False, threshold: float = 0.5) -> Dict:
         """
-        Compute route using HC2L GPS Routing Service
+        Compute route using HC2L GPS Routing Service with snap point information
         Returns enhanced route data with Google Maps integration
         
         Args:
-            start_lat: Starting latitude
-            start_lng: Starting longitude
-            dest_lat: Destination latitude
-            dest_lng: Destination longitude
+            start_pin_lat: Starting pin point latitude (user click)
+            start_pin_lng: Starting pin point longitude (user click)
+            dest_pin_lat: Destination pin point latitude (user click)
+            dest_pin_lng: Destination pin point longitude (user click)
+            start_snap_lat: Starting snap point latitude (snapped to edge)
+            start_snap_lng: Starting snap point longitude (snapped to edge)
+            dest_snap_lat: Destination snap point latitude (snapped to edge)
+            dest_snap_lng: Destination snap point longitude (snapped to edge)
+            start_edge_source: Source node of edge where start snap occurred
+            start_edge_target: Target node of edge where start snap occurred
+            start_edge_oneway: One-way property of start edge (1=forward, -1=reverse, 0=bidirectional)
+            dest_edge_source: Source node of edge where dest snap occurred
+            dest_edge_target: Target node of edge where dest snap occurred
+            dest_edge_oneway: One-way property of dest edge (1=forward, -1=reverse, 0=bidirectional)
             use_disruptions: Whether to consider traffic disruptions
             threshold: HC2L threshold parameter (default: 0.5)
         """
         try:
-            # Build command with file paths from config
+            # Build command with new argument structure
             disruption_flag = "true" if use_disruptions else "false"
             cmd = [
                 self.cpp_executable,
-                str(start_lat), str(start_lng),
-                str(dest_lat), str(dest_lng),
+                str(start_pin_lat), str(start_pin_lng),
+                str(start_snap_lat), str(start_snap_lng),
+                str(start_edge_source), str(start_edge_target), str(start_edge_oneway),
+                str(dest_pin_lat), str(dest_pin_lng),
+                str(dest_snap_lat), str(dest_snap_lng),
+                str(dest_edge_source), str(dest_edge_target), str(dest_edge_oneway),
                 disruption_flag,
                 str(Config.NODES_CSV),
                 str(Config.EDGES_CSV),
@@ -160,10 +179,14 @@ class GPSRoutingService:
                             'success': True,
                             'algorithm': 'HC2L (Hierarchical Cut 2-Hop Labelling)',
                             'input': {
-                                'start_lat': start_lat,
-                                'start_lng': start_lng,
-                                'dest_lat': dest_lat,
-                                'dest_lng': dest_lng,
+                                'start_pin_lat': start_pin_lat,
+                                'start_pin_lng': start_pin_lng,
+                                'start_snap_lat': start_snap_lat,
+                                'start_snap_lng': start_snap_lng,
+                                'dest_pin_lat': dest_pin_lat,
+                                'dest_pin_lng': dest_pin_lng,
+                                'dest_snap_lat': dest_snap_lat,
+                                'dest_snap_lng': dest_snap_lng,
                                 'use_disruptions': use_disruptions
                             },
                             'gps_mapping': {},
