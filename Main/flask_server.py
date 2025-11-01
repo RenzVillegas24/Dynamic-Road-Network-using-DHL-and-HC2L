@@ -791,7 +791,6 @@ def compute_dhl_route():
         turn_by_turn_directions = dhl_router.get_turn_by_turn_directions(route_result)
         route_summary_text = dhl_router.get_route_summary_text(route_result)
         detailed_route_info = dhl_router.get_detailed_route_info(route_result)
-        # print(f"🛣️  DHL Route Summary: {route_summary_text}")
         return jsonify({
             'success': True,
             'route': {

@@ -2,12 +2,12 @@
 OSM Road Geometry Snapper with Spatial Indexing
 
 This module provides road-aware point snapping using actual OSM road geometries
-from the osm_geometry.graphml file. It uses spatial indexing (STRtree) for
+from the edges CSV file. It uses spatial indexing (STRtree) for
 efficient nearest-road queries and considers road hierarchy and directionality.
 """
 
-import osmnx as ox
-import networkx as nx
+import csv
+import json
 from shapely.geometry import Point, LineString
 from shapely.strtree import STRtree
 from typing import Dict, List, Tuple, Optional
@@ -20,26 +20,25 @@ class OSMRoadSnapper:
     """
     Road-aware point snapping using OSM geometry with spatial indexing.
     
-    This class loads OSM road geometries from GraphML and builds a spatial
+    This class loads OSM road geometries from the edges CSV file and builds a spatial
     index for efficient nearest-road queries. It snaps points to actual
     road geometries rather than just intersection nodes.
     """
     
-    def __init__(self, graphml_path: str, nodes_csv: str = None):
+    def __init__(self, edges_csv: str, nodes_csv: str = None):
         """
         Initialize the OSM Road Snapper.
         
         Args:
-            graphml_path: Path to osm_geometry.graphml file
+            edges_csv: Path to edges CSV file (source,target,length,name,highway,oneway,geometry_coords)
             nodes_csv: Optional path to nodes CSV for routing node mapping
         """
-        self.graphml_path = Path(graphml_path)
+        self.edges_csv = Path(edges_csv)
         self.nodes_csv = Path(nodes_csv) if nodes_csv else None
         
-        # Load OSM graph
-        print(f"📁 Loading OSM graph from {graphml_path}...")
-        self.graph = ox.load_graphml(self.graphml_path)
-        print(f"✅ Loaded {len(self.graph.nodes)} nodes, {len(self.graph.edges)} edges")
+        # Load edge geometries from CSV
+        print(f"📁 Loading road geometries from {edges_csv}...")
+        self._load_edges_from_csv()
         
         # Build spatial index
         self._build_spatial_index()
@@ -50,38 +49,95 @@ class OSMRoadSnapper:
             self.routing_nodes_df = pd.read_csv(self.nodes_csv)
             print(f"✅ Loaded {len(self.routing_nodes_df)} routing nodes")
     
+    def _load_edges_from_csv(self):
+        """Load edge geometries from CSV file."""
+        self.edges_data = []
+        self.node_coords = {}
+        
+        # First load node coordinates if available
+        if self.nodes_csv and self.nodes_csv.exists():
+            with open(self.nodes_csv, 'r') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    node_id = int(row['node_id'])
+                    lat = float(row['latitude'])
+                    lng = float(row['longitude'])
+                    self.node_coords[node_id] = (lng, lat)  # (lon, lat) for Shapely
+        
+        # Load edges with geometry
+        with open(self.edges_csv, 'r') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                source = int(row['source'])
+                target = int(row['target'])
+                length = float(row['length'])
+                name = row.get('name', 'Unnamed Road')
+                highway = row.get('highway', 'unclassified')
+                oneway = row.get('oneway', '0')
+                geometry_json = row.get('geometry_coords', '[]')
+                
+                # Parse geometry
+                try:
+                    coords = json.loads(geometry_json) if geometry_json else []
+                except (json.JSONDecodeError, ValueError):
+                    coords = []
+                
+                # Create LineString from coordinates
+                if coords and len(coords) >= 2:
+                    # Coords are [[lon, lat], [lon, lat], ...]
+                    line_coords = [(coord[0], coord[1]) for coord in coords if len(coord) >= 2]
+                    if len(line_coords) >= 2:
+                        geometry = LineString(line_coords)
+                    else:
+                        geometry = None
+                else:
+                    # Fallback to straight line between nodes
+                    if source in self.node_coords and target in self.node_coords:
+                        geometry = LineString([
+                            self.node_coords[source],
+                            self.node_coords[target]
+                        ])
+                    else:
+                        geometry = None
+                
+                if geometry:
+                    self.edges_data.append({
+                        'source': source,
+                        'target': target,
+                        'name': name,
+                        'highway': highway,
+                        'oneway': oneway,
+                        'length': length,
+                        'geometry': geometry
+                    })
+        
+        print(f"✅ Loaded {len(self.edges_data)} edges with geometries")
+    
     def _build_spatial_index(self):
-        """Build spatial index from OSM edge geometries."""
-        print("🗺️  Building spatial index from OSM geometries...")
+        """Build spatial index from edge geometries."""
+        print("🗺️  Building spatial index from road geometries...")
         
         self.edge_geometries = []
         self.edge_metadata = []
+        self.geom_to_idx = {}  # Map geometry id to index
         
-        for u, v, key, data in self.graph.edges(keys=True, data=True):
-            # Get geometry
-            if 'geometry' in data:
-                geom = data['geometry']
-            else:
-                # Create straight line from node coordinates
-                u_data = self.graph.nodes[u]
-                v_data = self.graph.nodes[v]
-                geom = LineString([
-                    (u_data['x'], u_data['y']),
-                    (v_data['x'], v_data['y'])
-                ])
+        for idx, edge_data in enumerate(self.edges_data):
+            geom = edge_data['geometry']
             
             # Store geometry and metadata
             self.edge_geometries.append(geom)
             self.edge_metadata.append({
-                'u': u,
-                'v': v,
-                'key': key,
-                'name': data.get('name', 'Unnamed Road'),
-                'highway': data.get('highway', 'unclassified'),
-                'oneway': data.get('oneway', False),
-                'length': data.get('length', geom.length * 111320),  # Approximate meters
+                'u': edge_data['source'],
+                'v': edge_data['target'],
+                'name': edge_data['name'],
+                'highway': edge_data['highway'],
+                'oneway': edge_data['oneway'],
+                'length': edge_data['length'],
                 'geometry': geom
             })
+            
+            # Store mapping from geometry ID to index
+            self.geom_to_idx[id(geom)] = idx
         
         # Build STRtree for fast spatial queries
         self.spatial_index = STRtree(self.edge_geometries)
@@ -154,8 +210,25 @@ class OSMRoadSnapper:
         # Calculate distances and find best match
         candidates = []
         for geom in nearest_geoms:
-            # Find metadata for this geometry
-            geom_idx = self.edge_geometries.index(geom)
+            # Find metadata for this geometry using robust lookup
+            try:
+                # Try to find by geometry ID first (more reliable)
+                geom_idx = self.geom_to_idx.get(id(geom))
+                if geom_idx is None:
+                    # Fallback: search by geometry equality
+                    for idx, stored_geom in enumerate(self.edge_geometries):
+                        if stored_geom.equals(geom):
+                            geom_idx = idx
+                            break
+                
+                if geom_idx is None:
+                    # If still not found, skip this geometry
+                    continue
+                    
+            except Exception as e:
+                print(f"⚠️  Error finding geometry index: {e}")
+                continue
+            
             metadata = self.edge_metadata[geom_idx]
             
             # Calculate distance to road
@@ -222,12 +295,11 @@ class OSMRoadSnapper:
         clean_metadata = {
             'u': metadata['u'],
             'v': metadata['v'],
-            'key': metadata['key'],
             'name': metadata['name'],
             'highway': metadata['highway'],
             'oneway': metadata['oneway'],
             'length': metadata['length']
-            # Note: 'geometry' field excluded (not JSON serializable)
+            # Note: 'geometry' and 'key' fields excluded (not in CSV data structure)
         }
         
         return {
@@ -268,18 +340,9 @@ class OSMRoadSnapper:
             # Return OSM IDs as fallback
             return [osm_u, osm_v]
         
-        # Try to find exact matches in routing nodes
-        # This assumes routing nodes CSV has OSM ID mapping
-        # Adjust column names based on actual CSV structure
-        
-        # Get OSM node coordinates
-        u_data = self.graph.nodes.get(osm_u, {})
-        v_data = self.graph.nodes.get(osm_v, {})
-        
-        u_lat = u_data.get('y')
-        u_lng = u_data.get('x')
-        v_lat = v_data.get('y')
-        v_lng = v_data.get('x')
+        # Get OSM node coordinates from our loaded node_coords
+        u_lng, u_lat = self.node_coords.get(osm_u, (None, None))
+        v_lng, v_lat = self.node_coords.get(osm_v, (None, None))
         
         routing_nodes = []
         
@@ -332,14 +395,16 @@ class OSMRoadSnapper:
 
 # Test function
 if __name__ == "__main__":
-    print("🧪 Testing OSM Road Snapper...")
+    from config import Config
     
-    # Paths (adjust based on your structure)
-    graphml_path = "data/osm_geometry.graphml"
-    nodes_csv = "data/raw/quezon_city_nodes.csv"
+    print("🧪 Testing OSM Road Snapper (CSV-based)...")
+    
+    # Use paths from config
+    edges_csv = str(Config.EDGES_CSV)
+    nodes_csv = str(Config.NODES_CSV)
     
     try:
-        snapper = OSMRoadSnapper(graphml_path, nodes_csv)
+        snapper = OSMRoadSnapper(edges_csv, nodes_csv)
         
         # Test coordinates in Quezon City
         test_points = [
@@ -360,12 +425,12 @@ if __name__ == "__main__":
                 print(f"   Distance: {result['distance_m']:.1f}m")
                 print(f"   Snapped to: ({result['snapped_point']['lat']:.6f}, {result['snapped_point']['lng']:.6f})")
                 print(f"   Position on edge: {result['snap_position']:.2%}")
-                print(f"   OSM nodes: {result['osm_nodes']}")
-                print(f"   Routing nodes: {result['routing_nodes']}")
+                print(f"   Edge nodes: {result.get('osm_nodes', [])} or {result.get('edge_nodes', [])}")
+                print(f"   Routing nodes: {result.get('routing_nodes', [])}")
             else:
                 print(f"❌ No road found within 50m")
         
-        print("\n✅ Test complete!")
+        print("\n✅ Test complete! Road snapping working with CSV geometry")
         
     except Exception as e:
         print(f"❌ Test failed: {e}")

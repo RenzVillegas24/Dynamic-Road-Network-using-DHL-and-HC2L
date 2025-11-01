@@ -26,7 +26,7 @@
  * Description: Uses hierarchical graph cuts to create efficient 2-hop distance labels
  * 
  * Usage:
- *   ./hc2l_routing_api <start_lat> <start_lng> <dest_lat> <dest_lng> <use_disruptions> <nodes_csv> <edges_csv> <graph_file> <index_file>
+ *   ./hc2l_routing_api <start_lat> <start_lng> <dest_lat> <dest_lng> <use_disruptions> <nodes_csv> <edges_csv> <index_file>
  * 
  * Arguments:
  *   start_lat: Starting point latitude
@@ -35,8 +35,7 @@
  *   dest_lng: Destination longitude
  *   use_disruptions: "true" or "false" - whether to consider traffic disruptions
  *   nodes_csv: Path to nodes CSV file (node_id,latitude,longitude)
- *   edges_csv: Path to edges CSV file (source,target,length,name,highway,oneway)
- *   graph_file: Path to binary graph file
+ *   edges_csv: Path to edges CSV file (source,target,length,name,highway,oneway,geometry_coords)
  *   index_file: Path to HC2L index file
  * 
  * Output:
@@ -61,6 +60,16 @@
 
 using namespace road_network;
 using namespace std;
+
+// Helper structure for edge with geometry
+struct EdgeGeometry {
+    NodeID source;
+    NodeID target;
+    distance_t length;
+    vector<pair<double, double>> coords; // lon, lat pairs
+    
+    EdgeGeometry() : source(0), target(0), length(0) {}
+};
 
 // Helper structure for GPS coordinates
 struct GPSCoordinate {
@@ -153,8 +162,8 @@ vector<string> parse_csv_line(const string& line) {
     return fields;
 }
 
-// Load edges from CSV file with one-way road support
-map<NodeID, vector<Neighbor>> load_edges(const string& filename) {
+// Load edges from CSV file with one-way road support and geometry
+map<NodeID, vector<Neighbor>> load_edges(const string& filename, map<pair<NodeID, NodeID>, EdgeGeometry>& edge_geometries) {
     map<NodeID, vector<Neighbor>> adj_list;
     ifstream file(filename);
     
@@ -164,14 +173,14 @@ map<NodeID, vector<Neighbor>> load_edges(const string& filename) {
     }
     
     string line;
-    getline(file, line); // Skip header: source,target,length,name,highway,oneway
+    getline(file, line); // Skip header: source,target,length,name,highway,oneway,geometry_coords
     
     while (getline(file, line)) {
         // Use proper CSV parsing to handle quoted fields with commas
         vector<string> fields = parse_csv_line(line);
         
-        // Expected: source,target,length,name,highway,oneway (6 fields)
-        if (fields.size() < 6) {
+        // Expected: source,target,length,name,highway,oneway,geometry_coords (7 fields)
+        if (fields.size() < 7) {
             continue; // Skip malformed lines
         }
         
@@ -182,6 +191,48 @@ map<NodeID, vector<Neighbor>> load_edges(const string& filename) {
             // fields[3] is name (ignored for routing)
             // fields[4] is highway type (ignored for routing)
             string oneway_str = fields[5];
+            string geometry_json = fields[6];
+            
+            // Parse geometry JSON: [[lon1, lat1], [lon2, lat2], ...]
+            vector<pair<double, double>> coords;
+            if (!geometry_json.empty() && geometry_json != "[]") {
+                // Simple JSON parsing for coordinate arrays
+                size_t start_pos = 1; // Skip opening '['
+                size_t end_pos = geometry_json.length() - 1; // Skip closing ']'
+                
+                size_t pos = start_pos;
+                while (pos < end_pos) {
+                    // Find next coordinate pair [lon, lat]
+                    size_t pair_start = geometry_json.find('[', pos);
+                    if (pair_start == string::npos) break;
+                    
+                    size_t pair_end = geometry_json.find(']', pair_start);
+                    if (pair_end == string::npos) break;
+                    
+                    // Extract the pair
+                    string pair_str = geometry_json.substr(pair_start + 1, pair_end - pair_start - 1);
+                    size_t comma_pos = pair_str.find(',');
+                    if (comma_pos != string::npos) {
+                        try {
+                            double lon = stod(pair_str.substr(0, comma_pos));
+                            double lat = stod(pair_str.substr(comma_pos + 1));
+                            coords.push_back({lon, lat});
+                        } catch (...) {
+                            // Skip invalid coordinate
+                        }
+                    }
+                    
+                    pos = pair_end + 1;
+                }
+            }
+            
+            // Store geometry
+            EdgeGeometry geom;
+            geom.source = source;
+            geom.target = target;
+            geom.length = length;
+            geom.coords = coords;
+            edge_geometries[{source, target}] = geom;
             
             // Trim whitespace from oneway value
             oneway_str.erase(0, oneway_str.find_first_not_of(" \t\n\r"));
@@ -205,10 +256,24 @@ map<NodeID, vector<Neighbor>> load_edges(const string& filename) {
             } else if (oneway == -1) {
                 // One-way reverse: target -> source only
                 adj_list[target].push_back(Neighbor(source, length));
+                // Store reverse geometry too
+                EdgeGeometry reverse_geom = geom;
+                reverse_geom.source = target;
+                reverse_geom.target = source;
+                // Reverse the coordinates
+                reverse(reverse_geom.coords.begin(), reverse_geom.coords.end());
+                edge_geometries[{target, source}] = reverse_geom;
             } else {
                 // Bidirectional (oneway == 0 or any other value)
                 adj_list[source].push_back(Neighbor(target, length));
                 adj_list[target].push_back(Neighbor(source, length));
+                // Store reverse geometry too
+                EdgeGeometry reverse_geom = geom;
+                reverse_geom.source = target;
+                reverse_geom.target = source;
+                // Reverse the coordinates
+                reverse(reverse_geom.coords.begin(), reverse_geom.coords.end());
+                edge_geometries[{target, source}] = reverse_geom;
             }
         } catch (...) {
             // Skip invalid lines
@@ -316,6 +381,7 @@ void output_json_response(bool success, const string& error_message = "",
                          distance_t distance = 0, double query_time_ms = 0,
                          const vector<NodeID>& path = vector<NodeID>(),
                          const map<NodeID, GPSCoordinate>& coordinates = map<NodeID, GPSCoordinate>(),
+                         const map<pair<NodeID, NodeID>, EdgeGeometry>& edge_geometries = map<pair<NodeID, NodeID>, EdgeGeometry>(),
                          bool use_disruptions = false) {
     
     cout << "{" << endl;
@@ -379,7 +445,45 @@ void output_json_response(bool success, const string& error_message = "",
             
             if (i < path.size() - 1) cout << " -> ";
         }
-        cout << ")\"" << endl;
+        cout << ")\"," << endl;
+        
+        // Output detailed geometry for each edge in the path
+        cout << "    \"geometry\": [" << endl;
+        for (size_t i = 0; i < path.size() - 1; i++) {
+            NodeID from = path[i];
+            NodeID to = path[i + 1];
+            
+            cout << "      {" << endl;
+            cout << "        \"from\": " << from << "," << endl;
+            cout << "        \"to\": " << to << "," << endl;
+            cout << "        \"coordinates\": [";
+            
+            // Check if we have geometry for this edge
+            auto edge_key = make_pair(from, to);
+            if (edge_geometries.count(edge_key)) {
+                const auto& geom = edge_geometries.at(edge_key);
+                for (size_t j = 0; j < geom.coords.size(); j++) {
+                    cout << "[" << fixed << setprecision(6) << geom.coords[j].first << ", " 
+                         << geom.coords[j].second << "]";
+                    if (j < geom.coords.size() - 1) cout << ", ";
+                }
+            } else {
+                // Fallback to node coordinates if no geometry available
+                if (coordinates.count(from) && coordinates.count(to)) {
+                    const auto& from_coord = coordinates.at(from);
+                    const auto& to_coord = coordinates.at(to);
+                    cout << "[" << fixed << setprecision(6) << from_coord.longitude << ", " 
+                         << from_coord.latitude << "], ";
+                    cout << "[" << to_coord.longitude << ", " << to_coord.latitude << "]";
+                }
+            }
+            
+            cout << "]" << endl;
+            cout << "      }";
+            if (i < path.size() - 2) cout << ",";
+            cout << endl;
+        }
+        cout << "    ]" << endl;
         
         cout << "  }" << endl;
     }
@@ -389,8 +493,8 @@ void output_json_response(bool success, const string& error_message = "",
 
 int main(int argc, char* argv[]) {
     // Check arguments
-    if (argc != 10) {
-        output_json_response(false, "Invalid arguments. Usage: hc2l_routing_api <start_lat> <start_lng> <dest_lat> <dest_lng> <use_disruptions> <nodes_csv> <edges_csv> <graph_file> <index_file>");
+    if (argc != 9) {
+        output_json_response(false, "Invalid arguments. Usage: hc2l_routing_api <start_lat> <start_lng> <dest_lat> <dest_lng> <use_disruptions> <nodes_csv> <edges_csv> <index_file>");
         return 1;
     }
     
@@ -403,8 +507,7 @@ int main(int argc, char* argv[]) {
         bool use_disruptions = string(argv[5]) == "true";
         string nodes_csv = argv[6];
         string edges_csv = argv[7];
-        string graph_file = argv[8];
-        string index_file = argv[9];
+        string index_file = argv[8];
         
         // Load node coordinates
         auto coordinates = load_node_coordinates(nodes_csv);
@@ -413,8 +516,9 @@ int main(int argc, char* argv[]) {
             return 1;
         }
         
-        // Load edges for path reconstruction
-        auto adj_list = load_edges(edges_csv);
+        // Load edges for path reconstruction and geometry
+        map<pair<NodeID, NodeID>, EdgeGeometry> edge_geometries;
+        auto adj_list = load_edges(edges_csv, edge_geometries);
         if (adj_list.empty()) {
             output_json_response(false, "Failed to load edges from " + edges_csv);
             return 1;
@@ -429,16 +533,7 @@ int main(int argc, char* argv[]) {
             return 1;
         }
         
-        // Load graph and index
-        Graph g;
-        ifstream graph_stream(graph_file, ios::binary);
-        if (!graph_stream.is_open()) {
-            output_json_response(false, "Failed to open graph file: " + graph_file);
-            return 1;
-        }
-        read_graph(g, graph_stream);
-        graph_stream.close();
-        
+        // Load index from file (no graph file needed)
         ifstream index_stream(index_file, ios::binary);
         if (!index_stream.is_open()) {
             output_json_response(false, "Failed to open index file: " + index_file);
@@ -457,11 +552,11 @@ int main(int argc, char* argv[]) {
         // Get path using Dijkstra on the actual road network edges
         vector<NodeID> path = find_shortest_path(start_node, dest_node, adj_list);
         
-        // Output JSON response
+        // Output JSON response with geometry
         output_json_response(true, "", start_node, dest_node,
                            start_lat, start_lng, dest_lat, dest_lng,
                            distance, query_time_ms, path, coordinates,
-                           use_disruptions);
+                           edge_geometries, use_disruptions);
         
         return 0;
         

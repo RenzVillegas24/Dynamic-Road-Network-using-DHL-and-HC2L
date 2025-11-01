@@ -25,7 +25,7 @@ class RoadGeometryLoader:
         Initialize the road geometry loader.
         
         Args:
-            edges_csv_path: Path to edges CSV file (source,target,length,name,highway,oneway)
+            edges_csv_path: Path to edges CSV file (source,target,length,name,highway,oneway,geometry_coords)
             nodes_csv_path: Path to nodes CSV file (node_id,latitude,longitude)
             node_mapping_csv_path: Path to node ID mapping (sequential_id,osm_id)
         """
@@ -40,14 +40,11 @@ class RoadGeometryLoader:
         self.node_id_to_osm: Dict[int, int] = {}
         self.osm_id_to_node: Dict[int, int] = {}
         
-        # Edge lookup: (source, target) -> edge_data
+        # Edge lookup: (source, target) -> edge_data (includes geometry)
         self.edges: Dict[Tuple[int, int], Dict] = {}
         
         # Adjacency list for path finding: source -> [(target, length, edge_data)]
         self.adj_list: Dict[int, List[Tuple[int, float, Dict]]] = {}
-        
-        # OSM geometry loader (lazy loaded)
-        self._osm_geometry_loader = None
         
         self._load_data()
     
@@ -82,6 +79,7 @@ class RoadGeometryLoader:
         
         # Load edges
         if os.path.exists(self.edges_csv_path):
+            import json
             with open(self.edges_csv_path, 'r') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
@@ -92,13 +90,23 @@ class RoadGeometryLoader:
                     highway = row.get('highway', 'unclassified')
                     oneway = row.get('oneway', '0')
                     
+                    # Parse geometry coordinates from JSON
+                    geometry_coords = []
+                    if 'geometry_coords' in row and row['geometry_coords']:
+                        try:
+                            geometry_coords = json.loads(row['geometry_coords'])
+                        except (json.JSONDecodeError, ValueError):
+                            # If geometry parsing fails, fallback to node coordinates
+                            geometry_coords = []
+                    
                     edge_data = {
                         'source': source,
                         'target': target,
                         'length': length,
                         'name': name,
                         'highway': highway,
-                        'oneway': oneway
+                        'oneway': oneway,
+                        'geometry_coords': geometry_coords  # List of [lon, lat] pairs
                     }
                     
                     # Store edge
@@ -109,7 +117,7 @@ class RoadGeometryLoader:
                         self.adj_list[source] = []
                     self.adj_list[source].append((target, length, edge_data))
             
-            print(f"✅ Loaded {len(self.edges)} edges")
+            print(f"✅ Loaded {len(self.edges)} edges with geometry data")
         else:
             print(f"❌ Edges file not found: {self.edges_csv_path}")
     
@@ -142,12 +150,12 @@ class RoadGeometryLoader:
         """
         Convert a path (list of node IDs) to GPS coordinates following actual roads.
         
-        This method follows the actual edges in the road network. If OSM geometry
-        is available and enabled, it will use actual road curve data for smoother routes.
+        This method follows the actual edges in the road network using the geometry
+        data stored in the edges CSV file (from OSM).
         
         Args:
             path_nodes: List of node IDs representing the path
-            use_osm_geometry: If True, attempt to load OSM curve geometry
+            use_osm_geometry: If True, use detailed geometry from CSV (includes curves)
             
         Returns:
             List of coordinate dicts with 'lat', 'lng', and optional 'node_id' keys
@@ -159,62 +167,49 @@ class RoadGeometryLoader:
                 return [{'lat': lat, 'lng': lng, 'node_id': path_nodes[0]}]
             return []
         
-        # Try to use OSM geometry if available
-        if use_osm_geometry and self.node_id_to_osm:
-            try:
-                return self._get_path_with_osm_geometry(path_nodes)
-            except Exception as e:
-                print(f"⚠️  Could not use OSM geometry: {e}")
-                print(f"   Falling back to node-to-node connections")
-        
-        # Fallback: use simple node-to-node connections
         coordinates = []
         
-        for i in range(len(path_nodes)):
+        for i in range(len(path_nodes) - 1):
             current_node = path_nodes[i]
+            next_node = path_nodes[i + 1]
             
-            # Get coordinates for current node
-            if current_node in self.node_coords:
-                lat, lng = self.node_coords[current_node]
+            # Get edge data
+            edge = self.get_edge(current_node, next_node)
+            
+            if edge and use_osm_geometry and edge.get('geometry_coords'):
+                # Use detailed geometry from CSV (includes road curves)
+                geometry_coords = edge['geometry_coords']
+                
+                # Add all points from this edge's geometry
+                # geometry_coords is [[lon1, lat1], [lon2, lat2], ...]
+                for coord_pair in geometry_coords:
+                    if len(coord_pair) >= 2:
+                        lon, lat = coord_pair[0], coord_pair[1]
+                        coordinates.append({
+                            'lat': lat,
+                            'lng': lon
+                        })
+            else:
+                # Fallback: use node coordinates
+                if current_node in self.node_coords:
+                    lat, lng = self.node_coords[current_node]
+                    coordinates.append({
+                        'lat': lat,
+                        'lng': lng,
+                        'node_id': current_node
+                    })
+        
+        # Add final node
+        final_node = path_nodes[-1]
+        if final_node in self.node_coords:
+            lat, lng = self.node_coords[final_node]
+            # Check if we haven't already added this point
+            if not coordinates or (coordinates[-1]['lat'] != lat or coordinates[-1]['lng'] != lng):
                 coordinates.append({
                     'lat': lat,
                     'lng': lng,
-                    'node_id': current_node
+                    'node_id': final_node
                 })
-            else:
-                print(f"⚠️  Warning: Node {current_node} not found in coordinates")
-        
-        return coordinates
-    
-    def _get_path_with_osm_geometry(self, path_nodes: List[int]) -> List[Dict[str, float]]:
-        """
-        Get path coordinates using OSM geometry data (includes road curves).
-        
-        Args:
-            path_nodes: List of sequential node IDs
-            
-        Returns:
-            List of coordinates following actual road curves
-        """
-        # Lazy load OSM geometry
-        if self._osm_geometry_loader is None:
-            print("🗺️  Loading OSM geometry data for smooth curves...")
-            from osm_geometry_loader import OSMGeometryLoader
-            self._osm_geometry_loader = OSMGeometryLoader()
-        
-        # Convert sequential node IDs to OSM IDs
-        osm_path = []
-        for node_id in path_nodes:
-            if node_id in self.node_id_to_osm:
-                osm_path.append(self.node_id_to_osm[node_id])
-            else:
-                print(f"⚠️  Warning: Node {node_id} not in OSM mapping")
-                osm_path.append(node_id)  # Use as-is
-        
-        # Get geometry from OSM
-        coordinates = self._osm_geometry_loader.get_path_geometry(osm_path)
-        
-        print(f"✅ Using OSM geometry: {len(coordinates)} points (including curves)")
         
         return coordinates
     
@@ -223,8 +218,8 @@ class RoadGeometryLoader:
         """
         Get path coordinates with optional interpolation for smoother visualization.
         
-        This method first gets coordinates following actual roads, then optionally
-        interpolates intermediate points on long segments for smoother curves.
+        This method first gets coordinates following actual roads (with geometry from CSV),
+        then optionally interpolates intermediate points on long segments for smoother curves.
         
         Args:
             path_nodes: List of node IDs representing the path
@@ -233,8 +228,8 @@ class RoadGeometryLoader:
         Returns:
             List of coordinate dicts with 'lat' and 'lng' keys
         """
-        # First get the actual road coordinates
-        road_coords = self.get_path_coordinates(path_nodes)
+        # First get the actual road coordinates (with CSV geometry)
+        road_coords = self.get_path_coordinates(path_nodes, use_osm_geometry=True)
         
         if len(road_coords) < 2:
             return road_coords
@@ -342,17 +337,15 @@ if __name__ == "__main__":
     
     print(f"\n📍 Testing path: {test_path}")
     
-    # Get coordinates WITHOUT OSM geometry
+    # Get coordinates WITHOUT detailed geometry
     coords_simple = loader.get_path_coordinates(test_path, use_osm_geometry=False)
-    print(f"✅ Simple mode: {len(coords_simple)} coordinates")
+    print(f"✅ Simple mode (nodes only): {len(coords_simple)} coordinates")
     
-    # Get coordinates WITH OSM geometry
-    try:
-        coords_osm = loader.get_path_coordinates(test_path, use_osm_geometry=True)
-        print(f"✅ OSM geometry mode: {len(coords_osm)} coordinates")
-        print(f"   Improvement: {len(coords_osm) - len(coords_simple)} additional curve points")
-    except Exception as e:
-        print(f"⚠️  OSM geometry not available: {e}")
+    # Get coordinates WITH detailed geometry from CSV
+    coords_with_geometry = loader.get_path_coordinates(test_path, use_osm_geometry=True)
+    print(f"✅ With CSV geometry (road curves): {len(coords_with_geometry)} coordinates")
+    if len(coords_with_geometry) > len(coords_simple):
+        print(f"   Improvement: {len(coords_with_geometry) - len(coords_simple)} additional curve points from CSV")
     
     # Validate path
     is_valid, message = loader.validate_path(test_path)

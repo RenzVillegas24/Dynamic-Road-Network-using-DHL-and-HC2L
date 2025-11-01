@@ -24,15 +24,17 @@ class NodeMapper:
         # Initialize OSM road snapper for geometry-aware selection
         try:
             from osm_road_snapper import OSMRoadSnapper
-            osm_graphml_path = nodes_csv_path.replace('raw/quezon_city_nodes.csv', 'osm_geometry.graphml')
-            if os.path.exists(osm_graphml_path):
-                self.osm_snapper = OSMRoadSnapper(osm_graphml_path, nodes_csv_path)
-                print("✅ OSM road-aware snapping enabled")
+            edges_csv_path = nodes_csv_path.replace('nodes.csv', 'edges.csv')
+            if os.path.exists(edges_csv_path):
+                self.osm_snapper = OSMRoadSnapper(edges_csv_path, nodes_csv_path)
+                print("✅ OSM road-aware snapping enabled (CSV-based)")
             else:
-                print(f"⚠️  OSM geometry file not found at {osm_graphml_path}")
+                print(f"⚠️  Edges CSV file not found at {edges_csv_path}")
                 self.osm_snapper = None
         except Exception as e:
             print(f"⚠️  Could not initialize OSM road snapper: {e}")
+            import traceback
+            traceback.print_exc()
             self.osm_snapper = None
         
         # Initialize accessible node finder for one-way aware selection

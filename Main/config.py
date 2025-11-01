@@ -59,8 +59,9 @@ class Config:
     PROCESSED_DATA_DIR = DATA_DIR / 'processed'
     DISRUPTIONS_DIR = DATA_DIR / 'disruptions'
     
-    # OSM Geometry cache (for smooth road curves)
-    OSM_GEOMETRY_CACHE = DATA_DIR / 'osm_geometry.graphml'
+    # OSM Geometry cache (DEPRECATED - now using CSV-based geometry)
+    # Previously used osm_geometry.graphml but now geometry is stored in edges CSV
+    OSM_GEOMETRY_CACHE = DATA_DIR / 'osm_geometry.graphml'  # Kept for reference only
     
     # Build directories for executables
     BUILD_DIR = MAIN_DIR / 'build'

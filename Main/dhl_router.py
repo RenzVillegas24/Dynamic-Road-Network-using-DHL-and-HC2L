@@ -92,7 +92,6 @@ class DHLRouter:
                 str(tau_threshold),
                 str(Config.NODES_CSV),
                 str(Config.EDGES_CSV),
-                str(Config.DHL_GRAPH_FILE),
                 str(Config.DHL_INDEX_FILE)
             ]
             
@@ -168,12 +167,43 @@ class DHLRouter:
         # Extract path nodes from DHL output
         path_nodes = dhl_data.get('route', {}).get('path_nodes', [])
         
-        # Use road geometry loader to get coordinates following actual road network
+        # Check if C++ API already provided geometry
+        api_geometry = dhl_data.get('route', {}).get('geometry', [])
+        
         coordinates = []
-        if path_nodes:
+        if api_geometry:
+            # Use geometry from C++ API (already includes road curves from CSV)
+            print(f"📍 Using geometry from C++ DHL API: {len(api_geometry)} edge segments")
+            
+            # Convert C++ API geometry format to coordinate list
+            # API format: [{"from": 1, "to": 2, "coordinates": [[lon, lat], ...]}, ...]
+            for segment in api_geometry:
+                segment_coords = segment.get('coordinates', [])
+                for coord_pair in segment_coords:
+                    if len(coord_pair) >= 2:
+                        coordinates.append({
+                            'lat': coord_pair[1],  # lat is second
+                            'lng': coord_pair[0]   # lon is first
+                        })
+            
+            print(f"✅ Extracted {len(coordinates)} GPS coordinates from C++ DHL API geometry")
+            
+            # Get path summary from edges (for statistics)
+            if path_nodes and self.geometry_loader:
+                path_summary = self.geometry_loader.get_path_summary(path_nodes)
+            else:
+                path_summary = {
+                    'total_distance_m': dhl_data.get('metrics', {}).get('total_distance_units', 0),
+                    'num_segments': len(api_geometry),
+                    'num_nodes': len(path_nodes) if path_nodes else 0
+                }
+                
+        elif path_nodes:
+            # Fallback: C++ API didn't provide geometry (old version or error)
+            print(f"⚠️  C++ DHL API didn't provide geometry, using fallback method")
             print(f"📍 Getting road network coordinates for {len(path_nodes)} DHL nodes")
             
-            # Get coordinates following actual edges with OSM geometry (includes curves)
+            # Get coordinates following actual edges with geometry from CSV
             coordinates = self.geometry_loader.get_path_coordinates(path_nodes, use_osm_geometry=True)
             
             print(f"📍 DHL route has {len(coordinates)} points following road network (with curves)")
@@ -226,12 +256,12 @@ class DHLRouter:
         if len(coordinates) >= 2:
             print(f"📍 DHL route has {len(coordinates)} coordinate points")
             
-            # Since OSM geometry already includes curve points, only do minimal interpolation
-            # Only interpolate if there are still very long gaps (>100m)
+            # Apply minimal interpolation if needed (only for very long gaps)
+            from geometry_utils import enhance_route_geometry
             interpolated_coordinates = enhance_route_geometry(
                 coordinates, 
-                max_distance=100.0,  # Higher threshold since OSM already provides curves
-                preserve_node_ids=False  # OSM curve points don't have node IDs
+                max_distance=100.0,  # Higher threshold since CSV geometry already provides curves
+                preserve_node_ids=False
             )
             
             print(f"✅ Final DHL route with {len(interpolated_coordinates)} GPS coordinates")

@@ -125,7 +125,6 @@ class GPSRoutingService:
                 disruption_flag,
                 str(Config.NODES_CSV),
                 str(Config.EDGES_CSV),
-                str(Config.HC2L_GRAPH_FILE),
                 str(Config.HC2L_INDEX_FILE)
             ]
             
@@ -214,41 +213,76 @@ class GPSRoutingService:
             }
     
     def _enhance_route_with_coordinates(self, route_data: Dict) -> Dict:
-        """Enhance route data with actual GPS coordinates following road network"""
+        """Enhance route data with GPS coordinates from C++ API geometry output"""
         
         if not route_data.get('success', False):
             return route_data
         
         try:
-            path_nodes = route_data.get('route', {}).get('path_nodes', [])
+            # Check if C++ API already provided geometry
+            api_geometry = route_data.get('route', {}).get('geometry', [])
             
-            if not path_nodes:
-                return route_data
+            if api_geometry:
+                # Use geometry from C++ API (already includes road curves from CSV)
+                print(f"📍 Using geometry from C++ API: {len(api_geometry)} edge segments")
+                
+                # Convert C++ API geometry format to coordinate list
+                # API format: [{"from": 1, "to": 2, "coordinates": [[lon, lat], ...]}, ...]
+                coordinates = []
+                
+                for segment in api_geometry:
+                    segment_coords = segment.get('coordinates', [])
+                    for coord_pair in segment_coords:
+                        if len(coord_pair) >= 2:
+                            coordinates.append({
+                                'lat': coord_pair[1],  # lat is second
+                                'lng': coord_pair[0]   # lon is first
+                            })
+                
+                print(f"✅ Extracted {len(coordinates)} GPS coordinates from C++ API geometry")
+                
+                # Get path summary from edges (for statistics)
+                path_nodes = route_data.get('route', {}).get('path_nodes', [])
+                if path_nodes and self.geometry_loader:
+                    path_summary = self.geometry_loader.get_path_summary(path_nodes)
+                else:
+                    path_summary = {
+                        'total_distance_m': route_data.get('metrics', {}).get('total_distance_units', 0),
+                        'num_segments': len(api_geometry),
+                        'num_nodes': len(path_nodes) if path_nodes else 0
+                    }
+                
+            else:
+                # Fallback: C++ API didn't provide geometry (old version or error)
+                print(f"⚠️  C++ API didn't provide geometry, using fallback method")
+                path_nodes = route_data.get('route', {}).get('path_nodes', [])
+                
+                if not path_nodes:
+                    return route_data
+                
+                # Use the geometry loader to get coordinates following actual road network
+                print(f"📍 Getting road network coordinates for {len(path_nodes)} nodes")
+                
+                # Get coordinates following actual edges with geometry from CSV
+                coordinates = self.geometry_loader.get_path_coordinates(path_nodes, use_osm_geometry=True)
+                
+                print(f"📍 Route has {len(coordinates)} points following road network (with curves)")
+                
+                # Validate the path
+                is_valid, validation_message = self.geometry_loader.validate_path(path_nodes)
+                if not is_valid:
+                    print(f"⚠️  Warning: Path validation: {validation_message}")
+                
+                # Get path summary
+                path_summary = self.geometry_loader.get_path_summary(path_nodes)
+                print(f"📊 Path summary: {path_summary['total_distance_m']:.1f}m over {path_summary['num_segments']} segments")
             
-            # Use the geometry loader to get coordinates following actual road network
-            print(f"📍 Getting road network coordinates for {len(path_nodes)} nodes")
-            
-            # Get coordinates following actual edges with OSM geometry (includes curves)
-            road_coordinates = self.geometry_loader.get_path_coordinates(path_nodes, use_osm_geometry=True)
-            
-            print(f"📍 Route has {len(road_coordinates)} points following road network (with curves)")
-            
-            # Validate the path
-            is_valid, validation_message = self.geometry_loader.validate_path(path_nodes)
-            if not is_valid:
-                print(f"⚠️  Warning: Path validation: {validation_message}")
-            
-            # Get path summary
-            path_summary = self.geometry_loader.get_path_summary(path_nodes)
-            print(f"📊 Path summary: {path_summary['total_distance_m']:.1f}m over {path_summary['num_segments']} segments")
-            
-            # Since OSM geometry already includes curve points, only do minimal interpolation
-            # (OSM geometry will have given us smooth curves already)
-            # Only interpolate if there are still very long gaps (>100m)
+            # Apply minimal interpolation if needed (only for very long gaps)
+            from geometry_utils import enhance_route_geometry
             interpolated_coordinates = enhance_route_geometry(
-                road_coordinates, 
-                max_distance=100.0,  # Higher threshold since OSM already provides curves
-                preserve_node_ids=False  # OSM curve points don't have node IDs
+                coordinates, 
+                max_distance=100.0,  # Higher threshold since CSV geometry already provides curves
+                preserve_node_ids=False
             )
             
             print(f"✅ Final route with {len(interpolated_coordinates)} GPS coordinates")
