@@ -568,6 +568,7 @@ vector<NodeID> find_shortest_path(NodeID start, NodeID dest, const map<NodeID, v
 }
 
 // Helper function to find closest point on geometry to a snap point and clip the geometry
+// IMPROVED: Handles same edge and neighboring edge cases properly
 vector<pair<double, double>> clip_geometry_at_snap(
     const vector<pair<double, double>>& coords,
     double snap_lat, double snap_lng,
@@ -578,12 +579,50 @@ vector<pair<double, double>> clip_geometry_at_snap(
     // Find the closest point on the geometry to the snap point
     double min_dist = numeric_limits<double>::max();
     size_t closest_idx = 0;
+    double closest_segment_dist = numeric_limits<double>::max();
+    bool snap_is_at_vertex = false;
     
+    // First pass: Find closest vertex and closest segment
     for (size_t i = 0; i < coords.size(); i++) {
         double dist = haversine_distance(snap_lat, snap_lng, coords[i].second, coords[i].first);
-        if (dist < min_dist) {
+        
+        // Check if snap point is very close to a vertex (within 2 meters)
+        if (dist < 2.0) {
+            snap_is_at_vertex = true;
+            if (dist < min_dist) {
+                min_dist = dist;
+                closest_idx = i;
+            }
+        } else if (dist < min_dist && !snap_is_at_vertex) {
             min_dist = dist;
             closest_idx = i;
+        }
+    }
+    
+    // If snap point is not at a vertex, try to find closest point on a segment
+    if (!snap_is_at_vertex && coords.size() >= 2) {
+        // Check distances to line segments between consecutive points
+        for (size_t i = 0; i < coords.size() - 1; i++) {
+            // For each segment, find closest point on the segment
+            double lat1 = coords[i].second, lng1 = coords[i].first;
+            double lat2 = coords[i+1].second, lng2 = coords[i+1].first;
+            
+            // Simple perpendicular distance approximation
+            double seg_len_sq = (lat2 - lat1) * (lat2 - lat1) + (lng2 - lng1) * (lng2 - lng1);
+            if (seg_len_sq < 1e-10) continue;
+            
+            double t = ((snap_lat - lat1) * (lat2 - lat1) + (snap_lng - lng1) * (lng2 - lng1)) / seg_len_sq;
+            t = max(0.0, min(1.0, t));
+            
+            double proj_lat = lat1 + t * (lat2 - lat1);
+            double proj_lng = lng1 + t * (lng2 - lng1);
+            double segment_dist = haversine_distance(snap_lat, snap_lng, proj_lat, proj_lng);
+            
+            if (segment_dist < closest_segment_dist) {
+                closest_segment_dist = segment_dist;
+                closest_idx = i;
+                snap_is_at_vertex = false;
+            }
         }
     }
     
@@ -591,21 +630,38 @@ vector<pair<double, double>> clip_geometry_at_snap(
     vector<pair<double, double>> clipped;
     
     if (clip_start) {
-        // For start edge: keep from closest point to end
+        // For start edge: keep from snap point to end
+        // Always include the closest index (vertex or segment start)
         for (size_t i = closest_idx; i < coords.size(); i++) {
             clipped.push_back(coords[i]);
         }
-        // Prepend the actual snap point
-        if (!clipped.empty()) {
+        
+        // Prepend the actual snap point if it's not already the first vertex
+        if (!clipped.empty() && (snap_is_at_vertex && closest_idx > 0)) {
             clipped.insert(clipped.begin(), {snap_lng, snap_lat});
+        } else if (!snap_is_at_vertex && !clipped.empty()) {
+            // Snap point is on a segment, insert it at the beginning
+            clipped.insert(clipped.begin(), {snap_lng, snap_lat});
+        } else if (clipped.empty()) {
+            // Edge case: geometry is empty, return snap point
+            clipped.push_back({snap_lng, snap_lat});
         }
     } else {
-        // For end edge: keep from start to closest point
-        for (size_t i = 0; i <= closest_idx && i < coords.size(); i++) {
+        // For end edge: keep from start to snap point
+        // Always include up to closest index
+        size_t end_idx = min(closest_idx + 1, coords.size());
+        for (size_t i = 0; i < end_idx; i++) {
             clipped.push_back(coords[i]);
         }
-        // Append the actual snap point
-        if (!clipped.empty()) {
+        
+        // Append the actual snap point if it's not already the last vertex
+        if (!clipped.empty() && (snap_is_at_vertex && closest_idx < coords.size() - 1)) {
+            clipped.push_back({snap_lng, snap_lat});
+        } else if (!snap_is_at_vertex && !clipped.empty()) {
+            // Snap point is on a segment, append it at the end
+            clipped.push_back({snap_lng, snap_lat});
+        } else if (clipped.empty()) {
+            // Edge case: geometry is empty, return snap point
             clipped.push_back({snap_lng, snap_lat});
         }
     }
@@ -710,9 +766,21 @@ void output_json_response(bool success, const string& error_message = "",
         cout << ")\"," << endl;
         
         // Output detailed geometry for each edge in the path
-        // Clip first and last edges at snap points to avoid overflow
+        // CRITICAL: First edge should be from start snap edge, last edge should be to dest snap edge
+        // ALSO CRITICAL: Handle case where start and dest edges are the SAME edge
         cout << "    \"geometry\": [" << endl;
-        for (size_t i = 0; i < path.size() - 1; i++) {
+        
+        // Check if start and dest edges are the same
+        bool same_edge = (start_edge_source == dest_edge_source && start_edge_target == dest_edge_target) ||
+                         (start_edge_source == dest_edge_target && start_edge_target == dest_edge_source);
+        
+        // For same edge case with path.size() == 2, we need special handling
+        bool is_same_edge_case = (path.size() == 2 && same_edge);
+        
+        // Determine loop range: if same edge case, only output one edge
+        size_t edge_loop_end = is_same_edge_case ? 1 : path.size() - 1;
+        
+        for (size_t i = 0; i < edge_loop_end; i++) {
             NodeID from = path[i];
             NodeID to = path[i + 1];
             
@@ -724,19 +792,112 @@ void output_json_response(bool success, const string& error_message = "",
             cout << "        \"to\": " << to << "," << endl;
             cout << "        \"coordinates\": [";
             
-            // Check if we have geometry for this edge
+            // Try to get geometry from the direct edge path
             auto edge_key = make_pair(from, to);
+            vector<pair<double, double>> coords_to_output;
+            bool found_geometry = false;
+            bool should_clip = false;
+            
             if (edge_geometries.count(edge_key)) {
                 const auto& geom = edge_geometries.at(edge_key);
-                vector<pair<double, double>> coords_to_output = geom.coords;
+                coords_to_output = geom.coords;
+                found_geometry = true;
+                // Only apply clipping for first/last edges when using direct path
+                should_clip = is_first_edge || is_last_edge;
+            } else if (is_same_edge_case) {
+                // Special case: start and dest are on the SAME edge
+                // Try to find the snap edge geometry and clip between both snap points
+                auto snap_edge_forward = make_pair(start_edge_source, start_edge_target);
+                auto snap_edge_backward = make_pair(start_edge_target, start_edge_source);
                 
-                // Clip geometry at snap points for first and last edges
-                if (is_first_edge) {
-                    coords_to_output = clip_geometry_at_snap(geom.coords, start_snap_lat, start_snap_lng, true);
-                } else if (is_last_edge) {
-                    coords_to_output = clip_geometry_at_snap(geom.coords, dest_snap_lat, dest_snap_lng, false);
+                if (edge_geometries.count(snap_edge_forward)) {
+                    coords_to_output = edge_geometries.at(snap_edge_forward).coords;
+                    found_geometry = true;
+                    should_clip = true;
+                } else if (edge_geometries.count(snap_edge_backward)) {
+                    coords_to_output = edge_geometries.at(snap_edge_backward).coords;
+                    found_geometry = true;
+                    should_clip = true;
+                }
+            } else if (is_first_edge) {
+                // For first edge, try to find geometry matching the start snap edge
+                // Try both directions of the start snap edge
+                auto snap_edge_forward = make_pair(start_edge_source, start_edge_target);
+                auto snap_edge_backward = make_pair(start_edge_target, start_edge_source);
+                
+                if (edge_geometries.count(snap_edge_forward)) {
+                    coords_to_output = edge_geometries.at(snap_edge_forward).coords;
+                    found_geometry = true;
+                    should_clip = true;
+                } else if (edge_geometries.count(snap_edge_backward)) {
+                    coords_to_output = edge_geometries.at(snap_edge_backward).coords;
+                    found_geometry = true;
+                    should_clip = true;
+                }
+            } else if (is_last_edge) {
+                // For last edge, try to find geometry matching the dest snap edge
+                // Try both directions of the dest snap edge
+                auto snap_edge_forward = make_pair(dest_edge_source, dest_edge_target);
+                auto snap_edge_backward = make_pair(dest_edge_target, dest_edge_source);
+                
+                if (edge_geometries.count(snap_edge_forward)) {
+                    coords_to_output = edge_geometries.at(snap_edge_forward).coords;
+                    found_geometry = true;
+                    should_clip = true;
+                } else if (edge_geometries.count(snap_edge_backward)) {
+                    coords_to_output = edge_geometries.at(snap_edge_backward).coords;
+                    found_geometry = true;
+                    should_clip = true;
+                }
+            }
+            
+            if (found_geometry && !coords_to_output.empty()) {
+                // Apply clipping for first and last edges
+                if (should_clip) {
+                    if (is_same_edge_case) {
+                        // Clip between both snap points on the same edge
+                        // Find closest points to both snap locations
+                        double min_dist_start = numeric_limits<double>::max();
+                        double min_dist_end = numeric_limits<double>::max();
+                        size_t idx_start = 0, idx_end = coords_to_output.size() - 1;
+                        
+                        for (size_t j = 0; j < coords_to_output.size(); j++) {
+                            double dist_start = haversine_distance(start_snap_lat, start_snap_lng, 
+                                                                 coords_to_output[j].second, coords_to_output[j].first);
+                            double dist_end = haversine_distance(dest_snap_lat, dest_snap_lng, 
+                                                               coords_to_output[j].second, coords_to_output[j].first);
+                            
+                            if (dist_start < min_dist_start) {
+                                min_dist_start = dist_start;
+                                idx_start = j;
+                            }
+                            if (dist_end < min_dist_end) {
+                                min_dist_end = dist_end;
+                                idx_end = j;
+                            }
+                        }
+                        
+                        // Ensure idx_start <= idx_end
+                        if (idx_start > idx_end) {
+                            swap(idx_start, idx_end);
+                        }
+                        
+                        // Build clipped geometry from start snap to end snap
+                        vector<pair<double, double>> clipped;
+                        clipped.push_back({start_snap_lng, start_snap_lat});
+                        for (size_t j = idx_start; j <= idx_end && j < coords_to_output.size(); j++) {
+                            clipped.push_back(coords_to_output[j]);
+                        }
+                        clipped.push_back({dest_snap_lng, dest_snap_lat});
+                        coords_to_output = clipped;
+                    } else if (is_first_edge) {
+                        coords_to_output = clip_geometry_at_snap(coords_to_output, start_snap_lat, start_snap_lng, true);
+                    } else if (is_last_edge) {
+                        coords_to_output = clip_geometry_at_snap(coords_to_output, dest_snap_lat, dest_snap_lng, false);
+                    }
                 }
                 
+                // Output the geometry
                 for (size_t j = 0; j < coords_to_output.size(); j++) {
                     cout << "[" << fixed << setprecision(6) << coords_to_output[j].first << ", " 
                          << coords_to_output[j].second << "]";
@@ -748,7 +909,12 @@ void output_json_response(bool success, const string& error_message = "",
                     const auto& from_coord = coordinates.at(from);
                     const auto& to_coord = coordinates.at(to);
                     
-                    if (is_first_edge) {
+                    if (is_same_edge_case) {
+                        // Same edge with no full geometry - just use snap points
+                        cout << "[" << fixed << setprecision(6) << start_snap_lng << ", " 
+                             << start_snap_lat << "], ";
+                        cout << "[" << dest_snap_lng << ", " << dest_snap_lat << "]";
+                    } else if (is_first_edge) {
                         // Start from snap point
                         cout << "[" << fixed << setprecision(6) << start_snap_lng << ", " 
                              << start_snap_lat << "], ";
@@ -769,7 +935,7 @@ void output_json_response(bool success, const string& error_message = "",
             
             cout << "]" << endl;
             cout << "      }";
-            if (i < path.size() - 2) cout << ",";
+            if (i < edge_loop_end - 1) cout << ",";
             cout << endl;
         }
         cout << "    ]" << endl;
