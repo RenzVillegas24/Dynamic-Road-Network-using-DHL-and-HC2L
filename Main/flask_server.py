@@ -514,12 +514,16 @@ def compute_dhc2l_route():
             print(f"🗺️  Dest snap: {dest_osm_edge.get('road_name', 'Unknown')} " +
                   f"(Edge: {dest_edge_source}→{dest_edge_target}, oneway={dest_edge_oneway})")
         
-        # Check if disruptions should be used
-        use_disruptions = data.get('use_disruptions', False)
+        # Check if disruptions should be used - now as a directory path (optional parameter)
+        # If disruption_dir is provided, it should be a path to disruption data
+        # If empty or "null", treat as no disruptions
+        disruption_dir = data.get('disruption_dir', '')
+        threshold = float(data.get('threshold', 0.0))
         
         print(f"Computing GPS HC2L route with snap points:")
         print(f"  Start: Pin({start_pin_lat}, {start_pin_lng}) → Snap({start_snap_lat}, {start_snap_lng})")
         print(f"  Dest:  Pin({dest_pin_lat}, {dest_pin_lng}) → Snap({dest_snap_lat}, {dest_snap_lng})")
+        print(f"  Disruption dir: {disruption_dir if disruption_dir else '(none)'}")
         
         # Compute route using GPS HC2L with new argument structure
         start_time = time.time()
@@ -530,7 +534,7 @@ def compute_dhc2l_route():
             dest_snap_lat, dest_snap_lng,
             start_edge_source, start_edge_target, start_edge_oneway,
             dest_edge_source, dest_edge_target, dest_edge_oneway,
-            use_disruptions, threshold
+            disruption_dir, threshold  # Pass disruption_dir instead of use_disruptions
         )
         computation_time = time.time() - start_time
         
@@ -838,12 +842,13 @@ def compute_dhl_route():
             print(f"🗺️  Dest snap (DHL): {dest_osm_edge.get('road_name', 'Unknown')} " +
                   f"(Edge: {dest_edge_source}→{dest_edge_target}, oneway={dest_edge_oneway})")
         
-        # Check if disruptions should be used
-        use_disruptions = data.get('use_disruptions', False)
+        # Check if disruptions should be used - now as a directory path (optional parameter)
+        disruption_dir = data.get('disruption_dir', '')
         
         print(f"Computing DHL route with snap points:")
         print(f"  Start: Pin({start_pin_lat}, {start_pin_lng}) → Snap({start_snap_lat}, {start_snap_lng})")
         print(f"  Dest:  Pin({dest_pin_lat}, {dest_pin_lng}) → Snap({dest_snap_lat}, {dest_snap_lng})")
+        print(f"  Disruption dir: {disruption_dir if disruption_dir else '(none)'}")
         
         # Compute route using DHL with new argument structure
         start_time = time.time()
@@ -854,7 +859,7 @@ def compute_dhl_route():
             dest_snap_lat, dest_snap_lng,
             start_edge_source, start_edge_target, start_edge_oneway,
             dest_edge_source, dest_edge_target, dest_edge_oneway,
-            use_disruptions
+            disruption_dir  # Pass disruption_dir instead of use_disruptions
         )
         computation_time = time.time() - start_time
         

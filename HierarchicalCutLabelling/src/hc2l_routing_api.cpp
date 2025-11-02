@@ -21,6 +21,7 @@
 #include <sstream>
 #include <iomanip>
 #include <cmath>
+#include <ctime>
 #include <chrono>
 #include <map>
 #include <set>
@@ -64,6 +65,127 @@ double haversine_distance(double lat1, double lon1, double lat2, double lon2) {
     double c = 2 * atan2(sqrt(a), sqrt(1-a));
     
     return R * c;
+}
+
+// Calculate total route distance from path nodes using coordinates
+double calculate_route_distance(
+    const vector<NodeID>& path,
+    const map<NodeID, GPSCoordinate>& coordinates) {
+    
+    if (path.size() < 2) return 0.0;
+    
+    double total_distance = 0.0;
+    
+    for (size_t i = 0; i < path.size() - 1; i++) {
+        NodeID from = path[i];
+        NodeID to = path[i + 1];
+        
+        if (coordinates.count(from) && coordinates.count(to)) {
+            const auto& coord_from = coordinates.at(from);
+            const auto& coord_to = coordinates.at(to);
+            
+            double segment_distance = haversine_distance(
+                coord_from.latitude, coord_from.longitude,
+                coord_to.latitude, coord_to.longitude
+            );
+            
+            total_distance += segment_distance;
+        }
+    }
+    
+    return total_distance;
+}
+
+// Calculate ETA in seconds based on route distance and traffic conditions
+// Table 8 reference: Speed profiles for different incident types
+struct SpeedProfile {
+    const char* time_period;  // "morning", "noon", "evening"
+    double baseline_speed_kmh;  // Free-flow speed
+    double congestion_factor;   // Multiplier for congestion slowdown
+};
+
+// Speed profiles based on Quezon City traffic patterns (Table 8 reference)
+map<string, SpeedProfile> get_speed_profiles() {
+    return {
+        // Morning rush (6am-10am): Moderate to heavy congestion
+        {"morning", {"Morning Rush", 25.0, 0.4}},
+        // Noon (11am-2pm): Moderate congestion, lighter than morning
+        {"noon", {"Noon", 35.0, 0.65}},
+        // Evening rush (4pm-8pm): Heaviest congestion
+        {"evening", {"Evening Rush", 20.0, 0.35}},
+        // Off-peak (other times): Light traffic
+        {"off_peak", {"Off-Peak", 45.0, 0.85}}
+    };
+}
+
+// Get current speed profile based on hour of day
+SpeedProfile get_current_speed_profile(int hour = -1) {
+    if (hour < 0) {
+        // Use current time if not specified
+        time_t now = time(nullptr);
+        struct tm* timeinfo = localtime(&now);
+        hour = timeinfo->tm_hour;
+    }
+    
+    // Classification based on Table 8 patterns
+    if (hour >= 6 && hour < 10) {
+        return {"Morning Rush", 25.0, 0.4};  // Morning: 6am-10am
+    } else if (hour >= 10 && hour < 14) {
+        return {"Noon", 35.0, 0.65};          // Noon: 10am-2pm
+    } else if (hour >= 14 && hour < 20) {
+        return {"Evening Rush", 20.0, 0.35};  // Evening: 2pm-8pm (peak at 5pm-7pm)
+    } else {
+        return {"Off-Peak", 45.0, 0.85};      // Night/early morning
+    }
+}
+
+// Calculate ETA in seconds from distance and jam factor
+double calculate_eta_seconds(
+    double distance_m,
+    double jam_factor = 5.0,  // 0-10 scale
+    int hour_of_day = -1) {
+    
+    if (distance_m <= 0) return 0.0;
+    
+    // Get speed profile based on time of day
+    SpeedProfile profile = get_current_speed_profile(hour_of_day);
+    
+    // Adjust baseline speed based on jam factor (0=free flow, 10=standstill)
+    // jam_factor > 7 indicates heavy congestion
+    double jam_factor_normalized = jam_factor / 10.0;  // 0.0 to 1.0
+    double actual_speed_kmh = profile.baseline_speed_kmh * 
+                              (profile.congestion_factor + 
+                               (1.0 - profile.congestion_factor) * (1.0 - jam_factor_normalized));
+    
+    // Ensure minimum speed (don't divide by zero)
+    actual_speed_kmh = max(actual_speed_kmh, 1.0);
+    
+    // Convert to m/s: speed_kmh * 1000 / 3600 = speed_kmh / 3.6
+    double actual_speed_ms = actual_speed_kmh / 3.6;
+    
+    // Calculate time: distance (m) / speed (m/s) = time (s)
+    double eta_seconds = distance_m / actual_speed_ms;
+    
+    return eta_seconds;
+}
+
+// Format seconds into human-readable time string (HH:mm:ss)
+string format_eta_time(double seconds) {
+    int total_secs = static_cast<int>(seconds + 0.5);
+    int hours = total_secs / 3600;
+    int minutes = (total_secs % 3600) / 60;
+    int secs = total_secs % 60;
+    
+    stringstream ss;
+    if (hours > 0) {
+        ss << hours << "h " << setfill('0') << setw(2) << minutes << "m";
+    } else if (minutes > 0) {
+        ss << minutes << "m " << setfill('0') << setw(2) << secs << "s";
+    } else {
+        ss << secs << "s";
+    }
+    
+    return ss.str();
 }
 
 // Load node GPS coordinates from CSV file
@@ -495,7 +617,8 @@ void output_json_response(bool success, const string& error_message = "",
                          const vector<NodeID>& path = vector<NodeID>(),
                          const map<NodeID, GPSCoordinate>& coordinates = map<NodeID, GPSCoordinate>(),
                          const map<pair<NodeID, NodeID>, EdgeGeometry>& edge_geometries = map<pair<NodeID, NodeID>, EdgeGeometry>(),
-                         bool use_disruptions = false) {
+                         bool use_disruptions = false, const string& disruption_dir = "",
+                         const ContractionIndex* ci = nullptr, double index_load_time_ms = 0.0) {
     
     cout << "{" << endl;
     cout << "  \"success\": " << (success ? "true" : "false") << "," << endl;
@@ -513,6 +636,7 @@ void output_json_response(bool success, const string& error_message = "",
         cout << "    \"dest_pin_lng\": " << fixed << setprecision(6) << dest_pin_lng << "," << endl;
         cout << "    \"dest_snap_lat\": " << fixed << setprecision(6) << dest_snap_lat << "," << endl;
         cout << "    \"dest_snap_lng\": " << fixed << setprecision(6) << dest_snap_lng << "," << endl;
+        cout << "    \"disruption_dir\": \"" << disruption_dir << "\"," << endl;
         cout << "    \"use_disruptions\": " << (use_disruptions ? "true" : "false") << endl;
         cout << "  }," << endl;
         
@@ -549,10 +673,50 @@ void output_json_response(bool success, const string& error_message = "",
         
         cout << "  \"metrics\": {" << endl;
         cout << "    \"total_distance_units\": " << distance << "," << endl;
+        cout << "    \"total_distance_meters\": " << distance << "," << endl;
         cout << "    \"query_time_ms\": " << fixed << setprecision(3) << query_time_ms << "," << endl;
         cout << "    \"path_length\": " << path.size() << "," << endl;
         cout << "    \"uses_disruptions\": " << (use_disruptions ? "true" : "false") << "," << endl;
-        cout << "    \"interpolation_used\": false" << endl;
+        cout << "    \"interpolation_used\": false," << endl;
+        
+        // Calculate and add distance and ETA metrics
+        double calculated_distance = calculate_route_distance(path, coordinates);
+        double eta_seconds = calculate_eta_seconds(calculated_distance, 5.0);
+        string eta_formatted = format_eta_time(eta_seconds);
+        
+        cout << "    \"calculated_distance_meters\": " << fixed << setprecision(1) << calculated_distance << "," << endl;
+        cout << "    \"calculated_distance_km\": " << fixed << setprecision(2) << (calculated_distance / 1000.0) << "," << endl;
+        cout << "    \"eta_seconds\": " << fixed << setprecision(0) << eta_seconds << "," << endl;
+        cout << "    \"eta_formatted\": \"" << eta_formatted << "\"," << endl;
+        
+        // Add HC2L labeling information
+        if (ci != nullptr) {
+            size_t label_count = ci->label_count();
+            size_t inf_label_count = ci->inf_label_count();
+            size_t index_size = ci->size();
+            size_t height = ci->height();
+            size_t max_label_count = ci->max_label_count();
+            size_t max_cut_size = ci->max_cut_size();
+            size_t non_empty_cuts = ci->non_empty_cuts();
+            double avg_cut_size = ci->avg_cut_size();
+            
+            cout << "    \"labeling_info\": {" << endl;
+            cout << "      \"total_labels\": " << label_count << "," << endl;
+            cout << "      \"infinite_labels\": " << inf_label_count << "," << endl;
+            cout << "      \"index_size_bytes\": " << index_size << "," << endl;
+            cout << "      \"index_size_mb\": " << fixed << setprecision(2) << (index_size / (1024.0 * 1024.0)) << "," << endl;
+            cout << "      \"hierarchy_height\": " << height << "," << endl;
+            cout << "      \"max_label_count_per_node\": " << max_label_count << "," << endl;
+            cout << "      \"max_cut_size\": " << max_cut_size << "," << endl;
+            cout << "      \"average_cut_size\": " << fixed << setprecision(2) << avg_cut_size << "," << endl;
+            cout << "      \"non_empty_cuts\": " << non_empty_cuts << "," << endl;
+            cout << "      \"index_load_time_ms\": " << fixed << setprecision(3) << index_load_time_ms << endl;
+            cout << "    }" << endl;
+        } else {
+            cout << "    \"labeling_info\": {" << endl;
+            cout << "      \"note\": \"Index data unavailable\"" << endl;
+            cout << "    }" << endl;
+        }
         cout << "  }," << endl;
         
         cout << "  \"route\": {" << endl;
@@ -760,7 +924,7 @@ void output_json_response(bool success, const string& error_message = "",
 
 int main(int argc, char* argv[]) {
     if (argc != 19) {
-        output_json_response(false, "Invalid arguments. Usage: hc2l_routing_api <start_pin_lat> <start_pin_lng> <start_snap_lat> <start_snap_lng> <start_edge_source> <start_edge_target> <start_edge_oneway> <dest_pin_lat> <dest_pin_lng> <dest_snap_lat> <dest_snap_lng> <dest_edge_source> <dest_edge_target> <dest_edge_oneway> <use_disruptions> <nodes_csv> <edges_csv> <index_file>");
+        output_json_response(false, "Invalid arguments. Usage: hc2l_routing_api <start_pin_lat> <start_pin_lng> <start_snap_lat> <start_snap_lng> <start_edge_source> <start_edge_target> <start_edge_oneway> <dest_pin_lat> <dest_pin_lng> <dest_snap_lat> <dest_snap_lng> <dest_edge_source> <dest_edge_target> <dest_edge_oneway> <disruption_dir> <nodes_csv> <edges_csv> <index_file>");
         return 1;
     }
     
@@ -782,7 +946,10 @@ int main(int argc, char* argv[]) {
         NodeID dest_edge_target = stoul(argv[13]);
         int dest_edge_oneway = stoi(argv[14]);
         
-        bool use_disruptions = string(argv[15]) == "true";
+        // New: disruption_dir parameter (empty string "" or "null" means no disruptions)
+        string disruption_dir = argv[15];
+        bool use_disruptions = !disruption_dir.empty() && disruption_dir != "null" && disruption_dir != "";
+        
         string nodes_csv = argv[16];
         string edges_csv = argv[17];
         string index_file = argv[18];
@@ -802,6 +969,7 @@ int main(int argc, char* argv[]) {
         }
         
         // Load HC2L index
+        auto index_load_start = chrono::high_resolution_clock::now();
         ifstream index_stream(index_file, ios::binary);
         if (!index_stream.is_open()) {
             output_json_response(false, "Failed to open index file");
@@ -809,6 +977,8 @@ int main(int argc, char* argv[]) {
         }
         ContractionIndex ci(index_stream);
         index_stream.close();
+        auto index_load_end = chrono::high_resolution_clock::now();
+        double index_load_time_ms = chrono::duration<double, milli>(index_load_end - index_load_start).count();
         
         // Determine routing endpoints based on one-way constraints
         vector<NodeID> start_candidates, dest_candidates;
@@ -989,7 +1159,8 @@ int main(int argc, char* argv[]) {
                            start_edge_source, start_edge_target, start_edge_oneway,
                            dest_edge_source, dest_edge_target, dest_edge_oneway,
                            best_distance, query_time_ms, path, coordinates,
-                           edge_geometries, use_disruptions);
+                           edge_geometries, use_disruptions, disruption_dir,
+                           &ci, index_load_time_ms);
         
         return 0;
         

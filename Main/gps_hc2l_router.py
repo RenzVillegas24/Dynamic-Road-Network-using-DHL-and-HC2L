@@ -107,7 +107,7 @@ class GPSRoutingService:
                      dest_snap_lat: float, dest_snap_lng: float,
                      start_edge_source: int, start_edge_target: int, start_edge_oneway: int,
                      dest_edge_source: int, dest_edge_target: int, dest_edge_oneway: int,
-                     use_disruptions: bool = False, threshold: float = 0.5) -> Dict:
+                     disruption_dir: str = "", threshold: float = 0.5) -> Dict:
         """
         Compute route using HC2L GPS Routing Service with snap point information
         Returns enhanced route data with Google Maps integration
@@ -127,12 +127,12 @@ class GPSRoutingService:
             dest_edge_source: Source node of edge where dest snap occurred
             dest_edge_target: Target node of edge where dest snap occurred
             dest_edge_oneway: One-way property of dest edge (1=forward, -1=reverse, 0=bidirectional)
-            use_disruptions: Whether to consider traffic disruptions
+            disruption_dir: Path to disruption data directory (empty string or "null" = no disruptions)
             threshold: HC2L threshold parameter (default: 0.5)
         """
         try:
             # Build command with new argument structure
-            disruption_flag = "true" if use_disruptions else "false"
+            # disruption_dir can be empty string, "null", or an actual path
             cmd = [
                 self.cpp_executable,
                 str(start_pin_lat), str(start_pin_lng),
@@ -141,7 +141,7 @@ class GPSRoutingService:
                 str(dest_pin_lat), str(dest_pin_lng),
                 str(dest_snap_lat), str(dest_snap_lng),
                 str(dest_edge_source), str(dest_edge_target), str(dest_edge_oneway),
-                disruption_flag,
+                disruption_dir if disruption_dir else "",  # Pass directory path instead of true/false
                 str(Config.NODES_CSV),
                 str(Config.EDGES_CSV),
                 str(Config.HC2L_INDEX_FILE)
@@ -187,7 +187,8 @@ class GPSRoutingService:
                                 'dest_pin_lng': dest_pin_lng,
                                 'dest_snap_lat': dest_snap_lat,
                                 'dest_snap_lng': dest_snap_lng,
-                                'use_disruptions': use_disruptions
+                                'disruption_dir': disruption_dir,
+                                'use_disruptions': bool(disruption_dir and disruption_dir != "null")
                             },
                             'gps_mapping': {},
                             'metrics': {},
@@ -206,7 +207,8 @@ class GPSRoutingService:
                     metrics = route_data.get('metrics', {})
                     print(f"📊 Received metrics from C++ API:")
                     print(f"   🕐 Query time: {metrics.get('query_time_ms', 'N/A')} ms")
-                    print(f"   📏 Distance: {metrics.get('total_distance_meters', 'N/A')} m")
+                    print(f"   📏 Distance: {metrics.get('calculated_distance_km', 'N/A')} km")
+                    print(f"   ⏱️  ETA: {metrics.get('eta_formatted', 'N/A')}")
                     print(f"   🏷️  Labeling size: {metrics.get('labeling_size_mb', 'N/A')} MB")
                     print(f"   ⏱️  Labeling time: {metrics.get('labeling_time_ms', 'N/A')} s")
                 

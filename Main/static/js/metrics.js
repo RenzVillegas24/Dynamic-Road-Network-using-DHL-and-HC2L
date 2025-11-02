@@ -601,8 +601,15 @@ function updateRouteMetrics(routeData) {
     let distanceSource = 'unknown';
     
     // Try to get distance from multiple sources (same order as Route Panel)
-    // 1. First try road segments (most accurate)
-    if (route && route.road_segments && route.road_segments.length > 0) {
+    // 0. First try C++ calculated distance (direct from haversine path calculation)
+    if (metrics.calculated_distance_km && metrics.calculated_distance_km > 0) {
+      distanceM = metrics.calculated_distance_km * 1000;
+      distanceSource = 'metrics.calculated_distance_km (C++ haversine)';
+      console.log('📊 Bottom info using C++ calculated distance:', distanceM, 'meters');
+    }
+    
+    // 1. Try road segments (most accurate)
+    else if (route && route.road_segments && route.road_segments.length > 0) {
       let segmentTotal = 0;
       route.road_segments.forEach((segment, index) => {
         const segmentLength = segment.length_meters || segment.length || 0;
@@ -617,7 +624,7 @@ function updateRouteMetrics(routeData) {
     }
     
     // 2. Fallback to metrics if road segments calculation failed
-    if (distanceM === 0) {
+    else if (distanceM === 0) {
       if (metrics.total_distance_meters && metrics.total_distance_meters > 0) {
         distanceM = metrics.total_distance_meters;
         distanceSource = 'metrics.total_distance_meters';
@@ -657,18 +664,33 @@ function updateRouteMetrics(routeData) {
     const walkingDistanceKm = walkingDistanceM / 1000;
     
     // Calculate estimated time
-    // Walking: 5 km/h = 12 min/km
-    // Driving: 30 km/h average in urban areas = 2 min/km
-    const walkingMinutes = walkingDistanceKm * 12;
-    let drivingMinutes = 0;
-    
-    if (metrics.estimated_time_minutes) {
-      drivingMinutes = metrics.estimated_time_minutes;
-    } else if (drivingDistanceKm > 0) {
-      drivingMinutes = drivingDistanceKm * 2; // 30 km/h = 2 min/km
+    // Try to get ETA from C++ first (using Table 8 speed profiles)
+    let etaFromCpp = false;
+    if (metrics.eta_formatted && metrics.eta_formatted !== '--') {
+      // ETA already formatted from C++
+      estimatedMinutes = parseFloat(metrics.eta_formatted.match(/\d+/)[0]) || 0;
+      etaFromCpp = true;
+      console.log('📊 Using ETA from C++:', metrics.eta_formatted, '→', estimatedMinutes, 'minutes');
+    } else if (metrics.eta_seconds && metrics.eta_seconds > 0) {
+      // Convert seconds to minutes
+      estimatedMinutes = Math.round(metrics.eta_seconds / 60);
+      console.log('📊 Using ETA from C++ (seconds):', metrics.eta_seconds, '→', estimatedMinutes, 'minutes');
+    } else {
+      // Fallback: calculate from distance and speed
+      // Walking: 5 km/h = 12 min/km
+      // Driving: 30 km/h average in urban areas = 2 min/km
+      const walkingMinutes = walkingDistanceKm * 12;
+      let drivingMinutes = 0;
+      
+      if (metrics.estimated_time_minutes) {
+        drivingMinutes = metrics.estimated_time_minutes;
+      } else if (drivingDistanceKm > 0) {
+        drivingMinutes = drivingDistanceKm * 2; // 30 km/h = 2 min/km
+      }
+      
+      estimatedMinutes = Math.round(walkingMinutes + drivingMinutes);
+      console.log('📊 Calculating ETA from distance and speed:', estimatedMinutes, 'minutes');
     }
-    
-    estimatedMinutes = Math.round(walkingMinutes + drivingMinutes);
     
     console.log(`📊 Bottom info final: Total ${totalDistanceKm.toFixed(1)}km (Walking: ${walkingDistanceKm.toFixed(2)}km, Driving: ${drivingDistanceKm.toFixed(1)}km), ${estimatedMinutes}min`);
     

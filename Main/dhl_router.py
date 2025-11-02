@@ -72,7 +72,7 @@ class DHLRouter:
                      dest_snap_lat: float, dest_snap_lng: float,
                      start_edge_source: int, start_edge_target: int, start_edge_oneway: int,
                      dest_edge_source: int, dest_edge_target: int, dest_edge_oneway: int,
-                     use_disruptions: bool = False,
+                     disruption_dir: str = "",
                      tau_threshold: float = 0.5) -> Dict:
         """
         Compute route using DHL algorithm via JSON API with snap point information
@@ -93,13 +93,14 @@ class DHLRouter:
             dest_edge_source: Source node of edge where dest snap occurred
             dest_edge_target: Target node of edge where dest snap occurred
             dest_edge_oneway: One-way property of dest edge (1=forward, -1=reverse, 0=bidirectional)
-            use_disruptions: Whether to consider traffic disruptions
+            disruption_dir: Path to disruption data directory (empty string or "null" = no disruptions)
             tau_threshold: DHL threshold parameter (default: 0.5)
         """
         try:
             print(f"Executing DHL JSON API route computation...")
             
             # Build command with new argument structure
+            use_disruptions = bool(disruption_dir and disruption_dir != "null")
             cmd = [
                 self.cpp_executable,
                 str(start_pin_lat), str(start_pin_lng),
@@ -108,7 +109,7 @@ class DHLRouter:
                 str(dest_pin_lat), str(dest_pin_lng),
                 str(dest_snap_lat), str(dest_snap_lng),
                 str(dest_edge_source), str(dest_edge_target), str(dest_edge_oneway),
-                "true" if use_disruptions else "false",
+                disruption_dir if disruption_dir else "",  # Pass directory path instead of true/false
                 str(tau_threshold),
                 str(Config.NODES_CSV),
                 str(Config.EDGES_CSV),
