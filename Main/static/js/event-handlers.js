@@ -510,11 +510,8 @@ function initializeEventHandlers() {
             // Keep current path panel open
             adminPanel.classList.remove("translate-x-full");
             
-            // Reset map container to full width
-            const mapContainer = document.getElementById("map-container");
-            if (mapContainer) {
-                mapContainer.style.marginRight = "0";
-            }
+            // Keep map margin since current path panel is still visible
+            // Map resize will be triggered below
             
             // Trigger map resize
             if (map) {
@@ -543,11 +540,8 @@ function initializeEventHandlers() {
             // Keep current path panel open
             disruptionsPanel.classList.remove("translate-x-full");
             
-            // Reset map container to full width
-            const mapContainer = document.getElementById("map-container");
-            if (mapContainer) {
-                mapContainer.style.marginRight = "0";
-            }
+            // Keep map margin since current path panel is still visible
+            // Map resize will be triggered below
             
             // Trigger map resize
             if (map) {
@@ -576,11 +570,8 @@ function initializeEventHandlers() {
             // Keep current path panel open
             reportPanel.classList.remove("translate-x-full");
             
-            // Reset map container to full width
-            const mapContainer = document.getElementById("map-container");
-            if (mapContainer) {
-                mapContainer.style.marginRight = "0";
-            }
+            // Keep map margin since current path panel is still visible
+            // Map resize will be triggered below
             
             // Trigger map resize
             if (map) {
