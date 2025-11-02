@@ -153,24 +153,73 @@ map<NodeID, vector<Neighbor>> load_edges(const string& filename, map<pair<NodeID
             string oneway_str = fields[5];
             string geometry_json = fields[6];
             
-            // Parse geometry JSON
+            // Remove surrounding quotes from geometry JSON if present
+            if (!geometry_json.empty() && geometry_json.front() == '"' && geometry_json.back() == '"') {
+                geometry_json = geometry_json.substr(1, geometry_json.length() - 2);
+            }
+            
+            // Parse geometry JSON - WITH VALIDATION AND DEBUGGING
             vector<pair<double, double>> coords;
+            int parse_error_count = 0;
+            int success_count = 0;
+            
             if (!geometry_json.empty() && geometry_json != "[]") {
+                // Format is: [[lon1, lat1], [lon2, lat2], ...]
+                // Find all inner coordinate pairs [lon, lat]
                 size_t start = 0;
                 while ((start = geometry_json.find('[', start)) != string::npos) {
+                    // Skip if this is the outer bracket
+                    if (start == 0 && geometry_json[start + 1] == '[') {
+                        start++;
+                        continue;
+                    }
+                    
                     size_t end = geometry_json.find(']', start);
                     if (end == string::npos) break;
                     
                     string pair_str = geometry_json.substr(start + 1, end - start - 1);
+                    
+                    // Parse "lon, lat" or "lon,lat" 
                     size_t comma = pair_str.find(',');
                     if (comma != string::npos) {
                         try {
-                            double lon = stod(pair_str.substr(0, comma));
-                            double lat = stod(pair_str.substr(comma + 1));
-                            coords.push_back({lon, lat});
-                        } catch (...) {}
+                            string lon_str = pair_str.substr(0, comma);
+                            string lat_str = pair_str.substr(comma + 1);
+                            
+                            // Trim whitespace
+                            lon_str.erase(0, lon_str.find_first_not_of(" \t"));
+                            lon_str.erase(lon_str.find_last_not_of(" \t") + 1);
+                            lat_str.erase(0, lat_str.find_first_not_of(" \t"));
+                            lat_str.erase(lat_str.find_last_not_of(" \t") + 1);
+                            
+                            double lon = stod(lon_str);
+                            double lat = stod(lat_str);
+                            
+                            // Validate coordinate ranges (reasonable GPS bounds for Philippines)
+                            if (lat >= 4.0 && lat <= 20.0 && lon >= 115.0 && lon <= 130.0) {
+                                coords.push_back({lon, lat});
+                                success_count++;
+                            } else {
+                                parse_error_count++;
+                                cerr << "⚠️  Invalid coordinate range in edge " << source << "→" << target 
+                                     << ": lat=" << lat << ", lon=" << lon << endl;
+                            }
+                        } catch (const exception& e) {
+                            parse_error_count++;
+                            cerr << "⚠️  Failed to parse coordinate in edge " << source << "→" << target 
+                                 << ": [" << pair_str << "] (error: " << e.what() << ")" << endl;
+                        }
+                    } else {
+                        parse_error_count++;
+                        cerr << "⚠️  Malformed coordinate pair in edge " << source << "→" << target 
+                             << ": [" << pair_str << "]" << endl;
                     }
                     start = end + 1;
+                }
+                
+                if (parse_error_count > 0) {
+                    cerr << "   Edge " << source << "→" << target << ": " << success_count 
+                         << " valid coordinates, " << parse_error_count << " parse errors" << endl;
                 }
             }
             
@@ -222,10 +271,28 @@ map<NodeID, vector<Neighbor>> load_edges(const string& filename, map<pair<NodeID
     }
     
     file.close();
+    
+    // Log statistics about edge geometry
+    int edges_with_geometry = 0;
+    int edges_without_geometry = 0;
+    for (const auto& [edge_key, geom] : edge_geometries) {
+        if (geom.coords.empty()) {
+            edges_without_geometry++;
+        } else {
+            edges_with_geometry++;
+        }
+    }
+    cerr << "✓ Loaded edges: " << adj_list.size() << " source nodes with " << edge_geometries.size() 
+         << " directed edges" << endl;
+    cerr << "  Edges with geometry: " << edges_with_geometry << endl;
+    cerr << "  Edges without geometry: " << edges_without_geometry << endl;
+    
     return adj_list;
 }
 
 // SIMPLIFIED PATH FINDING: Just use Dijkstra with the road network
+// CRITICAL: This function MUST return ALL intermediate nodes on the shortest path
+// including intersection nodes at sharp turns and road junctions
 vector<NodeID> find_shortest_path(NodeID start, NodeID dest, const map<NodeID, vector<Neighbor>>& adj_list) {
     vector<NodeID> path;
     
@@ -268,16 +335,32 @@ vector<NodeID> find_shortest_path(NodeID start, NodeID dest, const map<NodeID, v
         }
     }
     
-    // Reconstruct path
+    // Reconstruct path - ENSURE ALL INTERMEDIATE NODES ARE INCLUDED
+    // This is critical for sharp turns and road junctions with multiple connections
     if (pred.count(dest) || dest == start) {
         NodeID curr = dest;
         while (curr != start) {
             path.push_back(curr);
-            if (!pred.count(curr)) break;
+            if (!pred.count(curr)) {
+                // Path reconstruction failed - node unreachable
+                cerr << "⚠️  Warning: Node " << curr << " has no predecessor, path may be incomplete" << endl;
+                break;
+            }
             curr = pred[curr];
         }
         path.push_back(start);
         reverse(path.begin(), path.end());
+    }
+    
+    // DEBUG: Log the path for verification
+    if (path.size() > 0) {
+        cerr << "✓ Path found with " << path.size() << " nodes: ";
+        for (size_t i = 0; i < path.size() && i < 10; i++) {
+            cerr << path[i];
+            if (i < min(size_t(9), path.size() - 1)) cerr << " → ";
+        }
+        if (path.size() > 10) cerr << " ... (" << (path.size() - 10) << " more nodes)";
+        cerr << endl;
     }
     
     return path;
@@ -479,6 +562,20 @@ void output_json_response(bool success, const string& error_message = "",
             if (i < path.size() - 1) cout << ", ";
         }
         cout << "]," << endl;
+        
+        // DEBUG INFO: Log path with coordinates for sharp turn detection
+        cerr << "📍 Complete path with " << path.size() << " nodes:" << endl;
+        for (size_t i = 0; i < path.size(); i++) {
+            NodeID node = path[i];
+            cerr << "  [" << i << "] Node " << node;
+            if (coordinates.count(node)) {
+                auto& coord = coordinates.at(node);
+                cerr << " @ (" << fixed << setprecision(6) << coord.latitude << ", " << coord.longitude << ")";
+            } else {
+                cerr << " (⚠️  NO COORDINATES)";
+            }
+            cerr << endl;
+        }
         
         cout << "    \"complete_trace\": \"HC2L Route (";
         for (size_t i = 0; i < path.size(); i++) {
@@ -763,6 +860,34 @@ int main(int argc, char* argv[]) {
         
         // Find actual path using Dijkstra
         vector<NodeID> path = find_shortest_path(best_start, best_dest, adj_list);
+        
+        // VALIDATION: Check for missing edges between path nodes
+        // This helps detect if intermediate nodes are being missed at sharp turns
+        vector<pair<NodeID, NodeID>> missing_edges;
+        for (size_t i = 0; i < path.size() - 1; i++) {
+            NodeID from = path[i];
+            NodeID to = path[i + 1];
+            
+            bool edge_found = false;
+            if (adj_list.count(from)) {
+                for (const auto& neighbor : adj_list.at(from)) {
+                    if (neighbor.node == to) {
+                        edge_found = true;
+                        break;
+                    }
+                }
+            }
+            
+            if (!edge_found) {
+                missing_edges.push_back({from, to});
+                cerr << "⚠️  WARNING: Missing edge in path: " << from << " → " << to << endl;
+            }
+        }
+        
+        if (!missing_edges.empty()) {
+            cerr << "❌ Found " << missing_edges.size() << " missing edges in path!" << endl;
+            cerr << "   This indicates intermediate nodes may be missing at sharp turns" << endl;
+        }
         
         // Determine if on same edge and if they can meet directly
         bool same_edge = (start_edge_source == dest_edge_source && start_edge_target == dest_edge_target) ||
