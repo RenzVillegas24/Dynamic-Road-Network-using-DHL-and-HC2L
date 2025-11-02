@@ -201,26 +201,14 @@
           </button>
         </div>
         <div class="relative flex-1">
-          <button id="google-compare-button" onclick="compareWithGoogleMaps()"
-            class="flex items-center space-x-2 px-4 py-3 glass-effect hover:shadow-md rounded-2xl transition-all duration-300 border border-slate-300 whitespace-nowrap text-sm font-bold text-slate-700">
-            <div class="bg-gradient-to-br from-orange-500 to-red-600 rounded-xl p-2 shadow-sm">
-              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
-                  d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7">
-                </path>
-              </svg>
-            </div>
-            <span class="font-bold text-slate-700 text-sm">Compare Google</span>
-          </button>
-        </div>
-        <div class="relative flex-1">
           <button id="show-current-route-only-btn" onclick="toggleCurrentRouteOnly()"
             class="flex items-center space-x-2 px-4 py-3 glass-effect hover:shadow-md rounded-2xl transition-all duration-300 border border-slate-300 whitespace-nowrap text-sm font-bold text-slate-700"
             style="display: none;">
             <div class="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl p-2 shadow-sm">
               <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" 
-                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z">
+                </path>
               </svg>
             </div>
             <span class="font-bold text-slate-700 text-sm">Current Route Only</span>
@@ -285,76 +273,173 @@
       </div>
     </div>
 
-    <!-- Map View -->
-    <div class="flex-1 relative z-0" id="map-container">
-      <!-- Leaflet Map will be loaded here -->
-      <div id="google-map" class="w-full h-full"></div>
+    <!-- Main Content -->
+    <div class="flex-1 flex relative z-0 transition-all duration-300" id="main-content">
 
-      <!-- Map placeholder (shown when maps fail to load) -->
-      <div
-        class="absolute inset-0 flex items-center justify-center text-slate-300 text-xl font-light pointer-events-none hidden z-10"
-        id="map-placeholder">
-        <div class="text-center">
-          <svg class="w-20 h-20 mx-auto mb-4 text-slate-300 float-animation" fill="none" stroke="currentColor"
-            viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-              d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-              d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
-          </svg>
-          <p>Map loading failed. Check your internet connection.</p>
+      <!-- Map View -->
+      <div class="flex-1 relative z-0 transition-all duration-300" id="map-container" style="margin-right: 0;">
+        <!-- Leaflet Map will be loaded here -->
+        <div id="google-map" class="w-full h-full"></div>
+
+        <!-- Map placeholder (shown when maps fail to load) -->
+        <div
+          class="absolute inset-0 flex items-center justify-center text-slate-300 text-xl font-light pointer-events-none hidden z-10"
+          id="map-placeholder">
+          <div class="text-center">
+            <svg class="w-20 h-20 mx-auto mb-4 text-slate-300 float-animation" fill="none" stroke="currentColor"
+              viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+            </svg>
+            <p>Map loading failed. Check your internet connection.</p>
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- Bottom Info Bar -->
-    <div class="glass-effect shadow-md border-t border-slate-300 px-8 py-5">
-      <div class="flex items-center justify-center w-full gap-6">
-        <!-- ETA -->
-        <div
-          class="flex items-center space-x-3 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl px-5 py-3 border border-slate-300 shadow-sm w-48">
-          <div class="bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl p-3 shadow-md flex-shrink-0">
-            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
-                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-          </div>
-          <div class="min-w-0">
-            <p class="text-xs font-bold text-blue-600 uppercase tracking-wide">ETA</p>
-            <p id="bottom-info-eta" class="font-bold text-2xl text-slate-800 truncate">--</p>
-          </div>
-        </div>
+      <!-- Current Path Panel -->
+      <div id="current-path-panel"
+        class="absolute top-0 right-0 w-[28rem] h-full flex flex-col glass-effect shadow-2xl z-40 border-l border-slate-300 transition-all duration-300 transform translate-x-full">
 
-        <!-- Distance -->
-        <div
-          class="flex items-center space-x-3 bg-gradient-to-br from-emerald-50 to-green-50 rounded-2xl px-5 py-3 border border-slate-300 shadow-sm w-48">
-          <div class="bg-gradient-to-br from-emerald-600 to-green-600 rounded-xl p-3 shadow-md flex-shrink-0">
-            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
-                d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-            </svg>
-          </div>
-          <div class="min-w-0">
-            <p class="text-xs font-bold text-emerald-600 uppercase tracking-wide">Distance</p>
-            <p id="bottom-info-distance" class="font-bold text-2xl text-slate-800 truncate">--</p>
-          </div>
-        </div>
+        <!-- Right Side Current Path Panel (reworked layout) -->
+        <div class="h-full flex flex-col">
 
-        <!-- Algorithm Performance / Comparison -->
-        <div
-          class="flex items-center space-x-3 bg-gradient-to-br from-purple-50 to-violet-50 rounded-2xl px-5 py-3 border border-slate-300 shadow-sm w-48">
-          <div class="bg-gradient-to-br from-purple-600 to-violet-600 rounded-xl p-3 shadow-md flex-shrink-0">
-            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
-                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z">
-              </path>
-            </svg>
+          <!-- Header (sticky) -->
+          <div                          
+            class="p-4 bg-gradient-to-r from-emerald-500 via-green-600 to-teal-600 text-white flex items-center justify-between sticky top-0 z-50">
+            <div>
+              <h2 id="current-path-title" class="font-bold text-lg">Current Path</h2>
+              <p class="text-sm text-emerald-100">Optimized route details</p>
+            </div>
+            <button id="current-path-close" class="ml-4 p-2 rounded-xl hover:bg-white/20 transition-colors">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
           </div>
-          <div class="min-w-0">
-            <p id="bottom-info-metric-label" class="text-xs font-bold text-purple-600 uppercase tracking-wide">Query
-              Time</p>
-            <p id="bottom-info-metric-value" class="font-bold text-2xl text-slate-800 truncate">--</p>
+
+          <!-- Content area: stats + disruption + steps (with max height and internal scroll) -->
+          <div class="flex-1 overflow-hidden p-4 flex flex-col gap-4 bg-slate-50">
+
+            <!-- Compact Route Summary (responsive) -->
+            <div class="grid grid-cols-3 gap-3">
+              <div class="bg-white rounded-2xl p-3 border border-slate-200 shadow-sm text-center">
+                <div class="text-xs text-slate-500 font-semibold uppercase">Distance</div>
+                <div id="route-distance" class="text-2xl font-bold text-emerald-600">12.4 km</div>
+              </div>
+              <div class="bg-white rounded-2xl p-3 border border-slate-200 shadow-sm text-center">
+                <div class="text-xs text-slate-500 font-semibold uppercase">Duration</div>
+                <div id="route-duration" class="text-2xl font-bold text-blue-600">22 min</div>
+              </div>
+              <div class="bg-white rounded-2xl p-3 border border-slate-200 shadow-sm text-center">
+                <div class="text-xs text-slate-500 font-semibold uppercase">Steps</div>
+                <div id="route-steps-count" class="text-2xl font-bold text-purple-600">8</div>
+              </div>
+            </div>
+
+            <!-- Disruption Alert (kept id) -->
+            <div id="route-disruption-alert"
+              class="bg-gradient-to-br from-red-50 to-rose-50 border-l-4 border-red-500 rounded-2xl p-3 shadow hidden">
+              <div class="flex items-start gap-3">
+                <div class="bg-red-500 rounded-xl p-2">
+                  <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd"
+                      d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                      clip-rule="evenodd"></path>
+                  </svg>
+                </div>
+                <div class="flex-1">
+                  <div class="text-sm font-bold text-red-900">Disruption on Route</div>
+                  <div class="text-xs text-red-700 mt-1">Click for details</div>
+                </div>
+                <div class="self-center">
+                  <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <!-- Route Steps (scrollable with fixed height) -->
+            <div class="flex-1 overflow-y-auto bg-white rounded-2xl p-4 border border-slate-200 shadow-sm min-h-0">
+              <!-- Placeholder or dynamic steps container -->
+              <div id="route-steps" class="space-y-3">
+                <div id="route-steps-placeholder" class="text-center py-8 text-slate-400">
+                  <svg class="w-14 h-14 mx-auto mb-4 text-slate-300" fill="none" stroke="currentColor"
+                    viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                      d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-1.447-.894L15 4m0 13V4m0 0L9 7">
+                    </path>
+                  </svg>
+                  <div class="text-sm font-medium">Pin locations and click "Go" to see turn-by-turn directions</div>
+                </div>
+                <!-- Example of a step item (scripts can populate similar nodes) -->
+                <!-- <div class="p-3 rounded-lg border border-slate-100">Turn right onto Example Ave (200 m)</div> -->
+              </div>
+            </div>
+
           </div>
+
+          <!-- Footer actions (sticky, keeps ids intact) -->
+          <div class="sticky bottom-0 bg-white/80 backdrop-blur-sm border-t border-slate-200 p-4 z-40">
+            <div class="max-w-full mx-auto space-y-3">
+
+              <!-- Primary Compare Button (keeps id) -->
+              <div id="current-path-google-compare-btn-container" class="w-full">
+                <button id="current-path-google-compare-btn" onclick="compareWithGoogleMaps()"
+                  class="w-full flex glass-effect items-center gap-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold py-3 px-4 rounded-2xl shadow-md transition-all duration-300"
+                  aria-label="Compare current route with Google Maps">
+                  <div class="flex-shrink-0 bg-white/10 p-2 rounded-xl">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                      aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z">
+                      </path>
+                    </svg>
+                  </div>
+
+                  <div class="flex-1 text-left">
+                    <div class="text-sm">Compare with Google Maps</div>
+                    <div class="text-xs text-white/80 font-medium">Assess route similarity & metrics</div>
+                  </div>
+                </button>
+              </div>
+
+              <!-- Collapsible Google Metrics (keeps id names) -->
+              <div id="google-maps-metrics-container"
+                class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-3 border border-slate-200 shadow-md hidden">
+                <h3 class="text-xs font-bold text-slate-700 mb-2 uppercase tracking-wide">📊 Route Accuracy vs Google
+                  Maps</h3>
+                <div class="grid grid-cols-1 gap-2">
+                  <div
+                    class="flex justify-between text-sm text-slate-700 bg-white p-2 rounded-lg border border-slate-200">
+                    <span class="font-medium">Fréchet Distance:</span>
+                    <span id="frechet-distance-value" class="font-bold text-blue-700">-- m</span>
+                  </div>
+                  <div
+                    class="flex justify-between text-sm text-slate-700 bg-white p-2 rounded-lg border border-slate-200">
+                    <span class="font-medium">Segment Overlap:</span>
+                    <span id="segment-overlap-value" class="font-bold text-emerald-700">--%</span>
+                  </div>
+                  <div
+                    class="flex justify-between text-sm text-slate-700 bg-white p-2 rounded-lg border border-slate-200">
+                    <span class="font-medium">Status:</span>
+                    <span id="frechet-status-value" class="font-bold text-emerald-700">--</span>
+                  </div>
+                </div>
+
+                <div class="mt-3">
+                  <button id="clear-google-comparison-btn" onclick="clearGoogleMapsComparison()"
+                    class="w-full bg-red-100 hover:bg-red-200 text-red-700 font-semibold py-2 px-3 rounded-lg transition-colors text-sm">
+                    Clear Comparison
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
@@ -532,99 +617,6 @@
       </div>
     </div>
 
-    <!-- Current Path Panel -->
-    <div id="current-path-panel"
-      class="fixed top-0 right-0 w-[28rem] h-full glass-effect shadow-2xl transform translate-x-full transition-transform duration-300 overflow-y-auto z-50 border-l border-slate-200/50">
-
-      <div
-        class="p-6 bg-gradient-to-r from-emerald-500 via-green-600 to-teal-600 text-white flex justify-between items-center">
-        <div>
-          <h2 class="font-bold text-2xl mb-1">Current Path</h2>
-          <p class="text-green-100 text-sm">Optimized route details</p>
-        </div>
-        <button id="current-path-close" class="hover:bg-white/20 rounded-xl p-2 transition-all">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
-      </div>
-
-      <div class="p-6">
-        <!-- Route Header -->
-        <div
-          class="bg-gradient-to-br from-emerald-50 via-green-50 to-blue-50 rounded-2xl p-5 mb-5 border-2 border-emerald-200 shadow-lg">
-          <div class="text-xl font-bold text-slate-900 mb-4">Route Found</div>
-          <div class="grid grid-cols-3 gap-3">
-            <div class="bg-white rounded-xl p-4 text-center border-2 border-slate-200 shadow-sm">
-              <div class="text-xs text-slate-600 font-bold uppercase mb-1">Distance</div>
-              <div class="text-xl font-bold text-emerald-600">12.4 km</div>
-            </div>
-            <div class="bg-white rounded-xl p-4 text-center border-2 border-slate-200 shadow-sm">
-              <div class="text-xs text-slate-600 font-bold uppercase mb-1">Duration</div>
-              <div class="text-xl font-bold text-blue-600">22 min</div>
-            </div>
-            <div class="bg-white rounded-xl p-4 text-center border-2 border-slate-200 shadow-sm">
-              <div class="text-xs text-slate-600 font-bold uppercase mb-1">Steps</div>
-              <div class="text-xl font-bold text-purple-600">8</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Disruption Alert -->
-        <!-- Disruption Alert (Hidden by default, shown when route has disruptions) -->
-        <div id="route-disruption-alert"
-          class="bg-gradient-to-br from-red-50 to-rose-50 border-l-4 border-red-500 rounded-2xl p-4 mb-5 shadow-md hidden">
-          <div class="flex items-start">
-            <div class="bg-red-500 rounded-xl p-2 mr-3">
-              <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd"
-                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                  clip-rule="evenodd"></path>
-              </svg>
-            </div>
-            <div class="flex-1">
-              <p class="text-sm font-bold text-red-900">Disruption on Route</p>
-              <p class="text-xs text-red-700 mt-1">Click for details</p>
-            </div>
-            <div class="ml-2">
-              <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-              </svg>
-            </div>
-          </div>
-        </div>
-
-        <!-- Route Path - Dynamic Content -->
-        <div class="space-y-4 max-h-96 overflow-y-auto">
-          <!-- Route steps will be dynamically populated by JavaScript -->
-          <div id="route-steps-placeholder" class="text-center py-8 text-slate-500">
-            <svg class="w-16 h-16 mx-auto mb-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-1.447-.894L15 4m0 13V4m0 0L9 7">
-              </path>
-            </svg>
-            <p class="text-sm font-medium">Pin locations and click "Go" to see turn-by-turn directions</p>
-          </div>
-        </div>
-
-        <!-- Action Buttons -->
-        <div id="google-maps-metrics-container"
-          class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-5 mt-6 mb-5 border-2 border-slate-200 shadow-md"
-          style="display: none;">
-          <h3 class="text-sm font-bold text-slate-700 mb-3 uppercase tracking-wide">Route Accuracy vs Google Maps</h3>
-          <div class="space-y-2">
-            <div class="flex justify-between text-sm text-slate-700 bg-white p-3 rounded-xl border border-slate-200">
-              <span class="font-medium">Fréchet Distance:</span>
-              <span id="frechet-distance-value" class="font-bold text-blue-700">-- m</span>
-            </div>
-            <div class="flex justify-between text-sm text-slate-700 bg-white p-3 rounded-xl border border-slate-200">
-              <span class="font-medium">Segment Overlap:</span>
-              <span id="segment-overlap-value" class="font-bold text-emerald-700">--%</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
 
     <!-- Admin Panel -->
     <div id="admin-panel"
@@ -666,12 +658,22 @@
                   d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"
                   clip-rule="evenodd"></path>
               </svg>
-              Simulate
+              Route
             </button>
             <button id="admin-reset-btn"
               class="px-4 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-bold transition-all duration-300">Reset</button>
             <button id="admin-export-btn"
               class="px-4 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-bold transition-all duration-300">Export</button>
+            <button id="admin-google-compare-btn" onclick="compareWithGoogleMaps()"
+              class="col-span-2 px-4 py-3 bg-gradient-to-br from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white rounded-xl font-bold shadow-md hover:shadow-lg transition-all duration-300 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-orange-500 disabled:hover:to-red-600"
+              disabled>
+              <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                  d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7">
+                </path>
+              </svg>
+              Compare with Google Maps
+            </button>
           </div>
         </div>
 
@@ -836,7 +838,8 @@
               class="w-full flex items-center space-x-3 px-3 py-3 glass-effect hover:shadow-md rounded-2xl transition-all duration-300 border border-slate-300">
               <div class="bg-gradient-to-br from-orange-600 to-red-700 rounded-xl p-2 shadow-sm">
                 <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                    d="M13 10V3L4 14h7v7l9-11h-7z"></path>
                 </svg>
               </div>
               <span class="font-bold text-slate-700">Fetch HERE Traffic</span>
@@ -885,34 +888,40 @@
             <button id="nodes-toggle"
               class="w-full flex items-center space-x-3 px-3 py-3 glass-effect hover:shadow-md rounded-2xl transition-all duration-300 border border-slate-300 bg-sky-50">
               <div class="bg-gradient-to-br from-sky-600 to-sky-700 rounded-xl p-2 shadow-sm">
-              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
-                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
-                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-              </svg>
-            </div>
-            <span class="font-bold text-sky-700">Show Nodes</span>
+                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                    d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z">
+                  </path>
+                </svg>
+              </div>
+              <span class="font-bold text-sky-700">Show Nodes</span>
             </button>
-            
+
             <!-- Export CSV Button -->
             <button id="export-csv-btn"
               class="w-full flex items-center space-x-3 px-3 py-3 glass-effect hover:shadow-md rounded-2xl transition-all duration-300 border border-slate-300 bg-green-50">
               <div class="bg-gradient-to-br from-green-600 to-green-700 rounded-xl p-2 shadow-sm">
                 <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                    d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                  </path>
                 </svg>
               </div>
               <span class="font-bold text-green-700">Export CSV</span>
             </button>
-            
+
             <!-- Run Demo Button -->
             <button id="run-demo-btn"
               class="w-full flex items-center space-x-3 px-3 py-3 glass-effect hover:shadow-md rounded-2xl transition-all duration-300 border-2 border-amber-400 bg-gradient-to-r from-amber-50 to-yellow-50">
               <div class="bg-gradient-to-br from-amber-600 to-yellow-600 rounded-xl p-2 shadow-sm">
                 <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                    d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z">
+                  </path>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                    d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                 </svg>
               </div>
               <span class="font-bold text-amber-700">Run Demo</span>
@@ -1125,7 +1134,7 @@
           attribution: '© OpenStreetMap contributors',
           maxZoom: 19
         }).addTo(map);
-        
+
         // Add subtle fade overlay to emphasize Quezon City focus
         // Create an inverted polygon that covers everything except Quezon City
         const worldBounds = [
@@ -1135,7 +1144,7 @@
           [90, -180],
           [-90, -180]
         ];
-        
+
         const quezonCityHole = [
           [14.5800, 121.0000],
           [14.5800, 121.1300],
@@ -1143,7 +1152,7 @@
           [14.7800, 120.9850],
           [14.5800, 120.9850]
         ];
-        
+
         // Create polygon with hole (world minus Quezon City)
         L.polygon([worldBounds, quezonCityHole], {
           color: 'transparent',
@@ -2166,7 +2175,7 @@
           const currentlyShown = nodesBtn.textContent && nodesBtn.textContent.trim().toLowerCase().includes('hide');
           toggleAllNodes();
           // Optimistically toggle button label (actual state may be cached)
-          nodesBtn.innerHTML = currentlyShown ? 
+          nodesBtn.innerHTML = currentlyShown ?
             `<div class="bg-gradient-to-br from-sky-600 to-sky-700 rounded-xl p-2 shadow-sm">
               <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
@@ -2176,7 +2185,7 @@
               </svg>
             </div>
             <span class="font-bold text-sky-700">Show Nodes</span>
-            ` :  
+            ` :
             `<div class="bg-gradient-to-br from-sky-600 to-sky-700 rounded-xl p-2 shadow-sm">
               <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
@@ -2188,7 +2197,7 @@
 
         });
       }
-      
+
       // Wire up Export CSV button
       const exportCsvBtn = document.getElementById('export-csv-btn');
       if (exportCsvBtn) {
@@ -2200,7 +2209,7 @@
           }
         });
       }
-      
+
       // Wire up Run Demo button
       const runDemoBtn = document.getElementById('run-demo-btn');
       if (runDemoBtn) {
@@ -2212,7 +2221,7 @@
           }
         });
       }
-      
+
       // Wire up Reset button
       const resetBtn = document.getElementById('admin-reset-btn');
       if (resetBtn) {
@@ -2238,10 +2247,15 @@
           if (typeof clearExportData === 'function') {
             clearExportData();
           }
+          // Disable Google Compare button since route is reset
+          const googleCompareBtn = document.getElementById('admin-google-compare-btn');
+          if (googleCompareBtn) {
+            googleCompareBtn.disabled = true;
+          }
           showUpdateToast('Map reset: all routes and disruptions cleared', 'success');
         });
       }
-      
+
       // Wire up Export button (admin panel)
       const adminExportBtn = document.getElementById('admin-export-btn');
       if (adminExportBtn) {
@@ -2253,14 +2267,14 @@
           }
         });
       }
-      
+
       // Wire up Fetch HERE Traffic button
       const fetchHereTrafficBtn = document.getElementById('fetch-here-traffic-btn');
       if (fetchHereTrafficBtn) {
         fetchHereTrafficBtn.addEventListener('click', async () => {
           try {
             showUpdateToast('Fetching real-time traffic data from HERE API...', 'info');
-            
+
             const response = await fetch('/fetch_here_traffic', {
               method: 'POST',
               headers: {
@@ -2271,15 +2285,15 @@
                 apply_immediately: true
               })
             });
-            
+
             const data = await response.json();
-            
+
             if (data.success) {
               showUpdateToast(
                 `HERE Traffic: ${data.edges_affected} edges affected (${data.metadata.flow_count} flow + ${data.metadata.incident_count} incidents)`,
                 'success'
               );
-              
+
               // Optionally refresh disruptions on map
               if (typeof loadDisruptionMarkers === 'function') {
                 setTimeout(() => {

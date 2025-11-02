@@ -717,7 +717,7 @@ function updateRouteSteps(route) {
       }
       
       // Find the route steps container
-      const stepsContainer = document.querySelector('#current-path-panel .space-y-4.max-h-96.overflow-y-auto');
+      const stepsContainer = document.getElementById('route-steps');
       if (!stepsContainer) {
         console.error('Route steps container not found');
         return;
@@ -1091,7 +1091,7 @@ function resetCurrentPathPanel() {
     }
     
     // Clear any dynamic route steps
-    const stepsContainer = document.querySelector('#current-path-panel .space-y-4.max-h-96.overflow-y-auto');
+    const stepsContainer = document.getElementById('route-steps');
     if (stepsContainer) {
       const existingSteps = stepsContainer.querySelectorAll('.flex.gap-4.items-start');
       existingSteps.forEach(step => step.remove());
@@ -1942,7 +1942,7 @@ function updateCurrentPathPanelWithGoogleRoute(routeMetadata) {
         }
         
         // Update route steps with Google Maps turn-by-turn directions
-        const stepsContainer = document.querySelector('#current-path-panel .space-y-4.max-h-96.overflow-y-auto');
+        const stepsContainer = document.getElementById('route-steps');
         if (stepsContainer) {
             // Hide placeholder
             const placeholder = document.getElementById('route-steps-placeholder');

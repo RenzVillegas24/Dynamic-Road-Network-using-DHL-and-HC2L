@@ -1384,166 +1384,254 @@ def compare_algorithms():
 
 @app.route('/compare_with_google_maps', methods=['POST'])
 def compare_with_google_maps():
-    """Compare algorithm route with Google Maps route"""
+    """
+    Compare current algorithm route with Google Maps route
+    
+    IMPORTANT: This function uses the CURRENT ROUTE already calculated on frontend.
+    No route recalculation is needed - we just compare the existing route.
+    
+    Frontend sends:
+    - start_lat, start_lng, dest_lat, dest_lng: Origin/destination coordinates
+    - algorithm: Algorithm name used (HC2L, DHC2L, DHL, etc)
+    - existing_route_geometry: Current route geometry from the calculated route
+    
+    Steps:
+    1. Extract algorithm route coordinates from the passed geometry
+    2. Fetch Google Maps route for the same origin/destination
+    3. Calculate Fréchet distance and overlap metrics
+    4. Return both routes for map display (no recalculation!)
+    """
     data = request.json
     
     try:
+        # Validate required input parameters
         start_lat = float(data['start_lat'])
         start_lng = float(data['start_lng'])
         dest_lat = float(data['dest_lat'])
         dest_lng = float(data['dest_lng'])
-        algorithm = data.get('algorithm', 'dhc2l')
-        use_disruptions = data.get('use_disruptions', False)
-        threshold = float(data.get('threshold', 0.5))
+        algorithm_name = data.get('algorithm', 'Unknown Algorithm')
         
+        print(f"\n🗺️  === GOOGLE MAPS COMPARISON (Dynamic) ===")
+        print(f"   Algorithm: {algorithm_name}")
+        print(f"   Route: ({start_lat}, {start_lng}) → ({dest_lat}, {dest_lng})")
+        print(f"   Using existing route data (no recalculation)")
+        
+        # Validate Google Maps service is initialized
         if not gmaps_service:
+            print(f"   ❌ Google Maps service not initialized")
             return jsonify({
                 'success': False,
-                'error': 'Google Maps service not initialized'
+                'error': 'Google Maps service not initialized. Check API key in .env'
             })
         
-        print(f"\n🗺️  Google Maps Comparison Request")
-        print(f"   Algorithm: {algorithm}")
-        print(f"   From: ({start_lat}, {start_lng})")
-        print(f"   To: ({dest_lat}, {dest_lng})")
+        # ============================================================
+        # STEP 1: Extract algorithm route coordinates from passed geometry
+        # ============================================================
+        print(f"\n📍 Step 1: Extract current algorithm route coordinates")
         
-        # Compute algorithm route first
-        algorithm_route = None
         algorithm_coords = []
-        algorithm_summary = {}
+        existing_geometry = data.get('existing_route_geometry')
+        print(f"   Received geometry type: {type(existing_geometry)}")
         
-        if algorithm.lower().startswith('dhl') and dhl_router:
-            print("   Computing DHL route...")
-            algorithm_route = dhl_router.compute_route(
-                start_lat, start_lng, dest_lat, dest_lng, use_disruptions
-            )
-            if algorithm_route.get('success'):
-                algorithm_summary = dhl_router.get_route_summary(algorithm_route)
-                # Extract coordinates from route
-                if 'route' in algorithm_route and 'coordinates' in algorithm_route['route']:
-                    algorithm_coords = algorithm_route['route']['coordinates']
-        else:
-            # D-HC2L / Lazy HC2L requires snap data
-            if gps_router:
-                print("   Computing D-HC2L route...")
-                
-                # Extract OSM snap data (required for HC2L)
-                start_osm_edge = data.get('start_osm_edge')
-                dest_osm_edge = data.get('dest_osm_edge')
-                
-                # Default to pin coordinates if no snap info
-                start_snap_lat = start_lat
-                start_snap_lng = start_lng
-                dest_snap_lat = dest_lat
-                dest_snap_lng = dest_lng
-                
-                # Default edge information
-                start_edge_source = 0
-                start_edge_target = 0
-                start_edge_oneway = 0
-                dest_edge_source = 0
-                dest_edge_target = 0
-                dest_edge_oneway = 0
-                
-                # Extract snap point and edge information
-                if start_osm_edge:
-                    if 'snapped_point' in start_osm_edge:
-                        start_snap_lat = float(start_osm_edge['snapped_point']['lat'])
-                        start_snap_lng = float(start_osm_edge['snapped_point']['lng'])
-                    if 'osm_nodes' in start_osm_edge and len(start_osm_edge['osm_nodes']) >= 2:
-                        start_edge_source = int(start_osm_edge['osm_nodes'][0])
-                        start_edge_target = int(start_osm_edge['osm_nodes'][1])
-                    oneway_str = start_osm_edge.get('oneway', '0')
-                    try:
-                        start_edge_oneway = int(oneway_str)
-                    except (ValueError, TypeError):
-                        start_edge_oneway = 0
-                
-                if dest_osm_edge:
-                    if 'snapped_point' in dest_osm_edge:
-                        dest_snap_lat = float(dest_osm_edge['snapped_point']['lat'])
-                        dest_snap_lng = float(dest_osm_edge['snapped_point']['lng'])
-                    if 'osm_nodes' in dest_osm_edge and len(dest_osm_edge['osm_nodes']) >= 2:
-                        dest_edge_source = int(dest_osm_edge['osm_nodes'][0])
-                        dest_edge_target = int(dest_osm_edge['osm_nodes'][1])
-                    oneway_str = dest_osm_edge.get('oneway', '0')
-                    try:
-                        dest_edge_oneway = int(oneway_str)
-                    except (ValueError, TypeError):
-                        dest_edge_oneway = 0
-                
-                # Get disruption file if using disruptions
-                disruption_file = ""
-                if use_disruptions:
-                    disruption_file = Config.DISRUPTION_FILE
-                
-                # Compute route with all required parameters
-                algorithm_route = gps_router.compute_route(
-                    start_lat, start_lng,
-                    dest_lat, dest_lng,
-                    start_snap_lat, start_snap_lng,
-                    dest_snap_lat, dest_snap_lng,
-                    start_edge_source, start_edge_target, start_edge_oneway,
-                    dest_edge_source, dest_edge_target, dest_edge_oneway,
-                    disruption_file, threshold
-                )
-                
-                if algorithm_route.get('success'):
-                    algorithm_summary = gps_router.get_route_summary(algorithm_route)
-                    # Extract coordinates from route
-                    if 'route' in algorithm_route and 'coordinates' in algorithm_route['route']:
-                        algorithm_coords = algorithm_route['route']['coordinates']
-        
-        if not algorithm_route or not algorithm_route.get('success'):
+        if not existing_geometry:
+            print(f"   ❌ No route geometry provided")
             return jsonify({
                 'success': False,
-                'error': 'Failed to compute algorithm route'
+                'error': 'No route geometry found. Please calculate a route first.'
             })
+        
+        # Debug: print raw geometry
+        print(f"   Raw geometry (first 200 chars): {str(existing_geometry)[:200]}")
+        
+        # Handle different geometry formats from various routing algorithms
+        if isinstance(existing_geometry, list):
+            # Format 1: Array of segments with coordinates
+            for segment in existing_geometry:
+                if isinstance(segment, dict):
+                    # Format 1a: Direct dict with lat/lng keys (MOST COMMON - DHL format)
+                    if 'lat' in segment and 'lng' in segment:
+                        try:
+                            lat = float(segment['lat'])
+                            lng = float(segment['lng'])
+                            algorithm_coords.append([lat, lng])
+                        except (ValueError, TypeError) as e:
+                            print(f"   ⚠️  Skipping invalid lat/lng dict: {segment} - {e}")
+                    # Format 1b: Dict with nested coordinates key
+                    elif 'coordinates' in segment:
+                        coords_list = segment['coordinates']
+                        if isinstance(coords_list, list):
+                            for coord in coords_list:
+                                if isinstance(coord, list) and len(coord) >= 2:
+                                    try:
+                                        lat = float(coord[1]) if len(coord) > 1 else float(coord[0])
+                                        lng = float(coord[0]) if len(coord) > 1 else float(coord[1])
+                                        # Swap if detected as [lat, lng] format
+                                        if lat > 90 or lat < -90:
+                                            lat, lng = lng, lat
+                                        algorithm_coords.append([lat, lng])
+                                    except (ValueError, IndexError) as e:
+                                        print(f"   ⚠️  Skipping invalid coord: {coord} - {e}")
+                    # Format 1c: Dict with path key
+                    elif 'path' in segment:
+                        path = segment['path']
+                        if isinstance(path, list):
+                            for pt in path:
+                                if isinstance(pt, dict) and 'lat' in pt and 'lng' in pt:
+                                    algorithm_coords.append([float(pt['lat']), float(pt['lng'])])
+                    # Format 1d: Dict with polyline key (Google Maps)
+                    elif 'polyline' in segment:
+                        # Handle polyline format (Google Maps)
+                        try:
+                            import polyline
+                            decoded = polyline.decode(segment['polyline'])
+                            algorithm_coords.extend(decoded)
+                        except:
+                            pass
+                            
+                elif isinstance(segment, (list, tuple)) and len(segment) >= 2:
+                    # Format 2: Direct coordinate array [lat, lng] or [lng, lat]
+                    try:
+                        lat = float(segment[0])
+                        lng = float(segment[1])
+                        # Detect format: if first value > 90, it's probably [lng, lat]
+                        if lat > 90 or lat < -90:
+                            lat, lng = lng, lat
+                        algorithm_coords.append([lat, lng])
+                    except (ValueError, TypeError) as e:
+                        print(f"   ⚠️  Skipping invalid segment: {segment} - {e}")
+        
+        # Remove duplicate consecutive points
+        if algorithm_coords:
+            deduplicated = [algorithm_coords[0]]
+            for coord in algorithm_coords[1:]:
+                if coord != deduplicated[-1]:
+                    deduplicated.append(coord)
+            algorithm_coords = deduplicated
+            print(f"   ✅ Deduped to {len(algorithm_coords)} unique points")
         
         if not algorithm_coords:
+            print(f"   ❌ Could not extract coordinates from geometry")
+            print(f"   Geometry structure: {existing_geometry}")
             return jsonify({
                 'success': False,
-                'error': 'Algorithm route has no coordinates'
+                'error': 'Route geometry format is invalid or empty. Check server logs for details.'
             })
         
-        # Fetch and compare with Google Maps
-        comparison = gmaps_service.compare_with_algorithm_route(
-            algorithm_coords, start_lat, start_lng, dest_lat, dest_lng
-        )
+        print(f"   ✅ Extracted {len(algorithm_coords)} unique points from algorithm route")
+        print(f"      Start point: [{algorithm_coords[0][0]:.6f}, {algorithm_coords[0][1]:.6f}]")
+        print(f"      End point: [{algorithm_coords[-1][0]:.6f}, {algorithm_coords[-1][1]:.6f}]")
         
-        if not comparison.get('success'):
-            return jsonify(comparison)
+        # ============================================================
+        # STEP 2: Fetch Google Maps route using same origin/destination
+        # ============================================================
+        print(f"\n🌐 Step 2: Fetch Google Maps route")
         
-        # Build response
+        google_route = gmaps_service.get_directions(start_lat, start_lng, dest_lat, dest_lng)
+        
+        if not google_route or not google_route.get('success'):
+            error_msg = google_route.get('error') if google_route else 'Google Maps API call failed'
+            print(f"   ❌ Error: {error_msg}")
+            return jsonify({
+                'success': False,
+                'error': f"Failed to fetch Google Maps route: {error_msg}"
+            })
+        
+        google_coords = google_route.get('coordinates', [])
+        
+        if not google_coords:
+            print(f"   ❌ Google Maps returned no coordinates")
+            return jsonify({
+                'success': False,
+                'error': 'Google Maps route has no coordinates'
+            })
+        
+        print(f"   ✅ Google Maps route fetched: {len(google_coords)} points")
+        print(f"      Distance: {google_route.get('distance_text', 'N/A')}")
+        print(f"      Duration: {google_route.get('duration_text', 'N/A')}")
+        print(f"      Distance (meters): {google_route.get('distance_meters', 'N/A')}")
+        
+        # ============================================================
+        # STEP 3: Calculate comparison metrics
+        # ============================================================
+        print(f"\n📊 Step 3: Calculate comparison metrics")
+        
+        # Calculate Fréchet distance (measures max deviation between routes)
+        frechet_distance = gmaps_service.compute_frechet_distance(algorithm_coords, google_coords)
+        
+        # Calculate segment overlap (percentage of matching points)
+        segment_overlap = gmaps_service.compute_segment_overlap(algorithm_coords, google_coords)
+        
+        print(f"   ✅ Fréchet distance: {frechet_distance:.2f} meters")
+        print(f"   ✅ Segment overlap: {segment_overlap:.2f}%")
+        
+        google_distance_meters = google_route.get('distance_meters', 1)
+        frechet_ratio = round((frechet_distance / max(google_distance_meters, 1)) * 100, 2)
+        print(f"   ✅ Fréchet/Distance ratio: {frechet_ratio}%")
+        
+        # ============================================================
+        # STEP 4: Build response with both routes for map display
+        # ============================================================
+        print(f"\n✅ Comparison complete!")
+        
         result = {
             'success': True,
             'algorithm_route': {
                 'coordinates': algorithm_coords,
-                'summary': algorithm_summary,
-                'name': algorithm_summary.get('algorithm', algorithm.upper())
+                'name': algorithm_name,
+                'point_count': len(algorithm_coords),
+                'format': 'Dynamic (current route data)'
             },
-            'google_maps_route': comparison['google_maps_route'],
-            'comparison': comparison['comparison'],
-            'message': f"Compared {len(algorithm_coords)} algorithm points with {len(comparison['google_maps_route']['coordinates'])} Google Maps points"
+            'google_maps_route': {
+                'coordinates': google_coords,
+                'distance_meters': google_route.get('distance_meters', 0),
+                'duration_seconds': google_route.get('duration_seconds', 0),
+                'distance_text': google_route.get('distance_text', ''),
+                'duration_text': google_route.get('duration_text', ''),
+                'point_count': len(google_coords)
+            },
+            'comparison': {
+                'frechet_distance_meters': round(frechet_distance, 2),
+                'segment_overlap_percent': round(segment_overlap, 2),
+                'algorithm_distance_ratio': frechet_ratio,
+                'interpretation': {
+                    'frechet_status': 'Excellent' if frechet_distance < 500 else 'Very Good' if frechet_distance < 1000 else 'Good' if frechet_distance < 2000 else 'Fair',
+                    'overlap_status': 'Perfect' if segment_overlap >= 90 else 'Very Good' if segment_overlap >= 75 else 'Good' if segment_overlap >= 60 else 'Fair'
+                }
+            },
+            'metadata': {
+                'comparison_time': time.time(),
+                'algorithm': algorithm_name,
+                'origin': {'lat': start_lat, 'lng': start_lng},
+                'destination': {'lat': dest_lat, 'lng': dest_lng}
+            }
         }
         
-        print(f"✅ Comparison complete:")
-        print(f"   Fréchet distance: {comparison['comparison']['frechet_distance_meters']:.2f}m")
-        print(f"   Segment overlap: {comparison['comparison']['segment_overlap_percent']:.2f}%")
+        print(f"   📊 Fréchet Status: {result['comparison']['interpretation']['frechet_status']}")
+        print(f"   📊 Overlap Status: {result['comparison']['interpretation']['overlap_status']}")
         
         return jsonify(result)
         
     except KeyError as e:
+        error_msg = f"Missing required parameter: {str(e)}"
+        print(f"\n❌ {error_msg}")
         return jsonify({
             'success': False,
-            'error': f"Missing required parameter: {str(e)}"
+            'error': error_msg
+        })
+    except ValueError as e:
+        error_msg = f"Invalid parameter value: {str(e)}"
+        print(f"\n❌ {error_msg}")
+        return jsonify({
+            'success': False,
+            'error': error_msg
         })
     except Exception as e:
         import traceback
+        print(f"\n❌ Google Maps comparison error: {str(e)}")
         traceback.print_exc()
         return jsonify({
             'success': False,
-            'error': f"Google Maps comparison error: {str(e)}"
+            'error': f"Comparison failed: {str(e)}"
         })
 
 

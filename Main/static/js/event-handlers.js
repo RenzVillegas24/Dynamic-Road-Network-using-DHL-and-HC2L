@@ -95,19 +95,6 @@ function initializeEventHandlers() {
     // Clear any existing routes
     clearRoutes();
     
-    // Get Google Maps route data for Fréchet distance computation (runs in background)
-    let googleRouteData = null;
-    try {
-        googleRouteData = await getGoogleMapsRouteWithCoordinates(window.startLocation.lat, window.startLocation.lng, window.destLocation.lat, window.destLocation.lng);
-        console.log('Google Maps route data obtained for Fréchet distance computation');
-        // Store Google route for comparison calculations
-        window.googleRouteMetadata = googleRouteData;
-    } catch (error) {
-        console.warn('Google Maps route failed (Fréchet distance will not be available):', error.message);
-        // Continue with algorithm routing even if Google Maps fails
-        window.googleRouteMetadata = null;
-    }
-    
     // Show loading state
     const goButton = document.getElementById("go-button");
     const originalText = goButton.innerHTML;
@@ -347,12 +334,46 @@ function initializeEventHandlers() {
       
       if (routeData) {
         // Store route data globally for Current Path Panel
+        // Add input coordinates for Google Maps comparison
+        routeData.input = {
+          start_snap_lat: window.osmSnapMarkers?.start?.data?.latitude,
+          start_snap_lng: window.osmSnapMarkers?.start?.data?.longitude,
+          dest_snap_lat: window.osmSnapMarkers?.dest?.data?.latitude,
+          dest_snap_lng: window.osmSnapMarkers?.dest?.data?.longitude
+        };
+        
+        // Ensure metrics object exists and has algorithm name
+        if (!routeData.metrics) {
+          routeData.metrics = {};
+        }
+        routeData.metrics.algorithm = selectedAlgorithm;
+        
         currentRouteData = routeData;
+        
+        console.log('✅ Route data stored with input coordinates:', {
+          algorithm: selectedAlgorithm,
+          startLat: routeData.input.start_snap_lat,
+          startLng: routeData.input.start_snap_lng,
+          destLat: routeData.input.dest_snap_lat,
+          destLng: routeData.input.dest_snap_lng
+        });
+        
+        // 🧹 Clear previous Google Maps comparison when new route is calculated
+        if (typeof clearGoogleMapsComparison === 'function') {
+          clearGoogleMapsComparison();
+          console.log('✅ Google Maps comparison cleared for new route');
+        }
         
         // Show "Current Route Only" button after route is calculated
         const showCurrentRouteBtn = document.getElementById('show-current-route-only-btn');
         if (showCurrentRouteBtn) {
             showCurrentRouteBtn.style.display = 'flex';
+        }
+        
+        // Enable "Compare with Google Maps" button after route is calculated
+        const googleCompareBtn = document.getElementById('admin-google-compare-btn');
+        if (googleCompareBtn) {
+            googleCompareBtn.disabled = false;
         }
         
         // Update UI with route information
@@ -386,7 +407,21 @@ function initializeEventHandlers() {
           disruptionsPanel.classList.add("translate-x-full");
           reportPanel.classList.add("translate-x-full");
           currentPathPanel.classList.remove("translate-x-full");
-          console.log('✅ Current Path Panel should now be visible');
+          
+          // Adjust map container to make room for the panel
+          const mapContainer = document.getElementById("map-container");
+          if (mapContainer) {
+              mapContainer.style.marginRight = "28rem";
+          }
+          
+          // Trigger map resize to adjust to new container size
+          if (map) {
+            setTimeout(() => {
+              map.invalidateSize();
+            }, 350); // Wait for transition to complete
+          }
+          
+          console.log('✅ Current Path Panel visible, map adjusted');
         }, 800);
         
       } else {
@@ -416,7 +451,53 @@ function initializeEventHandlers() {
     const currentPathClose = document.getElementById("current-path-close");
     if (currentPathClose) {
         currentPathClose.onclick = () => {
+            // Hide the panel using translate
             currentPathPanel.classList.add("translate-x-full");
+            
+            // Reset map container to full width
+            const mapContainer = document.getElementById("map-container");
+            if (mapContainer) {
+                mapContainer.style.marginRight = "0";
+            }
+            
+            // Reset the route and snap points
+            clearRoutes();
+            
+            // Reset snap points visualization
+            if (window.startSnapMarker) {
+                map.removeLayer(window.startSnapMarker);
+                window.startSnapMarker = null;
+            }
+            if (window.destSnapMarker) {
+                map.removeLayer(window.destSnapMarker);
+                window.destSnapMarker = null;
+            }
+            if (window.startSnapLine) {
+                map.removeLayer(window.startSnapLine);
+                window.startSnapLine = null;
+            }
+            if (window.destSnapLine) {
+                map.removeLayer(window.destSnapLine);
+                window.destSnapLine = null;
+            }
+            
+            // Clear stored snap data
+            window.startOsmEdge = null;
+            window.destOsmEdge = null;
+            
+            // Clear Google Maps comparison
+            if (typeof clearGoogleMapsComparison === 'function') {
+                clearGoogleMapsComparison();
+            }
+            
+            // Trigger map resize to adjust to full container
+            if (map) {
+                setTimeout(() => {
+                    map.invalidateSize();
+                }, 350); // Wait for transition to complete
+            }
+            
+            console.log('✅ Route and snap points cleared, map resized');
         };
     }
   
@@ -424,14 +505,23 @@ function initializeEventHandlers() {
     if (adminToggle) {
         adminToggle.onclick = () => {
             console.log('Admin toggle clicked');
-            // Only clear routes if map is ready
-            // if (map && directionsRenderer) {
-            //   clearRoutes    (); // Clear routes when opening admin panel
-            // }
             disruptionsPanel.classList.add("translate-x-full");
             reportPanel.classList.add("translate-x-full");
-            currentPathPanel.classList.add("translate-x-full");
+            // Keep current path panel open
             adminPanel.classList.remove("translate-x-full");
+            
+            // Reset map container to full width
+            const mapContainer = document.getElementById("map-container");
+            if (mapContainer) {
+                mapContainer.style.marginRight = "0";
+            }
+            
+            // Trigger map resize
+            if (map) {
+                setTimeout(() => {
+                    map.invalidateSize();
+                }, 350);
+            }
         };
         console.log('✅ Admin toggle handler registered');
     } else {
@@ -450,8 +540,21 @@ function initializeEventHandlers() {
         disruptionsToggle.onclick = async () => {
             adminPanel.classList.add("translate-x-full");
             reportPanel.classList.add("translate-x-full");
-            currentPathPanel.classList.add("translate-x-full");
+            // Keep current path panel open
             disruptionsPanel.classList.remove("translate-x-full");
+            
+            // Reset map container to full width
+            const mapContainer = document.getElementById("map-container");
+            if (mapContainer) {
+                mapContainer.style.marginRight = "0";
+            }
+            
+            // Trigger map resize
+            if (map) {
+                setTimeout(() => {
+                    map.invalidateSize();
+                }, 350);
+            }
             
             // Fetch and display active disruptions
             await loadActiveDisruptions();
@@ -470,8 +573,21 @@ function initializeEventHandlers() {
         reportToggle.onclick = () => {
             adminPanel.classList.add("translate-x-full");
             disruptionsPanel.classList.add("translate-x-full");
-            currentPathPanel.classList.add("translate-x-full");
+            // Keep current path panel open
             reportPanel.classList.remove("translate-x-full");
+            
+            // Reset map container to full width
+            const mapContainer = document.getElementById("map-container");
+            if (mapContainer) {
+                mapContainer.style.marginRight = "0";
+            }
+            
+            // Trigger map resize
+            if (map) {
+                setTimeout(() => {
+                    map.invalidateSize();
+                }, 350);
+            }
         };
     }
   

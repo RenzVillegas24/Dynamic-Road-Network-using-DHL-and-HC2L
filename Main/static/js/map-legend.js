@@ -21,12 +21,12 @@ function createMapLegend() {
     const legend = L.control({ position: 'bottomright' });
     
     legend.onAdd = function(map) {
-        const div = L.DomUtil.create('div', 'map-legend glass-effect');
+        const div = L.DomUtil.create('div', '');
         
         div.innerHTML = `
-            <div class="bg-white/95 backdrop-blur-lg rounded-2xl shadow-2xl p-4 border-2 border-slate-300" style="min-width: 280px;">
+            <div class="bg-white/85 backdrop-blur-lg rounded-lg shadow-2xl pt-4 pr-4 pl-4 border-2 border-slate-300 transition-all duration-300" style="min-width: 280px; padding-bottom: 0;">
                 <!-- Header -->
-                <div class="flex items-center justify-between mb-3 pb-3 border-b-2 border-slate-200">
+                <div class="flex items-center justify-between mb-3">
                     <h3 class="font-bold text-slate-800 text-lg flex items-center">
                         <svg class="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path>
@@ -34,14 +34,14 @@ function createMapLegend() {
                         Map Legend
                     </h3>
                     <button id="legend-toggle" class="text-slate-500 hover:text-slate-700 transition-colors">
-                        <svg id="legend-collapse-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg id="legend-collapse-icon" class="w-5 h-5 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"></path>
                         </svg>
                     </button>
                 </div>
                 
                 <!-- Legend Content -->
-                <div id="legend-content" class="space-y-3">
+                <div id="legend-content" class="space-y-3 transition-all duration-300 max-h-96 overflow-hidden opacity-0" style="max-height: 0;">
                     <!-- Routes Section -->
                     <div class="space-y-2">
                         <div class="text-xs font-bold text-slate-600 uppercase tracking-wide mb-2">Routes</div>
@@ -139,15 +139,38 @@ function createMapLegend() {
         const toggleBtn = document.getElementById('legend-toggle');
         const content = document.getElementById('legend-content');
         const icon = document.getElementById('legend-collapse-icon');
+        const container = content.closest('.bg-white\\/85');
+        const header = container.querySelector('.flex.items-center.justify-between');
         
         if (toggleBtn && content && icon) {
             toggleBtn.addEventListener('click', () => {
-                if (content.style.display === 'none') {
-                    content.style.display = 'block';
+                const isCollapsed = content.style.maxHeight === '0px' || content.style.maxHeight === '';
+                
+                if (isCollapsed) {
+                    // Expand
+                    content.style.maxHeight = '24rem'; // max-h-96 = 24rem
+                    content.style.opacity = '1';
                     icon.style.transform = 'rotate(0deg)';
+                    // Restore normal padding
+                    if (container) {
+                        container.style.paddingBottom = '1rem';
+                    }
+                    if (header) {
+                        header.classList.add('pb-3');
+                    }
                 } else {
-                    content.style.display = 'none';
+                    // Collapse
+                    content.style.maxHeight = '0';
+                    content.style.opacity = '0';
                     icon.style.transform = 'rotate(-90deg)';
+                    // Remove all bottom padding when collapsed
+                    if (container) {
+                        container.style.paddingBottom = '0';
+                    }
+                    if (header) {
+                        header.classList.remove('pb-3');
+                        header.style.paddingBottom = '0';
+                    }
                 }
             });
         }
