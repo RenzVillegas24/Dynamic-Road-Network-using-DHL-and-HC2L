@@ -51,6 +51,41 @@ struct GPSCoordinate {
     GPSCoordinate(double lat, double lng, NodeID id) : latitude(lat), longitude(lng), node_id(id) {}
 };
 
+// LazyHC2L State: tracks dirty labels and impact scores for adaptive updates
+struct LazyHC2LState {
+    set<NodeID> dirty_labels;           // Nodes with outdated labels
+    map<NodeID, double> impact_scores;  // Per-node impact values
+    time_t last_update_time;            // Timestamp of last update
+    int update_count;                   // Counter for number of updates
+    
+    LazyHC2LState() : last_update_time(time(nullptr)), update_count(0) {}
+};
+
+// Traffic Flow Data: stores HERE API flow metrics per edge
+struct TrafficFlowData {
+    double jam_factor;          // 0.0 to 10.0 (HERE API format)
+    double current_speed;       // Current speed in km/h
+    double free_flow_speed;     // Free flow speed in km/h
+    double speed_reduction;     // Percentage: 0.0 to 1.0
+    string flow_status;         // "free_flow", "light", "moderate", "heavy", "blocked"
+    string color_code;          // "green", "yellow", "orange", "red", "black"
+    
+    TrafficFlowData() : jam_factor(0.0), current_speed(0.0), free_flow_speed(50.0), 
+                       speed_reduction(0.0), flow_status("free_flow"), color_code("green") {}
+};
+
+// Alternative Route: stores route candidates with ETA metrics
+struct AlternativeRoute {
+    vector<NodeID> path;
+    distance_t distance;
+    double eta_seconds;
+    double avg_jam_factor;
+    string description;
+    int rank;
+    
+    AlternativeRoute() : distance(0), eta_seconds(0.0), avg_jam_factor(0.0), rank(0) {}
+};
+
 // Calculate Haversine distance between two GPS coordinates
 double haversine_distance(double lat1, double lon1, double lat2, double lon2) {
     const double R = 6371000.0; // Earth's radius in meters
@@ -65,6 +100,41 @@ double haversine_distance(double lat1, double lon1, double lat2, double lon2) {
     double c = 2 * atan2(sqrt(a), sqrt(1-a));
     
     return R * c;
+}
+
+// Determine flow status and color code from jam factor
+// Reference: HERE API jam_factor scale (0.0 = free flow, 10.0 = blocked)
+TrafficFlowData get_flow_color(double jam_factor, double current_speed, double free_flow_speed) {
+    TrafficFlowData flow;
+    flow.jam_factor = jam_factor;
+    flow.current_speed = current_speed;
+    flow.free_flow_speed = free_flow_speed;
+    
+    if (free_flow_speed > 0) {
+        flow.speed_reduction = 1.0 - (current_speed / free_flow_speed);
+    } else {
+        flow.speed_reduction = 0.0;
+    }
+    
+    // Color coding based on jam_factor (HERE API scale)
+    if (jam_factor < 2.0) {
+        flow.flow_status = "free_flow";
+        flow.color_code = "green";      // #00FF00
+    } else if (jam_factor < 4.0) {
+        flow.flow_status = "light";
+        flow.color_code = "yellow";     // #FFFF00
+    } else if (jam_factor < 7.0) {
+        flow.flow_status = "moderate";
+        flow.color_code = "orange";     // #FFA500
+    } else if (jam_factor < 9.0) {
+        flow.flow_status = "heavy";
+        flow.color_code = "red";        // #FF0000
+    } else {
+        flow.flow_status = "blocked";
+        flow.color_code = "black";      // #000000
+    }
+    
+    return flow;
 }
 
 // Calculate total route distance from path nodes using coordinates
@@ -167,6 +237,162 @@ double calculate_eta_seconds(
     double eta_seconds = distance_m / actual_speed_ms;
     
     return eta_seconds;
+}
+
+// Calculate ETA with detailed flow data per edge
+double calculate_eta_with_flow(
+    const vector<NodeID>& path,
+    const map<pair<NodeID, NodeID>, TrafficFlowData>& flow_data,
+    const map<NodeID, GPSCoordinate>& coordinates,
+    int hour_of_day = -1) {
+    
+    if (path.size() < 2) return 0.0;
+    
+    double total_eta = 0.0;
+    
+    for (size_t i = 0; i < path.size() - 1; i++) {
+        NodeID from = path[i];
+        NodeID to = path[i + 1];
+        auto edge_key = make_pair(from, to);
+        
+        // Calculate edge distance
+        double edge_distance = 0.0;
+        if (coordinates.count(from) && coordinates.count(to)) {
+            const auto& coord_from = coordinates.at(from);
+            const auto& coord_to = coordinates.at(to);
+            edge_distance = haversine_distance(
+                coord_from.latitude, coord_from.longitude,
+                coord_to.latitude, coord_to.longitude
+            );
+        }
+        
+        // Get flow data for this edge
+        double jam_factor = 5.0; // Default
+        if (flow_data.count(edge_key)) {
+            jam_factor = flow_data.at(edge_key).jam_factor;
+        }
+        
+        // Calculate segment ETA
+        double segment_eta = calculate_eta_seconds(edge_distance, jam_factor, hour_of_day);
+        total_eta += segment_eta;
+    }
+    
+    return total_eta;
+}
+
+// Generate K alternative routes using penalty-based search
+vector<AlternativeRoute> generate_alternative_routes(
+    NodeID start, NodeID dest,
+    const map<NodeID, vector<Neighbor>>& adj_list,
+    const ContractionIndex& ci,
+    const map<pair<NodeID, NodeID>, TrafficFlowData>& flow_data,
+    const map<NodeID, GPSCoordinate>& coordinates,
+    int K = 3) {
+    
+    vector<AlternativeRoute> alternatives;
+    set<pair<NodeID, NodeID>> used_edges;
+    
+    for (int k = 0; k < K; k++) {
+        // Find shortest path avoiding used edges (with penalty)
+        map<NodeID, distance_t> dist;
+        map<NodeID, NodeID> pred;
+        set<NodeID> visited;
+        
+        priority_queue<pair<distance_t, NodeID>,
+                       vector<pair<distance_t, NodeID>>,
+                       greater<pair<distance_t, NodeID>>> pq;
+        
+        dist[start] = 0;
+        pq.push({0, start});
+        
+        while (!pq.empty()) {
+            auto [d, u] = pq.top();
+            pq.pop();
+            
+            if (visited.count(u)) continue;
+            visited.insert(u);
+            
+            if (u == dest) break;
+            
+            if (adj_list.count(u)) {
+                for (const auto& neighbor : adj_list.at(u)) {
+                    NodeID v = neighbor.node;
+                    distance_t edge_cost = neighbor.distance;
+                    
+                    // Apply penalty to used edges
+                    auto edge_key = make_pair(u, v);
+                    if (used_edges.count(edge_key)) {
+                        edge_cost *= 2; // 2x penalty for used edges
+                    }
+                    
+                    distance_t new_dist = dist[u] + edge_cost;
+                    
+                    if (!dist.count(v) || new_dist < dist[v]) {
+                        dist[v] = new_dist;
+                        pred[v] = u;
+                        pq.push({new_dist, v});
+                    }
+                }
+            }
+        }
+        
+        // Reconstruct path
+        vector<NodeID> path;
+        if (pred.count(dest) || dest == start) {
+            NodeID curr = dest;
+            while (curr != start) {
+                path.push_back(curr);
+                if (!pred.count(curr)) break;
+                curr = pred[curr];
+            }
+            path.push_back(start);
+            reverse(path.begin(), path.end());
+        }
+        
+        if (path.empty() || path.size() < 2) break;
+        
+        // Calculate metrics
+        AlternativeRoute route;
+        route.path = path;
+        route.distance = dist.count(dest) ? dist[dest] : 0;
+        route.eta_seconds = calculate_eta_with_flow(path, flow_data, coordinates);
+        
+        // Calculate average jam factor
+        double total_jam = 0.0;
+        int edge_count = 0;
+        for (size_t i = 0; i < path.size() - 1; i++) {
+            auto edge_key = make_pair(path[i], path[i+1]);
+            if (flow_data.count(edge_key)) {
+                total_jam += flow_data.at(edge_key).jam_factor;
+                edge_count++;
+            }
+        }
+        route.avg_jam_factor = edge_count > 0 ? total_jam / edge_count : 5.0;
+        route.rank = k + 1;
+        route.description = k == 0 ? "Fastest route" : 
+                           k == 1 ? "Alternative via different path" :
+                           "Secondary alternative";
+        
+        alternatives.push_back(route);
+        
+        // Mark edges as used for next iteration
+        for (size_t i = 0; i < path.size() - 1; i++) {
+            used_edges.insert({path[i], path[i+1]});
+        }
+    }
+    
+    // Sort by ETA (best first)
+    sort(alternatives.begin(), alternatives.end(),
+         [](const AlternativeRoute& a, const AlternativeRoute& b) {
+             return a.eta_seconds < b.eta_seconds;
+         });
+    
+    // Update ranks
+    for (size_t i = 0; i < alternatives.size(); i++) {
+        alternatives[i].rank = i + 1;
+    }
+    
+    return alternatives;
 }
 
 // Format seconds into human-readable time string (HH:mm:ss)
@@ -412,6 +638,117 @@ map<NodeID, vector<Neighbor>> load_edges(const string& filename, map<pair<NodeID
     return adj_list;
 }
 
+// ============================================================
+// LAZYHC2L CORE FUNCTIONS
+// ============================================================
+
+// Compute impact score for a disruption
+// Impact = f(Δw) × f_jam × (1.0 + f_closure)
+// where closure_factor=1.0 doubles the impact
+double compute_impact_score(double weight_change_ratio, double jam_factor, double closure_factor) {
+    // Normalize weight change (0 to 1 scale)
+    double f_delta_w = min(1.0, max(0.0, weight_change_ratio));
+    
+    // Normalize jam factor (already 0-1 scale from HERE API)
+    double f_jam = min(1.0, max(0.0, jam_factor));
+    
+    // Closure multiplier (0 or 1)
+    double f_closure = min(1.0, max(0.0, closure_factor));
+    
+    // Combined impact: base impact multiplied by closure factor
+    // Closure doubles the impact
+    double impact = f_delta_w * f_jam * (1.0 + f_closure);
+    
+    // Ensure result is in [0, 1] range
+    return min(1.0, impact);
+}
+
+// Decide if immediate update should be triggered based on impact and threshold
+bool should_immediate_update(double impact_score, double tau_threshold) {
+    return impact_score >= tau_threshold;
+}
+
+// Mark nodes as dirty for lazy update
+// Marks affected edge endpoints and their neighbors
+void mark_nodes_dirty(
+    NodeID source, NodeID target,
+    const map<NodeID, vector<Neighbor>>& adj_list,
+    LazyHC2LState& state,
+    double impact_score) {
+    
+    // Mark the edge endpoints as dirty
+    state.dirty_labels.insert(source);
+    state.dirty_labels.insert(target);
+    state.impact_scores[source] = max(state.impact_scores[source], impact_score);
+    state.impact_scores[target] = max(state.impact_scores[target], impact_score);
+    
+    // Mark neighbors of source
+    if (adj_list.count(source)) {
+        for (const auto& neighbor : adj_list.at(source)) {
+            state.dirty_labels.insert(neighbor.node);
+            state.impact_scores[neighbor.node] = max(state.impact_scores[neighbor.node], impact_score * 0.5);
+        }
+    }
+    
+    // Mark neighbors of target
+    if (adj_list.count(target)) {
+        for (const auto& neighbor : adj_list.at(target)) {
+            state.dirty_labels.insert(neighbor.node);
+            state.impact_scores[neighbor.node] = max(state.impact_scores[neighbor.node], impact_score * 0.5);
+        }
+    }
+}
+
+// Lazy repair: check if path intersects dirty nodes
+// Returns true if repair was needed, false if cache hit
+bool lazy_repair_path(
+    const vector<NodeID>& path,
+    LazyHC2LState& state,
+    double& repair_time_ms,
+    int& nodes_repaired) {
+    
+    repair_time_ms = 0.0;
+    nodes_repaired = 0;
+    
+    // Check if any node in path is dirty
+    bool needs_repair = false;
+    for (NodeID node : path) {
+        if (state.dirty_labels.count(node)) {
+            needs_repair = true;
+            break;
+        }
+    }
+    
+    if (!needs_repair) {
+        // Cache hit: no repair needed
+        return false;
+    }
+    
+    // Simulate repair time (in real implementation, would rebuild labels)
+    auto repair_start = chrono::high_resolution_clock::now();
+    
+    // Count and clear dirty nodes in path
+    for (NodeID node : path) {
+        if (state.dirty_labels.count(node)) {
+            nodes_repaired++;
+            state.dirty_labels.erase(node);
+            state.impact_scores.erase(node);
+        }
+    }
+    
+    auto repair_end = chrono::high_resolution_clock::now();
+    repair_time_ms = chrono::duration<double, milli>(repair_end - repair_start).count();
+    
+    state.update_count++;
+    state.last_update_time = time(nullptr);
+    
+    return true;
+}
+
+// ============================================================
+// PATH FINDING
+// ============================================================
+
 // SIMPLIFIED PATH FINDING: Just use Dijkstra with the road network
 // CRITICAL: This function MUST return ALL intermediate nodes on the shortest path
 // including intersection nodes at sharp turns and road junctions
@@ -618,7 +955,18 @@ void output_json_response(bool success, const string& error_message = "",
                          const map<NodeID, GPSCoordinate>& coordinates = map<NodeID, GPSCoordinate>(),
                          const map<pair<NodeID, NodeID>, EdgeGeometry>& edge_geometries = map<pair<NodeID, NodeID>, EdgeGeometry>(),
                          bool use_disruptions = false, const string& disruption_dir = "",
-                         const ContractionIndex* ci = nullptr, double index_load_time_ms = 0.0) {
+                         const ContractionIndex* ci = nullptr, double index_load_time_ms = 0.0,
+                         double tau_threshold = 0.5,
+                         const LazyHC2LState* lazy_state = nullptr,
+                         double disruption_impact_score = 0.0,
+                         const string& update_strategy = "",
+                         const string& lazy_reason = "",
+                         int dirty_nodes_on_path = 0,
+                         double lazy_repair_time_ms = 0.0,
+                         int nodes_repaired = 0,
+                         bool cache_hit = false,
+                         const map<pair<NodeID, NodeID>, TrafficFlowData>& flow_data = map<pair<NodeID, NodeID>, TrafficFlowData>(),
+                         const vector<AlternativeRoute>& alternatives = vector<AlternativeRoute>()) {
     
     cout << "{" << endl;
     cout << "  \"success\": " << (success ? "true" : "false") << "," << endl;
@@ -717,6 +1065,35 @@ void output_json_response(bool success, const string& error_message = "",
             cout << "      \"note\": \"Index data unavailable\"" << endl;
             cout << "    }" << endl;
         }
+        cout << "  }," << endl;
+        
+        // LazyHC2L diagnostics section
+        cout << "  \"disruption_config\": {" << endl;
+        cout << "    \"use_disruptions\": " << (use_disruptions ? "true" : "false") << "," << endl;
+        cout << "    \"disruption_file\": \"" << disruption_dir << "\"," << endl;
+        cout << "    \"tau_threshold\": " << fixed << setprecision(2) << tau_threshold << "," << endl;
+        cout << "    \"tau_used_for\": \"Threshold triggers immediate update if ImpactScore >= tau\"" << endl;
+        cout << "  }," << endl;
+        
+        cout << "  \"lazy_hc2l\": {" << endl;
+        cout << "    \"enabled\": " << (use_disruptions ? "true" : "false") << "," << endl;
+        cout << "    \"disruption_impact_score\": " << fixed << setprecision(3) << disruption_impact_score << "," << endl;
+        cout << "    \"tau_threshold\": " << fixed << setprecision(2) << tau_threshold << "," << endl;
+        cout << "    \"update_strategy\": \"" << update_strategy << "\"," << endl;
+        cout << "    \"reason\": \"" << lazy_reason << "\"," << endl;
+        
+        if (lazy_state != nullptr) {
+            cout << "    \"dirty_nodes_marked\": " << lazy_state->dirty_labels.size() << "," << endl;
+            cout << "    \"total_updates\": " << lazy_state->update_count << "," << endl;
+        } else {
+            cout << "    \"dirty_nodes_marked\": 0," << endl;
+            cout << "    \"total_updates\": 0," << endl;
+        }
+        
+        cout << "    \"dirty_nodes_affected_path\": " << dirty_nodes_on_path << "," << endl;
+        cout << "    \"lazy_repair_time_ms\": " << fixed << setprecision(3) << lazy_repair_time_ms << "," << endl;
+        cout << "    \"nodes_repaired\": " << nodes_repaired << "," << endl;
+        cout << "    \"cache_hit\": " << (cache_hit ? "true" : "false") << endl;
         cout << "  }," << endl;
         
         cout << "  \"route\": {" << endl;
@@ -832,9 +1209,26 @@ void output_json_response(bool success, const string& error_message = "",
             cout << "      {" << endl;
             cout << "        \"from\": " << from << "," << endl;
             cout << "        \"to\": " << to << "," << endl;
+            
+            // Add flow data if available
+            auto edge_key = make_pair(from, to);
+            if (flow_data.count(edge_key)) {
+                const TrafficFlowData& flow = flow_data.at(edge_key);
+                cout << "        \"jam_factor\": " << fixed << setprecision(2) << flow.jam_factor << "," << endl;
+                cout << "        \"flow_status\": \"" << flow.flow_status << "\"," << endl;
+                cout << "        \"color\": \"" << flow.color_code << "\"," << endl;
+                cout << "        \"current_speed_kmh\": " << fixed << setprecision(1) << flow.current_speed << "," << endl;
+                cout << "        \"free_flow_speed_kmh\": " << fixed << setprecision(1) << flow.free_flow_speed << "," << endl;
+                cout << "        \"speed_reduction\": " << fixed << setprecision(3) << flow.speed_reduction << "," << endl;
+            } else {
+                // Default values when no flow data available
+                cout << "        \"jam_factor\": 5.0," << endl;
+                cout << "        \"flow_status\": \"unknown\"," << endl;
+                cout << "        \"color\": \"gray\"," << endl;
+            }
+            
             cout << "        \"coordinates\": [";
             
-            auto edge_key = make_pair(from, to);
             vector<pair<double, double>> coords_to_output;
             
             if (edge_geometries.count(edge_key)) {
@@ -916,20 +1310,47 @@ void output_json_response(bool success, const string& error_message = "",
         
         cout << "    ]" << endl;
         
-        cout << "  }" << endl;
+        cout << "  }," << endl;
+        
+        // Alternative routes section
+        cout << "  \"alternative_routes\": [" << endl;
+        for (size_t alt_idx = 0; alt_idx < alternatives.size(); alt_idx++) {
+            const AlternativeRoute& alt = alternatives[alt_idx];
+            
+            cout << "    {" << endl;
+            cout << "      \"rank\": " << alt.rank << "," << endl;
+            cout << "      \"description\": \"" << alt.description << "\"," << endl;
+            cout << "      \"distance_meters\": " << fixed << setprecision(1) << alt.distance << "," << endl;
+            cout << "      \"eta_seconds\": " << fixed << setprecision(0) << alt.eta_seconds << "," << endl;
+            cout << "      \"eta_formatted\": \"" << format_eta_time(alt.eta_seconds) << "\"," << endl;
+            cout << "      \"avg_jam_factor\": " << fixed << setprecision(2) << alt.avg_jam_factor << "," << endl;
+            cout << "      \"path_length\": " << alt.path.size() << "," << endl;
+            cout << "      \"path_nodes\": [";
+            for (size_t j = 0; j < alt.path.size(); j++) {
+                cout << alt.path[j];
+                if (j < alt.path.size() - 1) cout << ", ";
+            }
+            cout << "]" << endl;
+            cout << "    }";
+            if (alt_idx < alternatives.size() - 1) cout << ",";
+            cout << endl;
+        }
+        cout << "  ]" << endl;
     }
     
     cout << "}" << endl;
 }
 
 int main(int argc, char* argv[]) {
-    if (argc != 19) {
-        output_json_response(false, "Invalid arguments. Usage: hc2l_routing_api <start_pin_lat> <start_pin_lng> <start_snap_lat> <start_snap_lng> <start_edge_source> <start_edge_target> <start_edge_oneway> <dest_pin_lat> <dest_pin_lng> <dest_snap_lat> <dest_snap_lng> <dest_edge_source> <dest_edge_target> <dest_edge_oneway> <disruption_dir> <nodes_csv> <edges_csv> <index_file>");
+    // Accept 18 args (no disruption) or 19 args (with disruption file) or 20 args (with disruption + tau)
+    // Args: 14 routing params + 3 data files + optional disruption_file + optional tau_threshold
+    if (argc != 18 && argc != 19 && argc != 20) {
+        output_json_response(false, "Invalid arguments. Usage: hc2l_routing_api <start_pin_lat> <start_pin_lng> <start_snap_lat> <start_snap_lng> <start_edge_source> <start_edge_target> <start_edge_oneway> <dest_pin_lat> <dest_pin_lng> <dest_snap_lat> <dest_snap_lng> <dest_edge_source> <dest_edge_target> <dest_edge_oneway> <nodes_csv> <edges_csv> <index_file> [disruption_file] [tau_threshold]");
         return 1;
     }
     
     try {
-        // Parse arguments
+        // Parse arguments (14 routing parameters)
         double start_pin_lat = stod(argv[1]);
         double start_pin_lng = stod(argv[2]);
         double start_snap_lat = stod(argv[3]);
@@ -946,13 +1367,37 @@ int main(int argc, char* argv[]) {
         NodeID dest_edge_target = stoul(argv[13]);
         int dest_edge_oneway = stoi(argv[14]);
         
-        // New: disruption_dir parameter (empty string "" or "null" means no disruptions)
-        string disruption_dir = argv[15];
-        bool use_disruptions = !disruption_dir.empty() && disruption_dir != "null" && disruption_dir != "";
+        // Parse data file paths (3 parameters)
+        string nodes_csv = argv[15];
+        string edges_csv = argv[16];
+        string index_file = argv[17];
         
-        string nodes_csv = argv[16];
-        string edges_csv = argv[17];
-        string index_file = argv[18];
+        // Parse optional disruption file (arg 18)
+        string disruption_file = "";
+        bool use_disruptions = false;
+        if (argc >= 19) {
+            disruption_file = argv[18];
+            use_disruptions = !disruption_file.empty() && 
+                             disruption_file != "null" && 
+                             disruption_file != "NULL" &&
+                             disruption_file != "";
+        }
+        
+        // Parse optional tau threshold (arg 19)
+        double tau_threshold = 0.5; // Default
+        if (argc >= 20) {
+            tau_threshold = stod(argv[19]);
+        }
+        
+        // Initialize LazyHC2L state
+        LazyHC2LState lazy_state;
+        double disruption_impact_score = 0.0;
+        string update_strategy = "none";
+        string lazy_reason = "No disruptions loaded";
+        int dirty_nodes_on_path = 0;
+        double lazy_repair_time_ms = 0.0;
+        int nodes_repaired = 0;
+        bool cache_hit = false;
         
         // Load data
         auto coordinates = load_node_coordinates(nodes_csv);
@@ -979,6 +1424,101 @@ int main(int argc, char* argv[]) {
         index_stream.close();
         auto index_load_end = chrono::high_resolution_clock::now();
         double index_load_time_ms = chrono::duration<double, milli>(index_load_end - index_load_start).count();
+        
+        // ============================================================
+        // LAZYHC2L: Process disruptions and flow data if provided
+        // ============================================================
+        map<pair<NodeID, NodeID>, TrafficFlowData> flow_data;
+        
+        if (use_disruptions) {
+            cerr << "🔧 Processing disruptions from: " << disruption_file << endl;
+            cerr << "   Tau threshold: " << tau_threshold << endl;
+            
+            // Load disruption file with enhanced format
+            // Format: source target new_weight [jam_factor] [current_speed] [free_flow_speed]
+            ifstream disrupt_file(disruption_file);
+            if (disrupt_file.is_open()) {
+                string line;
+                int disruption_count = 0;
+                
+                while (getline(disrupt_file, line)) {
+                    if (line.empty() || line[0] == 'c' || line[0] == 'p') continue;
+                    
+                    istringstream iss(line);
+                    NodeID source, target;
+                    distance_t new_weight, old_weight = 0;
+                    double jam_factor_val = 5.0;
+                    double current_speed = 0.0;
+                    double free_flow_speed = 50.0;
+                    
+                    // Parse basic disruption data
+                    if (!(iss >> source >> target >> new_weight)) continue;
+                    
+                    // Try to parse optional flow data
+                    iss >> jam_factor_val >> current_speed >> free_flow_speed;
+                    
+                    // Find old weight from adj_list
+                    if (adj_list.count(source)) {
+                        for (const auto& neighbor : adj_list.at(source)) {
+                            if (neighbor.node == target) {
+                                old_weight = neighbor.distance;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // Store flow data for this edge
+                    auto edge_key = make_pair(source, target);
+                    flow_data[edge_key] = get_flow_color(jam_factor_val, current_speed, free_flow_speed);
+                    
+                    // Compute impact score
+                    double weight_change_ratio = (old_weight > 0) ? 
+                        (double)(new_weight - old_weight) / old_weight : 1.0;
+                    
+                    // Normalize jam_factor to 0-1 scale for impact calculation
+                    double jam_factor_normalized = jam_factor_val / 10.0;
+                    
+                    // Closure factor: 1.0 if new_weight is very high, else 0.0
+                    double closure_factor = (new_weight > old_weight * 5) ? 1.0 : 0.0;
+                    
+                    double impact = compute_impact_score(weight_change_ratio, jam_factor_normalized, closure_factor);
+                    disruption_impact_score = max(disruption_impact_score, impact);
+                    
+                    // Decide update strategy
+                    if (should_immediate_update(impact, tau_threshold)) {
+                        update_strategy = "immediate_update";
+                        lazy_reason = "ImpactScore >= tau: " + 
+                                     to_string(impact) + " >= " + to_string(tau_threshold);
+                        cerr << "   ⚡ Immediate update triggered for edge " << source 
+                             << "->" << target << " (Impact=" << impact 
+                             << ", JamFactor=" << jam_factor_val << ")" << endl;
+                        // In real implementation: rebuild labels here
+                    } else {
+                        if (update_strategy != "immediate_update") {
+                            update_strategy = "lazy_mark";
+                            lazy_reason = "ImpactScore < tau: " + 
+                                         to_string(impact) + " < " + to_string(tau_threshold);
+                        }
+                        mark_nodes_dirty(source, target, adj_list, lazy_state, impact);
+                        cerr << "   💤 Lazy mark for edge " << source 
+                             << "->" << target << " (Impact=" << impact 
+                             << ", JamFactor=" << jam_factor_val << ", Color=" 
+                             << flow_data[edge_key].color_code << ")" << endl;
+                    }
+                    
+                    disruption_count++;
+                }
+                
+                disrupt_file.close();
+                cerr << "✅ Processed " << disruption_count << " disruptions with flow data" << endl;
+                cerr << "   Strategy: " << update_strategy << endl;
+                cerr << "   Dirty nodes: " << lazy_state.dirty_labels.size() << endl;
+                cerr << "   Flow segments: " << flow_data.size() << endl;
+            } else {
+                cerr << "⚠️  Could not open disruption file: " << disruption_file << endl;
+                use_disruptions = false;
+            }
+        }
         
         // Determine routing endpoints based on one-way constraints
         vector<NodeID> start_candidates, dest_candidates;
@@ -1152,6 +1692,64 @@ int main(int argc, char* argv[]) {
             }
         }
         
+        // ============================================================
+        // LAZYHC2L: Apply lazy repair if path touches dirty nodes
+        // ============================================================
+        if (use_disruptions && !lazy_state.dirty_labels.empty()) {
+            // Count dirty nodes on path
+            for (NodeID node : path) {
+                if (lazy_state.dirty_labels.count(node)) {
+                    dirty_nodes_on_path++;
+                }
+            }
+            
+            // Trigger lazy repair if needed
+            bool repair_needed = lazy_repair_path(path, lazy_state, 
+                                                   lazy_repair_time_ms, nodes_repaired);
+            cache_hit = !repair_needed;
+            
+            if (repair_needed) {
+                cerr << "🔧 Lazy repair triggered: " << nodes_repaired 
+                     << " nodes repaired in " << lazy_repair_time_ms << " ms" << endl;
+            } else {
+                cerr << "✅ Cache hit: No repair needed (path doesn't touch dirty nodes)" << endl;
+            }
+        }
+        
+        // ============================================================
+        // GENERATE ALTERNATIVE ROUTES with ETA comparison
+        // ============================================================
+        vector<AlternativeRoute> alternatives;
+        
+        if (use_disruptions && !flow_data.empty()) {
+            cerr << "\n🔀 Generating alternative routes with ETA comparison..." << endl;
+            
+            // Generate up to 3 alternative routes
+            alternatives = generate_alternative_routes(
+                best_start, best_dest, adj_list, ci, flow_data, coordinates, 3
+            );
+            
+            if (!alternatives.empty()) {
+                cerr << "✅ Found " << alternatives.size() << " alternative routes:" << endl;
+                for (const auto& alt : alternatives) {
+                    cerr << "   Route " << alt.rank << ": " 
+                         << alt.description 
+                         << " - " << format_eta_time(alt.eta_seconds)
+                         << " (Avg Jam: " << fixed << setprecision(2) << alt.avg_jam_factor << ")"
+                         << endl;
+                }
+                
+                // Update main path to best alternative if better ETA found
+                if (alternatives[0].eta_seconds < calculate_eta_with_flow(path, flow_data, coordinates)) {
+                    cerr << "🚀 Switching to faster alternative route (saving " 
+                         << format_eta_time(calculate_eta_with_flow(path, flow_data, coordinates) - alternatives[0].eta_seconds)
+                         << ")" << endl;
+                    path = alternatives[0].path;
+                    best_distance = alternatives[0].distance;
+                }
+            }
+        }
+        
         // Output result
         output_json_response(true, "", best_start, best_dest,
                            start_pin_lat, start_pin_lng, start_snap_lat, start_snap_lng,
@@ -1159,8 +1757,12 @@ int main(int argc, char* argv[]) {
                            start_edge_source, start_edge_target, start_edge_oneway,
                            dest_edge_source, dest_edge_target, dest_edge_oneway,
                            best_distance, query_time_ms, path, coordinates,
-                           edge_geometries, use_disruptions, disruption_dir,
-                           &ci, index_load_time_ms);
+                           edge_geometries, use_disruptions, disruption_file,
+                           &ci, index_load_time_ms,
+                           tau_threshold, &lazy_state, disruption_impact_score,
+                           update_strategy, lazy_reason, dirty_nodes_on_path,
+                           lazy_repair_time_ms, nodes_repaired, cache_hit,
+                           flow_data, alternatives);
         
         return 0;
         

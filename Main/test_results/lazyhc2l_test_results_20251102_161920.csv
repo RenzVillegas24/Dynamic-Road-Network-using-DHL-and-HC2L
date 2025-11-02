@@ -1,0 +1,11 @@
+scenario,algorithm,impact_score,tau_threshold,update_strategy,dirty_nodes_marked,nodes_updated,nodes_repaired,lazy_repair_time_ms,query_time_ms,path_length,cache_hit
+Light Congestion,LazyHC2L,0.273,0.5,lazy_mark,4,,3,0.001,0.0,3,False
+Light Congestion,DHL,0.298,0.5,immediate_update,,7,,,0.0,3,
+Medium Jam,LazyHC2L,1.0,0.5,immediate_update,3,,3,0.001,0.0,3,False
+Medium Jam,DHL,1.0,0.5,immediate_update,,11,,,0.0,3,
+Heavy Closure,LazyHC2L,1.0,0.5,immediate_update,0,,0,0.0,0.0,3,False
+Heavy Closure,DHL,1.0,0.5,immediate_update,,6,,,0.0,3,
+Mixed Accident,LazyHC2L,0.5,0.5,immediate_update,4,,3,0.002,0.001,3,False
+Mixed Accident,DHL,1.0,0.5,immediate_update,,7,,,0.0,3,
+Multi-Segment Disruption,LazyHC2L,1.0,0.5,immediate_update,5,,3,0.002,0.0,3,False
+Multi-Segment Disruption,DHL,1.0,0.5,immediate_update,,13,,,0.0,3,

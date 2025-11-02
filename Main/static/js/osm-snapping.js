@@ -113,9 +113,11 @@ function createOSMSnapMarkers(clickedLat, clickedLng, snapData, role) {
     }).addTo(map);
     
     window.osmSnapMarkers[role].clicked.bindPopup(
-        `<b>${isStart ? '🟢 Start Location' : '🔴 Destination'}</b><br>` +
-        `Clicked Point<br>` +
-        `<small>${clickedLat.toFixed(6)}, ${clickedLng.toFixed(6)}</small>`
+        `<div class="p-2 min-w-[220px]">` +
+        `<div class="font-bold text-lg mb-2 ${isStart ? 'text-green-700' : 'text-red-700'}">${isStart ? '🟢 Start Location' : '🔴 Destination'}</div>` +
+        `<div class="text-sm text-slate-600 mb-1">📍 Clicked Point</div>` +
+        `<div class="text-xs text-slate-500 font-mono bg-slate-50 px-2 py-1 rounded">${clickedLat.toFixed(6)}, ${clickedLng.toFixed(6)}</div>` +
+        `</div>`
     );
     
     // 2. Marker at snapped road location (solid)
@@ -140,14 +142,22 @@ function createOSMSnapMarkers(clickedLat, clickedLng, snapData, role) {
         : 'Fallback to Nearest Node';
     
     window.osmSnapMarkers[role].snapped.bindPopup(
-        `<b>${isStart ? '🟢 Start Point' : '🔴 Destination'}</b><br>` +
-        `${methodText}<br>` +
-        `<b>Road:</b> ${snapData.road_name}<br>` +
-        `<b>Type:</b> ${snapData.highway_type}<br>` +
-        `${snapData.oneway ? '<b>⚠️ One-way road</b><br>' : ''}` +
-        `<b>Distance:</b> ${snapData.distance_m.toFixed(1)}m from click<br>` +
-        `${snapData.snap_position ? `<b>Position:</b> ${(snapData.snap_position * 100).toFixed(0)}% along edge<br>` : ''}` +
-        `<small>${snappedLat.toFixed(6)}, ${snappedLng.toFixed(6)}</small>`
+        `<div class="p-3 min-w-[280px]">` +
+        `<div class="font-bold text-xl mb-3 ${isStart ? 'text-green-700' : 'text-red-700'} flex items-center">` +
+        `<span class="mr-2">${isStart ? '🟢' : '🔴'}</span> ${isStart ? 'Start Point' : 'Destination'}` +
+        `</div>` +
+        `<div class="bg-gradient-to-r from-blue-50 to-indigo-50 px-3 py-2 rounded-lg mb-2 border border-blue-200">` +
+        `<div class="text-xs text-blue-600 font-semibold uppercase tracking-wide mb-1">${methodText}</div>` +
+        `</div>` +
+        `<div class="space-y-2 text-sm">` +
+        `<div class="flex items-start"><span class="font-semibold text-slate-700 w-20">🛣️ Road:</span><span class="text-slate-900 flex-1">${snapData.road_name}</span></div>` +
+        `<div class="flex items-start"><span class="font-semibold text-slate-700 w-20">🏷️ Type:</span><span class="text-slate-600">${snapData.highway_type}</span></div>` +
+        `${snapData.oneway ? '<div class="bg-yellow-50 border border-yellow-300 px-2 py-1 rounded text-yellow-800 font-semibold text-xs">⚠️ One-way road</div>' : ''}` +
+        `<div class="flex items-start"><span class="font-semibold text-slate-700 w-20">📏 Distance:</span><span class="text-emerald-600 font-bold">${snapData.distance_m.toFixed(1)}m</span> <span class="text-slate-500 text-xs ml-1">from click</span></div>` +
+        `${snapData.snap_position ? `<div class="flex items-start"><span class="font-semibold text-slate-700 w-20">📍 Position:</span><span class="text-blue-600">${(snapData.snap_position * 100).toFixed(0)}%</span> <span class="text-slate-500 text-xs ml-1">along edge</span></div>` : ''}` +
+        `<div class="text-xs text-slate-400 font-mono bg-slate-50 px-2 py-1 rounded mt-2">${snappedLat.toFixed(6)}, ${snappedLng.toFixed(6)}</div>` +
+        `</div>` +
+        `</div>`
     );
     
     // 3. Dashed connector line (walking path)
@@ -166,9 +176,11 @@ function createOSMSnapMarkers(clickedLat, clickedLng, snapData, role) {
         
         // Add popup for detailed info
         window.osmSnapMarkers[role].connector.bindPopup(
-            `<b>Walking Distance</b><br>` +
-            `${distance.toFixed(1)}m to road<br>` +
-            `<small>From clicked point to ${snapData.road_name}</small>`
+            `<div class="p-2 min-w-[200px]">` +
+            `<div class="font-bold text-lg mb-2 text-slate-700">🚶 Walking Distance</div>` +
+            `<div class="text-2xl font-bold text-emerald-600 mb-1">${distance.toFixed(1)}m</div>` +
+            `<div class="text-xs text-slate-500">From clicked point to<br/><span class="font-semibold text-slate-700">${snapData.road_name}</span></div>` +
+            `</div>`
         );
         
         // Add permanent tooltip showing distance
@@ -255,14 +267,16 @@ async function handleOSMStartLocationPin(lat, lng) {
             // Store location data
             window.startLocation = getOSMSnappedLocation('start');
             
-            // Update UI
+            // Update UI - update input box with location name
             const displayText = snapData.method === 'osm_geometry'
                 ? `📍 ${snapData.road_name} (${snapData.distance_m.toFixed(0)}m)`
                 : `📍 Node ${snapData.routing_nodes[0]} (${snapData.distance_m.toFixed(0)}m)`;
             
-            document.getElementById('start-location-text').textContent = displayText;
-            document.getElementById('start-location-text').classList.remove('text-slate-500');
-            document.getElementById('start-location-text').classList.add('text-slate-900', 'font-semibold');
+            const startInput = document.getElementById('start-location-input');
+            if (startInput) {
+              startInput.value = snapData.road_name || `Node ${snapData.routing_nodes[0]}`;
+              console.log(`✅ Updated start-location-input to: ${startInput.value}`);
+            }
             
             const message = snapData.method === 'osm_geometry'
                 ? `Start set on ${snapData.highway_type} road`
@@ -305,14 +319,16 @@ async function handleOSMDestLocationPin(lat, lng) {
             // Store location data
             window.destLocation = getOSMSnappedLocation('dest');
             
-            // Update UI
+            // Update UI - update input box with location name
             const displayText = snapData.method === 'osm_geometry'
                 ? `📍 ${snapData.road_name} (${snapData.distance_m.toFixed(0)}m)`
                 : `📍 Node ${snapData.routing_nodes[0]} (${snapData.distance_m.toFixed(0)}m)`;
             
-            document.getElementById('dest-location-text').textContent = displayText;
-            document.getElementById('dest-location-text').classList.remove('text-slate-500');
-            document.getElementById('dest-location-text').classList.add('text-slate-900', 'font-semibold');
+            const destInput = document.getElementById('dest-location-input');
+            if (destInput) {
+              destInput.value = snapData.road_name || `Node ${snapData.routing_nodes[0]}`;
+              console.log(`✅ Updated dest-location-input to: ${destInput.value}`);
+            }
             
             const message = snapData.method === 'osm_geometry'
                 ? `Destination set on ${snapData.highway_type} road`

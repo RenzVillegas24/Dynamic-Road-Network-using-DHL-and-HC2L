@@ -185,23 +185,37 @@ class OSMRoadSnapper:
         # STRtree.nearest() returns a single geometry in newer versions
         # We need to query multiple times or use query() with distance
         try:
-            # Try new API (Shapely 2.0+)
-            nearest_geom = self.spatial_index.nearest(point)
-            if nearest_geom is None:
-                return None
-            
-            # For multiple candidates, use query with distance
+            # For multiple candidates, use query with distance buffer
             if consider_hierarchy and num_candidates > 1:
                 # Get geometries within a larger radius for comparison
                 search_radius = max_distance_m / (111320 * np.cos(np.radians(lat)))
                 nearby_indices = self.spatial_index.query(point.buffer(search_radius))
-                nearest_geoms = [self.edge_geometries[idx] for idx in nearby_indices]
-                if not nearest_geoms:
-                    nearest_geoms = [nearest_geom]
+                # Convert indices to list if needed
+                if hasattr(nearby_indices, '__iter__'):
+                    nearby_indices = list(nearby_indices)
+                else:
+                    nearby_indices = [nearby_indices] if nearby_indices is not None else []
+                
+                if len(nearby_indices) == 0:
+                    return None
+                    
+                nearest_geoms = [self.edge_geometries[idx] for idx in nearby_indices if idx < len(self.edge_geometries)]
             else:
-                nearest_geoms = [nearest_geom]
+                # Try new API (Shapely 2.0+)
+                nearest_result = self.spatial_index.nearest(point)
+                # Handle both single geometry and index return types
+                if isinstance(nearest_result, int):
+                    if nearest_result < len(self.edge_geometries):
+                        nearest_geoms = [self.edge_geometries[nearest_result]]
+                    else:
+                        return None
+                elif hasattr(nearest_result, 'distance'):
+                    nearest_geoms = [nearest_result]
+                else:
+                    return None
+                    
         except Exception as e:
-            print(f"Error querying spatial index: {e}")
+            print(f"⚠️  Error querying spatial index: {e}")
             return None
         
         if not nearest_geoms or len(nearest_geoms) == 0:
@@ -212,12 +226,17 @@ class OSMRoadSnapper:
         for geom in nearest_geoms:
             # Find metadata for this geometry using robust lookup
             try:
+                # Ensure geom is a Geometry object
+                if not hasattr(geom, 'distance'):
+                    print(f"⚠️  Invalid geometry object (not a Shapely Geometry)")
+                    continue
+                
                 # Try to find by geometry ID first (more reliable)
                 geom_idx = self.geom_to_idx.get(id(geom))
                 if geom_idx is None:
-                    # Fallback: search by geometry equality
+                    # Fallback: search by geometry equality or bounds
                     for idx, stored_geom in enumerate(self.edge_geometries):
-                        if stored_geom.equals(geom):
+                        if stored_geom.equals(geom) or stored_geom.bounds == geom.bounds:
                             geom_idx = idx
                             break
                 

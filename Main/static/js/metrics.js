@@ -55,14 +55,38 @@ function updateAdminPerformanceMetrics(routeData) {
       
     } else {
       // D-HC2L metrics
+      // Check for labeling_info nested object (from HC2L C++ API)
+      console.log('🔍 DEBUG - Full metrics object:', metrics);
+      console.log('🔍 DEBUG - metrics.labeling_info:', metrics.labeling_info);
+      
+      const labelingInfo = metrics.labeling_info || {};
+      console.log('🔍 DEBUG - labelingInfo object:', labelingInfo);
+      
+      // Labeling time: try multiple possible locations
+      const labelingTimeMs = metrics.labeling_time_ms || 
+                            labelingInfo.index_load_time_ms ||
+                            0;
+      console.log('🔍 DEBUG - labelingTimeMs:', labelingTimeMs, 'from:', 
+                  metrics.labeling_time_ms ? 'metrics.labeling_time_ms' : 
+                  labelingInfo.index_load_time_ms ? 'labelingInfo.index_load_time_ms' : 'default 0');
       document.getElementById('perf-labeling-time').textContent = 
-        metrics.labeling_time_ms ? `${metrics.labeling_time_ms.toFixed(1)}s` : 'N/A';
+        labelingTimeMs > 0 ? `${labelingTimeMs.toFixed(1)} ms` : 'N/A';
       
+      // Labeling size: try multiple possible locations
+      const labelingSizeMb = metrics.labeling_size_mb || 
+                            labelingInfo.index_size_mb ||
+                            0;
+      console.log('🔍 DEBUG - labelingSizeMb:', labelingSizeMb, 'from:', 
+                  metrics.labeling_size_mb ? 'metrics.labeling_size_mb' : 
+                  labelingInfo.index_size_mb ? 'labelingInfo.index_size_mb' : 'default 0');
       document.getElementById('perf-labeling-size').textContent = 
-        metrics.labeling_size_mb ? `${metrics.labeling_size_mb.toFixed(1)} MB` : 'N/A';
+        labelingSizeMb > 0 ? `${labelingSizeMb.toFixed(1)} MB` : 'N/A';
       
+      // Query time
+      const queryTimeMs = metrics.query_time_ms || 0;
+      console.log('🔍 DEBUG - queryTimeMs:', queryTimeMs);
       document.getElementById('perf-query-time').textContent = 
-        metrics.query_time_ms ? `${metrics.query_time_ms.toFixed(3)}μs` : 'N/A';
+        queryTimeMs > 0 ? `${queryTimeMs.toFixed(3)} ms` : 'N/A';
         
       // Update D-HC2L mode badge
       const modeBadge = document.getElementById('update-mode-badge');
@@ -89,6 +113,11 @@ function updateAdminPerformanceMetrics(routeData) {
         modeBadge.className = `px-4 py-2 ${bgClass} text-white rounded-xl text-sm font-bold shadow-md`;
         
         console.log(`🔄 Updated mode badge: ${displayText} (${routingMode})`);
+        console.log(`📊 Performance metrics updated:`, {
+          labelingTimeMs,
+          labelingSizeMb,
+          queryTimeMs
+        });
       }
         
     //   document.getElementById('perf-route-similarity').textContent = 

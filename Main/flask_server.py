@@ -2,6 +2,8 @@
 from flask import Flask, request, jsonify, render_template
 import pandas as pd
 import time
+from pathlib import Path
+import atexit
 
 # Import configuration
 from config import Config
@@ -11,6 +13,12 @@ from coordinate_mapper import NodeMapper
 from gps_hc2l_router import GPSRoutingService
 from dhl_router import DHLRouter
 import request_new_datasets as rq
+
+# Import auto-disruption service
+from auto_disruption_service import init_auto_disruption_service, shutdown_auto_disruption_service, get_auto_disruption_service
+
+# Import Google Maps service
+from google_maps_service import GoogleMapsService
 
 
 app = Flask(__name__)
@@ -36,6 +44,54 @@ except Exception as e:
     print(f"❌ Error initializing DHL Router: {e}")
     dhl_router = None
 
+# Initialize Google Maps Service
+try:
+    gmaps_service = GoogleMapsService()
+    print("✅ Google Maps Service initialized successfully")
+except Exception as e:
+    print(f"❌ Error initializing Google Maps Service: {e}")
+    gmaps_service = None
+
+# Initialize auto-disruption service (90 second updates)
+auto_service = init_auto_disruption_service(app, update_interval=90)
+
+# Shutdown service on exit
+atexit.register(shutdown_auto_disruption_service)
+
+
+def get_dynamic_disruption_file(algorithm: str = 'hc2l') -> str:
+    """
+    Get the path to the current dynamic disruption file for the specified algorithm.
+    Falls back to static disruption file if dynamic file doesn't exist.
+    
+    Args:
+        algorithm: 'hc2l' or 'dhl'
+        
+    Returns:
+        Path to disruption file as string, or empty string if no disruptions
+    """
+    # First, try algorithm-specific dynamic file
+    dynamic_file = Config.DISRUPTIONS_DIR / f"dynamic_disruptions_{algorithm}.gr"
+    if dynamic_file.exists():
+        print(f"🔄 Using dynamic disruption file for {algorithm.upper()}: {dynamic_file}")
+        return str(dynamic_file)
+    
+    # Fall back to generic dynamic file
+    generic_dynamic = Config.DISRUPTIONS_DIR / "dynamic_disruptions_current.gr"
+    if generic_dynamic.exists():
+        print(f"🔄 Using generic dynamic disruption file: {generic_dynamic}")
+        return str(generic_dynamic)
+    
+    # Fall back to static scenario file
+    static_file = Config.PROCESSED_DATA_DIR / "qc_disrupted_scenario_1.gr"
+    if static_file.exists():
+        print(f"📋 Using static disruption file: {static_file}")
+        return str(static_file)
+    
+    print(f"⚠️  No disruption file found for {algorithm}")
+    return ""
+
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -58,6 +114,165 @@ def report_disruption():
         'success': True,
         'message': 'Disruption reported successfully'
     })
+
+@app.route('/search_location', methods=['POST'])
+def search_location():
+    """
+    Search for locations within Quezon City using Photon API (OSM alternative to Nominatim)
+    Returns list of matching places with coordinates
+    """
+    import requests
+    
+    data = request.json
+    query = data.get('query', '').strip()
+    print(f"[SEARCH] Query received: '{query}'")
+    
+    if not query:
+        print("[SEARCH] ❌ Query is empty")
+        return jsonify({
+            'success': False,
+            'error': 'Search query is required'
+        })
+    
+    try:
+        # Quezon City coordinates (approximate center)
+        qc_lat = 14.6760
+        qc_lng = 121.0437
+        
+        # Try Photon API first (faster, more reliable than Nominatim)
+        photon_url = "https://photon.komoot.io/api"
+        params = {
+            'q': query,
+            'lat': qc_lat,
+            'lon': qc_lng,
+            'limit': 10,
+            'bbox': '121.000,14.500,121.150,14.800'  # Quezon City bounds
+        }
+        
+        headers = {
+            'User-Agent': 'REACT-Navigation-App/1.0'
+        }
+        
+        print(f"[SEARCH] Trying Photon API: {photon_url}")
+        response = requests.get(photon_url, params=params, headers=headers, timeout=5)
+        response.raise_for_status()
+        
+        data_response = response.json()
+        results = data_response.get('features', [])
+        print(f"[SEARCH] Photon returned {len(results)} results")
+        
+        # Process Photon results
+        filtered_results = []
+        for result in results:
+            try:
+                properties = result.get('properties', {})
+                geometry = result.get('geometry', {})
+                coords = geometry.get('coordinates', [])
+                
+                if len(coords) < 2:
+                    continue
+                
+                lng = float(coords[0])
+                lat = float(coords[1])
+                
+                # Build location name
+                name_parts = []
+                if properties.get('name'):
+                    name_parts.append(properties['name'])
+                if properties.get('city'):
+                    name_parts.append(properties['city'])
+                if properties.get('state'):
+                    name_parts.append(properties['state'])
+                
+                name = ', '.join(name_parts) if name_parts else 'Unknown Location'
+                loc_type = properties.get('osm_type', 'place')
+                
+                # Double-check if within Quezon City bounds (with 5km tolerance)
+                if 14.45 <= lat <= 14.85 and 120.95 <= lng <= 121.20:
+                    filtered_results.append({
+                        'name': name,
+                        'lat': lat,
+                        'lng': lng,
+                        'type': loc_type,
+                        'address': properties
+                    })
+                    print(f"  ✅ Added: {name} ({lat:.4f}, {lng:.4f})")
+                else:
+                    print(f"  ⚠️  Outside bounds: {name} ({lat:.4f}, {lng:.4f})")
+            except (ValueError, TypeError, KeyError) as e:
+                print(f"  ⚠️  Parse error: {e}")
+                continue
+        
+        print(f"[SEARCH] ✅ Returning {len(filtered_results)} results from Photon")
+        return jsonify({
+            'success': True,
+            'results': filtered_results,
+            'count': len(filtered_results)
+        })
+        
+    except requests.exceptions.Timeout:
+        print(f"[SEARCH] ⚠️  Photon timeout, trying fallback...")
+        # Fallback: try Nominatim if Photon fails
+        try:
+            nominatim_url = "https://nominatim.openstreetmap.org/search"
+            params = {
+                'q': f"{query}, Quezon City",
+                'format': 'json',
+                'limit': 10,
+                'viewbox': '121.000,14.500,121.150,14.800',
+                'bounded': 1,
+                'addressdetails': 1
+            }
+            headers = {'User-Agent': 'REACT-Navigation-App/1.0'}
+            
+            response = requests.get(nominatim_url, params=params, headers=headers, timeout=5)
+            response.raise_for_status()
+            results = response.json()
+            
+            filtered_results = []
+            for result in results:
+                try:
+                    lat = float(result.get('lat', 0))
+                    lng = float(result.get('lon', 0))
+                    name = result.get('display_name', 'Unknown')
+                    
+                    if 14.45 <= lat <= 14.85 and 120.95 <= lng <= 121.20:
+                        filtered_results.append({
+                            'name': name,
+                            'lat': lat,
+                            'lng': lng,
+                            'type': result.get('type', 'place'),
+                            'address': result.get('address', {})
+                        })
+                except (ValueError, TypeError):
+                    continue
+            
+            return jsonify({
+                'success': True,
+                'results': filtered_results,
+                'count': len(filtered_results)
+            })
+        except Exception as e:
+            print(f"[SEARCH] ❌ Nominatim fallback also failed: {str(e)}")
+            return jsonify({
+                'success': False,
+                'error': f'Location search unavailable: {str(e)}'
+            })
+    
+    except requests.exceptions.RequestException as e:
+        print(f"[SEARCH] ❌ API request failed: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': f'Search service error: {str(e)}'
+        })
+    except Exception as e:
+        print(f"[SEARCH] ❌ Unexpected error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': f'Search failed: {str(e)}'
+        })
 
 @app.route('/get_all_nodes')
 def get_all_nodes():
@@ -514,18 +729,24 @@ def compute_dhc2l_route():
             print(f"🗺️  Dest snap: {dest_osm_edge.get('road_name', 'Unknown')} " +
                   f"(Edge: {dest_edge_source}→{dest_edge_target}, oneway={dest_edge_oneway})")
         
-        # Check if disruptions should be used - now as a directory path (optional parameter)
-        # If disruption_dir is provided, it should be a path to disruption data
-        # If empty or "null", treat as no disruptions
-        disruption_dir = data.get('disruption_dir', '')
-        threshold = float(data.get('threshold', 0.0))
+        # LazyHC2L: Extract optional disruption parameters
+        # disruption_file: path to .gr disruption file (optional)
+        # tau_threshold: threshold for lazy vs immediate update (default 0.5)
+        disruption_file = data.get('disruption_file', '')
+        
+        # If no disruption file specified, use dynamic disruptions if available
+        if not disruption_file:
+            disruption_file = get_dynamic_disruption_file('hc2l')
+        
+        tau_threshold = float(data.get('tau_threshold', 0.5))
         
         print(f"Computing GPS HC2L route with snap points:")
         print(f"  Start: Pin({start_pin_lat}, {start_pin_lng}) → Snap({start_snap_lat}, {start_snap_lng})")
         print(f"  Dest:  Pin({dest_pin_lat}, {dest_pin_lng}) → Snap({dest_snap_lat}, {dest_snap_lng})")
-        print(f"  Disruption dir: {disruption_dir if disruption_dir else '(none)'}")
+        print(f"  Disruption file: {disruption_file if disruption_file else '(none)'}")
+        print(f"  Tau threshold: {tau_threshold}")
         
-        # Compute route using GPS HC2L with new argument structure
+        # Compute route using GPS HC2L with LazyHC2L parameters
         start_time = time.time()
         route_result = gps_router.compute_route(
             start_pin_lat, start_pin_lng,
@@ -534,7 +755,7 @@ def compute_dhc2l_route():
             dest_snap_lat, dest_snap_lng,
             start_edge_source, start_edge_target, start_edge_oneway,
             dest_edge_source, dest_edge_target, dest_edge_oneway,
-            disruption_dir, threshold  # Pass disruption_dir instead of use_disruptions
+            disruption_file, tau_threshold  # Pass disruption_file and tau_threshold
         )
         computation_time = time.time() - start_time
         
@@ -842,15 +1063,54 @@ def compute_dhl_route():
             print(f"🗺️  Dest snap (DHL): {dest_osm_edge.get('road_name', 'Unknown')} " +
                   f"(Edge: {dest_edge_source}→{dest_edge_target}, oneway={dest_edge_oneway})")
         
-        # Check if disruptions should be used - now as a directory path (optional parameter)
-        disruption_dir = data.get('disruption_dir', '')
+        # Check if disruptions should be used
+        use_disruptions = data.get('use_disruptions', False)
+        
+        # DHL: Convert use_disruptions to actual disruption file path
+        # If disruption_file is explicitly provided, use it
+        # Otherwise, if use_disruptions is True, use dynamic disruptions
+        disruption_file = data.get('disruption_file', '')
+        
+        # Handle different ways disruptions can be specified
+        if not disruption_file or disruption_file in ['', 'null', 'NULL']:
+            # If use_disruptions is True, use dynamic or default disruption file
+            if use_disruptions:
+                # Try to use dynamic disruption file first
+                disruption_file = get_dynamic_disruption_file('dhl')
+                
+                # If no dynamic file, fall back to static file
+                if not disruption_file:
+                    disruption_gr = Config.PROCESSED_DATA_DIR / 'qc_disrupted_scenario_1.gr'
+                    if disruption_gr.exists():
+                        disruption_file = str(disruption_gr)
+                        print(f"📍 Using static disruption file: {disruption_file}")
+                    else:
+                        print(f"⚠️  No disruption file found")
+                        disruption_file = ''
+            else:
+                disruption_file = ''
+        elif disruption_file == 'active_disruptions':
+            # Frontend sent 'active_disruptions' - use dynamic disruptions
+            disruption_file = get_dynamic_disruption_file('dhl')
+            if not disruption_file:
+                # Fall back to static
+                disruption_gr = Config.PROCESSED_DATA_DIR / 'qc_disrupted_scenario_1.gr'
+                if disruption_gr.exists():
+                    disruption_file = str(disruption_gr)
+                    print(f"📍 Using static disruption file: {disruption_file}")
+                else:
+                    print(f"⚠️  No disruption file found")
+                    disruption_file = ''
+        
+        tau_threshold = float(data.get('tau_threshold', 0.5))
         
         print(f"Computing DHL route with snap points:")
         print(f"  Start: Pin({start_pin_lat}, {start_pin_lng}) → Snap({start_snap_lat}, {start_snap_lng})")
         print(f"  Dest:  Pin({dest_pin_lat}, {dest_pin_lng}) → Snap({dest_snap_lat}, {dest_snap_lng})")
-        print(f"  Disruption dir: {disruption_dir if disruption_dir else '(none)'}")
+        print(f"  Disruption file: {disruption_file if disruption_file else '(none)'}")
+        print(f"  Tau threshold: {tau_threshold}")
         
-        # Compute route using DHL with new argument structure
+        # Compute route using DHL with disruption parameters
         start_time = time.time()
         route_result = dhl_router.compute_route(
             start_pin_lat, start_pin_lng,
@@ -859,7 +1119,7 @@ def compute_dhl_route():
             dest_snap_lat, dest_snap_lng,
             start_edge_source, start_edge_target, start_edge_oneway,
             dest_edge_source, dest_edge_target, dest_edge_oneway,
-            disruption_dir  # Pass disruption_dir instead of use_disruptions
+            disruption_file, tau_threshold  # Pass disruption_file and tau_threshold
         )
         computation_time = time.time() - start_time
         
@@ -1119,9 +1379,218 @@ def compare_algorithms():
         })
 
 
+@app.route('/compare_with_google_maps', methods=['POST'])
+def compare_with_google_maps():
+    """Compare algorithm route with Google Maps route"""
+    data = request.json
+    
+    try:
+        start_lat = float(data['start_lat'])
+        start_lng = float(data['start_lng'])
+        dest_lat = float(data['dest_lat'])
+        dest_lng = float(data['dest_lng'])
+        algorithm = data.get('algorithm', 'dhc2l')
+        use_disruptions = data.get('use_disruptions', False)
+        threshold = float(data.get('threshold', 0.5))
+        
+        if not gmaps_service:
+            return jsonify({
+                'success': False,
+                'error': 'Google Maps service not initialized'
+            })
+        
+        print(f"\n🗺️  Google Maps Comparison Request")
+        print(f"   Algorithm: {algorithm}")
+        print(f"   From: ({start_lat}, {start_lng})")
+        print(f"   To: ({dest_lat}, {dest_lng})")
+        
+        # Compute algorithm route first
+        algorithm_route = None
+        algorithm_coords = []
+        algorithm_summary = {}
+        
+        if algorithm.lower().startswith('dhl') and dhl_router:
+            print("   Computing DHL route...")
+            algorithm_route = dhl_router.compute_route(
+                start_lat, start_lng, dest_lat, dest_lng, use_disruptions
+            )
+            if algorithm_route.get('success'):
+                algorithm_summary = dhl_router.get_route_summary(algorithm_route)
+                # Extract coordinates from route
+                if 'route' in algorithm_route and 'coordinates' in algorithm_route['route']:
+                    algorithm_coords = algorithm_route['route']['coordinates']
+        else:
+            # Default to D-HC2L
+            if gps_router:
+                print("   Computing D-HC2L route...")
+                algorithm_route = gps_router.compute_route(
+                    start_lat, start_lng, dest_lat, dest_lng, use_disruptions, threshold
+                )
+                if algorithm_route.get('success'):
+                    algorithm_summary = gps_router.get_route_summary(algorithm_route)
+                    # Extract coordinates from route
+                    if 'route' in algorithm_route and 'coordinates' in algorithm_route['route']:
+                        algorithm_coords = algorithm_route['route']['coordinates']
+        
+        if not algorithm_route or not algorithm_route.get('success'):
+            return jsonify({
+                'success': False,
+                'error': 'Failed to compute algorithm route'
+            })
+        
+        if not algorithm_coords:
+            return jsonify({
+                'success': False,
+                'error': 'Algorithm route has no coordinates'
+            })
+        
+        # Fetch and compare with Google Maps
+        comparison = gmaps_service.compare_with_algorithm_route(
+            algorithm_coords, start_lat, start_lng, dest_lat, dest_lng
+        )
+        
+        if not comparison.get('success'):
+            return jsonify(comparison)
+        
+        # Build response
+        result = {
+            'success': True,
+            'algorithm_route': {
+                'coordinates': algorithm_coords,
+                'summary': algorithm_summary,
+                'name': algorithm_summary.get('algorithm', algorithm.upper())
+            },
+            'google_maps_route': comparison['google_maps_route'],
+            'comparison': comparison['comparison'],
+            'message': f"Compared {len(algorithm_coords)} algorithm points with {len(comparison['google_maps_route']['coordinates'])} Google Maps points"
+        }
+        
+        print(f"✅ Comparison complete:")
+        print(f"   Fréchet distance: {comparison['comparison']['frechet_distance_meters']:.2f}m")
+        print(f"   Segment overlap: {comparison['comparison']['segment_overlap_percent']:.2f}%")
+        
+        return jsonify(result)
+        
+    except KeyError as e:
+        return jsonify({
+            'success': False,
+            'error': f"Missing required parameter: {str(e)}"
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': f"Google Maps comparison error: {str(e)}"
+        })
+
+
+@app.route('/register_active_route', methods=['POST'])
+def register_active_route():
+    """Register a route for automatic disruption monitoring"""
+    try:
+        data = request.json
+        route_id = data.get('route_id', f"route_{int(time.time())}")
+        
+        auto_service = get_auto_disruption_service()
+        if auto_service:
+            auto_service.register_active_route(route_id, {
+                'algorithm': data.get('algorithm', 'unknown'),
+                'start_lat': data.get('start_lat'),
+                'start_lng': data.get('start_lng'),
+                'dest_lat': data.get('dest_lat'),
+                'dest_lng': data.get('dest_lng'),
+                'use_disruptions': data.get('use_disruptions', False)
+            })
+            return jsonify({
+                'success': True,
+                'route_id': route_id,
+                'message': 'Route registered for monitoring'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Auto-disruption service not available'
+            })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
+
+@app.route('/unregister_active_route', methods=['POST'])
+def unregister_active_route():
+    """Unregister a route from monitoring"""
+    try:
+        data = request.json
+        route_id = data.get('route_id')
+        
+        auto_service = get_auto_disruption_service()
+        if auto_service and route_id:
+            auto_service.unregister_route(route_id)
+            return jsonify({
+                'success': True,
+                'message': 'Route unregistered'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Invalid route_id or service unavailable'
+            })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
+
+@app.route('/check_disruption_updates')
+def check_disruption_updates():
+    """Check if disruption files have been updated (polling endpoint)"""
+    try:
+        import hashlib
+        
+        files_to_check = [
+            Config.DISRUPTIONS_DIR / "dynamic_disruptions_hc2l.gr",
+            Config.DISRUPTIONS_DIR / "dynamic_disruptions_dhl.gr",
+            Config.DISRUPTIONS_DIR / "dynamic_disruptions_current.gr"
+        ]
+        
+        combined_content = ""
+        file_mtimes = {}
+        
+        for file_path in files_to_check:
+            if file_path.exists():
+                combined_content += file_path.read_text()
+                file_mtimes[file_path.name] = file_path.stat().st_mtime
+        
+        current_hash = hashlib.md5(combined_content.encode()).hexdigest() if combined_content else None
+        
+        return jsonify({
+            'success': True,
+            'hash': current_hash,
+            'file_mtimes': file_mtimes,
+            'timestamp': time.time()
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
+
 if __name__ == '__main__':
     # Print configuration summary
     print(Config.get_config_summary())
+    
+    print("\n" + "="*80)
+    print("🔄 Auto-Disruption Service Status:")
+    print(f"   Update Interval: 90 seconds")
+    print(f"   Monitoring: Dynamic disruption files")
+    print(f"   Auto-recalculation: Enabled for active routes")
+    print("="*80 + "\n")
     
     # Start Flask server
     app.run(

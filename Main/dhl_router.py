@@ -72,7 +72,7 @@ class DHLRouter:
                      dest_snap_lat: float, dest_snap_lng: float,
                      start_edge_source: int, start_edge_target: int, start_edge_oneway: int,
                      dest_edge_source: int, dest_edge_target: int, dest_edge_oneway: int,
-                     disruption_dir: str = "",
+                     disruption_file: str = "",
                      tau_threshold: float = 0.5) -> Dict:
         """
         Compute route using DHL algorithm via JSON API with snap point information
@@ -93,14 +93,14 @@ class DHLRouter:
             dest_edge_source: Source node of edge where dest snap occurred
             dest_edge_target: Target node of edge where dest snap occurred
             dest_edge_oneway: One-way property of dest edge (1=forward, -1=reverse, 0=bidirectional)
-            disruption_dir: Path to disruption data directory (empty string or "null" = no disruptions)
-            tau_threshold: DHL threshold parameter (default: 0.5)
+            disruption_file: Path to .gr disruption file (empty string or "null" = no disruptions)
+            tau_threshold: DHL threshold parameter (default: 0.5, for comparison with LazyHC2L)
         """
         try:
             print(f"Executing DHL JSON API route computation...")
             
-            # Build command with new argument structure
-            use_disruptions = bool(disruption_dir and disruption_dir != "null")
+            # Build command with DHL argument structure
+            # Args: 14 routing params + 3 data files + optional disruption_file + optional tau_threshold
             cmd = [
                 self.cpp_executable,
                 str(start_pin_lat), str(start_pin_lng),
@@ -109,12 +109,15 @@ class DHLRouter:
                 str(dest_pin_lat), str(dest_pin_lng),
                 str(dest_snap_lat), str(dest_snap_lng),
                 str(dest_edge_source), str(dest_edge_target), str(dest_edge_oneway),
-                disruption_dir if disruption_dir else "",  # Pass directory path instead of true/false
-                str(tau_threshold),
                 str(Config.NODES_CSV),
                 str(Config.EDGES_CSV),
                 str(Config.DHL_INDEX_FILE)
             ]
+            
+            # Add optional disruption parameters if provided
+            if disruption_file and disruption_file not in ['', 'null', 'NULL']:
+                cmd.append(str(disruption_file))
+                cmd.append(str(tau_threshold))
             
             print(f"Command: {' '.join(cmd)}")
             
@@ -125,11 +128,18 @@ class DHLRouter:
                 timeout=30
             )
             
+            print(f"DHL executable return code: {result.returncode}")
+            print(f"DHL stdout: {result.stdout[:500] if result.stdout else '(empty)'}")
+            print(f"DHL stderr: {result.stderr[:500] if result.stderr else '(empty)'}")
+            
             if result.returncode != 0:
+                error_msg = result.stderr if result.stderr else result.stdout
                 return {
                     'success': False,
-                    'error': f"DHL JSON API failed: {result.stderr}",
-                    'stdout': result.stdout
+                    'error': f"DHL JSON API failed (code {result.returncode}): {error_msg}",
+                    'stdout': result.stdout,
+                    'stderr': result.stderr,
+                    'return_code': result.returncode
                 }
             
             # Parse JSON output from DHL JSON API

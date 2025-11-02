@@ -107,7 +107,7 @@ class GPSRoutingService:
                      dest_snap_lat: float, dest_snap_lng: float,
                      start_edge_source: int, start_edge_target: int, start_edge_oneway: int,
                      dest_edge_source: int, dest_edge_target: int, dest_edge_oneway: int,
-                     disruption_dir: str = "", threshold: float = 0.5) -> Dict:
+                     disruption_file: str = "", tau_threshold: float = 0.5) -> Dict:
         """
         Compute route using HC2L GPS Routing Service with snap point information
         Returns enhanced route data with Google Maps integration
@@ -127,12 +127,12 @@ class GPSRoutingService:
             dest_edge_source: Source node of edge where dest snap occurred
             dest_edge_target: Target node of edge where dest snap occurred
             dest_edge_oneway: One-way property of dest edge (1=forward, -1=reverse, 0=bidirectional)
-            disruption_dir: Path to disruption data directory (empty string or "null" = no disruptions)
-            threshold: HC2L threshold parameter (default: 0.5)
+            disruption_file: Path to .gr disruption file (empty string or "null" = no disruptions)
+            tau_threshold: LazyHC2L threshold parameter (default: 0.5)
         """
         try:
-            # Build command with new argument structure
-            # disruption_dir can be empty string, "null", or an actual path
+            # Build command with LazyHC2L argument structure
+            # Args: 14 routing params + 3 data files + optional disruption_file + optional tau_threshold
             cmd = [
                 self.cpp_executable,
                 str(start_pin_lat), str(start_pin_lng),
@@ -141,11 +141,15 @@ class GPSRoutingService:
                 str(dest_pin_lat), str(dest_pin_lng),
                 str(dest_snap_lat), str(dest_snap_lng),
                 str(dest_edge_source), str(dest_edge_target), str(dest_edge_oneway),
-                disruption_dir if disruption_dir else "",  # Pass directory path instead of true/false
                 str(Config.NODES_CSV),
                 str(Config.EDGES_CSV),
                 str(Config.HC2L_INDEX_FILE)
             ]
+            
+            # Add optional disruption parameters if provided
+            if disruption_file and disruption_file not in ['', 'null', 'NULL']:
+                cmd.append(str(disruption_file))
+                cmd.append(str(tau_threshold))
             
             print(f"🚀 Executing GPS HC2L routing: {' '.join(cmd)}")
             
@@ -187,8 +191,9 @@ class GPSRoutingService:
                                 'dest_pin_lng': dest_pin_lng,
                                 'dest_snap_lat': dest_snap_lat,
                                 'dest_snap_lng': dest_snap_lng,
-                                'disruption_dir': disruption_dir,
-                                'use_disruptions': bool(disruption_dir and disruption_dir != "null")
+                                'disruption_file': disruption_file,
+                                'tau_threshold': tau_threshold,
+                                'use_disruptions': bool(disruption_file and disruption_file not in ['', 'null', 'NULL'])
                             },
                             'gps_mapping': {},
                             'metrics': {},

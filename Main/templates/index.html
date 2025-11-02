@@ -1,45 +1,105 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dynamic Navigator - OpenStreetMap</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-        crossorigin=""/>
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-          crossorigin=""></script>
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="https://cdn.tailwindcss.com"></script>
 
   <style>
     @keyframes float {
-      0%, 100% { transform: translateY(0px); }
-      50% { transform: translateY(-10px); }
+
+      0%,
+      100% {
+        transform: translateY(0px);
+      }
+
+      50% {
+        transform: translateY(-10px);
+      }
     }
-    .float-animation { animation: float 3s ease-in-out infinite; }
-    
+
+    .float-animation {
+      animation: float 3s ease-in-out infinite;
+    }
+
     @keyframes pulse-ring {
-      0% { transform: scale(0.8); opacity: 1; }
-      100% { transform: scale(1.4); opacity: 0; }
+      0% {
+        transform: scale(0.8);
+        opacity: 1;
+      }
+
+      100% {
+        transform: scale(1.4);
+        opacity: 0;
+      }
     }
-    .pulse-ring { animation: pulse-ring 2s ease-out infinite; }
-    
+
+    .pulse-ring {
+      animation: pulse-ring 2s ease-out infinite;
+    }
+
     .glass-effect {
       background: rgba(255, 255, 255, 0.95);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
+      border-color: #e2e8f0;
+      box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
     }
-    
-    .severity-heavy { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
-    .severity-medium { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
-    .severity-light { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
-    
+
+    .severity-heavy {
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    }
+
+    .severity-medium {
+      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    }
+
+    .severity-light {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    }
+
     /* Ensure Leaflet controls and popups are above the map */
-    .leaflet-control { z-index: 10 !important; }
-    .leaflet-popup { z-index: 10 !important; }
-    .leaflet-tooltip { z-index: 10 !important; }
-    
+    .leaflet-control {
+      z-index: 10 !important;
+    }
+
+    .leaflet-popup {
+      z-index: 10 !important;
+    }
+
+    .leaflet-tooltip {
+      z-index: 10 !important;
+    }
+
+    /* Beautiful popup styling */
+    .leaflet-popup-content-wrapper {
+      border-radius: 12px !important;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15) !important;
+      padding: 0 !important;
+      overflow: hidden !important;
+    }
+
+    .leaflet-popup-content {
+      margin: 0 !important;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+    }
+
+    .leaflet-popup-tip {
+      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    /* Hide Leaflet attribution watermark */
+    .leaflet-control-attribution {
+      display: none !important;
+    }
+
     /* Walking distance label styling */
     .walking-distance-label {
       background: rgba(117, 117, 117, 0.95) !important;
@@ -49,1785 +109,2036 @@
       padding: 4px 10px !important;
       font-weight: 600 !important;
       font-size: 12px !important;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.3) !important;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3) !important;
     }
+
     .walking-distance-label::before {
       border-top-color: rgba(117, 117, 117, 0.95) !important;
     }
   </style>
 </head>
+
 <body class="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
 
-<div class="h-screen w-full flex flex-col relative">
+  <div class="h-screen w-full flex flex-col relative">
 
-  <!-- Update Mode Toast Notification -->
-  <div id="update-toast"
-       class="fixed top-24 left-6 glass-effect border-2 shadow-2xl rounded-2xl px-6 py-4 text-sm font-semibold hidden z-50 transition-all transform hover:scale-105">
-    <span id="update-toast-message"></span>
-  </div>
-
-  <!-- Top Navigation Bar -->
-  <div class="glass-effect shadow-xl px-6 py-4 flex items-center justify-between border-b border-slate-200/50">
-    <div class="flex items-center space-x-4">
-      <div class="bg-gradient-to-br from-blue-600 to-indigo-600 p-3 rounded-2xl shadow-lg">
-        <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path>
-        </svg>
-      </div>
-      <div>
-        <span class="font-bold text-2xl text-slate-800 tracking-tight">REACT</span>
-        <p class="text-xs text-slate-500 font-medium">Intelligent Route Planning</p>
-      </div>
+    <!-- Update Mode Toast Notification -->
+    <div id="update-toast"
+      class="fixed top-24 left-6 glass-effect border-2 shadow-2xl rounded-2xl px-6 py-4 text-sm font-semibold hidden z-50 transition-all transform hover:scale-105">
+      <span id="update-toast-message"></span>
     </div>
-    
-    <!-- Location inputs -->
-    <div class="flex items-center space-x-3 flex-1 max-w-3xl mx-8">
-      <div class="relative flex-1">
-        <div class="flex items-center glass-effect rounded-2xl px-5 py-3 cursor-pointer hover:shadow-lg transition-all duration-300 border border-slate-200/50" id="start-location-btn">
-          <div class="bg-emerald-500 rounded-xl p-2 mr-3 shadow-md">
-            <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
-              <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"></path>
-            </svg>
+
+    <!-- Top Navigation Bar -->
+    <div class="glass-effect shadow-md px-6 py-4 flex items-center justify-between border-b border-slate-300">
+      <div class="flex items-center space-x-4">
+        <div class="bg-gradient-to-br from-blue-600 to-indigo-600 p-3 rounded-2xl shadow-md">
+          <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+              d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7">
+            </path>
+          </svg>
+        </div>
+        <div>
+          <span class="font-bold text-2xl text-slate-800 tracking-tight">REACT</span>
+          <p class="text-xs text-slate-500 font-medium">Intelligent Route Planning</p>
+        </div>
+      </div>
+
+      <!-- Location inputs -->
+      <div class="flex items-center space-x-3 flex-1 max-w-4xl mx-8">
+        <div class="relative flex-1">
+          <div
+            class="flex items-center glass-effect hover:shadow-md rounded-2xl transition-all duration-300 border border-slate-300">
+            <input type="text" id="start-location-input" placeholder="Search start location..."
+              class="flex-1 px-5 py-3 bg-transparent outline-none text-sm text-slate-700 font-medium placeholder-slate-400"
+              autocomplete="off">
+            <div class="flex items-center px-3 py-3" id="start-location-pin-btn" title="Pin on map">
+              <button class="bg-emerald-500 rounded-xl p-2 shadow-md hover:bg-emerald-600 transition-all">
+                <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd"
+                    d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z"
+                    clip-rule="evenodd"></path>
+                </svg>
+              </button>
+            </div>
           </div>
-          <div class="flex-1">
-            <p class="text-xs font-semibold text-emerald-600 mb-0.5">Start Location</p>
-            <span id="start-location-text" class="text-sm text-slate-500 font-medium">Click to pin starting point</span>
+        </div>
+
+        <div class="bg-gradient-to-r from-slate-300 to-slate-400 rounded-full p-2">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M9 5l7 7-7 7"></path>
+          </svg>
+        </div>
+
+        <div class="relative flex-1">
+          <div
+            class="flex items-center glass-effect hover:shadow-md rounded-2xl transition-all duration-300 border border-slate-300">
+            <input type="text" id="dest-location-input" placeholder="Search destination..."
+              class="flex-1 px-5 py-3 bg-transparent outline-none text-sm text-slate-700 font-medium placeholder-slate-400"
+              autocomplete="off">
+            <div class="flex items-center px-3 py-3" id="dest-location-pin-btn" title="Pin on map">
+              <button class="bg-rose-500 rounded-xl p-2 shadow-md hover:bg-rose-600 transition-all">
+                <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd"
+                    d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z"
+                    clip-rule="evenodd"></path>
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
-        <!-- Search suggestion for start (hidden by default) -->
-        <div id="start-search-hint" class="hidden absolute top-full mt-1 left-0 right-0 bg-white rounded-lg shadow-lg p-2 text-xs text-slate-600 border border-slate-200 z-10">
-          💡 Tip: Click on map or search for an establishment name
-        </div>
-      </div>
-      
-      <div class="bg-gradient-to-r from-slate-300 to-slate-400 rounded-full p-2">
-        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M9 5l7 7-7 7"></path>
-        </svg>
-      </div>
-      
-      <div class="flex items-center glass-effect rounded-2xl px-5 py-3 flex-1 cursor-pointer hover:shadow-lg transition-all duration-300 border border-slate-200/50" id="dest-location-btn">
-        <div class="bg-rose-500 rounded-xl p-2 mr-3 shadow-md">
-          <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
-            <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"></path>
-          </svg>
-        </div>
-        <div class="flex-1">
-          <p class="text-xs font-semibold text-rose-600 mb-0.5">Destination</p>
-          <span id="dest-location-text" class="text-sm text-slate-500 font-medium">Click to pin destination</span>
-        </div>
-      </div>
-      
-      <button id="go-button" class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-8 py-4 rounded-2xl font-bold shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
-        <span class="text-lg">Go</span>
-      </button>
-    </div>
+        <div class="relative flex-1">
 
-    <!-- Admin button -->
-     <div class="flex items-center justify-center space-x-4">
-      <button id="new-dataset" class="flex items-center space-x-3 px-6 py-3 glass-effect hover:shadow-lg rounded-2xl transition-all duration-300 border border-slate-200/50">
-        <div class="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl p-2">
-          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <ellipse cx="12" cy="5" rx="9" ry="3" />
-            <path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5" />
-            <path d="M12 12v7m-3.5-3.5h7" />
-          </svg>
-        </div>
-        <span id="new-dataset-text" class="font-bold text-slate-700">New Dataset</span>
-      </button>
-      <button id="show-osm-graph-btn" class="flex items-center space-x-3 px-6 py-3 glass-effect hover:shadow-lg rounded-2xl transition-all duration-300 border border-slate-200/50">
-        <div class="bg-gradient-to-br from-purple-600 to-purple-700 rounded-xl p-2">
-          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path>
-          </svg>
-        </div>
-        <span id="show-osm-graph-text" class="font-bold text-slate-700">Show OSM Graph</span>
-      </button>
-      <button id="admin-toggle" class="flex items-center space-x-3 px-6 py-3 glass-effect hover:shadow-lg rounded-2xl transition-all duration-300 border border-slate-200/50">
-        <div class="bg-gradient-to-br from-slate-600 to-slate-700 rounded-xl p-2">
-          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-          </svg>
-        </div>
-        <span class="font-bold text-slate-700">Admin</span>
-      </button>
-     </div>
-  </div>
-
-  <!-- Alert Banner -->
-  <div id="alert-banner" class="bg-gradient-to-r from-red-50 to-orange-50 border-l-4 border-red-500 px-6 py-4 flex items-start shadow-md hidden">
-    <div class="bg-red-500 rounded-xl p-2 mr-4">
-      <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
-        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
-      </svg>
-    </div>
-    <div class="flex-1">
-      <p class="font-bold text-red-900 text-lg mb-1">
-        <span id="incident-type">Accident</span> Detected
-      </p>
-      <div class="flex items-center space-x-4 text-sm text-red-800">
-        <span class="font-semibold">Severity: <span id="severity-level" class="px-2 py-1 bg-red-500 text-white rounded-lg text-xs">Heavy</span></span>
-        <span>•</span>
-        <span class="font-medium">Location: <span id="incident-location" class="font-bold">EDSA</span></span>
-        <span>•</span>
-        <span>ETA: <span id="eta-time" class="font-bold">22 min</span> <span id="eta-delay" class="text-red-600 font-bold">(+4 min)</span></span>
-      </div>
-    </div>
-  </div>
-
-  <!-- Map View -->
-  <div class="flex-1 relative z-0" id="map-container">
-    <!-- Leaflet Map will be loaded here -->
-    <div id="google-map" class="w-full h-full"></div>
-    
-    <!-- Map placeholder (shown when maps fail to load) -->
-    <div class="absolute inset-0 flex items-center justify-center text-slate-300 text-xl font-light pointer-events-none hidden z-10" id="map-placeholder">
-      <div class="text-center">
-        <svg class="w-20 h-20 mx-auto mb-4 text-slate-300 float-animation" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
-        </svg>
-        <p>Map loading failed. Check your internet connection.</p>
-      </div>
-    </div>
-  </div>
-
-  <!-- Bottom Info Bar -->
-  <div class="glass-effect shadow-2xl border-t border-slate-200/50 px-8 py-5">
-    <div class="flex items-center justify-between w-full gap-6">
-      <!-- ETA -->
-      <div class="flex items-center space-x-3 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl px-5 py-3 border border-blue-200/50">
-        <div class="bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl p-3 shadow-lg">
-          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-          </svg>
-        </div>
-        <div>
-          <p class="text-xs font-bold text-blue-600 uppercase tracking-wide">ETA</p>
-          <p id="bottom-info-eta" class="font-bold text-2xl text-slate-800">--</p>
-        </div>
-      </div>
-
-      <!-- Distance -->
-      <div class="flex items-center space-x-3 bg-gradient-to-br from-emerald-50 to-green-50 rounded-2xl px-5 py-3 border border-emerald-200/50">
-        <div class="bg-gradient-to-br from-emerald-600 to-green-600 rounded-xl p-3 shadow-lg">
-          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-          </svg>
-        </div>
-        <div>
-          <p class="text-xs font-bold text-emerald-600 uppercase tracking-wide">Distance</p>
-          <p id="bottom-info-distance" class="font-bold text-2xl text-slate-800">--</p>
-        </div>
-      </div>
-
-      <!-- Algorithm Performance / Comparison -->
-      <div class="flex items-center space-x-3 bg-gradient-to-br from-purple-50 to-violet-50 rounded-2xl px-5 py-3 border border-purple-200/50">
-        <div class="bg-gradient-to-br from-purple-600 to-violet-600 rounded-xl p-3 shadow-lg">
-          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-          </svg>
-        </div>
-        <div>
-          <p id="bottom-info-metric-label" class="text-xs font-bold text-purple-600 uppercase tracking-wide">Query Time</p>
-          <p id="bottom-info-metric-value" class="font-bold text-2xl text-slate-800">--</p>
-        </div>
-      </div>
-
-      <!-- Action Buttons -->
-      <div class="flex items-center space-x-3 flex-shrink-0">
-        <button id="disruptions-toggle" class="px-6 py-3 bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white rounded-2xl font-bold shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 whitespace-nowrap">
-          Active Disruptions
-        </button>
-        <button id="report-toggle" class="px-6 py-3 glass-effect hover:shadow-xl border-2 border-red-200 rounded-2xl font-bold text-red-600 whitespace-nowrap transition-all duration-300 transform hover:scale-105">
-          Report Incident
-        </button>
-        <button id="nodes-toggle" class="px-4 py-3 bg-gradient-to-r from-sky-600 to-cyan-600 hover:from-sky-700 hover:to-cyan-700 text-white rounded-2xl font-bold shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 whitespace-nowrap">
-          Show Nodes
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Report Incident Panel -->
-  <div id="report-panel"
-       class="fixed top-0 right-0 w-[28rem] h-full glass-effect shadow-2xl transform translate-x-full transition-transform duration-300 overflow-y-auto z-50 border-l border-slate-200/50">
-    
-    <div class="p-6 bg-gradient-to-r from-purple-600 via-purple-700 to-violet-700 text-white flex justify-between items-center">
-      <div>
-        <h2 class="font-bold text-2xl mb-1">Report Disruption</h2>
-        <p class="text-purple-200 text-sm">Help others navigate better</p>
-      </div>
-      <button id="report-close" class="hover:bg-white/20 rounded-xl p-2 transition-all">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
-        </svg>
-      </button>
-    </div>
-
-    <div class="p-6">
-      <form class="space-y-5" id="report-form">
-        <div>
-          <label class="block text-sm font-bold text-slate-700 mb-3">Incident Location</label>
-          <button type="button" id="pin-disruption-btn" class="w-full px-5 py-4 bg-gradient-to-br from-purple-50 to-violet-50 hover:from-purple-100 hover:to-violet-100 border-2 border-purple-300 rounded-2xl flex items-center justify-center gap-3 text-purple-700 font-bold transition-all duration-300 shadow-md hover:shadow-lg">
-            <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-              <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"></path>
-            </svg>
-            <span id="pin-disruption-text">Click to pin location on map</span>
+          <button id="go-button"
+            class="flex items-center space-x-2 px-4 py-3 glass-effect hover:shadow-md rounded-2xl transition-all duration-300 border border-slate-300 whitespace-nowrap text-sm font-bold text-slate-700">
+            <div class="bg-gradient-to-br from-emerald-600 to-green-700 rounded-xl p-2 shadow-sm">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                  d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+              </svg>
+            </div>
+            <span id="new-dataset-text" class="font-bold text-slate-700 text-sm">Route</span>
           </button>
-          <div id="disruption-coords" class="mt-3 text-xs text-slate-600 text-center font-semibold hidden bg-slate-100 py-2 rounded-xl"></div>
+        </div>
+        <div class="relative flex-1">
+          <button id="google-compare-button" onclick="compareWithGoogleMaps()"
+            class="flex items-center space-x-2 px-4 py-3 glass-effect hover:shadow-md rounded-2xl transition-all duration-300 border border-slate-300 whitespace-nowrap text-sm font-bold text-slate-700">
+            <div class="bg-gradient-to-br from-orange-500 to-red-600 rounded-xl p-2 shadow-sm">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                  d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7">
+                </path>
+              </svg>
+            </div>
+            <span class="font-bold text-slate-700 text-sm">Compare Google</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Admin button -->
+      <div class="flex items-center justify-center space-x-4">
+        <button id="admin-toggle"
+          class="flex items-center space-x-2 px-5 py-2 glass-effect hover:shadow-md rounded-2xl transition-all duration-300 border border-slate-300 whitespace-nowrap">
+          <div class="bg-gradient-to-br from-slate-600 to-slate-700 rounded-xl p-1 shadow-sm">
+            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z">
+              </path>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+            </svg>
+          </div>
+          <span class="font-bold text-slate-700 text-sm">Admin</span>
+        </button>
+      </div>
+
+    </div>
+
+    <!-- Dropdown results for start location (positioned outside header to avoid overflow issues) -->
+    <div id="start-dropdown-results"
+      class="fixed bg-white rounded-2xl shadow-2xl border border-slate-200 hidden z-[9999] max-h-80 overflow-y-auto"
+      style="width: 0; top: 0; left: 0;">
+    </div>
+
+    <!-- Dropdown results for destination (positioned outside header to avoid overflow issues) -->
+    <div id="dest-dropdown-results"
+      class="fixed bg-white rounded-2xl shadow-2xl border border-slate-200 hidden z-[9999] max-h-80 overflow-y-auto"
+      style="width: 0; top: 0; left: 0;">
+    </div>
+
+    <!-- Alert Banner -->
+    <div id="alert-banner"
+      class="bg-gradient-to-r from-red-50 to-orange-50 border-l-4 border-red-500 px-6 py-4 flex items-start shadow-md hidden">
+      <div class="bg-red-500 rounded-xl p-2 mr-4">
+        <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+          <path fill-rule="evenodd"
+            d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+            clip-rule="evenodd"></path>
+        </svg>
+      </div>
+      <div class="flex-1">
+        <p class="font-bold text-red-900 text-lg mb-1">
+          <span id="incident-type">Accident</span> Detected
+        </p>
+        <div class="flex items-center space-x-4 text-sm text-red-800">
+          <span class="font-semibold">Severity: <span id="severity-level"
+              class="px-2 py-1 bg-red-500 text-white rounded-lg text-xs">Heavy</span></span>
+          <span>•</span>
+          <span class="font-medium">Location: <span id="incident-location" class="font-bold">EDSA</span></span>
+          <span>•</span>
+          <span>ETA: <span id="eta-time" class="font-bold">22 min</span> <span id="eta-delay"
+              class="text-red-600 font-bold">(+4 min)</span></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Map View -->
+    <div class="flex-1 relative z-0" id="map-container">
+      <!-- Leaflet Map will be loaded here -->
+      <div id="google-map" class="w-full h-full"></div>
+
+      <!-- Map placeholder (shown when maps fail to load) -->
+      <div
+        class="absolute inset-0 flex items-center justify-center text-slate-300 text-xl font-light pointer-events-none hidden z-10"
+        id="map-placeholder">
+        <div class="text-center">
+          <svg class="w-20 h-20 mx-auto mb-4 text-slate-300 float-animation" fill="none" stroke="currentColor"
+            viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+              d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+              d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+          </svg>
+          <p>Map loading failed. Check your internet connection.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Info Bar -->
+    <div class="glass-effect shadow-md border-t border-slate-300 px-8 py-5">
+      <div class="flex items-center justify-center w-full gap-6">
+        <!-- ETA -->
+        <div
+          class="flex items-center space-x-3 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl px-5 py-3 border border-slate-300 shadow-sm w-48">
+          <div class="bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl p-3 shadow-md flex-shrink-0">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+          </div>
+          <div class="min-w-0">
+            <p class="text-xs font-bold text-blue-600 uppercase tracking-wide">ETA</p>
+            <p id="bottom-info-eta" class="font-bold text-2xl text-slate-800 truncate">--</p>
+          </div>
         </div>
 
-        <div>
-          <label class="block text-sm font-bold text-slate-700 mb-3">Incident Type</label>
-          <select id="disruption-type" class="w-full px-4 py-4 bg-slate-50 border-2 border-slate-300 rounded-2xl focus:border-purple-500 focus:ring-4 focus:ring-purple-200 outline-none font-medium text-slate-700 transition-all">
-            <option value="">Select incident type...</option>
-            <option value="accident">Accident</option>
-            <option value="construction">Construction Work</option>
-            <option value="congestion">Heavy Congestion</option>
-            <option value="disabled-vehicle">Disabled Vehicle</option>
-            <option value="mass-transit">Mass Transit Event</option>
-            <option value="planned-event">Planned Event</option>
-            <option value="road-hazard">Road Hazard</option>
-            <option value="road-closure">Road Closure</option>
-            <option value="weather">Severe Weather</option>
-            <option value="lane-restriction">Lane Restriction</option>
-          </select>
+        <!-- Distance -->
+        <div
+          class="flex items-center space-x-3 bg-gradient-to-br from-emerald-50 to-green-50 rounded-2xl px-5 py-3 border border-slate-300 shadow-sm w-48">
+          <div class="bg-gradient-to-br from-emerald-600 to-green-600 rounded-xl p-3 shadow-md flex-shrink-0">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+            </svg>
+          </div>
+          <div class="min-w-0">
+            <p class="text-xs font-bold text-emerald-600 uppercase tracking-wide">Distance</p>
+            <p id="bottom-info-distance" class="font-bold text-2xl text-slate-800 truncate">--</p>
+          </div>
         </div>
 
+        <!-- Algorithm Performance / Comparison -->
+        <div
+          class="flex items-center space-x-3 bg-gradient-to-br from-purple-50 to-violet-50 rounded-2xl px-5 py-3 border border-slate-300 shadow-sm w-48">
+          <div class="bg-gradient-to-br from-purple-600 to-violet-600 rounded-xl p-3 shadow-md flex-shrink-0">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z">
+              </path>
+            </svg>
+          </div>
+          <div class="min-w-0">
+            <p id="bottom-info-metric-label" class="text-xs font-bold text-purple-600 uppercase tracking-wide">Query
+              Time</p>
+            <p id="bottom-info-metric-value" class="font-bold text-2xl text-slate-800 truncate">--</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Report Incident Panel -->
+    <div id="report-panel"
+      class="fixed top-0 right-0 w-[28rem] h-full glass-effect shadow-2xl transform translate-x-full transition-transform duration-300 overflow-y-auto z-50 border-l border-slate-200/50">
+
+      <div
+        class="p-6 bg-gradient-to-r from-purple-600 via-purple-700 to-violet-700 text-white flex justify-between items-center">
         <div>
-          <label class="block text-sm font-bold text-slate-700 mb-3">Traffic Severity</label>
+          <h2 class="font-bold text-2xl mb-1">Report Disruption</h2>
+          <p class="text-purple-200 text-sm">Help others navigate better</p>
+        </div>
+        <button id="report-close" class="hover:bg-white/20 rounded-xl p-2 transition-all">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div class="p-6">
+        <form class="space-y-5" id="report-form">
+          <div>
+            <label class="block text-sm font-bold text-slate-700 mb-3">Incident Location</label>
+            <button type="button" id="pin-disruption-btn"
+              class="w-full px-5 py-4 bg-gradient-to-br from-purple-50 to-violet-50 hover:from-purple-100 hover:to-violet-100 border-2 border-purple-300 rounded-2xl flex items-center justify-center gap-3 text-purple-700 font-bold transition-all duration-300 shadow-md hover:shadow-lg">
+              <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd"
+                  d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z"
+                  clip-rule="evenodd"></path>
+              </svg>
+              <span id="pin-disruption-text">Click to pin location on map</span>
+            </button>
+            <div id="disruption-coords"
+              class="mt-3 text-xs text-slate-600 text-center font-semibold hidden bg-slate-100 py-2 rounded-xl"></div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-bold text-slate-700 mb-3">Incident Type</label>
+            <select id="disruption-type"
+              class="w-full px-4 py-4 bg-slate-50 border-2 border-slate-300 rounded-2xl focus:border-purple-500 focus:ring-4 focus:ring-purple-200 outline-none font-medium text-slate-700 transition-all">
+              <option value="">Select incident type...</option>
+              <option value="accident">Accident</option>
+              <option value="construction">Construction Work</option>
+              <option value="congestion">Heavy Congestion</option>
+              <option value="disabled-vehicle">Disabled Vehicle</option>
+              <option value="mass-transit">Mass Transit Event</option>
+              <option value="planned-event">Planned Event</option>
+              <option value="road-hazard">Road Hazard</option>
+              <option value="road-closure">Road Closure</option>
+              <option value="weather">Severe Weather</option>
+              <option value="lane-restriction">Lane Restriction</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-bold text-slate-700 mb-3">Traffic Severity</label>
+            <div class="space-y-3">
+              <label
+                class="flex items-center severity-heavy text-white p-4 rounded-2xl cursor-pointer hover:shadow-lg transition-all duration-300 transform hover:scale-102">
+                <input type="radio" name="traffic" value="heavy" class="mr-4 w-5 h-5">
+                <div class="flex-1">
+                  <span class="font-bold text-lg">Heavy Traffic</span>
+                  <p class="text-sm text-red-100 mt-0.5">Severe delays, barely moving</p>
+                </div>
+              </label>
+              <label
+                class="flex items-center severity-medium text-white p-4 rounded-2xl cursor-pointer hover:shadow-lg transition-all duration-300 transform hover:scale-102">
+                <input type="radio" name="traffic" value="medium" class="mr-4 w-5 h-5">
+                <div class="flex-1">
+                  <span class="font-bold text-lg">Moderate Traffic</span>
+                  <p class="text-sm text-orange-100 mt-0.5">Slower than usual</p>
+                </div>
+              </label>
+              <label
+                class="flex items-center severity-light text-white p-4 rounded-2xl cursor-pointer hover:shadow-lg transition-all duration-300 transform hover:scale-102">
+                <input type="radio" name="traffic" value="light" class="mr-4 w-5 h-5">
+                <div class="flex-1">
+                  <span class="font-bold text-lg">Light Impact</span>
+                  <p class="text-sm text-green-100 mt-0.5">Minor slowdown</p>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <button type="submit"
+            class="w-full bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white font-bold py-5 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 text-lg">
+            Submit Report
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Active Disruptions Panel -->
+    <div id="disruptions-panel"
+      class="fixed top-0 right-0 w-[28rem] h-full glass-effect shadow-2xl transform translate-x-full transition-transform duration-300 overflow-y-auto z-50 border-l border-slate-200/50">
+
+      <div
+        class="p-6 bg-gradient-to-r from-red-500 via-red-600 to-rose-600 text-white flex justify-between items-center">
+        <div>
+          <h2 class="font-bold text-2xl mb-1">Active Disruptions</h2>
+          <p class="text-red-100 text-sm">Real-time traffic incidents</p>
+        </div>
+        <button id="disruptions-close" class="hover:bg-white/20 rounded-xl p-2 transition-all">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div class="p-6 space-y-4">
+        <div
+          class="bg-gradient-to-br from-amber-50 to-orange-50 border-l-4 border-amber-500 rounded-2xl p-5 hover:shadow-xl transition-all duration-300">
+          <div class="flex items-start">
+            <div class="bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl p-3 mr-4 shadow-md">
+              <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd"
+                  d="M 57 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                  clip-rule="evenodd"></path>
+              </svg>
+            </div>
+            <div class="flex-1">
+              <h3 class="font-bold text-slate-900 text-xl mb-1">EDSA</h3>
+              <p class="text-sm text-amber-700 font-semibold mb-2">Accident • 22 min delay</p>
+              <div class="flex items-center justify-between">
+                <p class="text-xs text-slate-600 font-medium">Reported 15 mins ago</p>
+                <span class="px-3 py-1 bg-amber-500 text-white rounded-lg text-xs font-bold">Medium</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div
+          class="bg-gradient-to-br from-orange-50 to-red-50 border-l-4 border-orange-500 rounded-2xl p-5 hover:shadow-xl transition-all duration-300">
+          <div class="flex items-start">
+            <div class="bg-gradient-to-br from-orange-400 to-red-500 rounded-xl p-3 mr-4 shadow-md">
+              <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd"
+                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                  clip-rule="evenodd"></path>
+              </svg>
+            </div>
+            <div class="flex-1">
+              <h3 class="font-bold text-slate-900 text-xl mb-1">Highway 54</h3>
+              <p class="text-sm text-orange-700 font-semibold mb-2">Construction • 15 min delay</p>
+              <div class="flex items-center justify-between">
+                <p class="text-xs text-slate-600 font-medium">Reported 8 mins ago</p>
+                <span class="px-3 py-1 bg-orange-500 text-white rounded-lg text-xs font-bold">Medium</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div
+          class="bg-gradient-to-br from-red-50 to-rose-50 border-l-4 border-red-500 rounded-2xl p-5 hover:shadow-xl transition-all duration-300">
+          <div class="flex items-start">
+            <div class="bg-gradient-to-br from-red-500 to-rose-600 rounded-xl p-3 mr-4 shadow-md">
+              <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd"
+                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                  clip-rule="evenodd"></path>
+              </svg>
+            </div>
+            <div class="flex-1">
+              <h3 class="font-bold text-slate-900 text-xl mb-1">C-5</h3>
+              <p class="text-sm text-red-700 font-semibold mb-2">Heavy traffic • 10 min delay</p>
+              <div class="flex items-center justify-between">
+                <p class="text-xs text-slate-600 font-medium">Reported 3 mins ago</p>
+                <span class="px-3 py-1 bg-red-500 text-white rounded-lg text-xs font-bold">Heavy</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Current Path Panel -->
+    <div id="current-path-panel"
+      class="fixed top-0 right-0 w-[28rem] h-full glass-effect shadow-2xl transform translate-x-full transition-transform duration-300 overflow-y-auto z-50 border-l border-slate-200/50">
+
+      <div
+        class="p-6 bg-gradient-to-r from-emerald-500 via-green-600 to-teal-600 text-white flex justify-between items-center">
+        <div>
+          <h2 class="font-bold text-2xl mb-1">Current Path</h2>
+          <p class="text-green-100 text-sm">Optimized route details</p>
+        </div>
+        <button id="current-path-close" class="hover:bg-white/20 rounded-xl p-2 transition-all">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div class="p-6">
+        <!-- Route Header -->
+        <div
+          class="bg-gradient-to-br from-emerald-50 via-green-50 to-blue-50 rounded-2xl p-5 mb-5 border-2 border-emerald-200 shadow-lg">
+          <div class="text-xl font-bold text-slate-900 mb-4">Route Found</div>
+          <div class="grid grid-cols-3 gap-3">
+            <div class="bg-white rounded-xl p-4 text-center border-2 border-slate-200 shadow-sm">
+              <div class="text-xs text-slate-600 font-bold uppercase mb-1">Distance</div>
+              <div class="text-xl font-bold text-emerald-600">12.4 km</div>
+            </div>
+            <div class="bg-white rounded-xl p-4 text-center border-2 border-slate-200 shadow-sm">
+              <div class="text-xs text-slate-600 font-bold uppercase mb-1">Duration</div>
+              <div class="text-xl font-bold text-blue-600">22 min</div>
+            </div>
+            <div class="bg-white rounded-xl p-4 text-center border-2 border-slate-200 shadow-sm">
+              <div class="text-xs text-slate-600 font-bold uppercase mb-1">Steps</div>
+              <div class="text-xl font-bold text-purple-600">8</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Disruption Alert -->
+        <!-- Disruption Alert (Hidden by default, shown when route has disruptions) -->
+        <div id="route-disruption-alert"
+          class="bg-gradient-to-br from-red-50 to-rose-50 border-l-4 border-red-500 rounded-2xl p-4 mb-5 shadow-md hidden">
+          <div class="flex items-start">
+            <div class="bg-red-500 rounded-xl p-2 mr-3">
+              <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd"
+                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                  clip-rule="evenodd"></path>
+              </svg>
+            </div>
+            <div class="flex-1">
+              <p class="text-sm font-bold text-red-900">Disruption on Route</p>
+              <p class="text-xs text-red-700 mt-1">Click for details</p>
+            </div>
+            <div class="ml-2">
+              <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Route Path - Dynamic Content -->
+        <div class="space-y-4 max-h-96 overflow-y-auto">
+          <!-- Route steps will be dynamically populated by JavaScript -->
+          <div id="route-steps-placeholder" class="text-center py-8 text-slate-500">
+            <svg class="w-16 h-16 mx-auto mb-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-1.447-.894L15 4m0 13V4m0 0L9 7">
+              </path>
+            </svg>
+            <p class="text-sm font-medium">Pin locations and click "Go" to see turn-by-turn directions</p>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div
+          class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-5 mt-6 mb-5 border-2 border-slate-200 shadow-md">
+          <h3 class="text-sm font-bold text-slate-700 mb-3 uppercase tracking-wide">Route Accuracy vs Google Maps</h3>
+          <div class="space-y-2">
+            <div class="flex justify-between text-sm text-slate-700 bg-white p-3 rounded-xl border border-slate-200">
+              <span class="font-medium">Fréchet Distance:</span>
+              <span id="frechet-distance-value" class="font-bold text-blue-700">-- m</span>
+            </div>
+            <div class="flex justify-between text-sm text-slate-700 bg-white p-3 rounded-xl border border-slate-200">
+              <span class="font-medium">Segment Overlap:</span>
+              <span id="segment-overlap-value" class="font-bold text-emerald-700">--%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Admin Panel -->
+    <div id="admin-panel"
+      class="fixed top-0 right-0 w-[28rem] h-full glass-effect shadow-2xl transform translate-x-full transition-transform duration-300 overflow-y-auto z-50 border-l border-slate-200/50">
+
+      <div
+        class="p-6 bg-gradient-to-r from-slate-700 via-slate-800 to-slate-900 text-white flex justify-between items-center">
+        <div>
+          <h2 class="font-bold text-2xl mb-1">Admin Panel</h2>
+          <p class="text-slate-300 text-sm">System configuration & metrics</p>
+        </div>
+        <button id="admin-close" class="hover:bg-white/20 rounded-xl p-2 transition-all">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div class="p-6 space-y-5">
+        <!-- System Controls -->
+        <div class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-5 border border-slate-300 shadow-sm">
+          <h3 class="font-bold text-slate-800 mb-4 flex items-center text-lg">
+            <div class="bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl p-2 mr-3">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                  d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z">
+                </path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                  d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </div>
+            System Controls
+          </h3>
+          <div class="grid grid-cols-2 gap-3">
+            <button id="admin-start-btn"
+              class="col-span-2 px-4 py-3 bg-gradient-to-br from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white rounded-xl font-bold shadow-md hover:shadow-lg transition-all duration-300 flex items-center justify-center">
+              <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"
+                  clip-rule="evenodd"></path>
+              </svg>
+              Simulate
+            </button>
+            <button id="admin-reset-btn"
+              class="px-4 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-bold transition-all duration-300">Reset</button>
+            <button
+              class="px-4 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-bold transition-all duration-300">Export</button>
+          </div>
+        </div>
+
+        <!-- Algorithm & Dataset Selection -->
+        <div class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-5 border border-slate-300 shadow-sm">
+          <h3 class="font-bold text-slate-800 mb-4 text-lg">Algorithm & Dataset Selection</h3>
+
+          <label class="flex items-center mb-2 cursor-pointer hover:bg-white p-2 rounded transition">
+            <input type="radio" name="algo-dataset" value="dhl-base" class="mr-3 w-4 h-4 text-blue-600">
+            <span class="text-sm">DHL - Base Dataset</span>
+          </label>
+          <label class="flex items-center mb-2 cursor-pointer hover:bg-white p-2 rounded transition">
+            <input type="radio" name="algo-dataset" value="dhl-disrupted" class="mr-3 w-4 h-4 text-blue-600">
+            <span class="text-sm">DHL - Disrupted Dataset</span>
+          </label>
+          <label class="flex items-center mb-2 cursor-pointer hover:bg-white p-2 rounded transition">
+            <input type="radio" name="algo-dataset" value="dhc2l-base" class="mr-3 w-4 h-4 text-blue-600" checked>
+            <span class="text-sm">D-HC2L - Base Dataset</span>
+          </label>
+          <label class="flex items-center mb-2 cursor-pointer hover:bg-white p-2 rounded transition">
+            <input type="radio" name="algo-dataset" value="dhc2l-disrupted" class="mr-3 w-4 h-4 text-blue-600">
+            <span class="text-sm">D-HC2L - Disrupted Dataset</span>
+          </label>
+          <label class="flex items-center mb-2 cursor-pointer hover:bg-white p-2 rounded transition">
+            <input type="radio" name="algo-dataset" value="comparison-base" class="mr-3 w-4 h-4 text-blue-600">
+            <span class="text-sm">Comparison Mode - Base Dataset</span>
+          </label>
+          <label class="flex items-center cursor-pointer hover:bg-white p-2 rounded transition">
+            <input type="radio" name="algo-dataset" value="comparison-disrupted" class="mr-3 w-4 h-4 text-blue-600">
+            <span class="text-sm">Comparison Mode - Disrupted Dataset</span>
+          </label>
+        </div>
+
+        <!-- Threshold (τ) with Discrete Buttons -->
+        <div class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-5 border border-slate-300 shadow-sm">
+          <h3 class="font-bold text-slate-800 mb-4 text-lg">Threshold (τ)</h3>
+
+          <!-- Threshold Value Display -->
+          <div class="mb-4 flex items-center justify-between bg-white rounded-xl p-4 border border-slate-300 shadow-sm">
+            <span class="text-sm font-bold text-slate-600">Current τ:</span>
+            <span id="threshold-value" class="font-bold text-2xl text-blue-600">0.5</span>
+          </div>
+
+          <!-- Threshold Buttons Grid -->
+          <div class="grid grid-cols-5 gap-2">
+            <button
+              class="threshold-btn px-3 py-3 bg-white hover:bg-blue-50 border-2 border-slate-300 rounded-xl font-bold text-sm transition-all hover:shadow-md"
+              data-value="0.1">0.1</button>
+            <button
+              class="threshold-btn px-3 py-3 bg-white hover:bg-blue-50 border-2 border-slate-300 rounded-xl font-bold text-sm transition-all hover:shadow-md"
+              data-value="0.2">0.2</button>
+            <button
+              class="threshold-btn px-3 py-3 bg-white hover:bg-blue-50 border-2 border-slate-300 rounded-xl font-bold text-sm transition-all hover:shadow-md"
+              data-value="0.3">0.3</button>
+            <button
+              class="threshold-btn px-3 py-3 bg-white hover:bg-blue-50 border-2 border-slate-300 rounded-xl font-bold text-sm transition-all hover:shadow-md"
+              data-value="0.4">0.4</button>
+            <button
+              class="threshold-btn px-3 py-3 bg-blue-50 hover:bg-blue-100 border-2 border-blue-500 rounded-xl font-bold text-sm transition-all shadow-md"
+              data-value="0.5">0.5</button>
+            <button
+              class="threshold-btn px-3 py-3 bg-white hover:bg-blue-50 border-2 border-slate-300 rounded-xl font-bold text-sm transition-all hover:shadow-md"
+              data-value="0.6">0.6</button>
+            <button
+              class="threshold-btn px-3 py-3 bg-white hover:bg-blue-50 border-2 border-slate-300 rounded-xl font-bold text-sm transition-all hover:shadow-md"
+              data-value="0.7">0.7</button>
+            <button
+              class="threshold-btn px-3 py-3 bg-white hover:bg-blue-50 border-2 border-slate-300 rounded-xl font-bold text-sm transition-all hover:shadow-md"
+              data-value="0.8">0.8</button>
+            <button
+              class="threshold-btn px-3 py-3 bg-white hover:bg-blue-50 border-2 border-slate-300 rounded-xl font-bold text-sm transition-all hover:shadow-md"
+              data-value="0.9">0.9</button>
+            <button
+              class="threshold-btn px-3 py-3 bg-white hover:bg-blue-50 border-2 border-slate-300 rounded-xl font-bold text-sm transition-all hover:shadow-md"
+              data-value="1.0">1.0</button>
+          </div>
+        </div>
+
+        <!-- Update Mode Status -->
+        <div
+          class="bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50 rounded-2xl p-5 border border-slate-300 shadow-sm">
+          <h3 class="font-bold text-slate-800 mb-4 flex items-center text-lg">
+            <div class="bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl p-2 mr-3">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z">
+                </path>
+              </svg>
+            </div>
+            Update Mode Status
+          </h3>
+          <div class="bg-white rounded-xl p-4 border border-slate-300 shadow-sm">
+            <div class="flex items-center justify-between">
+              <span class="text-sm font-bold text-slate-700">Current Mode:</span>
+              <span id="update-mode-badge"
+                class="px-4 py-2 bg-orange-500 text-white rounded-xl text-sm font-bold shadow-md">
+                Immediate Update
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Performance Metrics -->
+        <div class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-5 border border-slate-300 shadow-sm">
+          <h3 class="font-bold text-slate-800 mb-4 text-lg">Performance Metrics</h3>
           <div class="space-y-3">
-            <label class="flex items-center severity-heavy text-white p-4 rounded-2xl cursor-pointer hover:shadow-lg transition-all duration-300 transform hover:scale-102">
-              <input type="radio" name="traffic" value="heavy" class="mr-4 w-5 h-5">
-              <div class="flex-1">
-                <span class="font-bold text-lg">Heavy Traffic</span>
-                <p class="text-sm text-red-100 mt-0.5">Severe delays, barely moving</p>
-              </div>
-            </label>
-            <label class="flex items-center severity-medium text-white p-4 rounded-2xl cursor-pointer hover:shadow-lg transition-all duration-300 transform hover:scale-102">
-              <input type="radio" name="traffic" value="medium" class="mr-4 w-5 h-5">
-              <div class="flex-1">
-                <span class="font-bold text-lg">Moderate Traffic</span>
-                <p class="text-sm text-orange-100 mt-0.5">Slower than usual</p>
-              </div>
-            </label>
-            <label class="flex items-center severity-light text-white p-4 rounded-2xl cursor-pointer hover:shadow-lg transition-all duration-300 transform hover:scale-102">
-              <input type="radio" name="traffic" value="light" class="mr-4 w-5 h-5">
-              <div class="flex-1">
-                <span class="font-bold text-lg">Light Impact</span>
-                <p class="text-sm text-green-100 mt-0.5">Minor slowdown</p>
-              </div>
-            </label>
-          </div>
-        </div>
-
-        <button type="submit" class="w-full bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white font-bold py-5 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 text-lg">
-          Submit Report
-        </button>
-      </form>
-    </div>
-  </div>
-
-  <!-- Active Disruptions Panel -->
-  <div id="disruptions-panel"
-       class="fixed top-0 right-0 w-[28rem] h-full glass-effect shadow-2xl transform translate-x-full transition-transform duration-300 overflow-y-auto z-50 border-l border-slate-200/50">
-    
-    <div class="p-6 bg-gradient-to-r from-red-500 via-red-600 to-rose-600 text-white flex justify-between items-center">
-      <div>
-        <h2 class="font-bold text-2xl mb-1">Active Disruptions</h2>
-        <p class="text-red-100 text-sm">Real-time traffic incidents</p>
-      </div>
-      <button id="disruptions-close" class="hover:bg-white/20 rounded-xl p-2 transition-all">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
-        </svg>
-      </button>
-    </div>
-
-    <div class="p-6 space-y-4">
-      <div class="bg-gradient-to-br from-amber-50 to-orange-50 border-l-4 border-amber-500 rounded-2xl p-5 hover:shadow-xl transition-all duration-300">
-        <div class="flex items-start">
-          <div class="bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl p-3 mr-4 shadow-md">
-            <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
-              <path fill-rule="evenodd" d="M 57 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
-            </svg>
-          </div>
-          <div class="flex-1">
-            <h3 class="font-bold text-slate-900 text-xl mb-1">EDSA</h3>
-            <p class="text-sm text-amber-700 font-semibold mb-2">Accident • 22 min delay</p>
-            <div class="flex items-center justify-between">
-              <p class="text-xs text-slate-600 font-medium">Reported 15 mins ago</p>
-              <span class="px-3 py-1 bg-amber-500 text-white rounded-lg text-xs font-bold">Medium</span>
+            <div
+              class="flex justify-between bg-white p-4 rounded-xl border-2 border-slate-200 shadow-sm hover:shadow-md transition-all">
+              <span class="text-sm font-semibold text-slate-700">Labeling Time</span>
+              <span id="perf-labeling-time" class="font-bold text-emerald-600 text-lg">-</span>
+            </div>
+            <div
+              class="flex justify-between bg-white p-4 rounded-xl border-2 border-slate-200 shadow-sm hover:shadow-md transition-all">
+              <span class="text-sm font-semibold text-slate-700">Labeling Size</span>
+              <span id="perf-labeling-size" class="font-bold text-blue-600 text-lg">-</span>
+            </div>
+            <div
+              class="flex justify-between bg-white p-4 rounded-xl border-2 border-slate-200 shadow-sm hover:shadow-md transition-all">
+              <span class="text-sm font-semibold text-slate-700">Query Response Time</span>
+              <span id="perf-query-time" class="font-bold text-indigo-600 text-lg">-</span>
             </div>
           </div>
-        </div>
-      </div>
 
-      <div class="bg-gradient-to-br from-orange-50 to-red-50 border-l-4 border-orange-500 rounded-2xl p-5 hover:shadow-xl transition-all duration-300">
-        <div class="flex items-start">
-          <div class="bg-gradient-to-br from-orange-400 to-red-500 rounded-xl p-3 mr-4 shadow-md">
-            <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
-              <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
-            </svg>
-          </div>
-          <div class="flex-1">
-            <h3 class="font-bold text-slate-900 text-xl mb-1">Highway 54</h3>
-            <p class="text-sm text-orange-700 font-semibold mb-2">Construction • 15 min delay</p>
-            <div class="flex items-center justify-between">
-              <p class="text-xs text-slate-600 font-medium">Reported 8 mins ago</p>
-              <span class="px-3 py-1 bg-orange-500 text-white rounded-lg text-xs font-bold">Medium</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="bg-gradient-to-br from-red-50 to-rose-50 border-l-4 border-red-500 rounded-2xl p-5 hover:shadow-xl transition-all duration-300">
-        <div class="flex items-start">
-          <div class="bg-gradient-to-br from-red-500 to-rose-600 rounded-xl p-3 mr-4 shadow-md">
-            <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
-              <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
-            </svg>
-          </div>
-          <div class="flex-1">
-            <h3 class="font-bold text-slate-900 text-xl mb-1">C-5</h3>
-            <p class="text-sm text-red-700 font-semibold mb-2">Heavy traffic • 10 min delay</p>
-            <div class="flex items-center justify-between">
-              <p class="text-xs text-slate-600 font-medium">Reported 3 mins ago</p>
-              <span class="px-3 py-1 bg-red-500 text-white rounded-lg text-xs font-bold">Heavy</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Current Path Panel -->
-  <div id="current-path-panel"
-       class="fixed top-0 right-0 w-[28rem] h-full glass-effect shadow-2xl transform translate-x-full transition-transform duration-300 overflow-y-auto z-50 border-l border-slate-200/50">
-    
-    <div class="p-6 bg-gradient-to-r from-emerald-500 via-green-600 to-teal-600 text-white flex justify-between items-center">
-      <div>
-        <h2 class="font-bold text-2xl mb-1">Current Path</h2>
-        <p class="text-green-100 text-sm">Optimized route details</p>
-      </div>
-      <button id="current-path-close" class="hover:bg-white/20 rounded-xl p-2 transition-all">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
-        </svg>
-      </button>
-    </div>
-
-    <div class="p-6">
-      <!-- Route Header -->
-      <div class="bg-gradient-to-br from-emerald-50 via-green-50 to-blue-50 rounded-2xl p-5 mb-5 border-2 border-emerald-200 shadow-lg">
-        <div class="text-xl font-bold text-slate-900 mb-4">Route Found</div>
-        <div class="grid grid-cols-3 gap-3">
-          <div class="bg-white rounded-xl p-4 text-center border-2 border-slate-200 shadow-sm">
-            <div class="text-xs text-slate-600 font-bold uppercase mb-1">Distance</div>
-            <div class="text-xl font-bold text-emerald-600">12.4 km</div>
-          </div>
-          <div class="bg-white rounded-xl p-4 text-center border-2 border-slate-200 shadow-sm">
-            <div class="text-xs text-slate-600 font-bold uppercase mb-1">Duration</div>
-            <div class="text-xl font-bold text-blue-600">22 min</div>
-          </div>
-          <div class="bg-white rounded-xl p-4 text-center border-2 border-slate-200 shadow-sm">
-            <div class="text-xs text-slate-600 font-bold uppercase mb-1">Steps</div>
-            <div class="text-xl font-bold text-purple-600">8</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Disruption Alert -->
-      <!-- Disruption Alert (Hidden by default, shown when route has disruptions) -->
-      <div id="route-disruption-alert" class="bg-gradient-to-br from-red-50 to-rose-50 border-l-4 border-red-500 rounded-2xl p-4 mb-5 shadow-md hidden">
-        <div class="flex items-start">
-          <div class="bg-red-500 rounded-xl p-2 mr-3">
-            <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
-              <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
-            </svg>
-          </div>
-          <div class="flex-1">
-            <p class="text-sm font-bold text-red-900">Disruption on Route</p>
-            <p class="text-xs text-red-700 mt-1">Click for details</p>
-          </div>
-          <div class="ml-2">
-            <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-            </svg>
-          </div>
-        </div>
-      </div>
-
-      <!-- Route Path - Dynamic Content -->
-      <div class="space-y-4 max-h-96 overflow-y-auto">
-        <!-- Route steps will be dynamically populated by JavaScript -->
-        <div id="route-steps-placeholder" class="text-center py-8 text-slate-500">
-          <svg class="w-16 h-16 mx-auto mb-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-1.447-.894L15 4m0 13V4m0 0L9 7"></path>
-          </svg>
-          <p class="text-sm font-medium">Pin locations and click "Go" to see turn-by-turn directions</p>
-        </div>
-      </div>
-
-      <!-- Action Buttons -->
-      <div class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-5 mt-6 mb-5 border-2 border-slate-200 shadow-md">
-        <h3 class="text-sm font-bold text-slate-700 mb-3 uppercase tracking-wide">Route Accuracy vs Google Maps</h3>
-        <div class="space-y-2">
-          <div class="flex justify-between text-sm text-slate-700 bg-white p-3 rounded-xl border border-slate-200">
-            <span class="font-medium">Fréchet Distance:</span>
-            <span id="frechet-distance-value" class="font-bold text-blue-700">-- m</span>
-          </div>
-          <div class="flex justify-between text-sm text-slate-700 bg-white p-3 rounded-xl border border-slate-200">
-            <span class="font-medium">Segment Overlap:</span>
-            <span id="segment-overlap-value" class="font-bold text-emerald-700">--%</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Admin Panel -->
-  <div id="admin-panel"
-       class="fixed top-0 right-0 w-[28rem] h-full glass-effect shadow-2xl transform translate-x-full transition-transform duration-300 overflow-y-auto z-50 border-l border-slate-200/50">
-    
-    <div class="p-6 bg-gradient-to-r from-slate-700 via-slate-800 to-slate-900 text-white flex justify-between items-center">
-      <div>
-        <h2 class="font-bold text-2xl mb-1">Admin Panel</h2>
-        <p class="text-slate-300 text-sm">System configuration & metrics</p>
-      </div>
-      <button id="admin-close" class="hover:bg-white/20 rounded-xl p-2 transition-all">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
-        </svg>
-      </button>
-    </div>
-
-    <div class="p-6 space-y-5">
-      <!-- System Controls -->
-      <div class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-5 border-2 border-slate-200 shadow-md">
-        <h3 class="font-bold text-slate-800 mb-4 flex items-center text-lg">
-          <div class="bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl p-2 mr-3">
-            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-          </div>
-          System Controls
-        </h3>
-        <div class="grid grid-cols-2 gap-3">
-          <button id="admin-start-btn" class="col-span-2 px-4 py-3 bg-gradient-to-br from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white rounded-xl font-bold shadow-md hover:shadow-lg transition-all duration-300 flex items-center justify-center">
-            <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path>
-            </svg>
-            Simulate
-          </button>
-          <button id="admin-reset-btn" class="px-4 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-bold transition-all duration-300">Reset</button>
-          <button class="px-4 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-bold transition-all duration-300">Export</button>
-        </div>
-      </div>
-
-      <!-- Algorithm & Dataset Selection -->
-      <div class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-5 border-2 border-slate-200 shadow-md">
-        <h3 class="font-bold text-slate-800 mb-4 text-lg">Algorithm & Dataset Selection</h3>
-        
-        <label class="flex items-center mb-2 cursor-pointer hover:bg-white p-2 rounded transition">
-          <input type="radio" name="algo-dataset" value="dhl-base" class="mr-3 w-4 h-4 text-blue-600">
-          <span class="text-sm">DHL - Base Dataset</span>
-        </label>
-        <label class="flex items-center mb-2 cursor-pointer hover:bg-white p-2 rounded transition">
-          <input type="radio" name="algo-dataset" value="dhl-disrupted" class="mr-3 w-4 h-4 text-blue-600">
-          <span class="text-sm">DHL - Disrupted Dataset</span>
-        </label>
-        <label class="flex items-center mb-2 cursor-pointer hover:bg-white p-2 rounded transition">
-          <input type="radio" name="algo-dataset" value="dhc2l-base" class="mr-3 w-4 h-4 text-blue-600" checked>
-          <span class="text-sm">D-HC2L - Base Dataset</span>
-        </label>
-        <label class="flex items-center mb-2 cursor-pointer hover:bg-white p-2 rounded transition">
-          <input type="radio" name="algo-dataset" value="dhc2l-disrupted" class="mr-3 w-4 h-4 text-blue-600">
-          <span class="text-sm">D-HC2L - Disrupted Dataset</span>
-        </label>
-        <label class="flex items-center mb-2 cursor-pointer hover:bg-white p-2 rounded transition">
-          <input type="radio" name="algo-dataset" value="comparison-base" class="mr-3 w-4 h-4 text-blue-600">
-          <span class="text-sm">Comparison Mode - Base Dataset</span>
-        </label>
-        <label class="flex items-center cursor-pointer hover:bg-white p-2 rounded transition">
-          <input type="radio" name="algo-dataset" value="comparison-disrupted" class="mr-3 w-4 h-4 text-blue-600">
-          <span class="text-sm">Comparison Mode - Disrupted Dataset</span>
-        </label>
-      </div>
-
-      <!-- Threshold (τ) with Discrete Buttons -->
-      <div class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-5 border-2 border-slate-200 shadow-md">
-        <h3 class="font-bold text-slate-800 mb-4 text-lg">Threshold (τ)</h3>
-        
-        <!-- Threshold Value Display -->
-        <div class="mb-4 flex items-center justify-between bg-white rounded-xl p-4 border-2 border-slate-300 shadow-sm">
-          <span class="text-sm font-bold text-slate-600">Current τ:</span>
-          <span id="threshold-value" class="font-bold text-2xl text-blue-600">0.5</span>
-        </div>
-        
-        <!-- Threshold Buttons Grid -->
-        <div class="grid grid-cols-5 gap-2">
-          <button class="threshold-btn px-3 py-3 bg-white hover:bg-blue-50 border-2 border-slate-300 rounded-xl font-bold text-sm transition-all hover:shadow-md" data-value="0.1">0.1</button>
-          <button class="threshold-btn px-3 py-3 bg-white hover:bg-blue-50 border-2 border-slate-300 rounded-xl font-bold text-sm transition-all hover:shadow-md" data-value="0.2">0.2</button>
-          <button class="threshold-btn px-3 py-3 bg-white hover:bg-blue-50 border-2 border-slate-300 rounded-xl font-bold text-sm transition-all hover:shadow-md" data-value="0.3">0.3</button>
-          <button class="threshold-btn px-3 py-3 bg-white hover:bg-blue-50 border-2 border-slate-300 rounded-xl font-bold text-sm transition-all hover:shadow-md" data-value="0.4">0.4</button>
-          <button class="threshold-btn px-3 py-3 bg-blue-50 hover:bg-blue-100 border-2 border-blue-500 rounded-xl font-bold text-sm transition-all shadow-md" data-value="0.5">0.5</button>
-          <button class="threshold-btn px-3 py-3 bg-white hover:bg-blue-50 border-2 border-slate-300 rounded-xl font-bold text-sm transition-all hover:shadow-md" data-value="0.6">0.6</button>
-          <button class="threshold-btn px-3 py-3 bg-white hover:bg-blue-50 border-2 border-slate-300 rounded-xl font-bold text-sm transition-all hover:shadow-md" data-value="0.7">0.7</button>
-          <button class="threshold-btn px-3 py-3 bg-white hover:bg-blue-50 border-2 border-slate-300 rounded-xl font-bold text-sm transition-all hover:shadow-md" data-value="0.8">0.8</button>
-          <button class="threshold-btn px-3 py-3 bg-white hover:bg-blue-50 border-2 border-slate-300 rounded-xl font-bold text-sm transition-all hover:shadow-md" data-value="0.9">0.9</button>
-          <button class="threshold-btn px-3 py-3 bg-white hover:bg-blue-50 border-2 border-slate-300 rounded-xl font-bold text-sm transition-all hover:shadow-md" data-value="1.0">1.0</button>
-        </div>
-      </div>
-
-      <!-- Update Mode Status -->
-      <div class="bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50 rounded-2xl p-5 border-2 border-orange-300 shadow-md">
-        <h3 class="font-bold text-slate-800 mb-4 flex items-center text-lg">
-          <div class="bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl p-2 mr-3">
-            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-            </svg>
-          </div>
-          Update Mode Status
-        </h3>
-        <div class="bg-white rounded-xl p-4 border-2 border-orange-200 shadow-sm">
-          <div class="flex items-center justify-between">
-            <span class="text-sm font-bold text-slate-700">Current Mode:</span>
-            <span id="update-mode-badge" class="px-4 py-2 bg-orange-500 text-white rounded-xl text-sm font-bold shadow-md">
-              Immediate Update
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Performance Metrics -->
-      <div class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-5 border-2 border-slate-200 shadow-md">
-        <h3 class="font-bold text-slate-800 mb-4 text-lg">Performance Metrics</h3>
-        <div class="space-y-3">
-          <div class="flex justify-between bg-white p-4 rounded-xl border-2 border-slate-200 shadow-sm hover:shadow-md transition-all">
-            <span class="text-sm font-semibold text-slate-700">Labeling Time</span>
-            <span id="perf-labeling-time" class="font-bold text-emerald-600 text-lg">-</span>
-          </div>
-          <div class="flex justify-between bg-white p-4 rounded-xl border-2 border-slate-200 shadow-sm hover:shadow-md transition-all">
-            <span class="text-sm font-semibold text-slate-700">Labeling Size</span>
-            <span id="perf-labeling-size" class="font-bold text-blue-600 text-lg">-</span>
-          </div>
-          <div class="flex justify-between bg-white p-4 rounded-xl border-2 border-slate-200 shadow-sm hover:shadow-md transition-all">
-            <span class="text-sm font-semibold text-slate-700">Query Response Time</span>
-            <span id="perf-query-time" class="font-bold text-indigo-600 text-lg">-</span>
-          </div>
-        </div>
-        
-        <!-- Comparison Mode Buttons -->
-        <div id="comparison-buttons" class="mt-5 space-y-3 hidden">
-          <button id="show-comparison-summary" class="w-full px-5 py-4 bg-gradient-to-r from-blue-600 via-blue-700 to-purple-600 hover:from-blue-700 hover:via-blue-800 hover:to-purple-700 text-white rounded-2xl font-bold shadow-xl hover:shadow-2xl flex items-center justify-center gap-3 transition-all duration-300 transform hover:scale-105">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-            </svg>
-            View Algorithm Comparison
-          </button>
-          <!-- <button id="show-similarity-computation" class="w-full px-5 py-4 bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 hover:from-emerald-700 hover:via-green-700 hover:to-teal-700 text-white rounded-2xl font-bold shadow-xl hover:shadow-2xl flex items-center justify-center gap-3 transition-all duration-300 transform hover:scale-105">
+          <!-- Comparison Mode Buttons -->
+          <div id="comparison-buttons" class="mt-5 space-y-3 hidden">
+            <button id="show-comparison-summary"
+              class="w-full px-5 py-4 bg-gradient-to-r from-blue-600 via-blue-700 to-purple-600 hover:from-blue-700 hover:via-blue-800 hover:to-purple-700 text-white rounded-2xl font-bold shadow-xl hover:shadow-2xl flex items-center justify-center gap-3 transition-all duration-300 transform hover:scale-105">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z">
+                </path>
+              </svg>
+              View Algorithm Comparison
+            </button>
+            <!-- <button id="show-similarity-computation" class="w-full px-5 py-4 bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 hover:from-emerald-700 hover:via-green-700 hover:to-teal-700 text-white rounded-2xl font-bold shadow-xl hover:shadow-2xl flex items-center justify-center gap-3 transition-all duration-300 transform hover:scale-105">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
             </svg>
             View Similarity Computation
           </button> -->
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Algorithm Comparison Modal -->
-  <div id="comparison-modal" class="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-6">
-    <div class="bg-white rounded-3xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto">
-      <div class="p-6 bg-gradient-to-r from-blue-600 via-blue-700 to-purple-700 text-white flex justify-between items-center sticky top-0 rounded-t-3xl">
-        <div>
-          <h2 class="font-bold text-2xl mb-1">Algorithm Performance Comparison</h2>
-          <p class="text-blue-100 text-sm">DHL vs Dynamic HC2L Analysis</p>
-        </div>
-        <button id="comparison-modal-close" class="hover:bg-white/20 rounded-xl p-2 transition-all">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
-      </div>
-      <div class="p-8">
-        <h3 class="text-2xl font-bold text-slate-900 mb-6">Performance Summary</h3>
-        
-        <div class="grid grid-cols-2 gap-5 mb-8">
-          <!-- DHL Column -->
-          <div class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-6 border-2 border-slate-300 shadow-lg">
-            <h4 class="font-bold text-xl text-slate-800 mb-4 flex items-center">
-              <span class="w-4 h-4 bg-slate-500 rounded-full mr-3 shadow-md"></span>
-              DHL (Baseline)
-            </h4>
-            <div class="space-y-3">
-              <div class="flex justify-between text-sm bg-white p-3 rounded-xl border border-slate-200">
-                <span class="text-slate-600 font-medium">Labeling Time:</span>
-                <span id="dhl-labeling-time" class="font-bold text-slate-800">--</span>
-              </div>
-              <div class="flex justify-between text-sm bg-white p-3 rounded-xl border border-slate-200">
-                <span class="text-slate-600 font-medium">Labeling Size:</span>
-                <span id="dhl-labeling-size" class="font-bold text-slate-800">--</span>
-              </div>
-              <div class="flex justify-between text-sm bg-white p-3 rounded-xl border border-slate-200">
-                <span class="text-slate-600 font-medium">Query Time:</span>
-                <span id="dhl-query-time" class="font-bold text-slate-800">--</span>
-              </div>
-            </div>
-          </div>
-          
-          <!-- D-HC2L Column -->
-          <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 border-2 border-blue-400 shadow-lg">
-            <h4 class="font-bold text-xl text-blue-900 mb-4 flex items-center">
-              <span class="w-4 h-4 bg-blue-600 rounded-full mr-3 shadow-md"></span>
-              Dynamic HC2L
-            </h4>
-            <div class="space-y-3">
-              <div class="flex justify-between text-sm bg-white p-3 rounded-xl border border-blue-200">
-                <span class="text-slate-600 font-medium">Labeling Time:</span>
-                <span id="dhc2l-labeling-time" class="font-bold text-emerald-600">--</span>
-              </div>
-              <div class="flex justify-between text-sm bg-white p-3 rounded-xl border border-blue-200">
-                <span class="text-slate-600 font-medium">Labeling Size:</span>
-                <span id="dhc2l-labeling-size" class="font-bold text-emerald-600">--</span>
-              </div>
-              <div class="flex justify-between text-sm bg-white p-3 rounded-xl border border-blue-200">
-                <span class="text-slate-600 font-medium">Query Time:</span>
-                <span id="dhc2l-query-time" class="font-bold text-red-600">--</span>
-              </div>
-            </div>
           </div>
         </div>
-      </div>
-    </div>
-  </div>
 
-  <!-- Similarity Computation Modal -->
-  <div id="similarity-modal" class="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-6">
-    <div class="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-      <div class="p-6 bg-gradient-to-r from-emerald-600 via-green-600 to-teal-700 text-white flex justify-between items-center sticky top-0 rounded-t-3xl">
-        <div>
-          <h2 class="font-bold text-2xl mb-1">Route Similarity Computation</h2>
-          <p class="text-green-100 text-sm">Understanding similarity metrics</p>
-        </div>
-        <button id="similarity-modal-close" class="hover:bg-white/20 rounded-xl p-2 transition-all">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
-      </div>
-      <div class="p-8">
-        <h3 class="text-2xl font-bold text-slate-900 mb-6">Similarity Metrics Explained</h3>
-        
-        <div class="space-y-5">
-          <!-- Fréchet Distance -->
-          <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 border-2 border-blue-300 shadow-md">
-            <h4 class="font-bold text-blue-900 mb-3 flex items-center text-lg">
-              <div class="bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl p-2 mr-3">
+        <!-- Utility Functions -->
+        <div
+          class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-5 border border-slate-300 shadow-sm mt-5">
+          <h3 class="font-bold text-slate-800 mb-4 text-lg">Utility Functions</h3>
+          <div class="space-y-3">
+
+            <!-- New Dataset Button -->
+            <button id="new-dataset"
+              class="w-full flex items-center space-x-3 px-3 py-3 glass-effect hover:shadow-md rounded-2xl transition-all duration-300 border border-slate-300">
+              <div class="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl p-2 shadow-sm">
                 <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path>
                 </svg>
               </div>
-              Fréchet Distance
-            </h4>
-            <p class="text-sm text-slate-700 mb-4 leading-relaxed">
-              Measures how similar two curves are by finding the minimum leash length needed for a person walking a dog along two paths.
-            </p>
-            <div class="bg-white rounded-xl p-4 border-2 border-blue-200 shadow-sm">
-              <div class="flex justify-between text-sm">
-                <span class="text-slate-600 font-semibold">Current Value:</span>
-                <span class="font-bold text-blue-700 text-lg">12.3</span>
-              </div>
-              <p class="text-xs text-slate-500 mt-2 font-medium">Lower is better (closer routes)</p>
-            </div>
-          </div>
-          
-          <!-- Segment Overlap -->
-          <div class="bg-gradient-to-br from-emerald-50 to-green-50 rounded-2xl p-6 border-2 border-emerald-300 shadow-md">
-            <h4 class="font-bold text-emerald-900 mb-3 flex items-center text-lg">
-              <div class="bg-gradient-to-br from-emerald-600 to-green-600 rounded-xl p-2 mr-3">
+              <span class="font-bold text-slate-700">New Dataset</span>
+            </button>
+
+            <!-- Show OSM Graph Button -->
+            <button id="show-osm-graph-btn"
+              class="w-full flex items-center space-x-3 px-3 py-3 glass-effect hover:shadow-md rounded-2xl transition-all duration-300 border border-slate-300">
+              <div class="bg-gradient-to-br from-purple-600 to-purple-700 rounded-xl p-2 shadow-sm">
                 <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z">
+                  </path>
                 </svg>
               </div>
-              Segment Overlap
-            </h4>
-            <p class="text-sm text-slate-700 mb-4 leading-relaxed">
-              Percentage of road segments that are common between the computed route and Google Maps baseline route.
-            </p>
-            <div class="bg-white rounded-xl p-4 border-2 border-emerald-200 shadow-sm">
-              <div class="flex justify-between text-sm">
-                <span class="text-slate-600 font-semibold">Current Value:</span>
-                <span class="font-bold text-emerald-700 text-lg">87%</span>
+              <span class="font-bold text-slate-700">Show OSM Graph</span>
+            </button>
+
+            <!-- Active Disruptions Button -->
+            <button id="disruptions-toggle"
+              class="w-full flex items-center space-x-3 px-3 py-3 glass-effect hover:shadow-md rounded-2xl transition-all duration-300 border border-slate-300 bg-red-50">
+              <div class="bg-gradient-to-br from-red-600 to-red-700 rounded-xl p-2 shadow-sm">
+                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                    d="M12 9v2m0 4v2m0 4v2M6.228 6.228a9 9 0 1012.544 12.544M6.228 6.228l5.656-5.656m5.656 5.656l5.656-5.656">
+                  </path>
+                </svg>
               </div>
-              <p class="text-xs text-slate-500 mt-2 font-medium">Higher is better (more similar routes)</p>
+              <span class="font-bold text-red-700">Active Disruptions</span>
+            </button>
+
+            <!-- Report Incident Button -->
+            <button id="report-toggle"
+              class="w-full flex items-center space-x-3 px-3 py-3 glass-effect hover:shadow-md rounded-2xl transition-all duration-300 border border-slate-300 bg-rose-50">
+              <div class="bg-gradient-to-br from-rose-600 to-rose-700 rounded-xl p-2 shadow-sm">
+                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                    d="M12 9v2m0 4v2m0 4v2M7.457 7.457A9 9 0 1020 12a9 9 0 01-12.543-4.543M6.5 10.5L4 9m4 6l-3 2">
+                  </path>
+                </svg>
+              </div>
+              <span class="font-bold text-rose-700">Report Incident</span>
+            </button>
+
+            <!-- Show Nodes Button -->
+            <button id="nodes-toggle"
+              class="w-full flex items-center space-x-3 px-3 py-3 glass-effect hover:shadow-md rounded-2xl transition-all duration-300 border border-slate-300 bg-sky-50">
+              <div class="bg-gradient-to-br from-sky-600 to-sky-700 rounded-xl p-2 shadow-sm">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+              </svg>
             </div>
-          </div>
-          
-          <!-- Combined Interpretation -->
-          <div class="bg-gradient-to-br from-purple-50 to-violet-50 rounded-2xl p-6 border-2 border-purple-300 shadow-md">
-            <h4 class="font-bold text-purple-900 mb-3 text-lg">Combined Interpretation</h4>
-            <p class="text-sm text-slate-700 leading-relaxed">
-              With <strong class="text-emerald-600">87% segment overlap</strong> and a Fréchet distance of <strong class="text-blue-600">12.3</strong>, 
-              the Dynamic HC2L algorithm produces routes that are highly similar to Google Maps baseline, 
-              while achieving significant improvements in labeling efficiency.
-            </p>
+            <span class="font-bold text-sky-700">Show Nodes</span>
+            </button>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- Algorithm Comparison Modal -->
+    <div id="comparison-modal"
+      class="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-6">
+      <div class="bg-white rounded-3xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto">
+        <div
+          class="p-6 bg-gradient-to-r from-blue-600 via-blue-700 to-purple-700 text-white flex justify-between items-center sticky top-0 rounded-t-3xl">
+          <div>
+            <h2 class="font-bold text-2xl mb-1">Algorithm Performance Comparison</h2>
+            <p class="text-blue-100 text-sm">DHL vs Dynamic HC2L Analysis</p>
+          </div>
+          <button id="comparison-modal-close" class="hover:bg-white/20 rounded-xl p-2 transition-all">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+        <div class="p-8">
+          <h3 class="text-2xl font-bold text-slate-900 mb-6">Performance Summary</h3>
+
+          <div class="grid grid-cols-2 gap-5 mb-8">
+            <!-- DHL Column -->
+            <div
+              class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-6 border-2 border-slate-300 shadow-lg">
+              <h4 class="font-bold text-xl text-slate-800 mb-4 flex items-center">
+                <span class="w-4 h-4 bg-slate-500 rounded-full mr-3 shadow-md"></span>
+                DHL (Baseline)
+              </h4>
+              <div class="space-y-3">
+                <div class="flex justify-between text-sm bg-white p-3 rounded-xl border border-slate-200">
+                  <span class="text-slate-600 font-medium">Labeling Time:</span>
+                  <span id="dhl-labeling-time" class="font-bold text-slate-800">--</span>
+                </div>
+                <div class="flex justify-between text-sm bg-white p-3 rounded-xl border border-slate-200">
+                  <span class="text-slate-600 font-medium">Labeling Size:</span>
+                  <span id="dhl-labeling-size" class="font-bold text-slate-800">--</span>
+                </div>
+                <div class="flex justify-between text-sm bg-white p-3 rounded-xl border border-slate-200">
+                  <span class="text-slate-600 font-medium">Query Time:</span>
+                  <span id="dhl-query-time" class="font-bold text-slate-800">--</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- D-HC2L Column -->
+            <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 border-2 border-blue-400 shadow-lg">
+              <h4 class="font-bold text-xl text-blue-900 mb-4 flex items-center">
+                <span class="w-4 h-4 bg-blue-600 rounded-full mr-3 shadow-md"></span>
+                Dynamic HC2L
+              </h4>
+              <div class="space-y-3">
+                <div class="flex justify-between text-sm bg-white p-3 rounded-xl border border-blue-200">
+                  <span class="text-slate-600 font-medium">Labeling Time:</span>
+                  <span id="dhc2l-labeling-time" class="font-bold text-emerald-600">--</span>
+                </div>
+                <div class="flex justify-between text-sm bg-white p-3 rounded-xl border border-blue-200">
+                  <span class="text-slate-600 font-medium">Labeling Size:</span>
+                  <span id="dhc2l-labeling-size" class="font-bold text-emerald-600">--</span>
+                </div>
+                <div class="flex justify-between text-sm bg-white p-3 rounded-xl border border-blue-200">
+                  <span class="text-slate-600 font-medium">Query Time:</span>
+                  <span id="dhc2l-query-time" class="font-bold text-red-600">--</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Similarity Computation Modal -->
+    <div id="similarity-modal"
+      class="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-6">
+      <div class="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div
+          class="p-6 bg-gradient-to-r from-emerald-600 via-green-600 to-teal-700 text-white flex justify-between items-center sticky top-0 rounded-t-3xl">
+          <div>
+            <h2 class="font-bold text-2xl mb-1">Route Similarity Computation</h2>
+            <p class="text-green-100 text-sm">Understanding similarity metrics</p>
+          </div>
+          <button id="similarity-modal-close" class="hover:bg-white/20 rounded-xl p-2 transition-all">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+        <div class="p-8">
+          <h3 class="text-2xl font-bold text-slate-900 mb-6">Similarity Metrics Explained</h3>
+
+          <div class="space-y-5">
+            <!-- Fréchet Distance -->
+            <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 border-2 border-blue-300 shadow-md">
+              <h4 class="font-bold text-blue-900 mb-3 flex items-center text-lg">
+                <div class="bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl p-2 mr-3">
+                  <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                      d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                  </svg>
+                </div>
+                Fréchet Distance
+              </h4>
+              <p class="text-sm text-slate-700 mb-4 leading-relaxed">
+                Measures how similar two curves are by finding the minimum leash length needed for a person walking a
+                dog along two paths.
+              </p>
+              <div class="bg-white rounded-xl p-4 border-2 border-blue-200 shadow-sm">
+                <div class="flex justify-between text-sm">
+                  <span class="text-slate-600 font-semibold">Current Value:</span>
+                  <span class="font-bold text-blue-700 text-lg">12.3</span>
+                </div>
+                <p class="text-xs text-slate-500 mt-2 font-medium">Lower is better (closer routes)</p>
+              </div>
+            </div>
+
+            <!-- Segment Overlap -->
+            <div
+              class="bg-gradient-to-br from-emerald-50 to-green-50 rounded-2xl p-6 border-2 border-emerald-300 shadow-md">
+              <h4 class="font-bold text-emerald-900 mb-3 flex items-center text-lg">
+                <div class="bg-gradient-to-br from-emerald-600 to-green-600 rounded-xl p-2 mr-3">
+                  <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                </div>
+                Segment Overlap
+              </h4>
+              <p class="text-sm text-slate-700 mb-4 leading-relaxed">
+                Percentage of road segments that are common between the computed route and Google Maps baseline route.
+              </p>
+              <div class="bg-white rounded-xl p-4 border-2 border-emerald-200 shadow-sm">
+                <div class="flex justify-between text-sm">
+                  <span class="text-slate-600 font-semibold">Current Value:</span>
+                  <span class="font-bold text-emerald-700 text-lg">87%</span>
+                </div>
+                <p class="text-xs text-slate-500 mt-2 font-medium">Higher is better (more similar routes)</p>
+              </div>
+            </div>
+
+            <!-- Combined Interpretation -->
+            <div
+              class="bg-gradient-to-br from-purple-50 to-violet-50 rounded-2xl p-6 border-2 border-purple-300 shadow-md">
+              <h4 class="font-bold text-purple-900 mb-3 text-lg">Combined Interpretation</h4>
+              <p class="text-sm text-slate-700 leading-relaxed">
+                With <strong class="text-emerald-600">87% segment overlap</strong> and a Fréchet distance of <strong
+                  class="text-blue-600">12.3</strong>,
+                the Dynamic HC2L algorithm produces routes that are highly similar to Google Maps baseline,
+                while achieving significant improvements in labeling efficiency.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Start Location Search Modal - REMOVED - Using dropdown combobox instead -->
+    <!-- Destination Search Modal - REMOVED - Using dropdown combobox instead -->
   </div>
-</div>
 
 
-<!-- Javascripts -->
-<script src="{{ url_for('static', filename='js/variables.js') }}"></script>
-<script src="{{ url_for('static', filename='js/functions.js') }}"></script>
-<script src="{{ url_for('static', filename='js/disruptions.js') }}"></script>
-<script src="{{ url_for('static', filename='js/metrics.js') }}"></script>
-<script src="{{ url_for('static', filename='js/osm-snapping.js') }}"></script>
-<script src="{{ url_for('static', filename='js/event-handlers.js') }}"></script>
+  <!-- Javascripts -->
+  <script src="{{ url_for('static', filename='js/variables.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/functions.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/disruptions.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/metrics.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/osm-snapping.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/event-handlers.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/search-and-drag.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/location-combobox.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/auto-route-updater.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/google-maps-comparison.js') }}"></script>
 
-<script>
+  <script>
 
-  // Initialize Leaflet Map
-  function initMap() {
-    try {
-      // Center on Manila, Philippines (adjust as needed)
-      const center = [14.6540, 121.0540];
-      
-      map = L.map("google-map", {
-        center: center,
-        zoom: 14,
-        zoomControl: true
-      });
-      
-      // Add OpenStreetMap tiles
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors',
-        maxZoom: 19
-      }).addTo(map);
-      
-      // Hide placeholder since maps loaded successfully
-      document.getElementById("map-placeholder").classList.add("hidden");
-      
-      setupMapClickHandlers();
-      showUpdateToast("OpenStreetMap loaded successfully", 'success');
-    } catch (error) {
-      console.error("Failed to initialize OpenStreetMap:", error);
-      document.getElementById("map-placeholder").classList.remove("hidden");
-      showUpdateToast("Failed to load OpenStreetMap", 'warning');
-    }
-  }
-  
-  // Helper function to handle start location pin with snap-to-road
-  async function handleStartLocationPin(lat, lng) {
-    try {
-      // Clear existing markers and connectors
-      if (startMarker) map.removeLayer(startMarker);
-      if (window.startSnapMarker) {
-        map.removeLayer(window.startSnapMarker);
-        window.startSnapMarker = null;
-      }
-      if (window.startConnectorLine) {
-        map.removeLayer(window.startConnectorLine);
-        window.startConnectorLine = null;
-      }
-      
-      // Find nearest accessible NODE (one-way aware for start point)
-      const nodeResponse = await fetch('/find_nearest_node', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lat, lng, is_start_point: true })
-      });
-      
-      const nodeData = await nodeResponse.json();
-      
-      if (!nodeData.success) {
-        showUpdateToast(nodeData.error || 'No accessible start node found', 'warning');
-        return;
-      }
-      
-      // Log accessibility info
-      if (nodeData.metadata) {
-        console.log('✅ Start node selection:', {
-          node_id: nodeData.node_id,
-          outgoing_edges: nodeData.metadata.outgoing_edges,
-          accessible: nodeData.metadata.accessible,
-          reason: nodeData.metadata.selection_reason
+    // Initialize Leaflet Map
+    function initMap() {
+      try {
+        // Center on Quezon City, Philippines
+        const center = [14.6760, 121.0437]; // Quezon City center
+
+        // Define Quezon City bounds (approximate boundaries)
+        const quezonCityBounds = L.latLngBounds(
+          L.latLng(14.5800, 120.9825),  // Southwest corner
+          L.latLng(14.7800, 121.1300)   // Northeast corner
+        );
+
+        map = L.map("google-map", {
+          center: center,
+          zoom: 13,
+          minZoom: 12,           // Prevent zooming out too far
+          maxZoom: 19,           // Allow detailed zoom
+          zoomControl: true,
+          maxBounds: quezonCityBounds,          // Restrict panning to Quezon City
+          maxBoundsViscosity: 1.0               // Make bounds rigid (can't pan outside)
         });
-        
-        // Show warning if node isn't optimal
-        if (nodeData.warning) {
-          showUpdateToast(nodeData.warning, 'warning');
-        }
-      }
-      
-      // Create semi-transparent marker at clicked location (establishment)
-      const greenIcon = L.icon({
-        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
-        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-        iconSize: [25, 41],
-        iconAnchor: [12, 41],
-        popupAnchor: [1, -34],
-        shadowSize: [41, 41],
-        className: 'establishment-marker'
-      });
-      
-      startMarker = L.marker([lat, lng], {
-        icon: greenIcon,
-        title: "Start Location (Establishment)",
-        opacity: 0.6
-      }).addTo(map);
-      
-      // Create solid snap marker at accessible road node
-      const snapIcon = L.divIcon({
-        className: 'snap-marker',
-        html: '<div style="background: #4CAF50; border: 3px solid white; border-radius: 50%; width: 16px; height: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.4);"></div>',
-        iconSize: [16, 16],
-        iconAnchor: [8, 8]
-      });
-      
-      window.startSnapMarker = L.marker(
-        [nodeData.lat, nodeData.lng],
-        { 
-          icon: snapIcon, 
-          title: `Road Entry Point (Node ${nodeData.node_id})${nodeData.metadata ? ` - ${nodeData.metadata.outgoing_edges} outgoing edges` : ''}` 
-        }
-      ).addTo(map);
-      
-      // Draw connector line if distance > 5m
-      const distance = nodeData.distance_m;
-      if (distance > 5) {
-        window.startConnectorLine = L.polyline([
-          [lat, lng],
-          [nodeData.lat, nodeData.lng]
-        ], {
-          color: '#808080',
-          weight: 2,
-          dashArray: '5, 10',
-          opacity: 0.7
+
+        // Add OpenStreetMap tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap contributors',
+          maxZoom: 19
         }).addTo(map);
         
-        window.startConnectorLine.bindPopup(
-          `Walking distance: ${distance.toFixed(0)}m<br>` +
-          `Node: ${nodeData.node_id}` +
-          (nodeData.metadata ? `<br>Outgoing roads: ${nodeData.metadata.outgoing_edges}` : '')
-        );
-      }
-      
-      // Store both original and snapped locations
-      window.startLocation = { 
-        lat: nodeData.lat, 
-        lng: nodeData.lng,
-        node_id: nodeData.node_id,
-        original_lat: lat,
-        original_lng: lng,
-        snap_distance: distance,
-        metadata: nodeData.metadata
-      };
-      
-      // Get establishment name
-      fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
-        .then(response => response.json())
-        .then(data => {
-          const locationText = data.display_name || `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-          const displayText = distance > 5 
-            ? `${locationText.substring(0, 40)}... → Road Node (${distance.toFixed(0)}m)`
-            : locationText;
-          document.getElementById('start-location-text').textContent = displayText;
-        })
-        .catch(() => {
-          const displayText = distance > 5
-            ? `Location → Road Node ${nodeData.node_id} (${distance.toFixed(0)}m)`
-            : `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-          document.getElementById('start-location-text').textContent = displayText;
-        });
-      
-      document.getElementById('start-location-text').classList.remove('text-slate-500');
-      document.getElementById('start-location-text').classList.add('text-slate-900', 'font-semibold');
-      
-      const message = distance > 5 
-        ? `Start location set (${distance.toFixed(0)}m from road)`
-        : 'Start location set';
-      showUpdateToast(message, 'success');
-      
-    } catch (error) {
-      console.error('Error pinning start location:', error);
-      showUpdateToast('Error setting start location', 'warning');
-    }
-    
-    pinningMode = null;
-    map.getContainer().style.cursor = 'default';
-  }
-  
-  // Helper function to handle destination location pin with one-way awareness
-  async function handleDestLocationPin(lat, lng) {
-    try {
-      // Clear existing markers and connectors
-      if (destMarker) map.removeLayer(destMarker);
-      if (window.destSnapMarker) {
-        map.removeLayer(window.destSnapMarker);
-        window.destSnapMarker = null;
-      }
-      if (window.destConnectorLine) {
-        map.removeLayer(window.destConnectorLine);
-        window.destConnectorLine = null;
-      }
-      
-      // Find nearest accessible NODE (one-way aware for destination point)
-      const nodeResponse = await fetch('/find_nearest_node', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lat, lng, is_start_point: false })
-      });
-      
-      const nodeData = await nodeResponse.json();
-      
-      if (!nodeData.success) {
-        showUpdateToast(nodeData.error || 'No accessible destination node found', 'warning');
-        return;
-      }
-      
-      // Log accessibility info
-      if (nodeData.metadata) {
-        console.log('✅ Destination node selection:', {
-          node_id: nodeData.node_id,
-          incoming_edges: nodeData.metadata.incoming_edges,
-          accessible: nodeData.metadata.accessible,
-          reason: nodeData.metadata.selection_reason
-        });
+        // Add subtle fade overlay to emphasize Quezon City focus
+        // Create an inverted polygon that covers everything except Quezon City
+        const worldBounds = [
+          [-90, -180],
+          [-90, 180],
+          [90, 180],
+          [90, -180],
+          [-90, -180]
+        ];
         
-        // Show warning if node isn't optimal
-        if (nodeData.warning) {
-          showUpdateToast(nodeData.warning, 'warning');
-        }
-      }
-      
-      // Create semi-transparent marker at clicked location (establishment)
-      const redIcon = L.icon({
-        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-        iconSize: [25, 41],
-        iconAnchor: [12, 41],
-        popupAnchor: [1, -34],
-        shadowSize: [41, 41],
-        className: 'establishment-marker'
-      });
-      
-      destMarker = L.marker([lat, lng], {
-        icon: redIcon,
-        title: "Destination (Establishment)",
-        opacity: 0.6
-      }).addTo(map);
-      
-      // Create solid snap marker at accessible road node
-      const snapIcon = L.divIcon({
-        className: 'snap-marker',
-        html: '<div style="background: #F44336; border: 3px solid white; border-radius: 50%; width: 16px; height: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.4);"></div>',
-        iconSize: [16, 16],
-        iconAnchor: [8, 8]
-      });
-      
-      window.destSnapMarker = L.marker(
-        [nodeData.lat, nodeData.lng],
-        { 
-          icon: snapIcon, 
-          title: `Road Exit Point (Node ${nodeData.node_id})${nodeData.metadata ? ` - ${nodeData.metadata.incoming_edges} incoming edges` : ''}` 
-        }
-      ).addTo(map);
-      
-      // Draw connector line if distance > 5m
-      const distance = nodeData.distance_m;
-      if (distance > 5) {
-        window.destConnectorLine = L.polyline([
-          [nodeData.lat, nodeData.lng],
-          [lat, lng]
-        ], {
-          color: '#808080',
-          weight: 2,
-          dashArray: '5, 10',
-          opacity: 0.7
+        const quezonCityHole = [
+          [14.5800, 121.0000],
+          [14.5800, 121.1300],
+          [14.7800, 121.1300],
+          [14.7800, 120.9850],
+          [14.5800, 120.9850]
+        ];
+        
+        // Create polygon with hole (world minus Quezon City)
+        L.polygon([worldBounds, quezonCityHole], {
+          color: 'transparent',
+          fillColor: '#000000',
+          fillOpacity: 0.3,
+          interactive: false,
+          className: 'focus-overlay'
         }).addTo(map);
-        
-        window.destConnectorLine.bindPopup(
-          `Walking distance: ${distance.toFixed(0)}m<br>` +
-          `Node: ${nodeData.node_id}` +
-          (nodeData.metadata ? `<br>Incoming roads: ${nodeData.metadata.incoming_edges}` : '')
-        );
+
+        // Hide placeholder since maps loaded successfully
+        document.getElementById("map-placeholder").classList.add("hidden");
+
+        setupMapClickHandlers();
+        showUpdateToast("OpenStreetMap loaded successfully", 'success');
+      } catch (error) {
+        console.error("Failed to initialize OpenStreetMap:", error);
+        document.getElementById("map-placeholder").classList.remove("hidden");
+        showUpdateToast("Failed to load OpenStreetMap", 'warning');
       }
-      
-      // Store both original and snapped locations
-      window.destLocation = { 
-        lat: nodeData.lat, 
-        lng: nodeData.lng,
-        node_id: nodeData.node_id,
-        original_lat: lat,
-        original_lng: lng,
-        snap_distance: distance,
-        metadata: nodeData.metadata
-      };
-      
-      // Get establishment name
-      fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
-        .then(response => response.json())
-        .then(data => {
-          const locationText = data.display_name || `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-          const displayText = distance > 5 
-            ? `${locationText.substring(0, 40)}... → Road Node (${distance.toFixed(0)}m)`
-            : locationText;
-          document.getElementById('dest-location-text').textContent = displayText;
-        })
-        .catch(() => {
-          const displayText = distance > 5
-            ? `Location → Road Node ${nodeData.node_id} (${distance.toFixed(0)}m)`
-            : `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-          document.getElementById('dest-location-text').textContent = displayText;
-        });
-      
-      document.getElementById('dest-location-text').classList.remove('text-slate-500');
-      document.getElementById('dest-location-text').classList.add('text-slate-900', 'font-semibold');
-      
-      const message = distance > 5 
-        ? `Destination set (${distance.toFixed(0)}m from road)`
-        : 'Destination set';
-      showUpdateToast(message, 'success');
-      
-    } catch (error) {
-      console.error('Error pinning destination:', error);
-      showUpdateToast('Error setting destination', 'warning');
     }
-    
-    pinningMode = null;
-    map.getContainer().style.cursor = 'default';
-  }
-  
-  function setupMapClickHandlers() {
-    map.on("click", async (event) => {
-      if (!pinningMode) return;
-      
-      const lat = event.latlng.lat;
-      const lng = event.latlng.lng;
-      
-      console.log(`Map clicked at: ${lat}, ${lng}`);
-      
-      if (pinningMode === 'start') {
-        // Use OSM road-aware snapping
-        await handleOSMStartLocationPin(lat, lng);
-        
-      } else if (pinningMode === 'dest') {
-        // Use OSM road-aware snapping
-        await handleOSMDestLocationPin(lat, lng);
-        
-      } else if (pinningMode === 'report') {
-        if (reportMarker) map.removeLayer(reportMarker);
-        
-        const violetIcon = L.icon({
-          iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-violet.png',
+
+    // Helper function to handle start location pin with snap-to-road
+    async function handleStartLocationPin(lat, lng) {
+      try {
+        // Clear existing markers and connectors
+        if (startMarker) map.removeLayer(startMarker);
+        if (window.startSnapMarker) {
+          map.removeLayer(window.startSnapMarker);
+          window.startSnapMarker = null;
+        }
+        if (window.startConnectorLine) {
+          map.removeLayer(window.startConnectorLine);
+          window.startConnectorLine = null;
+        }
+
+        // Find nearest accessible NODE (one-way aware for start point)
+        const nodeResponse = await fetch('/find_nearest_node', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lat, lng, is_start_point: true })
+        });
+
+        const nodeData = await nodeResponse.json();
+
+        if (!nodeData.success) {
+          showUpdateToast(nodeData.error || 'No accessible start node found', 'warning');
+          return;
+        }
+
+        // Log accessibility info
+        if (nodeData.metadata) {
+          console.log('✅ Start node selection:', {
+            node_id: nodeData.node_id,
+            outgoing_edges: nodeData.metadata.outgoing_edges,
+            accessible: nodeData.metadata.accessible,
+            reason: nodeData.metadata.selection_reason
+          });
+
+          // Show warning if node isn't optimal
+          if (nodeData.warning) {
+            showUpdateToast(nodeData.warning, 'warning');
+          }
+        }
+
+        // Create semi-transparent marker at clicked location (establishment)
+        const greenIcon = L.icon({
+          iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
           shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
           iconSize: [25, 41],
           iconAnchor: [12, 41],
           popupAnchor: [1, -34],
-          shadowSize: [41, 41]
+          shadowSize: [41, 41],
+          className: 'establishment-marker'
         });
-        
-        reportMarker = L.marker([lat, lng], {
-          icon: violetIcon,
-          title: "Report Location"
-        }).addTo(map);
-        
-        reportLocation = { lat, lng };
 
+        startMarker = L.marker([lat, lng], {
+          icon: greenIcon,
+          title: "Start Location (Establishment)",
+          opacity: 0.6
+        }).addTo(map);
+
+        // Create solid snap marker at accessible road node
+        const snapIcon = L.divIcon({
+          className: 'snap-marker',
+          html: '<div style="background: #4CAF50; border: 3px solid white; border-radius: 50%; width: 16px; height: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.4);"></div>',
+          iconSize: [16, 16],
+          iconAnchor: [8, 8]
+        });
+
+        window.startSnapMarker = L.marker(
+          [nodeData.lat, nodeData.lng],
+          {
+            icon: snapIcon,
+            title: `Road Entry Point (Node ${nodeData.node_id})${nodeData.metadata ? ` - ${nodeData.metadata.outgoing_edges} outgoing edges` : ''}`
+          }
+        ).addTo(map);
+
+        // Draw connector line if distance > 5m
+        const distance = nodeData.distance_m;
+        if (distance > 5) {
+          window.startConnectorLine = L.polyline([
+            [lat, lng],
+            [nodeData.lat, nodeData.lng]
+          ], {
+            color: '#808080',
+            weight: 2,
+            dashArray: '5, 10',
+            opacity: 0.7
+          }).addTo(map);
+
+          window.startConnectorLine.bindPopup(
+            `Walking distance: ${distance.toFixed(0)}m<br>` +
+            `Node: ${nodeData.node_id}` +
+            (nodeData.metadata ? `<br>Outgoing roads: ${nodeData.metadata.outgoing_edges}` : '')
+          );
+        }
+
+        // Store both original and snapped locations
+        window.startLocation = {
+          lat: nodeData.lat,
+          lng: nodeData.lng,
+          node_id: nodeData.node_id,
+          original_lat: lat,
+          original_lng: lng,
+          snap_distance: distance,
+          metadata: nodeData.metadata
+        };
+
+        // Get establishment name
         fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
           .then(response => response.json())
           .then(data => {
-            if (data.display_name) {
-              document.getElementById('pin-disruption-text').textContent = data.display_name;
-            } else {
-              document.getElementById('pin-disruption-text').textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-            }
+            const locationText = data.display_name || `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+            const displayText = distance > 5
+              ? `${locationText.substring(0, 40)}... → Road Node (${distance.toFixed(0)}m)`
+              : locationText;
+            document.getElementById('start-location-text').textContent = displayText;
           })
           .catch(() => {
-            document.getElementById('pin-disruption-text').textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+            const displayText = distance > 5
+              ? `Location → Road Node ${nodeData.node_id} (${distance.toFixed(0)}m)`
+              : `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+            document.getElementById('start-location-text').textContent = displayText;
           });
 
-        document.getElementById('disruption-coords').textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-        document.getElementById('disruption-coords').classList.remove('hidden');
-        showUpdateToast("Disruption location pinned", 'success');
-        pinningMode = null;
-        map.getContainer().style.cursor = 'default';
-      }
-    });
-  }
+        document.getElementById('start-location-text').classList.remove('text-slate-500');
+        document.getElementById('start-location-text').classList.add('text-slate-900', 'font-semibold');
 
-  
-  // D-HC2L Route Display Functions
-  function displayDHC2LRoute(routeData) {
-    // Clear only route polylines, keep location markers
-    if (routePolylines && routePolylines.length > 0) {
-        routePolylines.forEach(polyline => {
-            if (polyline && map) {
-                map.removeLayer(polyline);
-            }
-        });
-        routePolylines = [];
+        const message = distance > 5
+          ? `Start location set (${distance.toFixed(0)}m from road)`
+          : 'Start location set';
+        showUpdateToast(message, 'success');
+
+      } catch (error) {
+        console.error('Error pinning start location:', error);
+        showUpdateToast('Error setting start location', 'warning');
+      }
+
+      pinningMode = null;
+      map.getContainer().style.cursor = 'default';
     }
-    
-    // Display route polylines
-    if (routeData.route && routeData.route.polylines) {
-      console.log('Displaying D-HC2L route with', routeData.route.polylines.length, 'polylines');
-      
-      routeData.route.polylines.forEach((polylineData, index) => {
-        try {
-          // Handle both coordinate array formats
-          let polylinePath;
-          if (polylineData.coordinates) {
-            // Format: [{coordinates: [[lat, lng], ...]}, ...]
-            polylinePath = polylineData.coordinates.map(coord => [coord[0], coord[1]]);
-          } else if (polylineData.path) {
-            // Format: [{path: [{lat, lng}, ...]}, ...]
-            polylinePath = polylineData.path.map(p => [p.lat, p.lng]);
-          } else {
-            console.warn('Unknown polyline format:', polylineData);
-            return;
+
+    // Helper function to handle destination location pin with one-way awareness
+    async function handleDestLocationPin(lat, lng) {
+      try {
+        // Clear existing markers and connectors
+        if (destMarker) map.removeLayer(destMarker);
+        if (window.destSnapMarker) {
+          map.removeLayer(window.destSnapMarker);
+          window.destSnapMarker = null;
+        }
+        if (window.destConnectorLine) {
+          map.removeLayer(window.destConnectorLine);
+          window.destConnectorLine = null;
+        }
+
+        // Find nearest accessible NODE (one-way aware for destination point)
+        const nodeResponse = await fetch('/find_nearest_node', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lat, lng, is_start_point: false })
+        });
+
+        const nodeData = await nodeResponse.json();
+
+        if (!nodeData.success) {
+          showUpdateToast(nodeData.error || 'No accessible destination node found', 'warning');
+          return;
+        }
+
+        // Log accessibility info
+        if (nodeData.metadata) {
+          console.log('✅ Destination node selection:', {
+            node_id: nodeData.node_id,
+            incoming_edges: nodeData.metadata.incoming_edges,
+            accessible: nodeData.metadata.accessible,
+            reason: nodeData.metadata.selection_reason
+          });
+
+          // Show warning if node isn't optimal
+          if (nodeData.warning) {
+            showUpdateToast(nodeData.warning, 'warning');
           }
-          
-          const polyline = L.polyline(polylinePath, {
-            color: polylineData.strokeColor || polylineData.color || '#FF0000',
-            opacity: polylineData.strokeOpacity || polylineData.opacity || 0.8,
-            weight: polylineData.strokeWeight || polylineData.weight || 5
+        }
+
+        // Create semi-transparent marker at clicked location (establishment)
+        const redIcon = L.icon({
+          iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+          shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+          iconSize: [25, 41],
+          iconAnchor: [12, 41],
+          popupAnchor: [1, -34],
+          shadowSize: [41, 41],
+          className: 'establishment-marker'
+        });
+
+        destMarker = L.marker([lat, lng], {
+          icon: redIcon,
+          title: "Destination (Establishment)",
+          opacity: 0.6
+        }).addTo(map);
+
+        // Create solid snap marker at accessible road node
+        const snapIcon = L.divIcon({
+          className: 'snap-marker',
+          html: '<div style="background: #F44336; border: 3px solid white; border-radius: 50%; width: 16px; height: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.4);"></div>',
+          iconSize: [16, 16],
+          iconAnchor: [8, 8]
+        });
+
+        window.destSnapMarker = L.marker(
+          [nodeData.lat, nodeData.lng],
+          {
+            icon: snapIcon,
+            title: `Road Exit Point (Node ${nodeData.node_id})${nodeData.metadata ? ` - ${nodeData.metadata.incoming_edges} incoming edges` : ''}`
+          }
+        ).addTo(map);
+
+        // Draw connector line if distance > 5m
+        const distance = nodeData.distance_m;
+        if (distance > 5) {
+          window.destConnectorLine = L.polyline([
+            [nodeData.lat, nodeData.lng],
+            [lat, lng]
+          ], {
+            color: '#808080',
+            weight: 2,
+            dashArray: '5, 10',
+            opacity: 0.7
           }).addTo(map);
-          
-          routePolylines.push(polyline);
-          
-          console.log(`Polyline ${index + 1} added with ${polylinePath.length} points`);
-        } catch (error) {
-          console.error(`Error creating polyline ${index + 1}:`, error);
+
+          window.destConnectorLine.bindPopup(
+            `Walking distance: ${distance.toFixed(0)}m<br>` +
+            `Node: ${nodeData.node_id}` +
+            (nodeData.metadata ? `<br>Incoming roads: ${nodeData.metadata.incoming_edges}` : '')
+          );
+        }
+
+        // Store both original and snapped locations
+        window.destLocation = {
+          lat: nodeData.lat,
+          lng: nodeData.lng,
+          node_id: nodeData.node_id,
+          original_lat: lat,
+          original_lng: lng,
+          snap_distance: distance,
+          metadata: nodeData.metadata
+        };
+
+        // Get establishment name
+        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
+          .then(response => response.json())
+          .then(data => {
+            const locationText = data.display_name || `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+            const displayText = distance > 5
+              ? `${locationText.substring(0, 40)}... → Road Node (${distance.toFixed(0)}m)`
+              : locationText;
+            document.getElementById('dest-location-text').textContent = displayText;
+          })
+          .catch(() => {
+            const displayText = distance > 5
+              ? `Location → Road Node ${nodeData.node_id} (${distance.toFixed(0)}m)`
+              : `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+            document.getElementById('dest-location-text').textContent = displayText;
+          });
+
+        document.getElementById('dest-location-text').classList.remove('text-slate-500');
+        document.getElementById('dest-location-text').classList.add('text-slate-900', 'font-semibold');
+
+        const message = distance > 5
+          ? `Destination set (${distance.toFixed(0)}m from road)`
+          : 'Destination set';
+        showUpdateToast(message, 'success');
+
+      } catch (error) {
+        console.error('Error pinning destination:', error);
+        showUpdateToast('Error setting destination', 'warning');
+      }
+
+      pinningMode = null;
+      map.getContainer().style.cursor = 'default';
+    }
+
+    function setupMapClickHandlers() {
+      map.on("click", async (event) => {
+        if (!pinningMode) return;
+
+        const lat = event.latlng.lat;
+        const lng = event.latlng.lng;
+
+        console.log(`Map clicked at: ${lat}, ${lng}`);
+
+        if (pinningMode === 'start') {
+          // Use OSM road-aware snapping
+          await handleOSMStartLocationPin(lat, lng);
+
+        } else if (pinningMode === 'dest') {
+          // Use OSM road-aware snapping
+          await handleOSMDestLocationPin(lat, lng);
+
+        } else if (pinningMode === 'report') {
+          if (reportMarker) map.removeLayer(reportMarker);
+
+          const violetIcon = L.icon({
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-violet.png',
+            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+            shadowSize: [41, 41]
+          });
+
+          reportMarker = L.marker([lat, lng], {
+            icon: violetIcon,
+            title: "Report Location"
+          }).addTo(map);
+
+          reportLocation = { lat, lng };
+
+          fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
+            .then(response => response.json())
+            .then(data => {
+              if (data.display_name) {
+                document.getElementById('pin-disruption-text').textContent = data.display_name;
+              } else {
+                document.getElementById('pin-disruption-text').textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+              }
+            })
+            .catch(() => {
+              document.getElementById('pin-disruption-text').textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+            });
+
+          document.getElementById('disruption-coords').textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+          document.getElementById('disruption-coords').classList.remove('hidden');
+          showUpdateToast("Disruption location pinned", 'success');
+          pinningMode = null;
+          map.getContainer().style.cursor = 'default';
         }
       });
-      
-      // Add connector polylines from pinned locations to route start/end nodes
-      addConnectorPolylines(routeData);
-      
-      // Fit map to show the route
-      if (routePolylines.length > 0) {
-        const bounds = L.latLngBounds();
-        
-        // Include start and destination markers
-        if (window.startLocation) bounds.extend([window.startLocation.lat, window.startLocation.lng]);
-        if (window.destLocation) bounds.extend([window.destLocation.lat, window.destLocation.lng]);
-        
-        // Include route points
-        routeData.route.polylines.forEach(polylineData => {
-          if (polylineData.coordinates) {
-            polylineData.coordinates.forEach(coord => {
-              bounds.extend([coord[0], coord[1]]);
-            });
-          } else if (polylineData.path) {
-            polylineData.path.forEach(point => {
-              bounds.extend([point.lat, point.lng]);
-            });
+    }
+
+
+    // D-HC2L Route Display Functions
+    function displayDHC2LRoute(routeData) {
+      // Clear only route polylines, keep location markers
+      if (routePolylines && routePolylines.length > 0) {
+        routePolylines.forEach(polyline => {
+          if (polyline && map) {
+            map.removeLayer(polyline);
           }
         });
-        
-        map.fitBounds(bounds);
-        console.log('Map bounds fitted to route');
+        routePolylines = [];
       }
-    } else {
-      console.warn('No polylines found in route data:', routeData);
-    }
-    
-    console.log('D-HC2L route display complete');
-  }
-  
 
-  function addConnectorPolylines(routeData) {
-    try {
-      // Get the first and last coordinates of the actual route
-      let routeStartCoord = null;
-      let routeEndCoord = null;
-      
-      if (routeData.route && routeData.route.coordinates && routeData.route.coordinates.length > 0) {
-        // Use coordinates from the enhanced route data
-        const coordinates = routeData.route.coordinates;
-        routeStartCoord = {
-          lat: coordinates[0].lat,
-          lng: coordinates[0].lng
-        };
-        routeEndCoord = {
-          lat: coordinates[coordinates.length - 1].lat,
-          lng: coordinates[coordinates.length - 1].lng
-        };
-        console.log('Using route coordinates for connectors');
-        console.log('Route start node:', routeStartCoord);
-        console.log('Route end node:', routeEndCoord);
-      } else if (routeData.route && routeData.route.polylines && routeData.route.polylines.length > 0) {
-        // Fallback: extract from polylines
-        const firstPolyline = routeData.route.polylines[0];
-        const lastPolyline = routeData.route.polylines[routeData.route.polylines.length - 1];
-        
-        if (firstPolyline.path && firstPolyline.path.length > 0) {
-          routeStartCoord = firstPolyline.path[0];
-        } else if (firstPolyline.coordinates && firstPolyline.coordinates.length > 0) {
-          routeStartCoord = {
-            lat: firstPolyline.coordinates[0][0],
-            lng: firstPolyline.coordinates[0][1]
-          };
-        }
-        
-        if (lastPolyline.path && lastPolyline.path.length > 0) {
-          routeEndCoord = lastPolyline.path[lastPolyline.path.length - 1];
-        } else if (lastPolyline.coordinates && lastPolyline.coordinates.length > 0) {
-          const lastCoordIndex = lastPolyline.coordinates.length - 1;
-          routeEndCoord = {
-            lat: lastPolyline.coordinates[lastCoordIndex][0],
-            lng: lastPolyline.coordinates[lastCoordIndex][1]
-          };
-        }
-        console.log('Using polyline coordinates for connectors');
-      }
-      
-      // Check if OSM snapping is being used
-      const usingOSMStart = window.osmSnapMarkers?.start?.data != null;
-      const usingOSMDest = window.osmSnapMarkers?.dest?.data != null;
-      
-      // Add connector from start pin to route start node
-      if (window.startLocation && routeStartCoord) {
-        let startPoint = window.startLocation;
-        
-        // If using OSM snapping, connect from the snapped point instead
-        if (usingOSMStart && window.osmSnapMarkers.start.data.snapped_point) {
-          startPoint = window.osmSnapMarkers.start.data.snapped_point;
-        }
-        
-        const startDistance = calculateHaversineDistance(
-          startPoint.lat, startPoint.lng,
-          routeStartCoord.lat, routeStartCoord.lng
-        );
-        
-        // Only draw connector if there's a meaningful distance (>5m)
-        if (startDistance > 5) {
-          console.log(`Adding start connector: ${startDistance.toFixed(0)}m (OSM: ${usingOSMStart})`);
-          
-          const startConnector = L.polyline([
-            [startPoint.lat, startPoint.lng],
-            [routeStartCoord.lat, routeStartCoord.lng]
-          ], {
-            color: usingOSMStart ? '#757575' : '#FF0000', // Gray for OSM snap, Red for regular
-            opacity: 0.7,
-            weight: usingOSMStart ? 3 : 5,
-            dashArray: usingOSMStart ? '5, 8' : '10, 5' // Shorter dash for OSM
-          }).addTo(map);
-          
-          routePolylines.push(startConnector);
-        } else {
-          console.log(`⏭️  Skipping start connector (distance too small: ${startDistance.toFixed(1)}m)`);
-        }
-      }
-      
-      // Add connector from route end node to destination pin
-      if (window.destLocation && routeEndCoord) {
-        let endPoint = window.destLocation;
-        
-        // If using OSM snapping, connect from the snapped point instead
-        if (usingOSMDest && window.osmSnapMarkers.dest.data.snapped_point) {
-          endPoint = window.osmSnapMarkers.dest.data.snapped_point;
-        }
-        
-        const endDistance = calculateHaversineDistance(
-          routeEndCoord.lat, routeEndCoord.lng,
-          endPoint.lat, endPoint.lng
-        );
-        
-        // Only draw connector if there's a meaningful distance (>5m)
-        if (endDistance > 5) {
-          console.log(`Adding end connector: ${endDistance.toFixed(0)}m (OSM: ${usingOSMDest})`);
-          
-          const endConnector = L.polyline([
-            [routeEndCoord.lat, routeEndCoord.lng],
-            [endPoint.lat, endPoint.lng]
-          ], {
-            color: usingOSMDest ? '#757575' : '#FF0000', // Gray for OSM snap, Red for regular
-            opacity: 0.7,
-            weight: usingOSMDest ? 3 : 5,
-            dashArray: usingOSMDest ? '5, 8' : '10, 5' // Shorter dash for OSM
-          }).addTo(map);
-          
-          routePolylines.push(endConnector);
-        } else {
-          console.log(`⏭️  Skipping end connector (distance too small: ${endDistance.toFixed(1)}m)`);
-        }
-      }
-      
-      console.log('D-HC2L connector polylines added successfully');
-      
-    } catch (error) {
-      console.error('Error adding D-HC2L connector polylines:', error);
-    }
-  }
+      // Display route polylines
+      if (routeData.route && routeData.route.polylines) {
+        console.log('Displaying D-HC2L route with', routeData.route.polylines.length, 'polylines');
 
+        routeData.route.polylines.forEach((polylineData, index) => {
+          try {
+            // Handle both coordinate array formats
+            let polylinePath;
+            if (polylineData.coordinates) {
+              // Format: [{coordinates: [[lat, lng], ...]}, ...]
+              polylinePath = polylineData.coordinates.map(coord => [coord[0], coord[1]]);
+            } else if (polylineData.path) {
+              // Format: [{path: [{lat, lng}, ...]}, ...]
+              polylinePath = polylineData.path.map(p => [p.lat, p.lng]);
+            } else {
+              console.warn('Unknown polyline format:', polylineData);
+              return;
+            }
 
-  function addDHLConnectorPolylines(routeData) {
-    try {
-      // Get the first and last coordinates of the actual DHL route
-      let routeStartCoord = null;
-      let routeEndCoord = null;
-      
-      if (routeData.route && routeData.route.coordinates && routeData.route.coordinates.length > 0) {
-        // Use coordinates from the enhanced route data
-        const coordinates = routeData.route.coordinates;
-        routeStartCoord = {
-          lat: coordinates[0].lat,
-          lng: coordinates[0].lng
-        };
-        routeEndCoord = {
-          lat: coordinates[coordinates.length - 1].lat,
-          lng: coordinates[coordinates.length - 1].lng
-        };
-        console.log('Using DHL route coordinates for connectors');
-        console.log('DHL route start node:', routeStartCoord);
-        console.log('DHL route end node:', routeEndCoord);
-      } else if (routeData.route && routeData.route.polylines && routeData.route.polylines.length > 0) {
-        // Fallback: extract from polylines
-        const firstPolyline = routeData.route.polylines[0];
-        const lastPolyline = routeData.route.polylines[routeData.route.polylines.length - 1];
-        
-        if (firstPolyline.path && firstPolyline.path.length > 0) {
-          routeStartCoord = firstPolyline.path[0];
-        } else if (firstPolyline.coordinates && firstPolyline.coordinates.length > 0) {
-          routeStartCoord = {
-            lat: firstPolyline.coordinates[0][0],
-            lng: firstPolyline.coordinates[0][1]
-          };
-        }
-        
-        if (lastPolyline.path && lastPolyline.path.length > 0) {
-          routeEndCoord = lastPolyline.path[lastPolyline.path.length - 1];
-        } else if (lastPolyline.coordinates && lastPolyline.coordinates.length > 0) {
-          const lastCoordIndex = lastPolyline.coordinates.length - 1;
-          routeEndCoord = {
-            lat: lastPolyline.coordinates[lastCoordIndex][0],
-            lng: lastPolyline.coordinates[lastCoordIndex][1]
-          };
-        }
-        console.log('Using DHL polyline coordinates for connectors');
-      }
-      
-      // Check if OSM snapping is being used
-      const usingOSMStart = window.osmSnapMarkers?.start?.data != null;
-      const usingOSMDest = window.osmSnapMarkers?.dest?.data != null;
-      
-      // Add connector from start pin to route start node
-      if (window.startLocation && routeStartCoord) {
-        let startPoint = window.startLocation;
-        
-        // If using OSM snapping, connect from the snapped point instead
-        if (usingOSMStart && window.osmSnapMarkers.start.data.snapped_point) {
-          startPoint = window.osmSnapMarkers.start.data.snapped_point;
-        }
-        
-        const startDistance = calculateHaversineDistance(
-          startPoint.lat, startPoint.lng,
-          routeStartCoord.lat, routeStartCoord.lng
-        );
-        
-        // Only draw connector if there's a meaningful distance (>5m)
-        if (startDistance > 5) {
-          console.log(`Adding DHL start connector: ${startDistance.toFixed(0)}m (OSM: ${usingOSMStart})`);
-          
-          const startConnector = L.polyline([
-            [startPoint.lat, startPoint.lng],
-            [routeStartCoord.lat, routeStartCoord.lng]
-          ], {
-            color: usingOSMStart ? '#757575' : '#0066FF', // Gray for OSM snap, Blue for regular
-            opacity: 0.7,
-            weight: usingOSMStart ? 3 : 5,
-            dashArray: usingOSMStart ? '5, 8' : '10, 5' // Shorter dash for OSM
-          }).addTo(map);
-          
-          routePolylines.push(startConnector);
-        } else {
-          console.log(`⏭️  Skipping DHL start connector (distance too small: ${startDistance.toFixed(1)}m)`);
-        }
-      }
-      
-      // Add connector from route end node to destination pin
-      if (window.destLocation && routeEndCoord) {
-        let endPoint = window.destLocation;
-        
-        // If using OSM snapping, connect from the snapped point instead
-        if (usingOSMDest && window.osmSnapMarkers.dest.data.snapped_point) {
-          endPoint = window.osmSnapMarkers.dest.data.snapped_point;
-        }
-        
-        const endDistance = calculateHaversineDistance(
-          routeEndCoord.lat, routeEndCoord.lng,
-          endPoint.lat, endPoint.lng
-        );
-        
-        // Only draw connector if there's a meaningful distance (>5m)
-        if (endDistance > 5) {
-          console.log(`Adding DHL end connector: ${endDistance.toFixed(0)}m (OSM: ${usingOSMDest})`);
-          
-          const endConnector = L.polyline([
-            [routeEndCoord.lat, routeEndCoord.lng],
-            [endPoint.lat, endPoint.lng]
-          ], {
-            color: usingOSMDest ? '#757575' : '#0066FF', // Gray for OSM snap, Blue for regular
-            opacity: 0.7,
-            weight: usingOSMDest ? 3 : 5,
-            dashArray: usingOSMDest ? '5, 8' : '10, 5' // Shorter dash for OSM
-          }).addTo(map);
-          
-          routePolylines.push(endConnector);
-        } else {
-          console.log(`⏭️  Skipping DHL end connector (distance too small: ${endDistance.toFixed(1)}m)`);
-        }
-      }
-      
-      console.log('DHL connector polylines added successfully');
-      
-    } catch (error) {
-      console.error('Error adding DHL connector polylines:', error);
-    }
-  }
+            const polyline = L.polyline(polylinePath, {
+              color: polylineData.strokeColor || polylineData.color || '#FF0000',
+              opacity: polylineData.strokeOpacity || polylineData.opacity || 0.8,
+              weight: polylineData.strokeWeight || polylineData.weight || 5
+            }).addTo(map);
 
+            routePolylines.push(polyline);
 
-  function updateCurrentPathPanel(routeData) {
-    console.log('Updating Current Path Panel with route data:', routeData);
-    
-    if (!routeData || !routeData.success) {
-      console.warn('Invalid route data provided to updateCurrentPathPanel');
-      return;
-    }
-    
-    const route = routeData.route || {};
-    const metrics = routeData.metrics || {};
-    
-    // Update route header metrics
-    updateRouteHeaderMetrics(route, metrics);
-    
-    // Update route steps with turn-by-turn directions
-    updateRouteSteps(route);
-    
-    // Update comparison metrics
-    updateComparisonMetrics(routeData);
-    
-    // Check for disruptions on the route (async operation)
-    checkAndDisplayRouteDisruptions(routeData);
-    
-    console.log('Current Path Panel updated successfully');
-  }
-  
+            console.log(`Polyline ${index + 1} added with ${polylinePath.length} points`);
+          } catch (error) {
+            console.error(`Error creating polyline ${index + 1}:`, error);
+          }
+        });
 
-  async function checkAndDisplayRouteDisruptions(routeData) {
-    try {
-      console.log('Checking route for disruptions...');
-      const disruptedSegments = await checkRouteForDisruptions(routeData);
-      
-      if (disruptedSegments) {
-        console.log(`Found ${disruptedSegments.length} disrupted segments on route`);
-        displayRouteDisruptionAlert(disruptedSegments);
+        // Add connector polylines from pinned locations to route start/end nodes
+        addConnectorPolylines(routeData);
+
+        // Fit map to show the route
+        if (routePolylines.length > 0) {
+          const bounds = L.latLngBounds();
+
+          // Include start and destination markers
+          if (window.startLocation) bounds.extend([window.startLocation.lat, window.startLocation.lng]);
+          if (window.destLocation) bounds.extend([window.destLocation.lat, window.destLocation.lng]);
+
+          // Include route points
+          routeData.route.polylines.forEach(polylineData => {
+            if (polylineData.coordinates) {
+              polylineData.coordinates.forEach(coord => {
+                bounds.extend([coord[0], coord[1]]);
+              });
+            } else if (polylineData.path) {
+              polylineData.path.forEach(point => {
+                bounds.extend([point.lat, point.lng]);
+              });
+            }
+          });
+
+          map.fitBounds(bounds);
+          console.log('Map bounds fitted to route');
+        }
       } else {
-        console.log('No disruptions found on route');
-        // Hide the alert if no disruptions
+        console.warn('No polylines found in route data:', routeData);
+      }
+
+      console.log('D-HC2L route display complete');
+    }
+
+
+    function addConnectorPolylines(routeData) {
+      try {
+        // Get the first and last coordinates of the actual route
+        let routeStartCoord = null;
+        let routeEndCoord = null;
+
+        if (routeData.route && routeData.route.coordinates && routeData.route.coordinates.length > 0) {
+          // Use coordinates from the enhanced route data
+          const coordinates = routeData.route.coordinates;
+          routeStartCoord = {
+            lat: coordinates[0].lat,
+            lng: coordinates[0].lng
+          };
+          routeEndCoord = {
+            lat: coordinates[coordinates.length - 1].lat,
+            lng: coordinates[coordinates.length - 1].lng
+          };
+          console.log('Using route coordinates for connectors');
+          console.log('Route start node:', routeStartCoord);
+          console.log('Route end node:', routeEndCoord);
+        } else if (routeData.route && routeData.route.polylines && routeData.route.polylines.length > 0) {
+          // Fallback: extract from polylines
+          const firstPolyline = routeData.route.polylines[0];
+          const lastPolyline = routeData.route.polylines[routeData.route.polylines.length - 1];
+
+          if (firstPolyline.path && firstPolyline.path.length > 0) {
+            routeStartCoord = firstPolyline.path[0];
+          } else if (firstPolyline.coordinates && firstPolyline.coordinates.length > 0) {
+            routeStartCoord = {
+              lat: firstPolyline.coordinates[0][0],
+              lng: firstPolyline.coordinates[0][1]
+            };
+          }
+
+          if (lastPolyline.path && lastPolyline.path.length > 0) {
+            routeEndCoord = lastPolyline.path[lastPolyline.path.length - 1];
+          } else if (lastPolyline.coordinates && lastPolyline.coordinates.length > 0) {
+            const lastCoordIndex = lastPolyline.coordinates.length - 1;
+            routeEndCoord = {
+              lat: lastPolyline.coordinates[lastCoordIndex][0],
+              lng: lastPolyline.coordinates[lastCoordIndex][1]
+            };
+          }
+          console.log('Using polyline coordinates for connectors');
+        }
+
+        // Check if OSM snapping is being used
+        const usingOSMStart = window.osmSnapMarkers?.start?.data != null;
+        const usingOSMDest = window.osmSnapMarkers?.dest?.data != null;
+
+        // Add connector from start pin to route start node
+        if (window.startLocation && routeStartCoord) {
+          let startPoint = window.startLocation;
+
+          // If using OSM snapping, connect from the snapped point instead
+          if (usingOSMStart && window.osmSnapMarkers.start.data.snapped_point) {
+            startPoint = window.osmSnapMarkers.start.data.snapped_point;
+          }
+
+          const startDistance = calculateHaversineDistance(
+            startPoint.lat, startPoint.lng,
+            routeStartCoord.lat, routeStartCoord.lng
+          );
+
+          // Only draw connector if there's a meaningful distance (>5m)
+          if (startDistance > 5) {
+            console.log(`Adding start connector: ${startDistance.toFixed(0)}m (OSM: ${usingOSMStart})`);
+
+            const startConnector = L.polyline([
+              [startPoint.lat, startPoint.lng],
+              [routeStartCoord.lat, routeStartCoord.lng]
+            ], {
+              color: usingOSMStart ? '#757575' : '#FF0000', // Gray for OSM snap, Red for regular
+              opacity: 0.7,
+              weight: usingOSMStart ? 3 : 5,
+              dashArray: usingOSMStart ? '5, 8' : '10, 5' // Shorter dash for OSM
+            }).addTo(map);
+
+            routePolylines.push(startConnector);
+          } else {
+            console.log(`⏭️  Skipping start connector (distance too small: ${startDistance.toFixed(1)}m)`);
+          }
+        }
+
+        // Add connector from route end node to destination pin
+        if (window.destLocation && routeEndCoord) {
+          let endPoint = window.destLocation;
+
+          // If using OSM snapping, connect from the snapped point instead
+          if (usingOSMDest && window.osmSnapMarkers.dest.data.snapped_point) {
+            endPoint = window.osmSnapMarkers.dest.data.snapped_point;
+          }
+
+          const endDistance = calculateHaversineDistance(
+            routeEndCoord.lat, routeEndCoord.lng,
+            endPoint.lat, endPoint.lng
+          );
+
+          // Only draw connector if there's a meaningful distance (>5m)
+          if (endDistance > 5) {
+            console.log(`Adding end connector: ${endDistance.toFixed(0)}m (OSM: ${usingOSMDest})`);
+
+            const endConnector = L.polyline([
+              [routeEndCoord.lat, routeEndCoord.lng],
+              [endPoint.lat, endPoint.lng]
+            ], {
+              color: usingOSMDest ? '#757575' : '#FF0000', // Gray for OSM snap, Red for regular
+              opacity: 0.7,
+              weight: usingOSMDest ? 3 : 5,
+              dashArray: usingOSMDest ? '5, 8' : '10, 5' // Shorter dash for OSM
+            }).addTo(map);
+
+            routePolylines.push(endConnector);
+          } else {
+            console.log(`⏭️  Skipping end connector (distance too small: ${endDistance.toFixed(1)}m)`);
+          }
+        }
+
+        console.log('D-HC2L connector polylines added successfully');
+
+      } catch (error) {
+        console.error('Error adding D-HC2L connector polylines:', error);
+      }
+    }
+
+
+    function addDHLConnectorPolylines(routeData) {
+      try {
+        // Get the first and last coordinates of the actual DHL route
+        let routeStartCoord = null;
+        let routeEndCoord = null;
+
+        if (routeData.route && routeData.route.coordinates && routeData.route.coordinates.length > 0) {
+          // Use coordinates from the enhanced route data
+          const coordinates = routeData.route.coordinates;
+          routeStartCoord = {
+            lat: coordinates[0].lat,
+            lng: coordinates[0].lng
+          };
+          routeEndCoord = {
+            lat: coordinates[coordinates.length - 1].lat,
+            lng: coordinates[coordinates.length - 1].lng
+          };
+          console.log('Using DHL route coordinates for connectors');
+          console.log('DHL route start node:', routeStartCoord);
+          console.log('DHL route end node:', routeEndCoord);
+        } else if (routeData.route && routeData.route.polylines && routeData.route.polylines.length > 0) {
+          // Fallback: extract from polylines
+          const firstPolyline = routeData.route.polylines[0];
+          const lastPolyline = routeData.route.polylines[routeData.route.polylines.length - 1];
+
+          if (firstPolyline.path && firstPolyline.path.length > 0) {
+            routeStartCoord = firstPolyline.path[0];
+          } else if (firstPolyline.coordinates && firstPolyline.coordinates.length > 0) {
+            routeStartCoord = {
+              lat: firstPolyline.coordinates[0][0],
+              lng: firstPolyline.coordinates[0][1]
+            };
+          }
+
+          if (lastPolyline.path && lastPolyline.path.length > 0) {
+            routeEndCoord = lastPolyline.path[lastPolyline.path.length - 1];
+          } else if (lastPolyline.coordinates && lastPolyline.coordinates.length > 0) {
+            const lastCoordIndex = lastPolyline.coordinates.length - 1;
+            routeEndCoord = {
+              lat: lastPolyline.coordinates[lastCoordIndex][0],
+              lng: lastPolyline.coordinates[lastCoordIndex][1]
+            };
+          }
+          console.log('Using DHL polyline coordinates for connectors');
+        }
+
+        // Check if OSM snapping is being used
+        const usingOSMStart = window.osmSnapMarkers?.start?.data != null;
+        const usingOSMDest = window.osmSnapMarkers?.dest?.data != null;
+
+        // Add connector from start pin to route start node
+        if (window.startLocation && routeStartCoord) {
+          let startPoint = window.startLocation;
+
+          // If using OSM snapping, connect from the snapped point instead
+          if (usingOSMStart && window.osmSnapMarkers.start.data.snapped_point) {
+            startPoint = window.osmSnapMarkers.start.data.snapped_point;
+          }
+
+          const startDistance = calculateHaversineDistance(
+            startPoint.lat, startPoint.lng,
+            routeStartCoord.lat, routeStartCoord.lng
+          );
+
+          // Only draw connector if there's a meaningful distance (>5m)
+          if (startDistance > 5) {
+            console.log(`Adding DHL start connector: ${startDistance.toFixed(0)}m (OSM: ${usingOSMStart})`);
+
+            const startConnector = L.polyline([
+              [startPoint.lat, startPoint.lng],
+              [routeStartCoord.lat, routeStartCoord.lng]
+            ], {
+              color: usingOSMStart ? '#757575' : '#0066FF', // Gray for OSM snap, Blue for regular
+              opacity: 0.7,
+              weight: usingOSMStart ? 3 : 5,
+              dashArray: usingOSMStart ? '5, 8' : '10, 5' // Shorter dash for OSM
+            }).addTo(map);
+
+            routePolylines.push(startConnector);
+          } else {
+            console.log(`⏭️  Skipping DHL start connector (distance too small: ${startDistance.toFixed(1)}m)`);
+          }
+        }
+
+        // Add connector from route end node to destination pin
+        if (window.destLocation && routeEndCoord) {
+          let endPoint = window.destLocation;
+
+          // If using OSM snapping, connect from the snapped point instead
+          if (usingOSMDest && window.osmSnapMarkers.dest.data.snapped_point) {
+            endPoint = window.osmSnapMarkers.dest.data.snapped_point;
+          }
+
+          const endDistance = calculateHaversineDistance(
+            routeEndCoord.lat, routeEndCoord.lng,
+            endPoint.lat, endPoint.lng
+          );
+
+          // Only draw connector if there's a meaningful distance (>5m)
+          if (endDistance > 5) {
+            console.log(`Adding DHL end connector: ${endDistance.toFixed(0)}m (OSM: ${usingOSMDest})`);
+
+            const endConnector = L.polyline([
+              [routeEndCoord.lat, routeEndCoord.lng],
+              [endPoint.lat, endPoint.lng]
+            ], {
+              color: usingOSMDest ? '#757575' : '#0066FF', // Gray for OSM snap, Blue for regular
+              opacity: 0.7,
+              weight: usingOSMDest ? 3 : 5,
+              dashArray: usingOSMDest ? '5, 8' : '10, 5' // Shorter dash for OSM
+            }).addTo(map);
+
+            routePolylines.push(endConnector);
+          } else {
+            console.log(`⏭️  Skipping DHL end connector (distance too small: ${endDistance.toFixed(1)}m)`);
+          }
+        }
+
+        console.log('DHL connector polylines added successfully');
+
+      } catch (error) {
+        console.error('Error adding DHL connector polylines:', error);
+      }
+    }
+
+
+    function updateCurrentPathPanel(routeData) {
+      console.log('Updating Current Path Panel with route data:', routeData);
+
+      if (!routeData || !routeData.success) {
+        console.warn('Invalid route data provided to updateCurrentPathPanel');
+        return;
+      }
+
+      const route = routeData.route || {};
+      const metrics = routeData.metrics || {};
+
+      // Update route header metrics
+      updateRouteHeaderMetrics(route, metrics);
+
+      // Update route steps with turn-by-turn directions
+      updateRouteSteps(route);
+
+      // Update comparison metrics
+      updateComparisonMetrics(routeData);
+
+      // Check for disruptions on the route (async operation)
+      checkAndDisplayRouteDisruptions(routeData);
+
+      console.log('Current Path Panel updated successfully');
+    }
+
+
+    async function checkAndDisplayRouteDisruptions(routeData) {
+      try {
+        console.log('Checking route for disruptions...');
+        const disruptedSegments = await checkRouteForDisruptions(routeData);
+
+        if (disruptedSegments) {
+          console.log(`Found ${disruptedSegments.length} disrupted segments on route`);
+          displayRouteDisruptionAlert(disruptedSegments);
+        } else {
+          console.log('No disruptions found on route');
+          // Hide the alert if no disruptions
+          const alertElement = document.getElementById('route-disruption-alert');
+          if (alertElement) {
+            alertElement.classList.add('hidden');
+          }
+        }
+      } catch (error) {
+        console.error('Error checking route disruptions:', error);
+        // Hide alert on error
         const alertElement = document.getElementById('route-disruption-alert');
         if (alertElement) {
           alertElement.classList.add('hidden');
         }
       }
-    } catch (error) {
-      console.error('Error checking route disruptions:', error);
-      // Hide alert on error
-      const alertElement = document.getElementById('route-disruption-alert');
-      if (alertElement) {
-        alertElement.classList.add('hidden');
+    }
+
+
+    async function loadActiveDisruptions() {
+      try {
+        showUpdateToast("Loading active disruptions...", 'info');
+
+        const response = await fetch('/get_active_disruptions');
+        const data = await response.json();
+
+        if (!data.success) {
+          showUpdateToast(`Error loading disruptions: ${data.error}`, 'warning');
+          return;
+        }
+
+        // Update disruption panel content
+        updateDisruptionsPanel(data);
+
+        // Show disruption markers on map
+        showAllDisruptionsOnMap(data);
+
+        showUpdateToast(`Loaded ${data.total_disruptions} active disruptions`, 'success');
+
+      } catch (error) {
+        showUpdateToast('Network error loading disruptions', 'warning');
+        console.error('Error loading disruptions:', error);
       }
     }
-  }
 
-  
-  async function loadActiveDisruptions() {
-    try {
-      showUpdateToast("Loading active disruptions...", 'info');
-      
-      const response = await fetch('/get_active_disruptions');
-      const data = await response.json();
-      
-      if (!data.success) {
-        showUpdateToast(`Error loading disruptions: ${data.error}`, 'warning');
-        return;
+    // Automatic loading with disrupted algorithms
+    async function loadActiveDisruptionsForAlgorithm(algorithmName) {
+      try {
+        showUpdateToast(`Loading disruptions for ${algorithmName}...`, 'info');
+
+        const response = await fetch('/get_active_disruptions');
+        const data = await response.json();
+
+        if (!data.success) {
+          showUpdateToast(`Error loading disruptions: ${data.error}`, 'warning');
+          return;
+        }
+
+        // Update disruption panel content
+        updateDisruptionsPanel(data);
+
+        // Show disruption markers on map
+        showAllDisruptionsOnMap(data);
+
+        showUpdateToast(`${data.total_disruptions} disruptions loaded for ${algorithmName}`, 'success');
+
+      } catch (error) {
+        showUpdateToast('Network error loading disruptions', 'warning');
+        console.error('Error loading disruptions:', error);
       }
-      
-      // Update disruption panel content
-      updateDisruptionsPanel(data);
-      
-      // Show disruption markers on map
-      showAllDisruptionsOnMap(data);
-      
-      showUpdateToast(`Loaded ${data.total_disruptions} active disruptions`, 'success');
-      
-    } catch (error) {
-      showUpdateToast('Network error loading disruptions', 'warning');
-      console.error('Error loading disruptions:', error);
     }
-  }
-
-  // Automatic loading with disrupted algorithms
-  async function loadActiveDisruptionsForAlgorithm(algorithmName) {
-    try {
-      showUpdateToast(`Loading disruptions for ${algorithmName}...`, 'info');
-      
-      const response = await fetch('/get_active_disruptions');
-      const data = await response.json();
-      
-      if (!data.success) {
-        showUpdateToast(`Error loading disruptions: ${data.error}`, 'warning');
-        return;
-      }
-      
-      // Update disruption panel content
-      updateDisruptionsPanel(data);
-      
-      // Show disruption markers on map
-      showAllDisruptionsOnMap(data);
-      
-      showUpdateToast(`${data.total_disruptions} disruptions loaded for ${algorithmName}`, 'success');
-      
-    } catch (error) {
-      showUpdateToast('Network error loading disruptions', 'warning');
-      console.error('Error loading disruptions:', error);
-    }
-  }
 
 
-  async function checkRouteForDisruptions(routeData) {
-    if (!routeData || !routeData.route || !routeData.route.path_nodes) {
-      return null;
-    }
-    
-    try {
-      // Fetch current disruption data
-      const response = await fetch('/get_active_disruptions');
-      const disruptionData = await response.json();
-      
-      if (!disruptionData.success) {
-        console.warn('Could not fetch disruption data for route checking');
+    async function checkRouteForDisruptions(routeData) {
+      if (!routeData || !routeData.route || !routeData.route.path_nodes) {
         return null;
       }
-      
-      // Get route path nodes
-      const routeNodes = routeData.route.path_nodes;
-      const disruptedSegments = [];
-      
-      // Check each road segment in the route
-      for (let i = 0; i < routeNodes.length - 1; i++) {
-        const sourceNode = routeNodes[i];
-        const targetNode = routeNodes[i + 1];
-        
-        // Check all disruption types for matching road segments
-        for (const [incidentType, disruptions] of Object.entries(disruptionData.disruptions_by_type)) {
-          for (const disruption of disruptions) {
-            // Check if this disruption matches the current route segment
-            if ((disruption.source_id === sourceNode && disruption.target_id === targetNode) ||
+
+      try {
+        // Fetch current disruption data
+        const response = await fetch('/get_active_disruptions');
+        const disruptionData = await response.json();
+
+        if (!disruptionData.success) {
+          console.warn('Could not fetch disruption data for route checking');
+          return null;
+        }
+
+        // Get route path nodes
+        const routeNodes = routeData.route.path_nodes;
+        const disruptedSegments = [];
+
+        // Check each road segment in the route
+        for (let i = 0; i < routeNodes.length - 1; i++) {
+          const sourceNode = routeNodes[i];
+          const targetNode = routeNodes[i + 1];
+
+          // Check all disruption types for matching road segments
+          for (const [incidentType, disruptions] of Object.entries(disruptionData.disruptions_by_type)) {
+            for (const disruption of disruptions) {
+              // Check if this disruption matches the current route segment
+              if ((disruption.source_id === sourceNode && disruption.target_id === targetNode) ||
                 (disruption.source_id === targetNode && disruption.target_id === sourceNode)) {
-              
-              disruptedSegments.push({
-                sourceNode: sourceNode,
-                targetNode: targetNode,
-                roadName: disruption.road_name,
-                incidentType: disruption.incident_type,
-                severity: disruption.severity,
-                slowdownRatio: disruption.slowdown_ratio,
-                jamFactor: disruption.jam_factor,
-                speedKph: disruption.speed_kph
-              });
+
+                disruptedSegments.push({
+                  sourceNode: sourceNode,
+                  targetNode: targetNode,
+                  roadName: disruption.road_name,
+                  incidentType: disruption.incident_type,
+                  severity: disruption.severity,
+                  slowdownRatio: disruption.slowdown_ratio,
+                  jamFactor: disruption.jam_factor,
+                  speedKph: disruption.speed_kph
+                });
+              }
             }
           }
         }
-      }
-      
-      return disruptedSegments.length > 0 ? disruptedSegments : null;
-      
-    } catch (error) {
-      console.error('Error checking route for disruptions:', error);
-      return null;
-    }
-  }
-  
 
-  // Function to compute DHL route
-  async function computeDHLRoute(useDisruptions = false) {
-    if (!window.startLocation || !window.destLocation) {
-      showUpdateToast("Please pin both starting location and destination", 'warning');
-      return null;
-    }
-    
-    showUpdateToast(`Computing DHL route ${useDisruptions ? 'with disruptions' : ''}...`, 'info');
-    
-    try {
-      // Prepare routing request with OSM edge data if available
-      const requestBody = {
-        start_lat: window.startLocation.lat,
-        start_lng: window.startLocation.lng,
-        dest_lat: window.destLocation.lat,
-        dest_lng: window.destLocation.lng,
-        use_disruptions: useDisruptions
-      };
-      
-      // Add OSM edge-based routing if snapping was used
-      if (window.osmSnapMarkers?.start?.data) {
-        requestBody.start_osm_edge = {
-          routing_nodes: window.osmSnapMarkers.start.data.routing_nodes,
-          osm_nodes: window.osmSnapMarkers.start.data.osm_nodes,
-          snap_position: window.osmSnapMarkers.start.data.snap_position,
-          road_name: window.osmSnapMarkers.start.data.road_name,
-          oneway: window.osmSnapMarkers.start.data.oneway
-        };
-        console.log('📍 Using OSM edge for start (DHL):', requestBody.start_osm_edge);
-      }
-      
-      if (window.osmSnapMarkers?.dest?.data) {
-        requestBody.dest_osm_edge = {
-          routing_nodes: window.osmSnapMarkers.dest.data.routing_nodes,
-          osm_nodes: window.osmSnapMarkers.dest.data.osm_nodes,
-          snap_position: window.osmSnapMarkers.dest.data.snap_position,
-          road_name: window.osmSnapMarkers.dest.data.road_name,
-          oneway: window.osmSnapMarkers.dest.data.oneway
-        };
-        console.log('📍 Using OSM edge for destination (DHL):', requestBody.dest_osm_edge);
-      }
-      
-      const response = await fetch('/compute_dhl_route', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody)
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
-      }
-      
-      const routeData = await response.json();
-      console.log('Received DHL route data:', routeData);
-      
-      if (routeData.success) {
-        showUpdateToast("DHL route calculated successfully", 'success');
-        return routeData;
-      } else {
-        showUpdateToast(`DHL route calculation failed: ${routeData.error}`, 'warning');
+        return disruptedSegments.length > 0 ? disruptedSegments : null;
+
+      } catch (error) {
+        console.error('Error checking route for disruptions:', error);
         return null;
       }
-      
-    } catch (error) {
-      showUpdateToast(`DHL route error: ${error.message}`, 'warning');
-      console.error('DHL route calculation error:', error);
-      return null;
     }
-  }
-  
-  // Function to compute D-HC2L route  
-  async function computeDHC2LRoute(useDisruptions = false, threshold = 0.5) {
-    if (!window.startLocation || !window.destLocation) {
-      showUpdateToast("Please pin both starting location and destination", 'warning');
-      return null;
-    }
-    
-    const actualThreshold = threshold !== null ? threshold : currentThreshold;
-    showUpdateToast(`Computing D-HC2L route (τ=${actualThreshold}) ${useDisruptions ? 'with disruptions' : ''}...`, 'info');
-    
-    try {
-      // Prepare routing request with OSM edge data if available
-      const requestBody = {
-        start_lat: window.startLocation.lat,
-        start_lng: window.startLocation.lng,
-        dest_lat: window.destLocation.lat,
-        dest_lng: window.destLocation.lng,
-        threshold: actualThreshold,
-        use_disruptions: useDisruptions
-      };
-      
-      // Add OSM edge-based routing if snapping was used
-      if (window.osmSnapMarkers?.start?.data) {
-        requestBody.start_osm_edge = {
-          routing_nodes: window.osmSnapMarkers.start.data.routing_nodes,
-          osm_nodes: window.osmSnapMarkers.start.data.osm_nodes,
-          snap_position: window.osmSnapMarkers.start.data.snap_position,
-          road_name: window.osmSnapMarkers.start.data.road_name,
-          oneway: window.osmSnapMarkers.start.data.oneway
-        };
-        console.log('📍 Using OSM edge for start:', requestBody.start_osm_edge);
-      }
-      
-      if (window.osmSnapMarkers?.dest?.data) {
-        requestBody.dest_osm_edge = {
-          routing_nodes: window.osmSnapMarkers.dest.data.routing_nodes,
-          osm_nodes: window.osmSnapMarkers.dest.data.osm_nodes,
-          snap_position: window.osmSnapMarkers.dest.data.snap_position,
-          road_name: window.osmSnapMarkers.dest.data.road_name,
-          oneway: window.osmSnapMarkers.dest.data.oneway
-        };
-        console.log('📍 Using OSM edge for destination:', requestBody.dest_osm_edge);
-      }
-      
-      const response = await fetch('/compute_dhc2l_route', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody)
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
-      }
-      
-      const routeData = await response.json();
-      console.log('Received D-HC2L route data:', routeData);
-      
-      if (routeData.success) {
-        showUpdateToast("D-HC2L route calculated successfully", 'success');
-        return routeData;
-      } else {
-        showUpdateToast(`D-HC2L route calculation failed: ${routeData.error}`, 'warning');
+
+
+    // Function to compute DHL route
+    async function computeDHLRoute(useDisruptions = false) {
+      if (!window.startLocation || !window.destLocation) {
+        showUpdateToast("Please pin both starting location and destination", 'warning');
         return null;
       }
-      
-    } catch (error) {
-      showUpdateToast(`D-HC2L route error: ${error.message}`, 'warning');
-      console.error('D-HC2L route calculation error:', error);
-      return null;
-    }
-  }
-  
-  
-</script>
 
-<script>
-  // Initialize map when DOM is ready
-  document.addEventListener('DOMContentLoaded', function() {
-    initMap();
-    // Wire up Show Nodes toggle button (if present)
-    const nodesBtn = document.getElementById('nodes-toggle');
-    if (nodesBtn) {
-      nodesBtn.addEventListener('click', () => {
-        // Toggle label for clarity
-        const currentlyShown = nodesBtn.textContent && nodesBtn.textContent.trim().toLowerCase().includes('hide');
-        toggleAllNodes();
-        // Optimistically toggle button label (actual state may be cached)
-        nodesBtn.textContent = currentlyShown ? 'Show Nodes' : 'Hide Nodes';
-      });
+      showUpdateToast(`Computing DHL route ${useDisruptions ? 'with disruptions' : ''}...`, 'info');
+
+      try {
+        // Prepare routing request with OSM edge data if available
+        const requestBody = {
+          start_lat: window.startLocation.lat,
+          start_lng: window.startLocation.lng,
+          dest_lat: window.destLocation.lat,
+          dest_lng: window.destLocation.lng,
+          // DHL expects disruption_file and tau_threshold, not use_disruptions
+          disruption_file: useDisruptions ? 'active_disruptions' : '',
+          tau_threshold: currentThreshold || 0.5
+        };
+
+        // Add OSM edge-based routing if snapping was used
+        if (window.osmSnapMarkers?.start?.data) {
+          requestBody.start_osm_edge = {
+            routing_nodes: window.osmSnapMarkers.start.data.routing_nodes,
+            osm_nodes: window.osmSnapMarkers.start.data.osm_nodes,
+            snap_position: window.osmSnapMarkers.start.data.snap_position,
+            road_name: window.osmSnapMarkers.start.data.road_name,
+            oneway: window.osmSnapMarkers.start.data.oneway
+          };
+          console.log('📍 Using OSM edge for start (DHL):', requestBody.start_osm_edge);
+        }
+
+        if (window.osmSnapMarkers?.dest?.data) {
+          requestBody.dest_osm_edge = {
+            routing_nodes: window.osmSnapMarkers.dest.data.routing_nodes,
+            osm_nodes: window.osmSnapMarkers.dest.data.osm_nodes,
+            snap_position: window.osmSnapMarkers.dest.data.snap_position,
+            road_name: window.osmSnapMarkers.dest.data.road_name,
+            oneway: window.osmSnapMarkers.dest.data.oneway
+          };
+          console.log('📍 Using OSM edge for destination (DHL):', requestBody.dest_osm_edge);
+        }
+
+        const response = await fetch('/compute_dhl_route', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestBody)
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`HTTP ${response.status}: ${errorText}`);
+        }
+
+        const routeData = await response.json();
+        console.log('Received DHL route data:', routeData);
+
+        if (routeData.success) {
+          showUpdateToast("DHL route calculated successfully", 'success');
+          return routeData;
+        } else {
+          showUpdateToast(`DHL route calculation failed: ${routeData.error}`, 'warning');
+          return null;
+        }
+
+      } catch (error) {
+        showUpdateToast(`DHL route error: ${error.message}`, 'warning');
+        console.error('DHL route calculation error:', error);
+        return null;
+      }
     }
-  });
-</script>
+
+    // Function to compute D-HC2L route  
+    async function computeDHC2LRoute(useDisruptions = false, threshold = 0.5) {
+      if (!window.startLocation || !window.destLocation) {
+        showUpdateToast("Please pin both starting location and destination", 'warning');
+        return null;
+      }
+
+      const actualThreshold = threshold !== null ? threshold : currentThreshold;
+      showUpdateToast(`Computing D-HC2L route (τ=${actualThreshold}) ${useDisruptions ? 'with disruptions' : ''}...`, 'info');
+
+      try {
+        // Prepare routing request with OSM edge data if available
+        const requestBody = {
+          start_lat: window.startLocation.lat,
+          start_lng: window.startLocation.lng,
+          dest_lat: window.destLocation.lat,
+          dest_lng: window.destLocation.lng,
+          threshold: actualThreshold,
+          use_disruptions: useDisruptions
+        };
+
+        // Add OSM edge-based routing if snapping was used
+        if (window.osmSnapMarkers?.start?.data) {
+          requestBody.start_osm_edge = {
+            routing_nodes: window.osmSnapMarkers.start.data.routing_nodes,
+            osm_nodes: window.osmSnapMarkers.start.data.osm_nodes,
+            snap_position: window.osmSnapMarkers.start.data.snap_position,
+            road_name: window.osmSnapMarkers.start.data.road_name,
+            oneway: window.osmSnapMarkers.start.data.oneway
+          };
+          console.log('📍 Using OSM edge for start:', requestBody.start_osm_edge);
+        }
+
+        if (window.osmSnapMarkers?.dest?.data) {
+          requestBody.dest_osm_edge = {
+            routing_nodes: window.osmSnapMarkers.dest.data.routing_nodes,
+            osm_nodes: window.osmSnapMarkers.dest.data.osm_nodes,
+            snap_position: window.osmSnapMarkers.dest.data.snap_position,
+            road_name: window.osmSnapMarkers.dest.data.road_name,
+            oneway: window.osmSnapMarkers.dest.data.oneway
+          };
+          console.log('📍 Using OSM edge for destination:', requestBody.dest_osm_edge);
+        }
+
+        const response = await fetch('/compute_dhc2l_route', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestBody)
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`HTTP ${response.status}: ${errorText}`);
+        }
+
+        const routeData = await response.json();
+        console.log('Received D-HC2L route data:', routeData);
+
+        if (routeData.success) {
+          showUpdateToast("D-HC2L route calculated successfully", 'success');
+          return routeData;
+        } else {
+          showUpdateToast(`D-HC2L route calculation failed: ${routeData.error}`, 'warning');
+          return null;
+        }
+
+      } catch (error) {
+        showUpdateToast(`D-HC2L route error: ${error.message}`, 'warning');
+        console.error('D-HC2L route calculation error:', error);
+        return null;
+      }
+    }
+
+
+  </script>
+
+  <script>
+    // Initialize map when DOM is ready
+    document.addEventListener('DOMContentLoaded', function () {
+      initMap();
+      // Wire up Show Nodes toggle button (if present)
+      const nodesBtn = document.getElementById('nodes-toggle');
+      if (nodesBtn) {
+        nodesBtn.addEventListener('click', () => {
+          // Toggle label for clarity
+          const currentlyShown = nodesBtn.textContent && nodesBtn.textContent.trim().toLowerCase().includes('hide');
+          toggleAllNodes();
+          // Optimistically toggle button label (actual state may be cached)
+          nodesBtn.innerHTML = currentlyShown ? 
+            `<div class="bg-gradient-to-br from-sky-600 to-sky-700 rounded-xl p-2 shadow-sm">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+              </svg>
+            </div>
+            <span class="font-bold text-sky-700">Show Nodes</span>
+            ` :  
+            `<div class="bg-gradient-to-br from-sky-600 to-sky-700 rounded-xl p-2 shadow-sm">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"></path>
+              </svg>
+            </div>
+            <span class="font-bold text-sky-700">Hide Nodes</span>
+            `
+
+        });
+      }
+    });
+  </script>
 
 </body>
+
 </html>

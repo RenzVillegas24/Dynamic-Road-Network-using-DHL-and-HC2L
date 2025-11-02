@@ -1,60 +1,76 @@
-document.querySelectorAll('.threshold-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-        document.querySelectorAll('.threshold-btn').forEach(b => {
-        b.classList.remove('border-blue-500', 'bg-blue-50', 'shadow-md');
-        b.classList.add('border-slate-300');
+// Initialize all event handlers when DOM is ready
+function initializeEventHandlers() {
+    console.log('🎯 Initializing event handlers...');
+    
+    // Threshold buttons
+    document.querySelectorAll('.threshold-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            document.querySelectorAll('.threshold-btn').forEach(b => {
+            b.classList.remove('border-blue-500', 'bg-blue-50', 'shadow-md');
+            b.classList.add('border-slate-300');
+            });
+            
+            e.target.classList.remove('border-slate-300');
+            e.target.classList.add('border-blue-500', 'bg-blue-50', 'shadow-md');
+            
+            currentThreshold = parseFloat(e.target.dataset.value);
+            thresholdValue.textContent = currentThreshold.toFixed(1);
+            
+            // Show toast about threshold change
+            showUpdateToast(`Threshold updated to τ = ${currentThreshold}`, 'info');
+            
+            // If we have active routes, offer to recalculate
+            if (routePolylines.length > 0 && window.startLocation && window.destLocation) {
+            setTimeout(() => {
+                showUpdateToast("Threshold changed. Click 'Go' to recalculate route.", 'warning');
+            }, 1500);
+            }
         });
-        
-        e.target.classList.remove('border-slate-300');
-        e.target.classList.add('border-blue-500', 'bg-blue-50', 'shadow-md');
-        
-        currentThreshold = parseFloat(e.target.dataset.value);
-        thresholdValue.textContent = currentThreshold.toFixed(1);
-        
-        // Show toast about threshold change
-        showUpdateToast(`Threshold updated to τ = ${currentThreshold}`, 'info');
-        
-        // If we have active routes, offer to recalculate
-        if (routePolylines.length > 0 && window.startLocation && window.destLocation) {
-        setTimeout(() => {
-            showUpdateToast("Threshold changed. Click 'Go' to recalculate route.", 'warning');
-        }, 1500);
-        }
     });
-});
 
-document.getElementById('start-location-btn').addEventListener('click', () => {
-    if (!map) {
-        showUpdateToast("Please wait for the map to load", 'warning');
-        return;
+    const startLocationBtn = document.getElementById('start-location-btn');
+    if (startLocationBtn) {
+        startLocationBtn.addEventListener('click', () => {
+            if (!map) {
+                showUpdateToast("Please wait for the map to load", 'warning');
+                return;
+            }
+            pinningMode = 'start';
+            map.getContainer().style.cursor = 'crosshair';
+            showUpdateToast("Click on the map to pin starting location", 'info');
+        });
     }
-    pinningMode = 'start';
-    map.getContainer().style.cursor = 'crosshair';
-    showUpdateToast("Click on the map to pin starting location", 'info');
-});
   
-document.getElementById('dest-location-btn').addEventListener('click', () => {
-    if (!map) {
-    showUpdateToast("Please wait for the map to load", 'warning');
-    return;
+    const destLocationBtn = document.getElementById('dest-location-btn');
+    if (destLocationBtn) {
+        destLocationBtn.addEventListener('click', () => {
+            if (!map) {
+                showUpdateToast("Please wait for the map to load", 'warning');
+                return;
+            }
+            pinningMode = 'dest';
+            map.getContainer().style.cursor = 'crosshair';
+            showUpdateToast("Click on the map to pin destination", 'info');
+        });
     }
-    pinningMode = 'dest';
-    map.getContainer().style.cursor = 'crosshair';
-    showUpdateToast("Click on the map to pin destination", 'info');
-});
   
-document.getElementById('pin-disruption-btn').addEventListener('click', () => {
-    if (!map) {
-        showUpdateToast("Please wait for the map to load", 'warning');
-        return;
+    const pinDisruptionBtn = document.getElementById('pin-disruption-btn');
+    if (pinDisruptionBtn) {
+        pinDisruptionBtn.addEventListener('click', () => {
+            if (!map) {
+                showUpdateToast("Please wait for the map to load", 'warning');
+                return;
+            }
+            pinningMode = 'report';
+            map.getContainer().style.cursor = 'crosshair';
+            showUpdateToast("Click on the map to pin disruption location", 'info');
+        });
     }
-    pinningMode = 'report';
-    map.getContainer().style.cursor = 'crosshair';
-    showUpdateToast("Click on the map to pin disruption location", 'info');
-});
 
 
-document.getElementById("go-button").onclick = async () => {
+    const goButton = document.getElementById("go-button");
+    if (goButton) {
+        goButton.onclick = async () => {
     // Debug logging
     console.log('Go button clicked');
     console.log('startLocation:', window.startLocation);
@@ -369,59 +385,90 @@ document.getElementById("go-button").onclick = async () => {
       goButton.innerHTML = originalText;
       goButton.disabled = false;
     }
-};
+        };
+    }
   
-// Admin panel start button handler
-document.getElementById("admin-start-btn").onclick = async () => {
-    // Trigger the go button functionality
-    document.getElementById("go-button").click();
-};
+    // Admin panel start button handler
+    const adminStartBtn = document.getElementById("admin-start-btn");
+    if (adminStartBtn) {
+        adminStartBtn.onclick = async () => {
+            // Trigger the go button functionality
+            document.getElementById("go-button")?.click();
+        };
+    }
   
-document.getElementById("current-path-close").onclick = () => {
-    currentPathPanel.classList.add("translate-x-full");
-};
+    const currentPathClose = document.getElementById("current-path-close");
+    if (currentPathClose) {
+        currentPathClose.onclick = () => {
+            currentPathPanel.classList.add("translate-x-full");
+        };
+    }
   
-document.getElementById("admin-toggle").onclick = () => {
-    // Only clear routes if map is ready
-    // if (map && directionsRenderer) {
-    //   clearRoutes    (); // Clear routes when opening admin panel
-    // }
-    disruptionsPanel.classList.add("translate-x-full");
-    reportPanel.classList.add("translate-x-full");
-    currentPathPanel.classList.add("translate-x-full");
-    adminPanel.classList.remove("translate-x-full");
-};
+    const adminToggle = document.getElementById("admin-toggle");
+    if (adminToggle) {
+        adminToggle.onclick = () => {
+            console.log('Admin toggle clicked');
+            // Only clear routes if map is ready
+            // if (map && directionsRenderer) {
+            //   clearRoutes    (); // Clear routes when opening admin panel
+            // }
+            disruptionsPanel.classList.add("translate-x-full");
+            reportPanel.classList.add("translate-x-full");
+            currentPathPanel.classList.add("translate-x-full");
+            adminPanel.classList.remove("translate-x-full");
+        };
+        console.log('✅ Admin toggle handler registered');
+    } else {
+        console.error('❌ Admin toggle button not found');
+    }
   
-document.getElementById("admin-close").onclick = () => {
-    adminPanel.classList.add("translate-x-full");
-};
+    const adminClose = document.getElementById("admin-close");
+    if (adminClose) {
+        adminClose.onclick = () => {
+            adminPanel.classList.add("translate-x-full");
+        };
+    }
   
-document.getElementById("disruptions-toggle").onclick = async () => {
-    adminPanel.classList.add("translate-x-full");
-    reportPanel.classList.add("translate-x-full");
-    currentPathPanel.classList.add("translate-x-full");
-    disruptionsPanel.classList.remove("translate-x-full");
-    
-    // Fetch and display active disruptions
-    await loadActiveDisruptions();
-};
+    const disruptionsToggle = document.getElementById("disruptions-toggle");
+    if (disruptionsToggle) {
+        disruptionsToggle.onclick = async () => {
+            adminPanel.classList.add("translate-x-full");
+            reportPanel.classList.add("translate-x-full");
+            currentPathPanel.classList.add("translate-x-full");
+            disruptionsPanel.classList.remove("translate-x-full");
+            
+            // Fetch and display active disruptions
+            await loadActiveDisruptions();
+        };
+    }
   
-document.getElementById("disruptions-close").onclick = () => {
-    disruptionsPanel.classList.add("translate-x-full");
-};
+    const disruptionsClose = document.getElementById("disruptions-close");
+    if (disruptionsClose) {
+        disruptionsClose.onclick = () => {
+            disruptionsPanel.classList.add("translate-x-full");
+        };
+    }
   
-document.getElementById("report-toggle").onclick = () => {
-    adminPanel.classList.add("translate-x-full");
-    disruptionsPanel.classList.add("translate-x-full");
-    currentPathPanel.classList.add("translate-x-full");
-    reportPanel.classList.remove("translate-x-full");
-};
+    const reportToggle = document.getElementById("report-toggle");
+    if (reportToggle) {
+        reportToggle.onclick = () => {
+            adminPanel.classList.add("translate-x-full");
+            disruptionsPanel.classList.add("translate-x-full");
+            currentPathPanel.classList.add("translate-x-full");
+            reportPanel.classList.remove("translate-x-full");
+        };
+    }
   
-document.getElementById("report-close").onclick = () => {
-    reportPanel.classList.add("translate-x-full");
-};
+    const reportClose = document.getElementById("report-close");
+    if (reportClose) {
+        reportClose.onclick = () => {
+            reportPanel.classList.add("translate-x-full");
+        };
+    }
   
-document.getElementById('report-form').onsubmit = async (e) => {
+    const reportForm = document.getElementById('report-form');
+    if (reportForm) {
+        reportForm.onsubmit = async (e) => {
     e.preventDefault();
     
     if (!reportLocation) {
@@ -476,30 +523,37 @@ document.getElementById('report-form').onsubmit = async (e) => {
       submitButton.innerHTML = originalText;
       submitButton.disabled = false;
     }
-}
+        };
+    }
 
 
 
-document.querySelectorAll('input[name="algo-dataset"]').forEach(radio => {
-    radio.addEventListener('change', (e) => {
-      const value = e.target.nextElementSibling.textContent;
-      if (value.includes('Comparison Mode')) {
-        comparisonButtons.classList.remove('hidden');
-        isComparisonMode = true;
-      } else {
-        comparisonButtons.classList.add('hidden');
-        isComparisonMode = false;
-      }
+    document.querySelectorAll('input[name="algo-dataset"]').forEach(radio => {
+        radio.addEventListener('change', (e) => {
+          const value = e.target.nextElementSibling.textContent;
+          if (value.includes('Comparison Mode')) {
+            comparisonButtons.classList.remove('hidden');
+            isComparisonMode = true;
+          } else {
+            comparisonButtons.classList.add('hidden');
+            isComparisonMode = false;
+          }
+        });
     });
-});
   
-document.getElementById('show-comparison-summary').onclick = () => {
-    comparisonModal.classList.remove('hidden');
-};
+    const showComparisonSummary = document.getElementById('show-comparison-summary');
+    if (showComparisonSummary) {
+        showComparisonSummary.onclick = () => {
+            comparisonModal.classList.remove('hidden');
+        };
+    }
   
-document.getElementById('comparison-modal-close').onclick = () => {
-    comparisonModal.classList.add('hidden');
-};
+    const comparisonModalClose = document.getElementById('comparison-modal-close');
+    if (comparisonModalClose) {
+        comparisonModalClose.onclick = () => {
+            comparisonModal.classList.add('hidden');
+        };
+    }
   
 // document.getElementById('show-similarity-computation').onclick = () => {
 //     similarityModal.classList.remove('hidden');
@@ -509,44 +563,56 @@ document.getElementById('comparison-modal-close').onclick = () => {
 //     similarityModal.classList.add('hidden');
 // };
 
-document.getElementById('admin-reset-btn').onclick = () => {
-    // Only clear routes if map is ready
-    if (map && directionsRenderer) {
-      clearRoutes(); // Clear routes when opening admin panel
+    const adminResetBtn = document.getElementById('admin-reset-btn');
+    if (adminResetBtn) {
+        adminResetBtn.onclick = () => {
+            // Only clear routes if map is ready
+            if (map && directionsRenderer) {
+              clearRoutes(); // Clear routes when opening admin panel
+            }
+            // resetAll();
+        };
     }
-    // resetAll();
-}
   
-document.getElementById('new-dataset').onclick = async () => {
-    const originalText = newDatasetButtonText.innerHTML;
-    newDatasetButtonText.innerHTML = 'Adding...........';
-    newDatasetButtonText.disabled = true;
+    const newDatasetBtn = document.getElementById('new-dataset');
+    if (newDatasetBtn) {
+        newDatasetBtn.onclick = async () => {
+            console.log('New dataset button clicked');
+            const originalText = newDatasetButtonText.innerHTML;
+        newDatasetButtonText.innerHTML = 'Adding...........';
+        newDatasetBtn.disabled = true;
 
-    try {
-      const response = await fetch('/request_new_dataset');
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
-      if (data.success) {
-        showUpdateToast(data.message || 'New dataset added successfully', 'success');
+        try {
+          const response = await fetch('/request_new_dataset');
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          const data = await response.json();
+          if (data.success) {
+            showUpdateToast(data.message || 'New dataset added successfully', 'success');
 
-      } else {
-        throw new Error(data.error || 'Failed to add new dataset');
+          } else {
+            throw new Error(data.error || 'Failed to add new dataset');
+            }
+        } catch (error) {
+          console.error('Error requesting new dataset:', error);
+          showUpdateToast(`Error: ${error.message}`, 'warning');
         }
-    } catch (error) {
-      console.error('Error requesting new dataset:', error);
-      showUpdateToast(`Error: ${error.message}`, 'warning');
-    }
-    newDatasetButtonText.innerHTML = originalText;
-    newDatasetButtonText.disabled = false;
+        newDatasetButtonText.innerHTML = originalText;
+        newDatasetBtn.disabled = false;
+    };
+    console.log('✅ New dataset button handler registered');
+} else {
+    console.error('❌ New dataset button not found');
 }
 
-comparisonModal.onclick = (e) => {
-    if (e.target === comparisonModal) {
-      comparisonModal.classList.add('hidden');
-    }
-};
+if (comparisonModal) {
+    comparisonModal.onclick = (e) => {
+        if (e.target === comparisonModal) {
+          comparisonModal.classList.add('hidden');
+        }
+    };
+}
 
 // similarityModal.onclick = (e) => {
 //     if (e.target === similarityModal) {
@@ -559,30 +625,33 @@ comparisonModal.onclick = (e) => {
 let osmGraphLayer = null;
 let osmGraphVisible = false;
 
-document.getElementById('show-osm-graph-btn').onclick = async () => {
-    const button = document.getElementById('show-osm-graph-btn');
-    const buttonText = document.getElementById('show-osm-graph-text');
-    
-    if (!osmGraphVisible) {
-        // Show OSM graph
-        buttonText.textContent = 'Loading...';
-        button.disabled = true;
+const showOsmGraphBtn = document.getElementById('show-osm-graph-btn');
+if (showOsmGraphBtn) {
+    showOsmGraphBtn.onclick = async () => {
+        console.log('Show OSM graph button clicked');
+        const button = document.getElementById('show-osm-graph-btn');
+        const buttonText = document.getElementById('show-osm-graph-text');
         
-        try {
-            const response = await fetch('/get_osm_graph_edges?limit=1000000');
-            const data = await response.json();
+        if (!osmGraphVisible) {
+            // Show OSM graph
+            if (buttonText) buttonText.textContent = 'Loading...';
+            button.disabled = true;
             
-            if (data.success) {
-                // Create layer group for OSM edges
-                osmGraphLayer = L.layerGroup();
+            try {
+                const response = await fetch('/get_osm_graph_edges?limit=1000000');
+                const data = await response.json();
                 
-                // Add each edge as a polyline
-                data.edges.forEach(edge => {
-                    const polyline = L.polyline(edge.coordinates, {
-                        color: getHighwayColor(edge.highway),
-                        weight: getHighwayWeight(edge.highway),
-                        opacity: 0.4,
-                        className: 'osm-graph-edge'
+                if (data.success) {
+                    // Create layer group for OSM edges
+                    osmGraphLayer = L.layerGroup();
+                    
+                    // Add each edge as a polyline
+                    data.edges.forEach(edge => {
+                        const polyline = L.polyline(edge.coordinates, {
+                            color: getHighwayColor(edge.highway),
+                            weight: getHighwayWeight(edge.highway),
+                            opacity: 0.4,
+                            className: 'osm-graph-edge'
                     });
                     
                     // Add popup with edge info
@@ -599,7 +668,7 @@ document.getElementById('show-osm-graph-btn').onclick = async () => {
                 
                 osmGraphLayer.addTo(map);
                 osmGraphVisible = true;
-                buttonText.textContent = 'Hide OSM Graph';
+                if (buttonText) buttonText.textContent = 'Hide OSM Graph';
                 showUpdateToast(`Showing ${data.count} road segments`, 'success');
                 
                 if (data.count < data.total_edges) {
@@ -613,7 +682,7 @@ document.getElementById('show-osm-graph-btn').onclick = async () => {
         } catch (error) {
             console.error('Error loading OSM graph:', error);
             showUpdateToast(`Error: ${error.message}`, 'warning');
-            buttonText.textContent = 'Show OSM Graph';
+            if (buttonText) buttonText.textContent = 'Show OSM Graph';
         }
         
         button.disabled = false;
@@ -624,10 +693,17 @@ document.getElementById('show-osm-graph-btn').onclick = async () => {
             osmGraphLayer = null;
         }
         osmGraphVisible = false;
-        buttonText.textContent = 'Show OSM Graph';
+        if (buttonText) buttonText.textContent = 'Show OSM Graph';
         showUpdateToast('OSM graph hidden', 'info');
     }
-};
+    };
+    console.log('✅ Show OSM graph button handler registered');
+} else {
+    console.error('❌ Show OSM graph button not found');
+}
+
+    console.log('✅ All event handlers initialized');
+}
 
 // Helper function to get color based on highway type
 function getHighwayColor(type) {
@@ -659,8 +735,13 @@ function getHighwayWeight(type) {
     return weights[type] || 1;
 }
 
-
-
+// Initialize when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeEventHandlers);
+} else {
+    // DOM already loaded
+    initializeEventHandlers();
+}
 
 
 

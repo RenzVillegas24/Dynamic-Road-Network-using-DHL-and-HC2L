@@ -628,7 +628,12 @@ void output_json_response(bool success, const string& error_message = "",
                          const vector<NodeID>& path = vector<NodeID>(),
                          const map<NodeID, GPSCoordinate>& coordinates = map<NodeID, GPSCoordinate>(),
                          const map<pair<NodeID, NodeID>, EdgeGeometry>& edge_geometries = map<pair<NodeID, NodeID>, EdgeGeometry>(),
-                         const string& disruption_dir = "", double tau_threshold = 0.5) {
+                         bool use_disruptions = false, double tau_threshold = 0.5,
+                         const string& disruption_file = "",
+                         double disruption_impact_score = 0.0,
+                         const string& update_strategy = "",
+                         const string& update_reason = "",
+                         int nodes_updated = 0) {
     
     cout << "{" << endl;
     cout << "  \"success\": " << (success ? "true" : "false") << "," << endl;
@@ -646,7 +651,7 @@ void output_json_response(bool success, const string& error_message = "",
         cout << "    \"dest_pin_lng\": " << fixed << setprecision(6) << dest_pin_lng << "," << endl;
         cout << "    \"dest_snap_lat\": " << fixed << setprecision(6) << dest_snap_lat << "," << endl;
         cout << "    \"dest_snap_lng\": " << fixed << setprecision(6) << dest_snap_lng << "," << endl;
-        cout << "    \"disruption_dir\": \"" << disruption_dir << "\"," << endl;
+        cout << "    \"use_disruptions\": " << (use_disruptions ? "true" : "false") << "," << endl;
         cout << "    \"tau_threshold\": " << fixed << setprecision(2) << tau_threshold << endl;
         cout << "  }," << endl;
         
@@ -685,7 +690,7 @@ void output_json_response(bool success, const string& error_message = "",
         cout << "    \"total_distance_units\": " << distance << "," << endl;
         cout << "    \"query_time_ms\": " << fixed << setprecision(3) << query_time_ms << "," << endl;
         cout << "    \"path_length\": " << path.size() << "," << endl;
-        cout << "    \"disruption_dir\": \"" << disruption_dir << "\"," << endl;
+        cout << "    \"uses_disruptions\": " << (use_disruptions ? "true" : "false") << "," << endl;
         cout << "    \"tau_threshold\": " << fixed << setprecision(2) << tau_threshold << "," << endl;
         cout << "    \"interpolation_used\": false," << endl;
         
@@ -698,6 +703,24 @@ void output_json_response(bool success, const string& error_message = "",
         cout << "    \"calculated_distance_km\": " << fixed << setprecision(2) << (calculated_distance / 1000.0) << "," << endl;
         cout << "    \"eta_seconds\": " << fixed << setprecision(0) << eta_seconds << "," << endl;
         cout << "    \"eta_formatted\": \"" << eta_formatted << "\"" << endl;
+        cout << "  }," << endl;
+        
+        // Disruption configuration section
+        cout << "  \"disruption_config\": {" << endl;
+        cout << "    \"use_disruptions\": " << (use_disruptions ? "true" : "false") << "," << endl;
+        cout << "    \"disruption_file\": \"" << disruption_file << "\"," << endl;
+        cout << "    \"tau_threshold\": " << fixed << setprecision(2) << tau_threshold << "," << endl;
+        cout << "    \"tau_used_for\": \"Comparison only - DHL always performs immediate update\"" << endl;
+        cout << "  }," << endl;
+        
+        // DHL update info (for comparison with LazyHC2L)
+        cout << "  \"dhl_update_info\": {" << endl;
+        cout << "    \"algorithm_type\": \"baseline\"," << endl;
+        cout << "    \"update_strategy\": \"" << update_strategy << "\"," << endl;
+        cout << "    \"reason\": \"" << update_reason << "\"," << endl;
+        cout << "    \"disruption_impact_score\": " << fixed << setprecision(3) << disruption_impact_score << "," << endl;
+        cout << "    \"nodes_updated\": " << nodes_updated << "," << endl;
+        cout << "    \"note\": \"DHL performs immediate update for all disruptions (no lazy marking)\"" << endl;
         cout << "  }," << endl;
         
         cout << "  \"route\": {" << endl;
@@ -904,13 +927,19 @@ void output_json_response(bool success, const string& error_message = "",
 }
 
 int main(int argc, char* argv[]) {
-    if (argc != 20) {
-        output_json_response(false, "Invalid arguments. Usage: dhl_routing_api <start_pin_lat> <start_pin_lng> <start_snap_lat> <start_snap_lng> <start_edge_source> <start_edge_target> <start_edge_oneway> <dest_pin_lat> <dest_pin_lng> <dest_snap_lat> <dest_snap_lng> <dest_edge_source> <dest_edge_target> <dest_edge_oneway> <disruption_dir> <tau_threshold> <nodes_csv> <edges_csv> <index_file>");
+    // Accept 18 args (no disruption), 19 args (with disruption file), or 20 args (with disruption + tau)
+    // Args: 14 routing params + 3 data files + optional disruption_file + optional tau_threshold
+    // argc includes argv[0] (program name), so:
+    //   - argc=18: argv[0-17] = program + 14 params + 3 files
+    //   - argc=19: argv[0-18] = program + 14 params + 3 files + disruption
+    //   - argc=20: argv[0-19] = program + 14 params + 3 files + disruption + tau
+    if (argc != 18 && argc != 19 && argc != 20) {
+        output_json_response(false, "Invalid arguments. Usage: dhl_routing_api <start_pin_lat> <start_pin_lng> <start_snap_lat> <start_snap_lng> <start_edge_source> <start_edge_target> <start_edge_oneway> <dest_pin_lat> <dest_pin_lng> <dest_snap_lat> <dest_snap_lng> <dest_edge_source> <dest_edge_target> <dest_edge_oneway> <nodes_csv> <edges_csv> <index_file> [disruption_file] [tau_threshold]");
         return 1;
     }
     
     try {
-        // Parse arguments
+        // Parse arguments (14 routing parameters)
         double start_pin_lat = stod(argv[1]);
         double start_pin_lng = stod(argv[2]);
         double start_snap_lat = stod(argv[3]);
@@ -927,11 +956,32 @@ int main(int argc, char* argv[]) {
         NodeID dest_edge_target = stoul(argv[13]);
         int dest_edge_oneway = stoi(argv[14]);
         
-        string disruption_dir = argv[15];
-        double tau_threshold = stod(argv[16]);
-        string nodes_csv = argv[17];
-        string edges_csv = argv[18];
-        string index_file = argv[19];
+        // Parse data file paths (3 parameters)
+        string nodes_csv = argv[15];
+        string edges_csv = argv[16];
+        string index_file = argv[17];
+        
+        // Parse optional disruption file (arg 18)
+        string disruption_file = "";
+        bool use_disruptions = false;
+        if (argc >= 19) {
+            disruption_file = argv[18];
+            use_disruptions = !disruption_file.empty() && 
+                             disruption_file != "null" && 
+                             disruption_file != "NULL" &&
+                             disruption_file != "";
+        }
+        
+        // Parse optional tau threshold (arg 19)
+        double tau_threshold = 0.5; // Default
+        if (argc >= 20) {
+            tau_threshold = stod(argv[19]);
+        }
+        
+        // DHL always performs immediate update (no lazy marking)
+        double disruption_impact_score = 0.0;
+        string update_strategy = "none";
+        string update_reason = "No disruptions loaded";
         
         // Load data
         auto coordinates = load_node_coordinates(nodes_csv);
@@ -955,6 +1005,86 @@ int main(int argc, char* argv[]) {
         }
         ContractionIndex ci(index_stream);
         index_stream.close();
+        
+        // ============================================================
+        // DHL: Process disruptions if provided (ALWAYS IMMEDIATE UPDATE)
+        // ============================================================
+        int nodes_updated = 0;
+        if (use_disruptions) {
+            cerr << "🔧 DHL Processing disruptions from: " << disruption_file << endl;
+            cerr << "   DHL always performs immediate update (no lazy marking)" << endl;
+            cerr << "   Tau threshold (for comparison): " << tau_threshold << endl;
+            
+            // Load disruption file
+            ifstream disrupt_file(disruption_file);
+            if (disrupt_file.is_open()) {
+                string line;
+                int disruption_count = 0;
+                set<NodeID> affected_nodes;
+                
+                while (getline(disrupt_file, line)) {
+                    if (line.empty() || line[0] == 'c' || line[0] == 'p') continue;
+                    
+                    istringstream iss(line);
+                    NodeID source, target;
+                    distance_t new_weight, old_weight = 0;
+                    
+                    if (iss >> source >> target >> new_weight) {
+                        // Find old weight
+                        if (adj_list.count(source)) {
+                            for (const auto& neighbor : adj_list.at(source)) {
+                                if (neighbor.node == target) {
+                                    old_weight = neighbor.distance;
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        // Compute impact score for logging
+                        double weight_change_ratio = (old_weight > 0) ? 
+                            (double)(new_weight - old_weight) / old_weight : 1.0;
+                        double jam_factor = min(1.0, max(0.0, weight_change_ratio));
+                        double closure_factor = (new_weight > old_weight * 5) ? 1.0 : 0.0;
+                        
+                        // Use same formula as HC2L for comparison
+                        double impact = min(1.0, weight_change_ratio * jam_factor * (1.0 + closure_factor));
+                        disruption_impact_score = max(disruption_impact_score, impact);
+                        
+                        // DHL always updates immediately
+                        affected_nodes.insert(source);
+                        affected_nodes.insert(target);
+                        
+                        // Add neighbors
+                        if (adj_list.count(source)) {
+                            for (const auto& neighbor : adj_list.at(source)) {
+                                affected_nodes.insert(neighbor.node);
+                            }
+                        }
+                        if (adj_list.count(target)) {
+                            for (const auto& neighbor : adj_list.at(target)) {
+                                affected_nodes.insert(neighbor.node);
+                            }
+                        }
+                        
+                        cerr << "   ⚡ Immediate update for edge " << source 
+                             << "->" << target << " (Impact=" << impact << ")" << endl;
+                        
+                        disruption_count++;
+                    }
+                }
+                
+                nodes_updated = affected_nodes.size();
+                update_strategy = "immediate_update";
+                update_reason = "DHL baseline: always immediate update for all disruptions";
+                
+                disrupt_file.close();
+                cerr << "✅ DHL processed " << disruption_count << " disruptions" << endl;
+                cerr << "   Nodes updated: " << nodes_updated << endl;
+            } else {
+                cerr << "⚠️  Could not open disruption file: " << disruption_file << endl;
+                use_disruptions = false;
+            }
+        }
         
         // Determine routing endpoints based on one-way constraints
         vector<NodeID> start_candidates, dest_candidates;
@@ -1135,7 +1265,9 @@ int main(int argc, char* argv[]) {
                            start_edge_source, start_edge_target, start_edge_oneway,
                            dest_edge_source, dest_edge_target, dest_edge_oneway,
                            best_distance, query_time_ms, path, coordinates,
-                           edge_geometries, disruption_dir, tau_threshold);
+                           edge_geometries, use_disruptions, tau_threshold,
+                           disruption_file, disruption_impact_score,
+                           update_strategy, update_reason, nodes_updated);
         
         return 0;
         

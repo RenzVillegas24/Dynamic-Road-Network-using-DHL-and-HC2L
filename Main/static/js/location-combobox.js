@@ -1,0 +1,369 @@
+// location-combobox.js - Location search with dropdown autocomplete
+
+let searchTimeout;
+let currentFocusIndex = -1;
+
+// Position dropdown below input field using fixed positioning
+function positionDropdown(inputElement, dropdownElement) {
+  if (!inputElement || !dropdownElement) return;
+  
+  const rect = inputElement.getBoundingClientRect();
+  const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+  const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+  
+  // Position dropdown below the input with 8px gap (mt-2) and 8px margin (mr-8 equivalent)
+  dropdownElement.style.top = (rect.bottom + scrollTop + 8) + 'px';
+  dropdownElement.style.left = (rect.left + scrollLeft) + 'px';
+  dropdownElement.style.width = (rect.width - 16) + 'px'; // 8px margin on each side
+  dropdownElement.style.marginRight = '8px';
+}
+
+function initializeLocationCombobox() {
+  console.log('🔍 Initializing location combobox...');
+  
+  // Start location input
+  const startInput = document.getElementById('start-location-input');
+  if (startInput) {
+    startInput.addEventListener('input', (e) => {
+      clearTimeout(searchTimeout);
+      const query = e.target.value.trim();
+      currentFocusIndex = -1; // Reset focus
+      
+      if (query.length < 2) {
+        document.getElementById('start-dropdown-results').classList.add('hidden');
+        return;
+      }
+      
+      // Debounce search to avoid too many requests
+      searchTimeout = setTimeout(() => {
+        performLocationSearch(query, 'start');
+      }, 300);
+    });
+    
+    // Keyboard navigation
+    startInput.addEventListener('keydown', (e) => {
+      handleKeyboardNavigation(e, 'start');
+    });
+    
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#start-location-input') && 
+          !e.target.closest('#start-dropdown-results')) {
+        document.getElementById('start-dropdown-results').classList.add('hidden');
+      }
+    });
+    
+    console.log('✅ Start location input initialized');
+  }
+  
+  // Destination location input
+  const destInput = document.getElementById('dest-location-input');
+  if (destInput) {
+    destInput.addEventListener('input', (e) => {
+      clearTimeout(searchTimeout);
+      const query = e.target.value.trim();
+      currentFocusIndex = -1; // Reset focus
+      
+      if (query.length < 2) {
+        document.getElementById('dest-dropdown-results').classList.add('hidden');
+        return;
+      }
+      
+      // Debounce search
+      searchTimeout = setTimeout(() => {
+        performLocationSearch(query, 'dest');
+      }, 300);
+    });
+    
+    // Keyboard navigation
+    destInput.addEventListener('keydown', (e) => {
+      handleKeyboardNavigation(e, 'dest');
+    });
+    
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#dest-location-input') && 
+          !e.target.closest('#dest-dropdown-results')) {
+        document.getElementById('dest-dropdown-results').classList.add('hidden');
+      }
+    });
+    
+    console.log('✅ Destination location input initialized');
+  }
+  
+  // Pin button handlers (existing behavior)
+  const startPinBtn = document.getElementById('start-location-pin-btn');
+  if (startPinBtn) {
+    // Get the button element inside the container
+    const btn = startPinBtn.querySelector('button');
+    if (btn) {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        console.log('Start pin button clicked');
+        pinningMode = 'start';
+        if (map && map.getContainer) {
+          map.getContainer().style.cursor = 'crosshair';
+        }
+        showUpdateToast('Click on map to pin start location', 'info');
+        // Close dropdown
+        document.getElementById('start-dropdown-results').classList.add('hidden');
+      });
+      console.log('✅ Start pin button handler registered');
+    }
+  }
+  
+  const destPinBtn = document.getElementById('dest-location-pin-btn');
+  if (destPinBtn) {
+    // Get the button element inside the container
+    const btn = destPinBtn.querySelector('button');
+    if (btn) {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        console.log('Dest pin button clicked');
+        pinningMode = 'dest';
+        if (map && map.getContainer) {
+          map.getContainer().style.cursor = 'crosshair';
+        }
+        showUpdateToast('Click on map to pin destination', 'info');
+        // Close dropdown
+        document.getElementById('dest-dropdown-results').classList.add('hidden');
+      });
+      console.log('✅ Dest pin button handler registered');
+    }
+  }
+  
+  console.log('✅ Location combobox fully initialized');
+  
+  // Reposition dropdowns on window resize or scroll
+  window.addEventListener('resize', () => {
+    const startDropdown = document.getElementById('start-dropdown-results');
+    const destDropdown = document.getElementById('dest-dropdown-results');
+    const startInput = document.getElementById('start-location-input');
+    const destInput = document.getElementById('dest-location-input');
+    
+    if (startDropdown && !startDropdown.classList.contains('hidden')) {
+      positionDropdown(startInput, startDropdown);
+    }
+    if (destDropdown && !destDropdown.classList.contains('hidden')) {
+      positionDropdown(destInput, destDropdown);
+    }
+  });
+  
+  window.addEventListener('scroll', () => {
+    const startDropdown = document.getElementById('start-dropdown-results');
+    const destDropdown = document.getElementById('dest-dropdown-results');
+    const startInput = document.getElementById('start-location-input');
+    const destInput = document.getElementById('dest-location-input');
+    
+    if (startDropdown && !startDropdown.classList.contains('hidden')) {
+      positionDropdown(startInput, startDropdown);
+    }
+    if (destDropdown && !destDropdown.classList.contains('hidden')) {
+      positionDropdown(destInput, destDropdown);
+    }
+  });
+}
+
+// Handle keyboard navigation (arrow keys, Enter, Escape)
+function handleKeyboardNavigation(e, type) {
+  const dropdownId = type === 'start' ? 'start-dropdown-results' : 'dest-dropdown-results';
+  const dropdown = document.getElementById(dropdownId);
+  const items = dropdown.querySelectorAll('.dropdown-item');
+  
+  if (items.length === 0) return;
+  
+  // Arrow Down
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    currentFocusIndex = (currentFocusIndex + 1) % items.length;
+    updateFocus(items);
+  }
+  // Arrow Up
+  else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    currentFocusIndex = (currentFocusIndex - 1 + items.length) % items.length;
+    updateFocus(items);
+  }
+  // Enter - select focused item
+  else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (currentFocusIndex >= 0 && currentFocusIndex < items.length) {
+      items[currentFocusIndex].click();
+    }
+  }
+  // Escape - close dropdown
+  else if (e.key === 'Escape') {
+    dropdown.classList.add('hidden');
+    currentFocusIndex = -1;
+  }
+}
+
+// Update visual focus on dropdown items
+function updateFocus(items) {
+  items.forEach((item, index) => {
+    if (index === currentFocusIndex) {
+      item.classList.add('bg-slate-100');
+      item.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    } else {
+      item.classList.remove('bg-slate-100');
+    }
+  });
+}
+
+// Perform location search and show dropdown results
+async function performLocationSearch(query, type) {
+  const dropdownId = type === 'start' ? 'start-dropdown-results' : 'dest-dropdown-results';
+  const inputId = type === 'start' ? 'start-location-input' : 'dest-location-input';
+  const dropdown = document.getElementById(dropdownId);
+  const input = document.getElementById(inputId);
+  
+  console.log(`🔍 Searching for "${query}" (${type})`);
+  
+  // Position dropdown below the input field
+  positionDropdown(input, dropdown);
+  
+  // Show loading state
+  dropdown.innerHTML = `
+    <div class="p-4 text-center">
+      <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-${type === 'start' ? 'emerald' : 'rose'}-600"></div>
+      <p class="mt-2 text-sm text-slate-600">Searching...</p>
+    </div>
+  `;
+  dropdown.classList.remove('hidden');
+  
+  try {
+    console.log('📡 Sending search request');
+    const response = await fetch('/search_location', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query })
+    });
+    
+    console.log(`📥 Response status: ${response.status}`);
+    const data = await response.json();
+    console.log('📊 Search response:', data);
+    
+    if (!data.success) {
+      dropdown.innerHTML = `
+        <div class="p-4 text-center text-slate-500">
+          <svg class="w-10 h-10 mx-auto mb-2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <p class="text-sm font-medium">${data.error || 'Search failed'}</p>
+        </div>
+      `;
+      return;
+    }
+    
+    if (data.results.length === 0) {
+      dropdown.innerHTML = `
+        <div class="p-4 text-center text-slate-500">
+          <svg class="w-10 h-10 mx-auto mb-2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M12 12h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <p class="text-sm font-medium">No locations found</p>
+          <p class="text-xs text-slate-400">Try a different search</p>
+        </div>
+      `;
+      return;
+    }
+    
+    // Display results as dropdown items
+    const resultColor = type === 'start' ? 'emerald' : 'rose';
+    const resultHTML = data.results.map((result, index) => `
+      <div class="dropdown-item px-4 py-3 hover:bg-${resultColor}-50 cursor-pointer border-b border-slate-100 last:border-b-0 transition-colors"
+           data-lat="${result.lat}" 
+           data-lng="${result.lng}" 
+           data-type="${type}"
+           data-name="${result.name.replace(/"/g, '&quot;')}">
+        <div class="flex items-start gap-3">
+          <div class="bg-gradient-to-br from-${resultColor}-500 to-${resultColor}-600 rounded-lg p-2 flex-shrink-0 mt-0.5">
+            <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"></path>
+            </svg>
+          </div>
+          <div class="flex-1 min-w-0">
+            <h4 class="font-bold text-slate-900 text-sm truncate">${result.name.split(',')[0]}</h4>
+            <p class="text-xs text-slate-600 mt-0.5 line-clamp-1">${result.name}</p>
+            <div class="flex items-center gap-2 mt-1">
+              <span class="px-2 py-0.5 bg-${resultColor}-100 text-${resultColor}-700 rounded text-xs font-semibold">${result.type}</span>
+              <span class="text-xs text-slate-500">${result.lat.toFixed(4)}, ${result.lng.toFixed(4)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    `).join('');
+    
+    dropdown.innerHTML = resultHTML;
+    console.log(`✅ Displayed ${data.results.length} results`);
+    
+    // Add click handlers to results - use setTimeout to ensure DOM is updated
+    setTimeout(() => {
+      const items = dropdown.querySelectorAll('.dropdown-item');
+      items.forEach(item => {
+        item.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const lat = parseFloat(item.dataset.lat);
+          const lng = parseFloat(item.dataset.lng);
+          const locType = item.dataset.type;
+          const name = item.dataset.name;
+          
+          console.log(`📍 Location selected: ${name} (${lat}, ${lng})`);
+          
+          // Get the correct input element based on data-type
+          const selectedType = item.dataset.type;
+          const selectedInputId = selectedType === 'start' ? 'start-location-input' : 'dest-location-input';
+          const targetInput = document.getElementById(selectedInputId);
+          
+          if (targetInput) {
+            const displayName = name.split(',')[0]; // Show just the main name
+            targetInput.value = displayName;
+            console.log(`✅ Set ${selectedInputId} value to: ${displayName}`);
+            
+            // Dispatch input event to trigger any listeners
+            targetInput.dispatchEvent(new Event('input', { bubbles: true }));
+          } else {
+            console.error(`❌ Input ${selectedInputId} not found`);
+          }
+          
+          // Hide dropdown
+          dropdown.classList.add('hidden');
+          
+          // Set location
+          if (locType === 'start') {
+            handleOSMStartLocationPin(lat, lng, name);
+          } else {
+            handleOSMDestLocationPin(lat, lng, name);
+          }
+          
+          // Pan map to location
+          if (map) {
+            map.setView([lat, lng], 17);
+          }
+        });
+      });
+    }, 0);
+    
+    showUpdateToast(`Found ${data.count} location${data.count !== 1 ? 's' : ''}`, 'success');
+    
+  } catch (error) {
+    console.error('❌ Search error:', error);
+    dropdown.innerHTML = `
+      <div class="p-4 text-center text-red-500">
+        <svg class="w-10 h-10 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        <p class="text-sm font-medium">Network error</p>
+        <p class="text-xs text-slate-400 mt-1">${error.message}</p>
+      </div>
+    `;
+    showUpdateToast(`Search failed: ${error.message}`, 'error');
+  }
+}
+
+// Initialize when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeLocationCombobox);
+} else {
+  initializeLocationCombobox();
+}
