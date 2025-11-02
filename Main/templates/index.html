@@ -213,6 +213,19 @@
             <span class="font-bold text-slate-700 text-sm">Compare Google</span>
           </button>
         </div>
+        <div class="relative flex-1">
+          <button id="show-current-route-only-btn" onclick="toggleCurrentRouteOnly()"
+            class="flex items-center space-x-2 px-4 py-3 glass-effect hover:shadow-md rounded-2xl transition-all duration-300 border border-slate-300 whitespace-nowrap text-sm font-bold text-slate-700"
+            style="display: none;">
+            <div class="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl p-2 shadow-sm">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" 
+                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+              </svg>
+            </div>
+            <span class="font-bold text-slate-700 text-sm">Current Route Only</span>
+          </button>
+        </div>
       </div>
 
       <!-- Admin button -->
@@ -595,8 +608,9 @@
         </div>
 
         <!-- Action Buttons -->
-        <div
-          class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-5 mt-6 mb-5 border-2 border-slate-200 shadow-md">
+        <div id="google-maps-metrics-container"
+          class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-5 mt-6 mb-5 border-2 border-slate-200 shadow-md"
+          style="display: none;">
           <h3 class="text-sm font-bold text-slate-700 mb-3 uppercase tracking-wide">Route Accuracy vs Google Maps</h3>
           <div class="space-y-2">
             <div class="flex justify-between text-sm text-slate-700 bg-white p-3 rounded-xl border border-slate-200">
@@ -656,7 +670,7 @@
             </button>
             <button id="admin-reset-btn"
               class="px-4 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-bold transition-all duration-300">Reset</button>
-            <button
+            <button id="admin-export-btn"
               class="px-4 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-bold transition-all duration-300">Export</button>
           </div>
         </div>
@@ -817,6 +831,17 @@
               <span class="font-bold text-slate-700">New Dataset</span>
             </button>
 
+            <!-- Fetch HERE Traffic Button -->
+            <button id="fetch-here-traffic-btn"
+              class="w-full flex items-center space-x-3 px-3 py-3 glass-effect hover:shadow-md rounded-2xl transition-all duration-300 border border-slate-300">
+              <div class="bg-gradient-to-br from-orange-600 to-red-700 rounded-xl p-2 shadow-sm">
+                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                </svg>
+              </div>
+              <span class="font-bold text-slate-700">Fetch HERE Traffic</span>
+            </button>
+
             <!-- Show OSM Graph Button -->
             <button id="show-osm-graph-btn"
               class="w-full flex items-center space-x-3 px-3 py-3 glass-effect hover:shadow-md rounded-2xl transition-all duration-300 border border-slate-300">
@@ -868,6 +893,29 @@
               </svg>
             </div>
             <span class="font-bold text-sky-700">Show Nodes</span>
+            </button>
+            
+            <!-- Export CSV Button -->
+            <button id="export-csv-btn"
+              class="w-full flex items-center space-x-3 px-3 py-3 glass-effect hover:shadow-md rounded-2xl transition-all duration-300 border border-slate-300 bg-green-50">
+              <div class="bg-gradient-to-br from-green-600 to-green-700 rounded-xl p-2 shadow-sm">
+                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+              </div>
+              <span class="font-bold text-green-700">Export CSV</span>
+            </button>
+            
+            <!-- Run Demo Button -->
+            <button id="run-demo-btn"
+              class="w-full flex items-center space-x-3 px-3 py-3 glass-effect hover:shadow-md rounded-2xl transition-all duration-300 border-2 border-amber-400 bg-gradient-to-r from-amber-50 to-yellow-50">
+              <div class="bg-gradient-to-br from-amber-600 to-yellow-600 rounded-xl p-2 shadow-sm">
+                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+              </div>
+              <span class="font-bold text-amber-700">Run Demo</span>
             </button>
           </div>
         </div>
@@ -1043,6 +1091,10 @@
   <script src="{{ url_for('static', filename='js/location-combobox.js') }}"></script>
   <script src="{{ url_for('static', filename='js/auto-route-updater.js') }}"></script>
   <script src="{{ url_for('static', filename='js/google-maps-comparison.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/update-regions.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/map-legend.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/csv-export.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/demo-automation.js') }}"></script>
 
   <script>
 
@@ -2134,6 +2186,114 @@
             <span class="font-bold text-sky-700">Hide Nodes</span>
             `
 
+        });
+      }
+      
+      // Wire up Export CSV button
+      const exportCsvBtn = document.getElementById('export-csv-btn');
+      if (exportCsvBtn) {
+        exportCsvBtn.addEventListener('click', () => {
+          if (typeof exportAllData === 'function') {
+            exportAllData();
+          } else {
+            showUpdateToast('Export functionality not available', 'warning');
+          }
+        });
+      }
+      
+      // Wire up Run Demo button
+      const runDemoBtn = document.getElementById('run-demo-btn');
+      if (runDemoBtn) {
+        runDemoBtn.addEventListener('click', () => {
+          if (typeof runDemo === 'function') {
+            runDemo();
+          } else {
+            showUpdateToast('Demo functionality not available', 'warning');
+          }
+        });
+      }
+      
+      // Wire up Reset button
+      const resetBtn = document.getElementById('admin-reset-btn');
+      if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+          console.log('Reset button clicked');
+          // Clear all routes
+          if (typeof clearRoutes === 'function') {
+            clearRoutes();
+          }
+          // Clear disruption markers
+          if (typeof clearDisruptionMarkers === 'function') {
+            clearDisruptionMarkers();
+          }
+          // Clear Google Maps route
+          if (typeof clearGoogleMapsRoute === 'function') {
+            clearGoogleMapsRoute();
+          }
+          // Clear update regions
+          if (typeof clearUpdateRegions === 'function') {
+            clearUpdateRegions();
+          }
+          // Clear export data buffer
+          if (typeof clearExportData === 'function') {
+            clearExportData();
+          }
+          showUpdateToast('Map reset: all routes and disruptions cleared', 'success');
+        });
+      }
+      
+      // Wire up Export button (admin panel)
+      const adminExportBtn = document.getElementById('admin-export-btn');
+      if (adminExportBtn) {
+        adminExportBtn.addEventListener('click', () => {
+          if (typeof exportAllData === 'function') {
+            exportAllData();
+          } else {
+            showUpdateToast('Export functionality not available', 'warning');
+          }
+        });
+      }
+      
+      // Wire up Fetch HERE Traffic button
+      const fetchHereTrafficBtn = document.getElementById('fetch-here-traffic-btn');
+      if (fetchHereTrafficBtn) {
+        fetchHereTrafficBtn.addEventListener('click', async () => {
+          try {
+            showUpdateToast('Fetching real-time traffic data from HERE API...', 'info');
+            
+            const response = await fetch('/fetch_here_traffic', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                algorithm: 'current',
+                apply_immediately: true
+              })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+              showUpdateToast(
+                `HERE Traffic: ${data.edges_affected} edges affected (${data.metadata.flow_count} flow + ${data.metadata.incident_count} incidents)`,
+                'success'
+              );
+              
+              // Optionally refresh disruptions on map
+              if (typeof loadDisruptionMarkers === 'function') {
+                setTimeout(() => {
+                  showUpdateToast('Refreshing disruption markers...', 'info');
+                  loadDisruptionMarkers();
+                }, 1000);
+              }
+            } else {
+              showUpdateToast(`Failed to fetch HERE traffic: ${data.error}`, 'warning');
+            }
+          } catch (error) {
+            showUpdateToast(`Error fetching HERE traffic: ${error.message}`, 'warning');
+            console.error('HERE traffic fetch error:', error);
+          }
         });
       }
     });

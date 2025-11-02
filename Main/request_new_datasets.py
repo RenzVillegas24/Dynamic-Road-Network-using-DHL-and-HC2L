@@ -237,7 +237,7 @@ def fetch_here_traffic_data(api_key):
         print(f"⚠️  Failed to fetch flow data: {e}")
     
     # Fetch Incident Data (accidents, closures, etc.)
-    incidents_url = f"https://data.incidents.hereapi.com/v7/incidents?in=bbox:{bbox}&locationReferencing=shape&apiKey={api_key}"
+    incidents_url = f"https://data.traffic.hereapi.com/v7/incidents?in=bbox:{bbox}&locationReferencing=shape&apiKey={api_key}"
     incidents_data = []
     
     try:

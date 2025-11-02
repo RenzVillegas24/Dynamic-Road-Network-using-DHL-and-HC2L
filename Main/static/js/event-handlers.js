@@ -349,12 +349,28 @@ function initializeEventHandlers() {
         // Store route data globally for Current Path Panel
         currentRouteData = routeData;
         
+        // Show "Current Route Only" button after route is calculated
+        const showCurrentRouteBtn = document.getElementById('show-current-route-only-btn');
+        if (showCurrentRouteBtn) {
+            showCurrentRouteBtn.style.display = 'flex';
+        }
+        
         // Update UI with route information
         updateRouteMetrics(routeData);
         updateAdminPerformanceMetrics(routeData);
         
         // Update Current Path Panel with real route data
         updateCurrentPathPanel(routeData);
+        
+        // Show update region overlay if applicable
+        if (typeof showUpdateRegion === 'function') {
+          showUpdateRegion(routeData);
+        }
+        
+        // Add route to CSV export buffer
+        if (typeof addRouteToExport === 'function') {
+          addRouteToExport(routeData);
+        }
         
         setTimeout(() => {
           const currentMode = updateModeBadge.textContent;

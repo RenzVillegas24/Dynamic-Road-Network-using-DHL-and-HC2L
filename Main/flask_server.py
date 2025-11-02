@@ -20,6 +20,9 @@ from auto_disruption_service import init_auto_disruption_service, shutdown_auto_
 # Import Google Maps service
 from google_maps_service import GoogleMapsService
 
+# Import HERE Traffic service
+from here_traffic_service import get_here_traffic_service
+
 
 app = Flask(__name__)
 
@@ -1420,12 +1423,71 @@ def compare_with_google_maps():
                 if 'route' in algorithm_route and 'coordinates' in algorithm_route['route']:
                     algorithm_coords = algorithm_route['route']['coordinates']
         else:
-            # Default to D-HC2L
+            # D-HC2L / Lazy HC2L requires snap data
             if gps_router:
                 print("   Computing D-HC2L route...")
+                
+                # Extract OSM snap data (required for HC2L)
+                start_osm_edge = data.get('start_osm_edge')
+                dest_osm_edge = data.get('dest_osm_edge')
+                
+                # Default to pin coordinates if no snap info
+                start_snap_lat = start_lat
+                start_snap_lng = start_lng
+                dest_snap_lat = dest_lat
+                dest_snap_lng = dest_lng
+                
+                # Default edge information
+                start_edge_source = 0
+                start_edge_target = 0
+                start_edge_oneway = 0
+                dest_edge_source = 0
+                dest_edge_target = 0
+                dest_edge_oneway = 0
+                
+                # Extract snap point and edge information
+                if start_osm_edge:
+                    if 'snapped_point' in start_osm_edge:
+                        start_snap_lat = float(start_osm_edge['snapped_point']['lat'])
+                        start_snap_lng = float(start_osm_edge['snapped_point']['lng'])
+                    if 'osm_nodes' in start_osm_edge and len(start_osm_edge['osm_nodes']) >= 2:
+                        start_edge_source = int(start_osm_edge['osm_nodes'][0])
+                        start_edge_target = int(start_osm_edge['osm_nodes'][1])
+                    oneway_str = start_osm_edge.get('oneway', '0')
+                    try:
+                        start_edge_oneway = int(oneway_str)
+                    except (ValueError, TypeError):
+                        start_edge_oneway = 0
+                
+                if dest_osm_edge:
+                    if 'snapped_point' in dest_osm_edge:
+                        dest_snap_lat = float(dest_osm_edge['snapped_point']['lat'])
+                        dest_snap_lng = float(dest_osm_edge['snapped_point']['lng'])
+                    if 'osm_nodes' in dest_osm_edge and len(dest_osm_edge['osm_nodes']) >= 2:
+                        dest_edge_source = int(dest_osm_edge['osm_nodes'][0])
+                        dest_edge_target = int(dest_osm_edge['osm_nodes'][1])
+                    oneway_str = dest_osm_edge.get('oneway', '0')
+                    try:
+                        dest_edge_oneway = int(oneway_str)
+                    except (ValueError, TypeError):
+                        dest_edge_oneway = 0
+                
+                # Get disruption file if using disruptions
+                disruption_file = ""
+                if use_disruptions:
+                    disruption_file = Config.DISRUPTION_FILE
+                
+                # Compute route with all required parameters
                 algorithm_route = gps_router.compute_route(
-                    start_lat, start_lng, dest_lat, dest_lng, use_disruptions, threshold
+                    start_lat, start_lng,
+                    dest_lat, dest_lng,
+                    start_snap_lat, start_snap_lng,
+                    dest_snap_lat, dest_snap_lng,
+                    start_edge_source, start_edge_target, start_edge_oneway,
+                    dest_edge_source, dest_edge_target, dest_edge_oneway,
+                    disruption_file, threshold
                 )
+                
                 if algorithm_route.get('success'):
                     algorithm_summary = gps_router.get_route_summary(algorithm_route)
                     # Extract coordinates from route
@@ -1575,6 +1637,65 @@ def check_disruption_updates():
         })
         
     except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
+
+@app.route('/fetch_here_traffic', methods=['POST'])
+def fetch_here_traffic():
+    """
+    Fetch real-time traffic data from HERE API and generate disruption file
+    
+    Request body:
+    {
+        "algorithm": "hc2l" or "dhl",  // Optional, defaults to "current"
+        "apply_immediately": true       // Optional, whether to use this as dynamic disruption
+    }
+    """
+    try:
+        data = request.get_json() or {}
+        algorithm = data.get('algorithm', 'current')
+        apply_immediately = data.get('apply_immediately', True)
+        
+        # Get HERE traffic service
+        here_service = get_here_traffic_service()
+        
+        # Determine output file
+        if algorithm in ['hc2l', 'dhl']:
+            output_file = Config.DISRUPTIONS_DIR / f"here_traffic_disruptions_{algorithm}.gr"
+        else:
+            output_file = Config.DISRUPTIONS_DIR / "here_traffic_disruptions_current.gr"
+        
+        # Fetch and generate disruptions
+        edges_count, metadata = here_service.fetch_and_generate_disruptions(
+            Config.EDGES_CSV,
+            output_file
+        )
+        
+        # If apply_immediately, copy to dynamic disruptions file
+        if apply_immediately and edges_count > 0:
+            import shutil
+            if algorithm in ['hc2l', 'dhl']:
+                dynamic_file = Config.DISRUPTIONS_DIR / f"dynamic_disruptions_{algorithm}.gr"
+            else:
+                dynamic_file = Config.DISRUPTIONS_DIR / "dynamic_disruptions_current.gr"
+            
+            shutil.copy(output_file, dynamic_file)
+            metadata['applied_to'] = str(dynamic_file)
+            print(f"✅ Applied HERE traffic disruptions to {dynamic_file}")
+        
+        return jsonify({
+            'success': True,
+            'edges_affected': edges_count,
+            'metadata': metadata,
+            'output_file': str(output_file)
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({
             'success': False,
             'error': str(e)

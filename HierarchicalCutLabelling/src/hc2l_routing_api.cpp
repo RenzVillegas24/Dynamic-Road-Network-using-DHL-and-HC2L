@@ -1647,6 +1647,13 @@ int main(int argc, char* argv[]) {
         if (!path.empty() && !same_edge) {
             // Different edges: ensure both snap edges are included
             
+            cerr << "🔍 START EDGE INCLUSION CHECK:" << endl;
+            cerr << "   Start edge: " << start_edge_source << " → " << start_edge_target << endl;
+            cerr << "   First path node: " << path[0] << endl;
+            if (path.size() >= 2) {
+                cerr << "   Second path node: " << path[1] << endl;
+            }
+            
             // Prepend start edge if needed
             NodeID first = path[0];
             bool start_edge_present = false;
@@ -1656,17 +1663,29 @@ int main(int argc, char* argv[]) {
                                    (first == start_edge_target && second == start_edge_source);
             }
             
+            cerr << "   Start edge present in path: " << (start_edge_present ? "YES" : "NO") << endl;
+            
             if (!start_edge_present) {
                 // Add the other endpoint to create the edge
                 if (first == start_edge_source) {
                     path.insert(path.begin(), start_edge_target);
+                    cerr << "   ✅ Prepended target node " << start_edge_target << " to create start edge" << endl;
                 } else if (first == start_edge_target) {
                     path.insert(path.begin(), start_edge_source);
+                    cerr << "   ✅ Prepended source node " << start_edge_source << " to create start edge" << endl;
                 } else {
                     // Path doesn't start on snap edge - add both nodes
                     path.insert(path.begin(), start_edge_target);
                     path.insert(path.begin(), start_edge_source);
+                    cerr << "   ⚠️  Path doesn't start on snap edge! Added both: " << start_edge_source << " → " << start_edge_target << endl;
                 }
+            }
+            
+            cerr << "\n🔍 DEST EDGE INCLUSION CHECK:" << endl;
+            cerr << "   Dest edge: " << dest_edge_source << " → " << dest_edge_target << endl;
+            cerr << "   Last path node: " << path[path.size() - 1] << endl;
+            if (path.size() >= 2) {
+                cerr << "   Second-last path node: " << path[path.size() - 2] << endl;
             }
             
             // Append dest edge if needed
@@ -1678,18 +1697,31 @@ int main(int argc, char* argv[]) {
                                   (second_last == dest_edge_target && last == dest_edge_source);
             }
             
+            cerr << "   Dest edge present in path: " << (dest_edge_present ? "YES" : "NO") << endl;
+            
             if (!dest_edge_present) {
                 // Add the other endpoint to create the edge
                 if (last == dest_edge_source) {
                     path.push_back(dest_edge_target);
+                    cerr << "   ✅ Appended target node " << dest_edge_target << " to create dest edge" << endl;
                 } else if (last == dest_edge_target) {
                     path.push_back(dest_edge_source);
+                    cerr << "   ✅ Appended source node " << dest_edge_source << " to create dest edge" << endl;
                 } else {
                     // Path doesn't end on snap edge - add both nodes
                     path.push_back(dest_edge_source);
                     path.push_back(dest_edge_target);
+                    cerr << "   ⚠️  Path doesn't end on snap edge! Added both: " << dest_edge_source << " → " << dest_edge_target << endl;
                 }
             }
+            
+            cerr << "\n✅ Final path after edge inclusion: ";
+            for (size_t i = 0; i < min(path.size(), size_t(15)); i++) {
+                cerr << path[i];
+                if (i < min(path.size(), size_t(15)) - 1) cerr << " → ";
+            }
+            if (path.size() > 15) cerr << " ... (" << (path.size() - 15) << " more)";
+            cerr << endl << endl;
         }
         
         // ============================================================
@@ -1747,6 +1779,55 @@ int main(int argc, char* argv[]) {
                     path = alternatives[0].path;
                     best_distance = alternatives[0].distance;
                 }
+            }
+        }
+        
+        // ============================================================
+        // FINAL EDGE INCLUSION: Re-apply after alternative route selection
+        // ============================================================
+        if (!path.empty() && !same_edge) {
+            cerr << "\n🔧 FINAL: Re-applying start/dest edges after alternative route selection..." << endl;
+            
+            // Prepend start edge if needed
+            NodeID first = path[0];
+            bool start_edge_present = false;
+            if (path.size() >= 2) {
+                NodeID second = path[1];
+                start_edge_present = (first == start_edge_source && second == start_edge_target) ||
+                                   (first == start_edge_target && second == start_edge_source);
+            }
+            
+            if (!start_edge_present) {
+                if (first == start_edge_source) {
+                    path.insert(path.begin(), start_edge_target);
+                } else if (first == start_edge_target) {
+                    path.insert(path.begin(), start_edge_source);
+                } else {
+                    path.insert(path.begin(), start_edge_target);
+                    path.insert(path.begin(), start_edge_source);
+                }
+                cerr << "   ✅ Start edge re-added" << endl;
+            }
+            
+            // Append dest edge if needed
+            NodeID last = path[path.size() - 1];
+            bool dest_edge_present = false;
+            if (path.size() >= 2) {
+                NodeID second_last = path[path.size() - 2];
+                dest_edge_present = (second_last == dest_edge_source && last == dest_edge_target) ||
+                                  (second_last == dest_edge_target && last == dest_edge_source);
+            }
+            
+            if (!dest_edge_present) {
+                if (last == dest_edge_source) {
+                    path.push_back(dest_edge_target);
+                } else if (last == dest_edge_target) {
+                    path.push_back(dest_edge_source);
+                } else {
+                    path.push_back(dest_edge_source);
+                    path.push_back(dest_edge_target);
+                }
+                cerr << "   ✅ Dest edge re-added" << endl;
             }
         }
         

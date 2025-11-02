@@ -624,7 +624,7 @@ void output_json_response(bool success, const string& error_message = "",
                          double dest_snap_lat = 0, double dest_snap_lng = 0,
                          NodeID start_edge_source = 0, NodeID start_edge_target = 0, int start_edge_oneway = 0,
                          NodeID dest_edge_source = 0, NodeID dest_edge_target = 0, int dest_edge_oneway = 0,
-                         distance_t distance = 0, double query_time_ms = 0,
+                         distance_t distance = 0, double query_time_ms = 0, double index_load_time_ms = 0,
                          const vector<NodeID>& path = vector<NodeID>(),
                          const map<NodeID, GPSCoordinate>& coordinates = map<NodeID, GPSCoordinate>(),
                          const map<pair<NodeID, NodeID>, EdgeGeometry>& edge_geometries = map<pair<NodeID, NodeID>, EdgeGeometry>(),
@@ -689,6 +689,7 @@ void output_json_response(bool success, const string& error_message = "",
         cout << "  \"metrics\": {" << endl;
         cout << "    \"total_distance_units\": " << distance << "," << endl;
         cout << "    \"query_time_ms\": " << fixed << setprecision(3) << query_time_ms << "," << endl;
+        cout << "    \"labeling_time_ms\": " << fixed << setprecision(3) << index_load_time_ms << "," << endl;
         cout << "    \"path_length\": " << path.size() << "," << endl;
         cout << "    \"uses_disruptions\": " << (use_disruptions ? "true" : "false") << "," << endl;
         cout << "    \"tau_threshold\": " << fixed << setprecision(2) << tau_threshold << "," << endl;
@@ -997,7 +998,9 @@ int main(int argc, char* argv[]) {
             return 1;
         }
         
-        // Load DHL index
+        // Load DHL index and measure time
+        auto index_load_start = chrono::high_resolution_clock::now();
+        
         ifstream index_stream(index_file, ios::binary);
         if (!index_stream.is_open()) {
             output_json_response(false, "Failed to open index file");
@@ -1005,6 +1008,10 @@ int main(int argc, char* argv[]) {
         }
         ContractionIndex ci(index_stream);
         index_stream.close();
+        
+        auto index_load_end = chrono::high_resolution_clock::now();
+        chrono::duration<double, milli> index_load_duration = index_load_end - index_load_start;
+        double index_load_time_ms = index_load_duration.count();
         
         // ============================================================
         // DHL: Process disruptions if provided (ALWAYS IMMEDIATE UPDATE)
@@ -1264,7 +1271,7 @@ int main(int argc, char* argv[]) {
                            dest_pin_lat, dest_pin_lng, dest_snap_lat, dest_snap_lng,
                            start_edge_source, start_edge_target, start_edge_oneway,
                            dest_edge_source, dest_edge_target, dest_edge_oneway,
-                           best_distance, query_time_ms, path, coordinates,
+                           best_distance, query_time_ms, index_load_time_ms, path, coordinates,
                            edge_geometries, use_disruptions, tau_threshold,
                            disruption_file, disruption_impact_score,
                            update_strategy, update_reason, nodes_updated);

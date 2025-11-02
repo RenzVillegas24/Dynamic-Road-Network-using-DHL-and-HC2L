@@ -54,14 +54,19 @@ async function compareWithGoogleMaps() {
             return;
         }
         
-        // Get selected algorithm
-        const algorithmRadio = document.querySelector('input[name="algorithm"]:checked');
-        if (!algorithmRadio) {
-            showUpdateToast('Please select an algorithm', 'warning');
-            return;
+        // Get algorithm from current route data instead of radio button
+        let algorithm = 'lazy-hc2l'; // Default
+        
+        if (window.currentRouteData && window.currentRouteData.metrics && window.currentRouteData.metrics.algorithm) {
+            const algoName = window.currentRouteData.metrics.algorithm.toLowerCase();
+            if (algoName.includes('dhl')) {
+                algorithm = 'dhl';
+            } else if (algoName.includes('hc2l') || algoName.includes('lazy')) {
+                algorithm = 'lazy-hc2l';
+            }
         }
         
-        const algorithm = algorithmRadio.value;
+        console.log('Using algorithm from current route:', algorithm);
         const useDisruptions = algorithm.includes('disrupted');
         const threshold = parseFloat(document.getElementById('threshold-value')?.textContent || '0.5');
         
@@ -69,8 +74,42 @@ async function compareWithGoogleMaps() {
         console.log('  Algorithm:', algorithm);
         console.log('  Use disruptions:', useDisruptions);
         
+        // Extract OSM snap data if available (required for HC2L)
+        let startOsmEdge = null;
+        let destOsmEdge = null;
+        
+        if (window.osmSnapMarkers) {
+            if (window.osmSnapMarkers.start && window.osmSnapMarkers.start.edgeData) {
+                startOsmEdge = window.osmSnapMarkers.start.edgeData;
+                console.log('  Start snap data:', startOsmEdge.road_name || 'Unknown');
+            }
+            if (window.osmSnapMarkers.dest && window.osmSnapMarkers.dest.edgeData) {
+                destOsmEdge = window.osmSnapMarkers.dest.edgeData;
+                console.log('  Dest snap data:', destOsmEdge.road_name || 'Unknown');
+            }
+        }
+        
         // Show loading state
         showUpdateToast('Fetching Google Maps route...', 'info');
+        
+        // Build request payload
+        const payload = {
+            start_lat: startLat,
+            start_lng: startLng,
+            dest_lat: destLat,
+            dest_lng: destLng,
+            algorithm: algorithm,
+            use_disruptions: useDisruptions,
+            threshold: threshold
+        };
+        
+        // Add OSM snap data if available (required for HC2L routing)
+        if (startOsmEdge) {
+            payload.start_osm_edge = startOsmEdge;
+        }
+        if (destOsmEdge) {
+            payload.dest_osm_edge = destOsmEdge;
+        }
         
         // Call backend API
         const response = await fetch('/compare_with_google_maps', {
@@ -78,15 +117,7 @@ async function compareWithGoogleMaps() {
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                start_lat: startLat,
-                start_lng: startLng,
-                dest_lat: destLat,
-                dest_lng: destLng,
-                algorithm: algorithm,
-                use_disruptions: useDisruptions,
-                threshold: threshold
-            })
+            body: JSON.stringify(payload)
         });
         
         const data = await response.json();
@@ -106,6 +137,11 @@ async function compareWithGoogleMaps() {
         
         // Update metrics display
         updateGoogleMapsMetrics(data.comparison);
+        
+        // Add comparison to CSV export buffer
+        if (typeof addComparisonToExport === 'function') {
+            addComparisonToExport(data);
+        }
         
         // Show success message
         showUpdateToast(
@@ -185,6 +221,12 @@ function displayGoogleMapsRoute(googleMapsRoute) {
  */
 function updateGoogleMapsMetrics(comparison) {
     try {
+        // Show the metrics container
+        const metricsContainer = document.getElementById('google-maps-metrics-container');
+        if (metricsContainer) {
+            metricsContainer.style.display = 'block';
+        }
+        
         // Update Fréchet distance
         const frechetElement = document.getElementById('frechet-distance-value');
         if (frechetElement) {
@@ -208,21 +250,53 @@ function updateGoogleMapsMetrics(comparison) {
  * Clear Google Maps route from map
  */
 function clearGoogleMapsRoute() {
-    if (googleMapsRouteLayer) {
-        map.removeLayer(googleMapsRouteLayer);
-        googleMapsRouteLayer = null;
-        console.log('🗑️  Google Maps route cleared');
-    }
-    
-    // Reset metrics
-    const frechetElement = document.getElementById('frechet-distance-value');
-    if (frechetElement) {
-        frechetElement.textContent = '-- m';
-    }
-    
-    const overlapElement = document.getElementById('segment-overlap-value');
-    if (overlapElement) {
-        overlapElement.textContent = '--%';
+    try {
+        // Remove Google Maps route layer
+        if (googleMapsRouteLayer) {
+            map.removeLayer(googleMapsRouteLayer);
+            googleMapsRouteLayer = null;
+            console.log('✅ Google Maps route cleared');
+        }
+        
+        // Hide metrics container
+        const metricsContainer = document.getElementById('google-maps-metrics-container');
+        if (metricsContainer) {
+            metricsContainer.style.display = 'none';
+        }
+        
+        // Reset metric values
+        const frechetElement = document.getElementById('frechet-distance-value');
+        if (frechetElement) {
+            frechetElement.textContent = '-- m';
+        }
+        
+        const overlapElement = document.getElementById('segment-overlap-value');
+        if (overlapElement) {
+            overlapElement.textContent = '--%';
+        }
+        
+        // Reset toggle button state if it exists
+        if (typeof showCurrentRouteOnlyActive !== 'undefined' && showCurrentRouteOnlyActive) {
+            // Reset the toggle state
+            showCurrentRouteOnlyActive = false;
+            
+            // Reset button appearance
+            const button = document.getElementById('show-current-route-only-btn');
+            if (button) {
+                const buttonText = button.querySelector('span');
+                if (buttonText) {
+                    buttonText.textContent = 'Current Route Only';
+                }
+                
+                const iconDiv = button.querySelector('div');
+                if (iconDiv) {
+                    iconDiv.classList.remove('from-green-500', 'to-emerald-600');
+                    iconDiv.classList.add('from-blue-500', 'to-indigo-600');
+                }
+            }
+        }
+    } catch (error) {
+        console.error('❌ Error clearing Google Maps route:', error);
     }
 }
 
@@ -248,5 +322,68 @@ window.compareWithGoogleMaps = compareWithGoogleMaps;
 window.displayGoogleMapsRoute = displayGoogleMapsRoute;
 window.clearGoogleMapsRoute = clearGoogleMapsRoute;
 window.autoCompareWithGoogleMaps = autoCompareWithGoogleMaps;
+
+/**
+ * Toggle visibility of current algorithm route only
+ * When activated, hides Google Maps route overlay and shows only the current algorithm route
+ */
+let showCurrentRouteOnlyActive = false; // Track toggle state
+
+function toggleCurrentRouteOnly() {
+    const button = document.getElementById('show-current-route-only-btn');
+    
+    if (!button) {
+        console.warn('Show Current Route Only button not found');
+        return;
+    }
+    
+    showCurrentRouteOnlyActive = !showCurrentRouteOnlyActive;
+    
+    if (showCurrentRouteOnlyActive) {
+        // Hide Google Maps route overlay
+        if (googleMapsRouteLayer && map) {
+            map.removeLayer(googleMapsRouteLayer);
+            console.log('✅ Hidden Google Maps route overlay');
+        }
+        
+        // Update button text to indicate current state
+        const buttonText = button.querySelector('span');
+        if (buttonText) {
+            buttonText.textContent = 'Show All Routes';
+        }
+        
+        // Change button color to indicate active state
+        const iconDiv = button.querySelector('div');
+        if (iconDiv) {
+            iconDiv.classList.remove('from-blue-500', 'to-indigo-600');
+            iconDiv.classList.add('from-green-500', 'to-emerald-600');
+        }
+        
+        console.log('✅ Showing current route only');
+    } else {
+        // Restore Google Maps route overlay
+        if (googleMapsRouteLayer && map) {
+            googleMapsRouteLayer.addTo(map);
+            console.log('✅ Restored Google Maps route overlay');
+        }
+        
+        // Update button text back to original
+        const buttonText = button.querySelector('span');
+        if (buttonText) {
+            buttonText.textContent = 'Current Route Only';
+        }
+        
+        // Change button color back to original
+        const iconDiv = button.querySelector('div');
+        if (iconDiv) {
+            iconDiv.classList.remove('from-green-500', 'to-emerald-600');
+            iconDiv.classList.add('from-blue-500', 'to-indigo-600');
+        }
+        
+        console.log('✅ Showing all routes');
+    }
+}
+
+window.toggleCurrentRouteOnly = toggleCurrentRouteOnly;
 
 console.log('✅ Google Maps comparison module loaded');

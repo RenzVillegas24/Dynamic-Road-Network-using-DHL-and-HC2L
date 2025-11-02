@@ -105,6 +105,12 @@ function clearRoutes() {
     // Clear current route data
     currentRouteData = null;
 
+    // Hide "Current Route Only" button when routes are cleared
+    const showCurrentRouteBtn = document.getElementById('show-current-route-only-btn');
+    if (showCurrentRouteBtn) {
+        showCurrentRouteBtn.style.display = 'none';
+    }
+
     // Reset Current Path Panel to placeholder
     resetCurrentPathPanel();
 
