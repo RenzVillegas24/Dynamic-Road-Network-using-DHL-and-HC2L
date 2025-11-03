@@ -369,51 +369,30 @@ function updateRouteHeaderMetrics(route, metrics) {
       const stepCount = turnDirections.length;
       
       // Update distance metric
-      const distanceElement = document.querySelector('#current-path-panel .text-xl.font-bold.text-emerald-600');
+      const distanceElement = document.getElementById('route-distance');
       if (distanceElement) {
         distanceElement.textContent = `${distanceKm} km`;
         console.log('✅ Updated distance element with:', `${distanceKm} km`);
       } else {
-        console.error('❌ Distance element not found with selector: #current-path-panel .text-xl.font-bold.text-emerald-600');
-        // Try alternative selector
-        const allDistanceElements = document.querySelectorAll('.text-xl.font-bold.text-emerald-600');
-        console.log('Found distance elements:', allDistanceElements.length);
-        if (allDistanceElements.length > 0) {
-          allDistanceElements[0].textContent = `${distanceKm} km`;
-          console.log('✅ Updated first distance element as fallback');
-        }
+        console.error('❌ Distance element not found (#route-distance)');
       }
       
       // Update duration metric
-      const durationElement = document.querySelector('#current-path-panel .text-xl.font-bold.text-blue-600');
+      const durationElement = document.getElementById('route-duration');
       if (durationElement) {
         durationElement.textContent = `${durationMinutes} min`;
         console.log('✅ Updated duration element with:', `${durationMinutes} min`);
       } else {
-        console.error('❌ Duration element not found with selector: #current-path-panel .text-xl.font-bold.text-blue-600');
-        // Try alternative selector
-        const allDurationElements = document.querySelectorAll('.text-xl.font-bold.text-blue-600');
-        console.log('Found duration elements:', allDurationElements.length);
-        if (allDurationElements.length > 0) {
-          allDurationElements[0].textContent = `${durationMinutes} min`;
-          console.log('✅ Updated first duration element as fallback');
-        }
+        console.error('❌ Duration element not found (#route-duration)');
       }
       
       // Update steps count
-      const stepsElement = document.querySelector('#current-path-panel .text-xl.font-bold.text-purple-600');
+      const stepsElement = document.getElementById('route-steps-count');
       if (stepsElement) {
         stepsElement.textContent = stepCount.toString();
         console.log('✅ Updated steps element with:', stepCount.toString());
       } else {
-        console.error('❌ Steps element not found with selector: #current-path-panel .text-xl.font-bold.text-purple-600');
-        // Try alternative selector
-        const allStepsElements = document.querySelectorAll('.text-xl.font-bold.text-purple-600');
-        console.log('Found steps elements:', allStepsElements.length);
-        if (allStepsElements.length > 0) {
-          allStepsElements[0].textContent = stepCount.toString();
-          console.log('✅ Updated first steps element as fallback');
-        }
+        console.error('❌ Steps element not found (#route-steps-count)');
       }
       
       console.log(`Route metrics updated: ${distanceKm}km, ${durationMinutes}min, ${stepCount} steps`);

@@ -1027,6 +1027,7 @@ int main(int argc, char* argv[]) {
             if (disrupt_file.is_open()) {
                 string line;
                 int disruption_count = 0;
+                int closed_roads_count = 0;
                 set<NodeID> affected_nodes;
                 
                 while (getline(disrupt_file, line)) {
@@ -1036,7 +1037,20 @@ int main(int argc, char* argv[]) {
                     NodeID source, target;
                     distance_t new_weight, old_weight = 0;
                     
+                    // Enhanced format: source target new_weight jam_factor current_speed free_flow_speed 
+                    //                  impact_score confidence highway is_closed type
+                    double jam_factor = 5.0, current_speed = 0.0, free_flow_speed = 50.0;
+                    double impact_score = 0.5, confidence = 0.7;
+                    string highway_type = "unknown", disruption_type = "unknown";
+                    int is_closed = 0;
+                    
+                    // Read all available fields
                     if (iss >> source >> target >> new_weight) {
+                        // Try to read enhanced fields (optional - backward compatible)
+                        iss >> jam_factor >> current_speed >> free_flow_speed 
+                            >> impact_score >> confidence >> highway_type 
+                            >> is_closed >> disruption_type;
+                        
                         // Find old weight
                         if (adj_list.count(source)) {
                             for (const auto& neighbor : adj_list.at(source)) {
@@ -1047,15 +1061,40 @@ int main(int argc, char* argv[]) {
                             }
                         }
                         
-                        // Compute impact score for logging
-                        double weight_change_ratio = (old_weight > 0) ? 
-                            (double)(new_weight - old_weight) / old_weight : 1.0;
-                        double jam_factor = min(1.0, max(0.0, weight_change_ratio));
-                        double closure_factor = (new_weight > old_weight * 5) ? 1.0 : 0.0;
-                        
-                        // Use same formula as HC2L for comparison
-                        double impact = min(1.0, weight_change_ratio * jam_factor * (1.0 + closure_factor));
-                        disruption_impact_score = max(disruption_impact_score, impact);
+                        // Handle road closures: skip closed edges in routing
+                        if (is_closed == 1 || new_weight >= 999999.0) {
+                            cerr << "   🚧 Road CLOSED: Edge " << source << "->" << target 
+                                 << " (Type: " << disruption_type << ")" << endl;
+                            closed_roads_count++;
+                            
+                            // Remove edge from adjacency list to make it unreachable
+                            if (adj_list.count(source)) {
+                                auto& neighbors = adj_list[source];
+                                neighbors.erase(
+                                    remove_if(neighbors.begin(), neighbors.end(),
+                                             [target](const Neighbor& n) { return n.node == target; }),
+                                    neighbors.end()
+                                );
+                            }
+                            
+                            disruption_impact_score = 1.0; // Maximum impact for closures
+                        } else {
+                            // Normal disruption: update edge weight
+                            if (adj_list.count(source)) {
+                                for (auto& neighbor : adj_list[source]) {
+                                    if (neighbor.node == target) {
+                                        neighbor.distance = new_weight;
+                                        break;
+                                    }
+                                }
+                            }
+                            
+                            // Use provided impact score or calculate from weight change
+                            double weight_impact = (old_weight > 0) ? 
+                                (double)(new_weight - old_weight) / old_weight : 1.0;
+                            disruption_impact_score = max(disruption_impact_score, 
+                                                         max(impact_score, weight_impact));
+                        }
                         
                         // DHL always updates immediately
                         affected_nodes.insert(source);
@@ -1073,8 +1112,9 @@ int main(int argc, char* argv[]) {
                             }
                         }
                         
-                        cerr << "   ⚡ Immediate update for edge " << source 
-                             << "->" << target << " (Impact=" << impact << ")" << endl;
+                        cerr << "   ⚡ Immediate update for edge " << source << "->" << target 
+                             << " (Impact=" << impact_score << ", Confidence=" << confidence 
+                             << ", Highway=" << highway_type << ")" << endl;
                         
                         disruption_count++;
                     }
@@ -1086,7 +1126,9 @@ int main(int argc, char* argv[]) {
                 
                 disrupt_file.close();
                 cerr << "✅ DHL processed " << disruption_count << " disruptions" << endl;
-                cerr << "   Nodes updated: " << nodes_updated << endl;
+                cerr << "   - Closed roads: " << closed_roads_count << endl;
+                cerr << "   - Active disruptions: " << (disruption_count - closed_roads_count) << endl;
+                cerr << "   - Nodes updated: " << nodes_updated << endl;
             } else {
                 cerr << "⚠️  Could not open disruption file: " << disruption_file << endl;
                 use_disruptions = false;

@@ -169,31 +169,31 @@ function initializeEventHandlers() {
               const routes = comparisonData.routes;
               
               if (routes.dhl && routes.dhl.polylines) {
-                // Display DHL route with solid blue line (thicker, on top)
+                // Display DHL route with solid purple line (thicker, on top)
                 routes.dhl.polylines.forEach(polyline => {
                   const pathCoords = polyline.path.map(p => [p.lat, p.lng]);
                   
                   const dhlPolyline = L.polyline(pathCoords, {
-                    color: '#0066FF', // Blue for DHL
+                    color: '#9333ea', // Purple for DHL
                     opacity: 0.9,
                     weight: 6 // Thicker for DHL
                   }).addTo(map);
                   
                   routePolylines.push(dhlPolyline);
                 });
-                console.log('✅ DHL route displayed in solid blue');
+                console.log('✅ DHL route displayed in solid purple');
                 
                 // Add DHL connector polylines
                 addDHLConnectorPolylines({ route: routes.dhl });
               }
               
               if (routes.dhc2l && routes.dhc2l.polylines) {
-                // Display D-HC2L route with dashed red line (thinner, underneath)
+                // Display D-HC2L route with dashed blue line (thinner, underneath)
                 routes.dhc2l.polylines.forEach(polyline => {
                   const pathCoords = polyline.path.map(p => [p.lat, p.lng]);
                   
                   const dhc2lPolyline = L.polyline(pathCoords, {
-                    color: '#FF0000', // Red for D-HC2L
+                    color: '#3b82f6', // Blue for D-HC2L (Lazy HC2L)
                     opacity: 0.9,
                     weight: 4, // Thinner for D-HC2L
                     dashArray: '10, 5' // Dashed pattern
@@ -201,7 +201,7 @@ function initializeEventHandlers() {
                   
                   routePolylines.push(dhc2lPolyline);
                 });
-                console.log('✅ D-HC2L route displayed in dashed red');
+                console.log('✅ D-HC2L route displayed in dashed blue');
                 
                 // Add D-HC2L connector polylines
                 addConnectorPolylines({ route: routes.dhc2l });
@@ -222,7 +222,7 @@ function initializeEventHandlers() {
               // Update algorithm comparison modal with actual metrics
               updateAlgorithmComparisonModal(routes.dhl, routes.dhc2l);
               
-              showUpdateToast('Both algorithms displayed! Solid Blue = DHL, Dashed Red = D-HC2L', 'success');
+              showUpdateToast('Both algorithms displayed! Solid Purple = DHL, Dashed Blue = D-HC2L', 'success');
             } else {
               throw new Error(comparisonData.error || 'Comparison computation failed');
             }
@@ -266,31 +266,31 @@ function initializeEventHandlers() {
               const routes = comparisonData.routes;
               
               if (routes.dhl && routes.dhl.polylines) {
-                // Display DHL route with solid blue line (thicker, on top)
+                // Display DHL route with solid purple line (thicker, on top)
                 routes.dhl.polylines.forEach(polyline => {
                   const pathCoords = polyline.path.map(p => [p.lat, p.lng]);
                   
                   const dhlPolyline = L.polyline(pathCoords, {
-                    color: '#0066FF', // Blue for DHL
+                    color: '#9333ea', // Purple for DHL
                     opacity: 0.9,
                     weight: 6 // Thicker for DHL
                   }).addTo(map);
                   
                   routePolylines.push(dhlPolyline);
                 });
-                console.log('✅ DHL route displayed in solid blue');
+                console.log('✅ DHL route displayed in solid purple');
                 
                 // Add DHL connector polylines
                 addDHLConnectorPolylines({ route: routes.dhl });
               }
               
               if (routes.dhc2l && routes.dhc2l.polylines) {
-                // Display D-HC2L route with dashed red line (thinner, underneath)
+                // Display D-HC2L route with dashed blue line (thinner, underneath)
                 routes.dhc2l.polylines.forEach(polyline => {
                   const pathCoords = polyline.path.map(p => [p.lat, p.lng]);
                   
                   const dhc2lPolyline = L.polyline(pathCoords, {
-                    color: '#FF0000', // Red for D-HC2L
+                    color: '#3b82f6', // Blue for D-HC2L (Lazy HC2L)
                     opacity: 0.9,
                     weight: 4, // Thinner for D-HC2L
                     dashArray: '10, 5' // Dashed pattern
@@ -298,7 +298,7 @@ function initializeEventHandlers() {
                   
                   routePolylines.push(dhc2lPolyline);
                 });
-                console.log('✅ D-HC2L route displayed in dashed red');
+                console.log('✅ D-HC2L route displayed in dashed blue');
                 
                 // Add D-HC2L connector polylines
                 addConnectorPolylines({ route: routes.dhc2l });
@@ -316,7 +316,7 @@ function initializeEventHandlers() {
               // Update bottom info bar with comparison data
               // updateRouteMetrics(routeData);
               updateAlgorithmComparisonModal(routes.dhl, routes.dhc2l);
-              showUpdateToast('Both algorithms displayed! Solid Blue = DHL, Dashed Red = D-HC2L', 'success');
+              showUpdateToast('Both algorithms displayed! Solid Purple = DHL, Dashed Blue = D-HC2L', 'success');
             } else {
               throw new Error(comparisonData.error || 'Comparison computation failed');
             }

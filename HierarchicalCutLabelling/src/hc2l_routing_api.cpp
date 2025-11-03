@@ -1435,11 +1435,13 @@ int main(int argc, char* argv[]) {
             cerr << "   Tau threshold: " << tau_threshold << endl;
             
             // Load disruption file with enhanced format
-            // Format: source target new_weight [jam_factor] [current_speed] [free_flow_speed]
+            // Enhanced format: source target new_weight jam_factor current_speed free_flow_speed 
+            //                  impact_score confidence highway is_closed type
             ifstream disrupt_file(disruption_file);
             if (disrupt_file.is_open()) {
                 string line;
                 int disruption_count = 0;
+                int closed_roads_count = 0;
                 
                 while (getline(disrupt_file, line)) {
                     if (line.empty() || line[0] == 'c' || line[0] == 'p') continue;
@@ -1447,15 +1449,22 @@ int main(int argc, char* argv[]) {
                     istringstream iss(line);
                     NodeID source, target;
                     distance_t new_weight, old_weight = 0;
+                    
+                    // Default values for backward compatibility
                     double jam_factor_val = 5.0;
                     double current_speed = 0.0;
                     double free_flow_speed = 50.0;
+                    double impact_score = 0.5, confidence = 0.7;
+                    string highway_type = "unknown", disruption_type = "unknown";
+                    int is_closed = 0;
                     
                     // Parse basic disruption data
                     if (!(iss >> source >> target >> new_weight)) continue;
                     
-                    // Try to parse optional flow data
-                    iss >> jam_factor_val >> current_speed >> free_flow_speed;
+                    // Try to parse enhanced fields (optional - backward compatible)
+                    iss >> jam_factor_val >> current_speed >> free_flow_speed 
+                        >> impact_score >> confidence >> highway_type 
+                        >> is_closed >> disruption_type;
                     
                     // Find old weight from adj_list
                     if (adj_list.count(source)) {
@@ -1467,53 +1476,85 @@ int main(int argc, char* argv[]) {
                         }
                     }
                     
-                    // Store flow data for this edge
+                    // Handle road closures: remove edge from graph
+                    if (is_closed == 1 || new_weight >= 999999.0) {
+                        cerr << "   🚧 Road CLOSED: Edge " << source << "->" << target 
+                             << " (Type: " << disruption_type << ")" << endl;
+                        closed_roads_count++;
+                        
+                        // Remove edge from adjacency list to make it unreachable
+                        if (adj_list.count(source)) {
+                            auto& neighbors = adj_list[source];
+                            neighbors.erase(
+                                remove_if(neighbors.begin(), neighbors.end(),
+                                         [target](const Neighbor& n) { return n.node == target; }),
+                                neighbors.end()
+                            );
+                        }
+                        
+                        disruption_impact_score = 1.0; // Maximum impact for closures
+                        disruption_count++;
+                        continue; // Skip normal processing for closed roads
+                    }
+                    
+                    // Store flow data for this edge (for visualization)
                     auto edge_key = make_pair(source, target);
                     flow_data[edge_key] = get_flow_color(jam_factor_val, current_speed, free_flow_speed);
                     
-                    // Compute impact score
+                    // Use provided impact_score or calculate from weight change
                     double weight_change_ratio = (old_weight > 0) ? 
                         (double)(new_weight - old_weight) / old_weight : 1.0;
                     
-                    // Normalize jam_factor to 0-1 scale for impact calculation
-                    double jam_factor_normalized = jam_factor_val / 10.0;
+                    // Use the geospatial matching impact score if available, otherwise calculate
+                    double final_impact = (impact_score > 0.0) ? impact_score : 
+                                          compute_impact_score(weight_change_ratio, 
+                                                              jam_factor_val / 10.0, 
+                                                              (new_weight > old_weight * 5) ? 1.0 : 0.0);
                     
-                    // Closure factor: 1.0 if new_weight is very high, else 0.0
-                    double closure_factor = (new_weight > old_weight * 5) ? 1.0 : 0.0;
+                    disruption_impact_score = max(disruption_impact_score, final_impact);
                     
-                    double impact = compute_impact_score(weight_change_ratio, jam_factor_normalized, closure_factor);
-                    disruption_impact_score = max(disruption_impact_score, impact);
-                    
-                    // Decide update strategy
-                    if (should_immediate_update(impact, tau_threshold)) {
+                    // Decide update strategy based on impact and threshold
+                    if (should_immediate_update(final_impact, tau_threshold)) {
                         update_strategy = "immediate_update";
                         lazy_reason = "ImpactScore >= tau: " + 
-                                     to_string(impact) + " >= " + to_string(tau_threshold);
-                        cerr << "   ⚡ Immediate update triggered for edge " << source 
-                             << "->" << target << " (Impact=" << impact 
-                             << ", JamFactor=" << jam_factor_val << ")" << endl;
+                                     to_string(final_impact) + " >= " + to_string(tau_threshold);
+                        cerr << "   ⚡ Immediate update for edge " << source << "->" << target 
+                             << " (Impact=" << final_impact << ", JamFactor=" << jam_factor_val 
+                             << ", Highway=" << highway_type << ", Confidence=" << confidence << ")" << endl;
+                        
+                        // Update edge weight in adj_list
+                        if (adj_list.count(source)) {
+                            for (auto& neighbor : adj_list[source]) {
+                                if (neighbor.node == target) {
+                                    neighbor.distance = new_weight;
+                                    break;
+                                }
+                            }
+                        }
                         // In real implementation: rebuild labels here
                     } else {
                         if (update_strategy != "immediate_update") {
                             update_strategy = "lazy_mark";
                             lazy_reason = "ImpactScore < tau: " + 
-                                         to_string(impact) + " < " + to_string(tau_threshold);
+                                         to_string(final_impact) + " < " + to_string(tau_threshold);
                         }
-                        mark_nodes_dirty(source, target, adj_list, lazy_state, impact);
-                        cerr << "   💤 Lazy mark for edge " << source 
-                             << "->" << target << " (Impact=" << impact 
-                             << ", JamFactor=" << jam_factor_val << ", Color=" 
-                             << flow_data[edge_key].color_code << ")" << endl;
+                        mark_nodes_dirty(source, target, adj_list, lazy_state, final_impact);
+                        cerr << "   💤 Lazy mark for edge " << source << "->" << target 
+                             << " (Impact=" << final_impact << ", JamFactor=" << jam_factor_val 
+                             << ", Highway=" << highway_type << ", Confidence=" << confidence 
+                             << ", Color=" << flow_data[edge_key].color_code << ")" << endl;
                     }
                     
                     disruption_count++;
                 }
                 
                 disrupt_file.close();
-                cerr << "✅ Processed " << disruption_count << " disruptions with flow data" << endl;
-                cerr << "   Strategy: " << update_strategy << endl;
-                cerr << "   Dirty nodes: " << lazy_state.dirty_labels.size() << endl;
-                cerr << "   Flow segments: " << flow_data.size() << endl;
+                cerr << "✅ Processed " << disruption_count << " disruptions with enhanced data" << endl;
+                cerr << "   - Closed roads: " << closed_roads_count << endl;
+                cerr << "   - Active disruptions: " << (disruption_count - closed_roads_count) << endl;
+                cerr << "   - Strategy: " << update_strategy << endl;
+                cerr << "   - Dirty nodes: " << lazy_state.dirty_labels.size() << endl;
+                cerr << "   - Flow segments: " << flow_data.size() << endl;
             } else {
                 cerr << "⚠️  Could not open disruption file: " << disruption_file << endl;
                 use_disruptions = false;

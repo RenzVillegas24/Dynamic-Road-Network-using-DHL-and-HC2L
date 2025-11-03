@@ -289,6 +289,18 @@ async function handleOSMStartLocationPin(lat, lng) {
                     showUpdateToast(snapData.validation.message, 'warning');
                 }, 1000);
             }
+            
+            // Auto-trigger routing if both start and dest are set
+            if (window.startLocation && window.destLocation) {
+                console.log('🚀 Both locations set - auto-triggering route computation');
+                setTimeout(() => {
+                    if (typeof computeRouteBasedOnSelection === 'function') {
+                        computeRouteBasedOnSelection();
+                    } else {
+                        console.warn('computeRouteBasedOnSelection function not found');
+                    }
+                }, 500); // Small delay to ensure markers are visible
+            }
         } else {
             // Fallback to original node-based handler
             console.warn('OSM snapping failed, using fallback');
@@ -340,6 +352,18 @@ async function handleOSMDestLocationPin(lat, lng) {
                 setTimeout(() => {
                     showUpdateToast(snapData.validation.message, 'warning');
                 }, 1000);
+            }
+            
+            // Auto-trigger routing if both start and dest are set
+            if (window.startLocation && window.destLocation) {
+                console.log('🚀 Both locations set - auto-triggering route computation');
+                setTimeout(() => {
+                    if (typeof computeRouteBasedOnSelection === 'function') {
+                        computeRouteBasedOnSelection();
+                    } else {
+                        console.warn('computeRouteBasedOnSelection function not found');
+                    }
+                }, 500); // Small delay to ensure markers are visible
             }
         } else {
             // Fallback to original node-based handler

@@ -1029,7 +1029,7 @@ function displayDHLRoute(routeData) {
         }
         
         const polyline = L.polyline(pathCoords, {
-          color: polylineData.strokeColor || polylineData.color || '#0066FF', // Blue for DHL
+          color: polylineData.strokeColor || polylineData.color || '#9333ea', // Purple for DHL
           opacity: polylineData.strokeOpacity || polylineData.opacity || 0.8,
           weight: polylineData.strokeWeight || polylineData.weight || 5
         }).addTo(map);
@@ -1044,7 +1044,7 @@ function displayDHLRoute(routeData) {
       const pathCoords = route.coordinates.map(coord => [coord.lat, coord.lng]);
       
       const polyline = L.polyline(pathCoords, {
-        color: '#0066FF', // Blue for DHL
+        color: '#9333ea', // Purple for DHL
         opacity: 0.8,
         weight: 5
       }).addTo(map);

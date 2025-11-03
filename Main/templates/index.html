@@ -115,6 +115,44 @@
     .walking-distance-label::before {
       border-top-color: rgba(117, 117, 117, 0.95) !important;
     }
+
+    /* Toggle Checkbox Styling */
+    .toggle-checkbox {
+      appearance: none;
+      width: 44px;
+      height: 24px;
+      background: #cbd5e1;
+      border-radius: 12px;
+      position: relative;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+
+    .toggle-checkbox::before {
+      content: '';
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: white;
+      top: 2px;
+      left: 2px;
+      transition: transform 0.3s ease;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .toggle-checkbox:checked {
+      background: #8b5cf6;
+    }
+
+    .toggle-checkbox:checked::before {
+      transform: translateX(20px);
+    }
+
+    .toggle-checkbox:focus {
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.3);
+    }
   </style>
 </head>
 
@@ -326,15 +364,15 @@
             <div class="grid grid-cols-3 gap-3">
               <div class="bg-white rounded-2xl p-3 border border-slate-200 shadow-sm text-center">
                 <div class="text-xs text-slate-500 font-semibold uppercase">Distance</div>
-                <div id="route-distance" class="text-2xl font-bold text-emerald-600">12.4 km</div>
+                <div id="route-distance" class="text-2xl font-bold text-emerald-600">--</div>
               </div>
               <div class="bg-white rounded-2xl p-3 border border-slate-200 shadow-sm text-center">
                 <div class="text-xs text-slate-500 font-semibold uppercase">Duration</div>
-                <div id="route-duration" class="text-2xl font-bold text-blue-600">22 min</div>
+                <div id="route-duration" class="text-2xl font-bold text-blue-600">--</div>
               </div>
               <div class="bg-white rounded-2xl p-3 border border-slate-200 shadow-sm text-center">
                 <div class="text-xs text-slate-500 font-semibold uppercase">Steps</div>
-                <div id="route-steps-count" class="text-2xl font-bold text-purple-600">8</div>
+                <div id="route-steps-count" class="text-2xl font-bold text-purple-600">--</div>
               </div>
             </div>
 
@@ -679,76 +717,143 @@
 
         <!-- Algorithm & Dataset Selection -->
         <div class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-5 border border-slate-300 shadow-sm">
-          <h3 class="font-bold text-slate-800 mb-4 text-lg">Algorithm & Dataset Selection</h3>
+          <h3 class="font-bold text-slate-800 mb-4 text-lg">Algorithm Selection</h3>
 
-          <label class="flex items-center mb-2 cursor-pointer hover:bg-white p-2 rounded transition">
-            <input type="radio" name="algo-dataset" value="dhl-base" class="mr-3 w-4 h-4 text-blue-600">
-            <span class="text-sm">DHL - Base Dataset</span>
-          </label>
-          <label class="flex items-center mb-2 cursor-pointer hover:bg-white p-2 rounded transition">
-            <input type="radio" name="algo-dataset" value="dhl-disrupted" class="mr-3 w-4 h-4 text-blue-600">
-            <span class="text-sm">DHL - Disrupted Dataset</span>
-          </label>
-          <label class="flex items-center mb-2 cursor-pointer hover:bg-white p-2 rounded transition">
-            <input type="radio" name="algo-dataset" value="dhc2l-base" class="mr-3 w-4 h-4 text-blue-600" checked>
-            <span class="text-sm">D-HC2L - Base Dataset</span>
-          </label>
-          <label class="flex items-center mb-2 cursor-pointer hover:bg-white p-2 rounded transition">
-            <input type="radio" name="algo-dataset" value="dhc2l-disrupted" class="mr-3 w-4 h-4 text-blue-600">
-            <span class="text-sm">D-HC2L - Disrupted Dataset</span>
-          </label>
-          <label class="flex items-center mb-2 cursor-pointer hover:bg-white p-2 rounded transition">
-            <input type="radio" name="algo-dataset" value="comparison-base" class="mr-3 w-4 h-4 text-blue-600">
-            <span class="text-sm">Comparison Mode - Base Dataset</span>
-          </label>
-          <label class="flex items-center cursor-pointer hover:bg-white p-2 rounded transition">
-            <input type="radio" name="algo-dataset" value="comparison-disrupted" class="mr-3 w-4 h-4 text-blue-600">
-            <span class="text-sm">Comparison Mode - Disrupted Dataset</span>
-          </label>
+          <!-- Algorithm Choice -->
+          <div class="mb-4">
+            <label class="flex items-center mb-2 cursor-pointer hover:bg-white p-2 rounded transition">
+              <input type="radio" name="algorithm" value="hc2l" class="mr-3 w-4 h-4 text-purple-600" checked>
+              <span class="text-sm font-medium">HC2L (Hierarchical Cut 2-Hop Labeling)</span>
+            </label>
+            <label class="flex items-center mb-2 cursor-pointer hover:bg-white p-2 rounded transition">
+              <input type="radio" name="algorithm" value="dhl" class="mr-3 w-4 h-4 text-blue-600">
+              <span class="text-sm font-medium">DHL (Dual-Hierarchy Labeling)</span>
+            </label>
+            <label class="flex items-center mb-2 cursor-pointer hover:bg-white p-2 rounded transition">
+              <input type="radio" name="algorithm" value="both" class="mr-3 w-4 h-4 text-green-600">
+              <span class="text-sm font-medium">Both (Comparison Mode)</span>
+            </label>
+          </div>
+
+          <!-- Dataset Selection (Disruption Type) -->
+          <div class="mt-4 pt-4 border-t border-slate-300">
+            <label class="block text-sm font-bold text-slate-700 mb-3">Dataset Selection</label>
+            
+            <label class="flex items-center mb-2 cursor-pointer hover:bg-white p-2 rounded transition">
+              <input type="radio" name="dataset" value="none" class="mr-3 w-4 h-4 text-gray-600" checked>
+              <span class="text-sm">None (No Disruptions)</span>
+            </label>
+            <label class="flex items-center mb-2 cursor-pointer hover:bg-white p-2 rounded transition">
+              <input type="radio" name="dataset" value="incidents" class="mr-3 w-4 h-4 text-red-600">
+              <span class="text-sm">Incidents Only</span>
+            </label>
+            <label class="flex items-center mb-2 cursor-pointer hover:bg-white p-2 rounded transition">
+              <input type="radio" name="dataset" value="flow" class="mr-3 w-4 h-4 text-orange-600">
+              <span class="text-sm">Flow Only</span>
+            </label>
+            <label class="flex items-center cursor-pointer hover:bg-white p-2 rounded transition">
+              <input type="radio" name="dataset" value="both" class="mr-3 w-4 h-4 text-purple-600">
+              <span class="text-sm">Incidents + Flow</span>
+            </label>
+          </div>
         </div>
 
-        <!-- Threshold (τ) with Discrete Buttons -->
+        <!-- Graph Options (formerly Traffic Visualization) -->
+        <div class="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-2xl p-5 border-2 border-purple-300 shadow-sm">
+          <h3 class="font-bold text-purple-900 mb-4 flex items-center text-lg">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 00-2-2m0 0h2a2 2 0 012 2v6a2 2 0 01-2 2h-2a2 2 0 01-2-2v-6z">
+              </path>
+            </svg>
+            Graph Options
+          </h3>
+          
+          <!-- Show OSM Graph Toggle -->
+          <label class="flex items-center justify-between py-2 px-3 hover:bg-purple-100 rounded-lg cursor-pointer">
+            <span class="text-sm font-medium text-purple-900">Show OSM Graph</span>
+            <input type="checkbox" id="show-osm-graph" class="toggle-checkbox" />
+          </label>
+          
+          <!-- Show Nodes Toggle -->
+          <label class="flex items-center justify-between py-2 px-3 hover:bg-purple-100 rounded-lg cursor-pointer">
+            <span class="text-sm font-medium text-purple-900">Show Nodes</span>
+            <input type="checkbox" id="show-nodes" class="toggle-checkbox" />
+          </label>
+          
+          <!-- Show Active Incidents Toggle -->
+          <label class="flex items-center justify-between py-2 px-3 hover:bg-purple-100 rounded-lg cursor-pointer">
+            <span class="text-sm font-medium text-purple-900">Show Active Incidents</span>
+            <input type="checkbox" id="show-active-incidents" class="toggle-checkbox" />
+          </label>
+          
+          <!-- Show Traffic Overlay Toggle -->
+          <label class="flex items-center justify-between py-2 px-3 hover:bg-purple-100 rounded-lg cursor-pointer">
+            <span class="text-sm font-medium text-purple-900">Show Traffic Overlay</span>
+            <input type="checkbox" id="show-traffic-overlay" class="toggle-checkbox" />
+          </label>
+          
+          <!-- For Current Route Only (conditional) -->
+          <div id="route-only-container" class="hidden ml-4 mt-2">
+            <label class="flex items-center justify-between py-2 px-3 hover:bg-indigo-100 rounded-lg cursor-pointer">
+              <span class="text-sm font-medium text-indigo-900">For Current Route Only</span>
+              <input type="checkbox" id="traffic-route-only" class="toggle-checkbox" />
+            </label>
+          </div>
+          
+          <!-- Traffic Data Mode (conditional) -->
+          <div id="traffic-mode-container" class="hidden mt-3 pt-3 border-t border-purple-200">
+            <label class="block text-sm font-medium text-purple-900 mb-2">Traffic Data Mode</label>
+            <select id="traffic-data-mode" class="w-full px-3 py-2 bg-white border-2 border-purple-300 rounded-lg text-sm font-medium text-purple-900 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all">
+              <option value="both">Both (Incidents + Flow)</option>
+              <option value="incidents">Incidents Only</option>
+              <option value="flow">Flow Only</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Threshold (τ) with Input -->
         <div class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-5 border border-slate-300 shadow-sm">
           <h3 class="font-bold text-slate-800 mb-4 text-lg">Threshold (τ)</h3>
 
-          <!-- Threshold Value Display -->
-          <div class="mb-4 flex items-center justify-between bg-white rounded-xl p-4 border border-slate-300 shadow-sm">
-            <span class="text-sm font-bold text-slate-600">Current τ:</span>
-            <span id="threshold-value" class="font-bold text-2xl text-blue-600">0.5</span>
+          <!-- Threshold Input -->
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-slate-700 mb-2">Enter Threshold Value</label>
+            <input 
+              type="number" 
+              id="threshold-input" 
+              min="0" 
+              max="1" 
+              step="0.01" 
+              value="0.5"
+              class="w-full px-4 py-3 bg-white border-2 border-slate-300 rounded-xl text-lg font-bold text-blue-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+              placeholder="0.00 - 1.00"
+            />
           </div>
 
-          <!-- Threshold Buttons Grid -->
-          <div class="grid grid-cols-5 gap-2">
-            <button
-              class="threshold-btn px-3 py-3 bg-white hover:bg-blue-50 border-2 border-slate-300 rounded-xl font-bold text-sm transition-all hover:shadow-md"
-              data-value="0.1">0.1</button>
-            <button
-              class="threshold-btn px-3 py-3 bg-white hover:bg-blue-50 border-2 border-slate-300 rounded-xl font-bold text-sm transition-all hover:shadow-md"
-              data-value="0.2">0.2</button>
-            <button
-              class="threshold-btn px-3 py-3 bg-white hover:bg-blue-50 border-2 border-slate-300 rounded-xl font-bold text-sm transition-all hover:shadow-md"
-              data-value="0.3">0.3</button>
-            <button
-              class="threshold-btn px-3 py-3 bg-white hover:bg-blue-50 border-2 border-slate-300 rounded-xl font-bold text-sm transition-all hover:shadow-md"
-              data-value="0.4">0.4</button>
-            <button
-              class="threshold-btn px-3 py-3 bg-blue-50 hover:bg-blue-100 border-2 border-blue-500 rounded-xl font-bold text-sm transition-all shadow-md"
-              data-value="0.5">0.5</button>
-            <button
-              class="threshold-btn px-3 py-3 bg-white hover:bg-blue-50 border-2 border-slate-300 rounded-xl font-bold text-sm transition-all hover:shadow-md"
-              data-value="0.6">0.6</button>
-            <button
-              class="threshold-btn px-3 py-3 bg-white hover:bg-blue-50 border-2 border-slate-300 rounded-xl font-bold text-sm transition-all hover:shadow-md"
-              data-value="0.7">0.7</button>
-            <button
-              class="threshold-btn px-3 py-3 bg-white hover:bg-blue-50 border-2 border-slate-300 rounded-xl font-bold text-sm transition-all hover:shadow-md"
-              data-value="0.8">0.8</button>
-            <button
-              class="threshold-btn px-3 py-3 bg-white hover:bg-blue-50 border-2 border-slate-300 rounded-xl font-bold text-sm transition-all hover:shadow-md"
-              data-value="0.9">0.9</button>
-            <button
-              class="threshold-btn px-3 py-3 bg-white hover:bg-blue-50 border-2 border-slate-300 rounded-xl font-bold text-sm transition-all hover:shadow-md"
-              data-value="1.0">1.0</button>
+          <!-- Quick Select Buttons -->
+          <div class="mb-3">
+            <label class="block text-sm font-medium text-slate-700 mb-2">Quick Select</label>
+            <div class="grid grid-cols-4 gap-2">
+              <button
+                class="quick-threshold-btn px-3 py-2 bg-white hover:bg-blue-50 border-2 border-slate-300 rounded-lg font-bold text-sm transition-all hover:shadow-md"
+                data-value="0.25">0.25</button>
+              <button
+                class="quick-threshold-btn px-3 py-2 bg-blue-50 hover:bg-blue-100 border-2 border-blue-500 rounded-lg font-bold text-sm transition-all shadow-md"
+                data-value="0.5">0.5</button>
+              <button
+                class="quick-threshold-btn px-3 py-2 bg-white hover:bg-blue-50 border-2 border-slate-300 rounded-lg font-bold text-sm transition-all hover:shadow-md"
+                data-value="0.75">0.75</button>
+              <button
+                class="quick-threshold-btn px-3 py-2 bg-white hover:bg-blue-50 border-2 border-slate-300 rounded-lg font-bold text-sm transition-all hover:shadow-md"
+                data-value="1.0">1.0</button>
+            </div>
+          </div>
+
+          <!-- Current Value Display -->
+          <div class="flex items-center justify-between bg-white rounded-xl p-4 border border-slate-300 shadow-sm">
+            <span class="text-sm font-bold text-slate-600">Current τ:</span>
+            <span id="threshold-value" class="font-bold text-2xl text-blue-600">0.5</span>
           </div>
         </div>
 
@@ -845,32 +950,6 @@
               <span class="font-bold text-slate-700">Fetch HERE Traffic</span>
             </button>
 
-            <!-- Show OSM Graph Button -->
-            <button id="show-osm-graph-btn"
-              class="w-full flex items-center space-x-3 px-3 py-3 glass-effect hover:shadow-md rounded-2xl transition-all duration-300 border border-slate-300">
-              <div class="bg-gradient-to-br from-purple-600 to-purple-700 rounded-xl p-2 shadow-sm">
-                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
-                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z">
-                  </path>
-                </svg>
-              </div>
-              <span class="font-bold text-slate-700">Show OSM Graph</span>
-            </button>
-
-            <!-- Active Disruptions Button -->
-            <button id="disruptions-toggle"
-              class="w-full flex items-center space-x-3 px-3 py-3 glass-effect hover:shadow-md rounded-2xl transition-all duration-300 border border-slate-300 bg-red-50">
-              <div class="bg-gradient-to-br from-red-600 to-red-700 rounded-xl p-2 shadow-sm">
-                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
-                    d="M12 9v2m0 4v2m0 4v2M6.228 6.228a9 9 0 1012.544 12.544M6.228 6.228l5.656-5.656m5.656 5.656l5.656-5.656">
-                  </path>
-                </svg>
-              </div>
-              <span class="font-bold text-red-700">Active Disruptions</span>
-            </button>
-
             <!-- Report Incident Button -->
             <button id="report-toggle"
               class="w-full flex items-center space-x-3 px-3 py-3 glass-effect hover:shadow-md rounded-2xl transition-all duration-300 border border-slate-300 bg-rose-50">
@@ -882,21 +961,6 @@
                 </svg>
               </div>
               <span class="font-bold text-rose-700">Report Incident</span>
-            </button>
-
-            <!-- Show Nodes Button -->
-            <button id="nodes-toggle"
-              class="w-full flex items-center space-x-3 px-3 py-3 glass-effect hover:shadow-md rounded-2xl transition-all duration-300 border border-slate-300 bg-sky-50">
-              <div class="bg-gradient-to-br from-sky-600 to-sky-700 rounded-xl p-2 shadow-sm">
-                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
-                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
-                    d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z">
-                  </path>
-                </svg>
-              </div>
-              <span class="font-bold text-sky-700">Show Nodes</span>
             </button>
 
             <!-- Export CSV Button -->
@@ -1547,7 +1611,7 @@
             }
 
             const polyline = L.polyline(polylinePath, {
-              color: polylineData.strokeColor || polylineData.color || '#FF0000',
+              color: polylineData.strokeColor || polylineData.color || '#3b82f6', // Blue for D-HC2L (Lazy HC2L)
               opacity: polylineData.strokeOpacity || polylineData.opacity || 0.8,
               weight: polylineData.strokeWeight || polylineData.weight || 5
             }).addTo(map);
@@ -1667,7 +1731,7 @@
               [startPoint.lat, startPoint.lng],
               [routeStartCoord.lat, routeStartCoord.lng]
             ], {
-              color: usingOSMStart ? '#757575' : '#FF0000', // Gray for OSM snap, Red for regular
+              color: usingOSMStart ? '#757575' : '#8b5cf6', // Gray for OSM snap, Violet for regular
               opacity: 0.7,
               weight: usingOSMStart ? 3 : 5,
               dashArray: usingOSMStart ? '5, 8' : '10, 5' // Shorter dash for OSM
@@ -1701,7 +1765,7 @@
               [routeEndCoord.lat, routeEndCoord.lng],
               [endPoint.lat, endPoint.lng]
             ], {
-              color: usingOSMDest ? '#757575' : '#FF0000', // Gray for OSM snap, Red for regular
+              color: usingOSMDest ? '#757575' : '#8b5cf6', // Gray for OSM snap, Violet for regular
               opacity: 0.7,
               weight: usingOSMDest ? 3 : 5,
               dashArray: usingOSMDest ? '5, 8' : '10, 5' // Shorter dash for OSM
@@ -2010,6 +2074,113 @@
     }
 
 
+    // Helper function to get current algorithm and dataset selections
+    function getCurrentSelections() {
+      const algorithmRadio = document.querySelector('input[name="algorithm"]:checked');
+      const datasetRadio = document.querySelector('input[name="dataset"]:checked');
+      const thresholdInput = document.getElementById('threshold-input');
+      
+      return {
+        algorithm: algorithmRadio ? algorithmRadio.value : 'hc2l',
+        dataset_mode: datasetRadio ? datasetRadio.value : 'none',
+        threshold: thresholdInput ? parseFloat(thresholdInput.value) : 0.5
+      };
+    }
+
+    // Unified routing function based on algorithm selection
+    async function computeRouteBasedOnSelection() {
+      if (!window.startLocation || !window.destLocation) {
+        showUpdateToast("Please pin both starting location and destination", 'warning');
+        return null;
+      }
+
+      const selections = getCurrentSelections();
+      const useDisruptions = selections.dataset_mode !== 'none';
+      
+      console.log('🚀 Computing route with selections:', selections);
+      
+      // Clear previous routes
+      clearRoutes();
+      
+      try {
+        if (selections.algorithm === 'hc2l') {
+          // HC2L only
+          const hc2lResult = await computeDHC2LRoute(useDisruptions, selections.threshold);
+          if (hc2lResult && hc2lResult.success) {
+            displayDHC2LRoute(hc2lResult);
+            updateMetricsDisplay(hc2lResult.metrics);
+          }
+          return hc2lResult;
+          
+        } else if (selections.algorithm === 'dhl') {
+          // DHL only
+          const dhlResult = await computeDHLRoute(useDisruptions);
+          if (dhlResult && dhlResult.success) {
+            displayDHLRoute(dhlResult);
+            updateMetricsDisplay(dhlResult.metrics);
+          }
+          return dhlResult;
+          
+        } else if (selections.algorithm === 'both') {
+          // Both algorithms - comparison mode
+          showUpdateToast('Computing comparison routes...', 'info');
+          
+          // Compute both routes in parallel
+          const [hc2lResult, dhlResult] = await Promise.all([
+            computeDHC2LRoute(useDisruptions, selections.threshold),
+            computeDHLRoute(useDisruptions)
+          ]);
+          
+          // Display both routes
+          if (hc2lResult && hc2lResult.success) {
+            displayDHC2LRoute(hc2lResult);
+          }
+          
+          if (dhlResult && dhlResult.success) {
+            displayDHLRoute(dhlResult);
+          }
+          
+          // Show comparison metrics
+          if (hc2lResult && dhlResult && hc2lResult.success && dhlResult.success) {
+            showComparisonMetrics(hc2lResult.metrics, dhlResult.metrics);
+            showUpdateToast('Comparison routes computed successfully', 'success');
+          }
+          
+          return { hc2l: hc2lResult, dhl: dhlResult };
+        }
+      } catch (error) {
+        console.error('Error computing route:', error);
+        showUpdateToast(`Route computation error: ${error.message}`, 'error');
+        return null;
+      }
+    }
+
+    // Function to show comparison metrics
+    function showComparisonMetrics(hc2lMetrics, dhlMetrics) {
+      console.log('📊 Comparison Metrics:');
+      console.log('HC2L:', hc2lMetrics);
+      console.log('DHL:', dhlMetrics);
+      
+      // Update metrics display to show both
+      const metricsHtml = `
+        <div class="comparison-metrics">
+          <div class="metric-column">
+            <h4 class="font-bold text-purple-600">HC2L</h4>
+            <p>Distance: ${hc2lMetrics.total_distance_km || 'N/A'} km</p>
+            <p>Query Time: ${hc2lMetrics.query_time_ms || 'N/A'} ms</p>
+          </div>
+          <div class="metric-column">
+            <h4 class="font-bold text-blue-600">DHL</h4>
+            <p>Distance: ${dhlMetrics.total_distance_km || 'N/A'} km</p>
+            <p>Query Time: ${dhlMetrics.query_time_ms || 'N/A'} ms</p>
+          </div>
+        </div>
+      `;
+      
+      // Could update a comparison panel here
+      showUpdateToast('Route comparison complete - check console for details', 'info');
+    }
+
     // Function to compute DHL route
     async function computeDHLRoute(useDisruptions = false) {
       if (!window.startLocation || !window.destLocation) {
@@ -2017,7 +2188,8 @@
         return null;
       }
 
-      showUpdateToast(`Computing DHL route ${useDisruptions ? 'with disruptions' : ''}...`, 'info');
+      const selections = getCurrentSelections();
+      showUpdateToast(`Computing DHL route (dataset: ${selections.dataset_mode})...`, 'info');
 
       try {
         // Prepare routing request with OSM edge data if available
@@ -2026,9 +2198,10 @@
           start_lng: window.startLocation.lng,
           dest_lat: window.destLocation.lat,
           dest_lng: window.destLocation.lng,
-          // DHL expects disruption_file and tau_threshold, not use_disruptions
+          // Pass dataset mode to backend
+          dataset_mode: selections.dataset_mode,
           disruption_file: useDisruptions ? 'active_disruptions' : '',
-          tau_threshold: currentThreshold || 0.5
+          tau_threshold: selections.threshold
         };
 
         // Add OSM edge-based routing if snapping was used
@@ -2092,8 +2265,9 @@
         return null;
       }
 
-      const actualThreshold = threshold !== null ? threshold : currentThreshold;
-      showUpdateToast(`Computing D-HC2L route (τ=${actualThreshold}) ${useDisruptions ? 'with disruptions' : ''}...`, 'info');
+      const selections = getCurrentSelections();
+      const actualThreshold = threshold !== null ? threshold : selections.threshold;
+      showUpdateToast(`Computing D-HC2L route (dataset: ${selections.dataset_mode}, τ=${actualThreshold})...`, 'info');
 
       try {
         // Prepare routing request with OSM edge data if available
@@ -2103,7 +2277,8 @@
           dest_lat: window.destLocation.lat,
           dest_lng: window.destLocation.lng,
           threshold: actualThreshold,
-          use_disruptions: useDisruptions
+          use_disruptions: useDisruptions,
+          dataset_mode: selections.dataset_mode  // Pass dataset mode to backend
         };
 
         // Add OSM edge-based routing if snapping was used
@@ -2167,34 +2342,93 @@
     // Initialize map when DOM is ready
     document.addEventListener('DOMContentLoaded', function () {
       initMap();
-      // Wire up Show Nodes toggle button (if present)
-      const nodesBtn = document.getElementById('nodes-toggle');
-      if (nodesBtn) {
-        nodesBtn.addEventListener('click', () => {
-          // Toggle label for clarity
-          const currentlyShown = nodesBtn.textContent && nodesBtn.textContent.trim().toLowerCase().includes('hide');
-          toggleAllNodes();
-          // Optimistically toggle button label (actual state may be cached)
-          nodesBtn.innerHTML = currentlyShown ?
-            `<div class="bg-gradient-to-br from-sky-600 to-sky-700 rounded-xl p-2 shadow-sm">
-              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
-                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
-                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-              </svg>
-            </div>
-            <span class="font-bold text-sky-700">Show Nodes</span>
-            ` :
-            `<div class="bg-gradient-to-br from-sky-600 to-sky-700 rounded-xl p-2 shadow-sm">
-              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
-                d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"></path>
-              </svg>
-            </div>
-            <span class="font-bold text-sky-700">Hide Nodes</span>
-            `
+      
+      // Wire up Threshold Input and Quick Select Buttons
+      const thresholdInput = document.getElementById('threshold-input');
+      const thresholdValue = document.getElementById('threshold-value');
+      const quickThresholdBtns = document.querySelectorAll('.quick-threshold-btn');
 
+      if (thresholdInput && thresholdValue) {
+        // Update display when input changes
+        thresholdInput.addEventListener('input', (e) => {
+          let value = parseFloat(e.target.value);
+          // Clamp value between 0 and 1
+          if (value < 0) value = 0;
+          if (value > 1) value = 1;
+          e.target.value = value;
+          thresholdValue.textContent = value.toFixed(2);
+          
+          // Update button highlighting
+          quickThresholdBtns.forEach(btn => {
+            if (parseFloat(btn.dataset.value) === value) {
+              btn.classList.add('bg-blue-50', 'border-blue-500', 'shadow-md');
+              btn.classList.remove('bg-white', 'border-slate-300');
+            } else {
+              btn.classList.remove('bg-blue-50', 'border-blue-500', 'shadow-md');
+              btn.classList.add('bg-white', 'border-slate-300');
+            }
+          });
+        });
+
+        // Wire up quick select buttons
+        quickThresholdBtns.forEach(btn => {
+          btn.addEventListener('click', () => {
+            const value = parseFloat(btn.dataset.value);
+            thresholdInput.value = value;
+            thresholdValue.textContent = value.toFixed(2);
+            
+            // Update button highlighting
+            quickThresholdBtns.forEach(b => {
+              b.classList.remove('bg-blue-50', 'border-blue-500', 'shadow-md');
+              b.classList.add('bg-white', 'border-slate-300');
+            });
+            btn.classList.add('bg-blue-50', 'border-blue-500', 'shadow-md');
+            btn.classList.remove('bg-white', 'border-slate-300');
+            
+            showUpdateToast(`Threshold set to ${value}`, 'info');
+          });
+        });
+      }
+
+      // Wire up Graph Options Toggles
+      const showOsmGraph = document.getElementById('show-osm-graph');
+      const showNodes = document.getElementById('show-nodes');
+
+      if (showOsmGraph) {
+        showOsmGraph.addEventListener('change', (e) => {
+          if (e.target.checked) {
+            // Load and display OSM graph edges
+            if (typeof loadOSMGraph === 'function') {
+              loadOSMGraph();
+            }
+            showUpdateToast('OSM Graph displayed', 'info');
+          } else {
+            // Hide OSM graph
+            if (typeof clearOSMGraph === 'function') {
+              clearOSMGraph();
+            }
+            showUpdateToast('OSM Graph hidden', 'info');
+          }
+        });
+      }
+
+      if (showNodes) {
+        showNodes.addEventListener('change', (e) => {
+          if (e.target.checked) {
+            if (typeof showAllNodes === 'function') {
+              showAllNodes();
+            } else if (typeof toggleAllNodes === 'function') {
+              toggleAllNodes();
+            }
+            showUpdateToast('Nodes displayed', 'info');
+          } else {
+            if (typeof hideAllNodes === 'function') {
+              hideAllNodes();
+            } else if (typeof toggleAllNodes === 'function') {
+              toggleAllNodes();
+            }
+            showUpdateToast('Nodes hidden', 'info');
+          }
         });
       }
 
@@ -2207,6 +2441,176 @@
           } else {
             showUpdateToast('Export functionality not available', 'warning');
           }
+        });
+      }
+
+      // Wire up Algorithm & Dataset Selection
+      const algorithmRadios = document.querySelectorAll('input[name="algorithm"]');
+      const datasetRadios = document.querySelectorAll('input[name="dataset"]');
+
+      // Load saved selections from localStorage
+      const savedAlgorithm = localStorage.getItem('selectedAlgorithm') || 'hc2l';
+      const savedDataset = localStorage.getItem('selectedDataset') || 'none';
+
+      algorithmRadios.forEach(radio => {
+        if (radio.value === savedAlgorithm) {
+          radio.checked = true;
+        }
+        
+        radio.addEventListener('change', (e) => {
+          localStorage.setItem('selectedAlgorithm', e.target.value);
+          showUpdateToast(`Algorithm: ${e.target.value.toUpperCase()}`, 'info');
+        });
+      });
+
+      datasetRadios.forEach(radio => {
+        if (radio.value === savedDataset) {
+          radio.checked = true;
+        }
+        
+        radio.addEventListener('change', (e) => {
+          const mode = e.target.value;
+          localStorage.setItem('selectedDataset', mode);
+          
+          // Update backend traffic mode
+          fetch('/set_traffic_mode', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({mode: mode})
+          })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              const modeLabel = {
+                'none': 'No Disruptions',
+                'incidents': 'Incidents Only',
+                'flow': 'Flow Only',
+                'both': 'Incidents + Flow'
+              }[mode] || mode;
+              
+              showUpdateToast(`Dataset: ${modeLabel}`, 'success');
+            } else {
+              showUpdateToast('Failed to set dataset mode', 'error');
+            }
+          })
+          .catch(error => {
+            console.error('Error setting dataset mode:', error);
+            showUpdateToast('Error updating dataset mode', 'error');
+          });
+        });
+      });
+
+      // Initialize backend with saved dataset selection
+      if (savedDataset !== 'none') {
+        fetch('/set_traffic_mode', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({mode: savedDataset})
+        }).catch(error => console.error('Error initializing dataset mode:', error));
+      }
+
+      // Wire up Traffic Visualization Controls
+      const showActiveIncidents = document.getElementById('show-active-incidents');
+      const showTrafficOverlay = document.getElementById('show-traffic-overlay');
+      const trafficRouteOnly = document.getElementById('traffic-route-only');
+      const trafficDataMode = document.getElementById('traffic-data-mode');
+      const routeOnlyContainer = document.getElementById('route-only-container');
+      const trafficModeContainer = document.getElementById('traffic-mode-container');
+
+      if (showActiveIncidents) {
+        showActiveIncidents.addEventListener('change', (e) => {
+          if (e.target.checked) {
+            // Load and display active incidents
+            if (typeof loadActiveIncidents === 'function') {
+              loadActiveIncidents();
+            }
+            showUpdateToast('Active Incidents displayed', 'info');
+          } else {
+            // Hide active incidents
+            if (typeof clearActiveIncidents === 'function') {
+              clearActiveIncidents();
+            }
+            showUpdateToast('Active Incidents hidden', 'info');
+          }
+        });
+      }
+
+      if (showTrafficOverlay) {
+        showTrafficOverlay.addEventListener('change', (e) => {
+          // Show/hide conditional controls
+          if (routeOnlyContainer) {
+            routeOnlyContainer.classList.toggle('hidden', !e.target.checked);
+          }
+          if (trafficModeContainer) {
+            trafficModeContainer.classList.toggle('hidden', !e.target.checked);
+          }
+
+          if (e.target.checked) {
+            // Apply traffic overlay with current mode
+            const mode = trafficDataMode ? trafficDataMode.value : 'both';
+            const routeOnly = trafficRouteOnly ? trafficRouteOnly.checked : false;
+            
+            if (typeof applyTrafficOverlay === 'function') {
+              applyTrafficOverlay(mode, routeOnly);
+            }
+            showUpdateToast(`Traffic Overlay enabled (${mode} mode)`, 'info');
+          } else {
+            // Clear traffic overlay
+            if (typeof clearTrafficOverlay === 'function') {
+              clearTrafficOverlay();
+            }
+            showUpdateToast('Traffic Overlay disabled', 'info');
+          }
+        });
+      }
+
+      if (trafficRouteOnly) {
+        trafficRouteOnly.addEventListener('change', (e) => {
+          const mode = trafficDataMode ? trafficDataMode.value : 'both';
+          
+          if (typeof applyTrafficOverlay === 'function') {
+            applyTrafficOverlay(mode, e.target.checked);
+          }
+          
+          const msg = e.target.checked ? 
+            'Showing traffic for current route only' : 
+            'Showing all traffic';
+          showUpdateToast(msg, 'info');
+        });
+      }
+
+      if (trafficDataMode) {
+        trafficDataMode.addEventListener('change', (e) => {
+          const mode = e.target.value;
+          const routeOnly = trafficRouteOnly ? trafficRouteOnly.checked : false;
+          
+          // Update backend traffic mode
+          fetch('/set_traffic_mode', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({mode: mode})
+          })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              console.log('Traffic mode set to:', mode);
+              
+              // Refresh traffic overlay if enabled
+              if (showTrafficOverlay && showTrafficOverlay.checked) {
+                if (typeof applyTrafficOverlay === 'function') {
+                  applyTrafficOverlay(mode, routeOnly);
+                }
+              }
+              
+              showUpdateToast(`Traffic mode: ${data.mode.toUpperCase()}`, 'success');
+            } else {
+              showUpdateToast('Failed to set traffic mode', 'error');
+            }
+          })
+          .catch(error => {
+            console.error('Error setting traffic mode:', error);
+            showUpdateToast('Error updating traffic mode', 'error');
+          });
         });
       }
 
@@ -2312,6 +2716,9 @@
       }
     });
   </script>
+
+  <!-- Traffic Visualization Module -->
+  <script src="{{ url_for('static', filename='js/traffic-visualization.js') }}"></script>
 
 </body>
 
