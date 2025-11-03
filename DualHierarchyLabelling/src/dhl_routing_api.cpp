@@ -50,6 +50,19 @@ struct GPSCoordinate {
     GPSCoordinate(double lat, double lng, NodeID id) : latitude(lat), longitude(lng), node_id(id) {}
 };
 
+// Traffic Flow Data: stores HERE API flow metrics per edge
+struct TrafficFlowData {
+    double jam_factor;          // 0.0 to 10.0 (HERE API format)
+    double current_speed;       // Current speed in km/h
+    double free_flow_speed;     // Free flow speed in km/h
+    double speed_reduction;     // Percentage: 0.0 to 1.0
+    string flow_status;         // "free_flow", "light", "moderate", "heavy", "blocked"
+    string color_code;          // "green", "yellow", "orange", "red", "black"
+    
+    TrafficFlowData() : jam_factor(0.0), current_speed(0.0), free_flow_speed(50.0), 
+                       speed_reduction(0.0), flow_status("free_flow"), color_code("green") {}
+};
+
 // Calculate Haversine distance between two GPS coordinates
 double haversine_distance(double lat1, double lon1, double lat2, double lon2) {
     const double R = 6371000.0; // Earth's radius in meters
@@ -64,6 +77,43 @@ double haversine_distance(double lat1, double lon1, double lat2, double lon2) {
     double c = 2 * atan2(sqrt(a), sqrt(1-a));
     
     return R * c;
+}
+
+// Determine flow status and color code from jam factor
+// Reference: HERE API jam_factor scale (0.0 = free flow, 10.0 = blocked)
+// Color mapping: green → yellow → orange → red → black (increasing congestion)
+TrafficFlowData get_flow_color(double jam_factor, double current_speed, double free_flow_speed) {
+    TrafficFlowData flow;
+    flow.jam_factor = jam_factor;
+    flow.current_speed = current_speed;
+    flow.free_flow_speed = free_flow_speed;
+    
+    if (free_flow_speed > 0) {
+        flow.speed_reduction = 1.0 - (current_speed / free_flow_speed);
+    } else {
+        flow.speed_reduction = 0.0;
+    }
+    
+    // Color coding based on jam_factor (HERE API scale)
+    // jam_factor: 0.0 = free flow, 10.0 = completely blocked
+    if (jam_factor < 2.0) {
+        flow.flow_status = "free_flow";
+        flow.color_code = "#10b981";    // Green (emerald)
+    } else if (jam_factor < 4.0) {
+        flow.flow_status = "light";
+        flow.color_code = "#fbbf24";    // Yellow (amber)
+    } else if (jam_factor < 7.0) {
+        flow.flow_status = "moderate";
+        flow.color_code = "#f59e0b";    // Orange
+    } else if (jam_factor < 9.0) {
+        flow.flow_status = "heavy";
+        flow.color_code = "#ef4444";    // Red
+    } else {
+        flow.flow_status = "blocked";
+        flow.color_code = "#000000";    // Black
+    }
+    
+    return flow;
 }
 
 // Calculate total route distance from path nodes using coordinates
@@ -633,7 +683,8 @@ void output_json_response(bool success, const string& error_message = "",
                          double disruption_impact_score = 0.0,
                          const string& update_strategy = "",
                          const string& update_reason = "",
-                         int nodes_updated = 0) {
+                         int nodes_updated = 0,
+                         const map<pair<NodeID, NodeID>, TrafficFlowData>& flow_data = map<pair<NodeID, NodeID>, TrafficFlowData>()) {
     
     cout << "{" << endl;
     cout << "  \"success\": " << (success ? "true" : "false") << "," << endl;
@@ -821,7 +872,12 @@ void output_json_response(bool success, const string& error_message = "",
                          << coordinates.at(first_path_node).latitude << "]";
                 }
             }
-            cout << "]" << endl;
+            cout << "]," << endl;
+            cout << "        \"color\": \"#8b5cf6\"," << endl;
+            cout << "        \"flow_status\": \"default\"," << endl;
+            cout << "        \"jam_factor\": 0.0," << endl;
+            cout << "        \"speed_kmh\": 0.0," << endl;
+            cout << "        \"speed_reduction\": 0.0" << endl;
             cout << "      }," << endl;
         }
         
@@ -878,7 +934,25 @@ void output_json_response(bool success, const string& error_message = "",
                 }
             }
             
-            cout << "]" << endl;
+            cout << "]," << endl;
+            
+            // Add flow color information for this edge
+            if (flow_data.count(edge_key)) {
+                const auto& flow = flow_data.at(edge_key);
+                cout << "        \"color\": \"" << flow.color_code << "\"," << endl;
+                cout << "        \"flow_status\": \"" << flow.flow_status << "\"," << endl;
+                cout << "        \"jam_factor\": " << fixed << setprecision(2) << flow.jam_factor << "," << endl;
+                cout << "        \"speed_kmh\": " << fixed << setprecision(1) << flow.current_speed << "," << endl;
+                cout << "        \"speed_reduction\": " << fixed << setprecision(3) << flow.speed_reduction << endl;
+            } else {
+                // Default values when no flow data available - DHL default color (violet/purple)
+                cout << "        \"color\": \"#8b5cf6\"," << endl;
+                cout << "        \"flow_status\": \"default\"," << endl;
+                cout << "        \"jam_factor\": 0.0," << endl;
+                cout << "        \"speed_kmh\": 0.0," << endl;
+                cout << "        \"speed_reduction\": 0.0" << endl;
+            }
+            
             cout << "      }";
             if (i < edge_loop_end - 1 || (same_edge && !can_meet_on_same_edge)) cout << ",";
             cout << endl;
@@ -915,7 +989,12 @@ void output_json_response(bool success, const string& error_message = "",
                 }
                 cout << "[" << fixed << setprecision(6) << dest_snap_lng << ", " << dest_snap_lat << "]";
             }
-            cout << "]" << endl;
+            cout << "]," << endl;
+            cout << "        \"color\": \"#8b5cf6\"," << endl;
+            cout << "        \"flow_status\": \"default\"," << endl;
+            cout << "        \"jam_factor\": 0.0," << endl;
+            cout << "        \"speed_kmh\": 0.0," << endl;
+            cout << "        \"speed_reduction\": 0.0" << endl;
             cout << "      }" << endl;
         }
         

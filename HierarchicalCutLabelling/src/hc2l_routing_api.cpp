@@ -119,19 +119,19 @@ TrafficFlowData get_flow_color(double jam_factor, double current_speed, double f
     // Color coding based on jam_factor (HERE API scale)
     if (jam_factor < 2.0) {
         flow.flow_status = "free_flow";
-        flow.color_code = "green";      // #00FF00
+        flow.color_code = "#10b981";    // Green (emerald)
     } else if (jam_factor < 4.0) {
         flow.flow_status = "light";
-        flow.color_code = "yellow";     // #FFFF00
+        flow.color_code = "#fbbf24";    // Yellow (amber)
     } else if (jam_factor < 7.0) {
         flow.flow_status = "moderate";
-        flow.color_code = "orange";     // #FFA500
+        flow.color_code = "#f59e0b";    // Orange
     } else if (jam_factor < 9.0) {
         flow.flow_status = "heavy";
-        flow.color_code = "red";        // #FF0000
+        flow.color_code = "#ef4444";    // Red
     } else {
         flow.flow_status = "blocked";
-        flow.color_code = "black";      // #000000
+        flow.color_code = "#000000";    // Black
     }
     
     return flow;
@@ -1193,7 +1193,12 @@ void output_json_response(bool success, const string& error_message = "",
                          << coordinates.at(first_path_node).latitude << "]";
                 }
             }
-            cout << "]" << endl;
+            cout << "]," << endl;
+            cout << "        \"color\": \"#3b82f6\"," << endl;
+            cout << "        \"flow_status\": \"default\"," << endl;
+            cout << "        \"jam_factor\": 0.0," << endl;
+            cout << "        \"speed_kmh\": 0.0," << endl;
+            cout << "        \"speed_reduction\": 0.0" << endl;
             cout << "      }," << endl;
         }
         
@@ -1221,10 +1226,12 @@ void output_json_response(bool success, const string& error_message = "",
                 cout << "        \"free_flow_speed_kmh\": " << fixed << setprecision(1) << flow.free_flow_speed << "," << endl;
                 cout << "        \"speed_reduction\": " << fixed << setprecision(3) << flow.speed_reduction << "," << endl;
             } else {
-                // Default values when no flow data available
-                cout << "        \"jam_factor\": 5.0," << endl;
-                cout << "        \"flow_status\": \"unknown\"," << endl;
-                cout << "        \"color\": \"gray\"," << endl;
+                // Default values when no flow data available - HC2L default color (blue)
+                cout << "        \"color\": \"#3b82f6\"," << endl;
+                cout << "        \"flow_status\": \"default\"," << endl;
+                cout << "        \"jam_factor\": 0.0," << endl;
+                cout << "        \"speed_kmh\": 0.0," << endl;
+                cout << "        \"speed_reduction\": 0.0," << endl;
             }
             
             cout << "        \"coordinates\": [";
@@ -1267,7 +1274,25 @@ void output_json_response(bool success, const string& error_message = "",
                 }
             }
             
-            cout << "]" << endl;
+            cout << "]," << endl;
+            
+            // Add flow color information for this edge
+            if (flow_data.count(edge_key)) {
+                const auto& flow = flow_data.at(edge_key);
+                cout << "        \"color\": \"" << flow.color_code << "\"," << endl;
+                cout << "        \"flow_status\": \"" << flow.flow_status << "\"," << endl;
+                cout << "        \"jam_factor\": " << fixed << setprecision(2) << flow.jam_factor << "," << endl;
+                cout << "        \"speed_kmh\": " << fixed << setprecision(1) << flow.current_speed << "," << endl;
+                cout << "        \"speed_reduction\": " << fixed << setprecision(3) << flow.speed_reduction << endl;
+            } else {
+                // Default values when no flow data available - HC2L default color (blue)
+                cout << "        \"color\": \"#3b82f6\"," << endl;
+                cout << "        \"flow_status\": \"default\"," << endl;
+                cout << "        \"jam_factor\": 0.0," << endl;
+                cout << "        \"speed_kmh\": 0.0," << endl;
+                cout << "        \"speed_reduction\": 0.0" << endl;
+            }
+            
             cout << "      }";
             if (i < edge_loop_end - 1 || (same_edge && !can_meet_on_same_edge)) cout << ",";
             cout << endl;
@@ -1304,7 +1329,12 @@ void output_json_response(bool success, const string& error_message = "",
                 }
                 cout << "[" << fixed << setprecision(6) << dest_snap_lng << ", " << dest_snap_lat << "]";
             }
-            cout << "]" << endl;
+            cout << "]," << endl;
+            cout << "        \"color\": \"#3b82f6\"," << endl;
+            cout << "        \"flow_status\": \"default\"," << endl;
+            cout << "        \"jam_factor\": 0.0," << endl;
+            cout << "        \"speed_kmh\": 0.0," << endl;
+            cout << "        \"speed_reduction\": 0.0" << endl;
             cout << "      }" << endl;
         }
         

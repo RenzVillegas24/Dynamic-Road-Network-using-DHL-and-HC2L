@@ -153,6 +153,18 @@
       outline: none;
       box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.3);
     }
+
+    /* Radio Button Selection Highlighting */
+    input[type="radio"]:checked + span {
+      font-weight: 700;
+      color: #1e293b;
+    }
+    
+    label:has(input[type="radio"]:checked) {
+      background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%) !important;
+      border-left: 4px solid #3b82f6;
+      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
+    }
   </style>
 </head>
 
@@ -1591,38 +1603,55 @@
         routePolylines = [];
       }
 
-      // Display route polylines
-      if (routeData.route && routeData.route.polylines) {
-        console.log('Displaying D-HC2L route with', routeData.route.polylines.length, 'polylines');
+      // Display route geometry with colors on map using Leaflet
+      if (routeData.route && routeData.route.geometry && routeData.route.geometry.length > 0) {
+        console.log('Displaying D-HC2L route with', routeData.route.geometry.length, 'colored segments');
 
-        routeData.route.polylines.forEach((polylineData, index) => {
+        routeData.route.geometry.forEach((segment, index) => {
           try {
-            // Handle both coordinate array formats
-            let polylinePath;
-            if (polylineData.coordinates) {
-              // Format: [{coordinates: [[lat, lng], ...]}, ...]
-              polylinePath = polylineData.coordinates.map(coord => [coord[0], coord[1]]);
-            } else if (polylineData.path) {
-              // Format: [{path: [{lat, lng}, ...]}, ...]
-              polylinePath = polylineData.path.map(p => [p.lat, p.lng]);
-            } else {
-              console.warn('Unknown polyline format:', polylineData);
+            // Extract coordinates from segment
+            const coords = segment.coordinates;
+            if (!coords || coords.length < 2) {
+              console.warn('Segment has insufficient coordinates:', segment);
               return;
             }
-
-            const polyline = L.polyline(polylinePath, {
-              color: polylineData.strokeColor || polylineData.color || '#3b82f6', // Blue for D-HC2L (Lazy HC2L)
-              opacity: polylineData.strokeOpacity || polylineData.opacity || 0.8,
-              weight: polylineData.strokeWeight || polylineData.weight || 5
+            
+            // Convert coordinates to Leaflet format [lng, lat] -> [lat, lng]
+            const pathCoords = coords.map(coord => [coord[1], coord[0]]);
+            
+            // Get color from segment (hex format)
+            let segmentColor = segment.color || '#3b82f6'; // Default HC2L blue
+            
+            // Create polyline with segment-specific color
+            const polyline = L.polyline(pathCoords, {
+              color: segmentColor,
+              opacity: 0.8,
+              weight: 5
             }).addTo(map);
-
+            
+            // Add popup with traffic info if available
+            if (segment.flow_status && segment.flow_status !== 'default') {
+              const popupContent = `
+                <div class="text-sm">
+                  <strong>Segment ${index + 1}</strong><br>
+                  Status: ${segment.flow_status}<br>
+                  Jam Factor: ${segment.jam_factor.toFixed(1)}<br>
+                  Speed: ${segment.speed_kmh.toFixed(1)} km/h<br>
+                  Reduction: ${(segment.speed_reduction * 100).toFixed(1)}%
+                </div>
+              `;
+              polyline.bindPopup(popupContent);
+            }
+            
             routePolylines.push(polyline);
 
-            console.log(`Polyline ${index + 1} added with ${polylinePath.length} points`);
+            console.log(`Segment ${index + 1} added with ${pathCoords.length} points, color: ${segmentColor}`);
           } catch (error) {
-            console.error(`Error creating polyline ${index + 1}:`, error);
+            console.error(`Error creating segment ${index + 1}:`, error);
           }
         });
+
+        console.log(`✅ Added ${routeData.route.geometry.length} colored HC2L segments to map`);
 
         // Add connector polylines from pinned locations to route start/end nodes
         addConnectorPolylines(routeData);
@@ -1635,7 +1664,53 @@
           if (window.startLocation) bounds.extend([window.startLocation.lat, window.startLocation.lng]);
           if (window.destLocation) bounds.extend([window.destLocation.lat, window.destLocation.lng]);
 
-          // Include route points
+          // Include route points from geometry
+          routeData.route.geometry.forEach(segment => {
+            if (segment.coordinates) {
+              segment.coordinates.forEach(coord => {
+                bounds.extend([coord[1], coord[0]]); // [lng, lat] -> [lat, lng]
+              });
+            }
+          });
+
+          map.fitBounds(bounds);
+          console.log('Map bounds fitted to route');
+        }
+      } else if (routeData.route && routeData.route.polylines) {
+        // Legacy fallback for old polylines format
+        console.log('Displaying D-HC2L route with', routeData.route.polylines.length, 'polylines (legacy)');
+
+        routeData.route.polylines.forEach((polylineData, index) => {
+          try {
+            let polylinePath;
+            if (polylineData.coordinates) {
+              polylinePath = polylineData.coordinates.map(coord => [coord[0], coord[1]]);
+            } else if (polylineData.path) {
+              polylinePath = polylineData.path.map(p => [p.lat, p.lng]);
+            } else {
+              console.warn('Unknown polyline format:', polylineData);
+              return;
+            }
+
+            const polyline = L.polyline(polylinePath, {
+              color: polylineData.strokeColor || polylineData.color || '#3b82f6',
+              opacity: 0.8,
+              weight: 5
+            }).addTo(map);
+
+            routePolylines.push(polyline);
+          } catch (error) {
+            console.error(`Error creating polyline ${index + 1}:`, error);
+          }
+        });
+
+        addConnectorPolylines(routeData);
+
+        if (routePolylines.length > 0) {
+          const bounds = L.latLngBounds();
+          if (window.startLocation) bounds.extend([window.startLocation.lat, window.startLocation.lng]);
+          if (window.destLocation) bounds.extend([window.destLocation.lat, window.destLocation.lng]);
+
           routeData.route.polylines.forEach(polylineData => {
             if (polylineData.coordinates) {
               polylineData.coordinates.forEach(coord => {
@@ -1649,10 +1724,9 @@
           });
 
           map.fitBounds(bounds);
-          console.log('Map bounds fitted to route');
         }
       } else {
-        console.warn('No polylines found in route data:', routeData);
+        console.warn('No geometry or polylines found in route data:', routeData);
       }
 
       console.log('D-HC2L route display complete');

@@ -1006,16 +1006,54 @@ function displayDHLRoute(routeData) {
     
     const route = routeData.route;
     
-    // Display route polylines on map using Leaflet
-    if (route.polylines && route.polylines.length > 0) {
+    // Display route geometry with colors on map using Leaflet
+    if (route.geometry && route.geometry.length > 0) {
+      route.geometry.forEach((segment, index) => {
+        // Extract coordinates from segment
+        const coords = segment.coordinates;
+        if (!coords || coords.length < 2) {
+          console.warn('Segment has insufficient coordinates:', segment);
+          return;
+        }
+        
+        // Convert coordinates to Leaflet format [lng, lat] -> [lat, lng]
+        const pathCoords = coords.map(coord => [coord[1], coord[0]]);
+        
+        // Get color from segment (hex format or color name)
+        let segmentColor = segment.color || '#8b5cf6'; // Default DHL violet
+        
+        // Create polyline with segment-specific color
+        const polyline = L.polyline(pathCoords, {
+          color: segmentColor,
+          opacity: 0.8,
+          weight: 5
+        }).addTo(map);
+        
+        // Add popup with traffic info if available
+        if (segment.flow_status && segment.flow_status !== 'default') {
+          const popupContent = `
+            <div class="text-sm">
+              <strong>Segment ${index + 1}</strong><br>
+              Status: ${segment.flow_status}<br>
+              Jam Factor: ${segment.jam_factor.toFixed(1)}<br>
+              Speed: ${segment.speed_kmh.toFixed(1)} km/h<br>
+              Reduction: ${(segment.speed_reduction * 100).toFixed(1)}%
+            </div>
+          `;
+          polyline.bindPopup(popupContent);
+        }
+        
+        routePolylines.push(polyline);
+      });
+      
+      console.log(`✅ Added ${route.geometry.length} colored DHL segments to map`);
+    } else if (route.polylines && route.polylines.length > 0) {
+      // Legacy fallback for old polylines format
       route.polylines.forEach(polylineData => {
-        // Handle both internal format (coordinates) and path format
         let pathCoords;
         if (polylineData.path) {
-          // Path format from Flask server
           pathCoords = polylineData.path.map(p => [p.lat, p.lng]);
         } else if (polylineData.coordinates) {
-          // Internal format - array of [lat, lng]
           pathCoords = polylineData.coordinates.map(coord => {
             if (Array.isArray(coord)) {
               return [coord[0], coord[1]];
@@ -1024,36 +1062,21 @@ function displayDHLRoute(routeData) {
             }
           });
         } else {
-          console.warn('No valid path or coordinates found in polyline data:', polylineData);
           return;
         }
         
         const polyline = L.polyline(pathCoords, {
-          color: polylineData.strokeColor || polylineData.color || '#9333ea', // Purple for DHL
-          opacity: polylineData.strokeOpacity || polylineData.opacity || 0.8,
-          weight: polylineData.strokeWeight || polylineData.weight || 5
+          color: polylineData.strokeColor || polylineData.color || '#8b5cf6',
+          opacity: 0.8,
+          weight: 5
         }).addTo(map);
         
         routePolylines.push(polyline);
       });
       
-      console.log(`✅ Added ${route.polylines.length} DHL polylines to map`);
-    } else if (route.coordinates && route.coordinates.length >= 2) {
-      // Fallback: Create polyline directly from coordinates if polylines array is missing
-      console.log('Creating DHL polyline from coordinates array');
-      const pathCoords = route.coordinates.map(coord => [coord.lat, coord.lng]);
-      
-      const polyline = L.polyline(pathCoords, {
-        color: '#9333ea', // Purple for DHL
-        opacity: 0.8,
-        weight: 5
-      }).addTo(map);
-      
-      routePolylines.push(polyline);
-      
-      console.log(`✅ Created DHL polyline from ${route.coordinates.length} coordinates`);
+      console.log(`✅ Added ${route.polylines.length} DHL polylines (legacy)`);
     } else {
-      console.warn('No valid polyline data or coordinates found in DHL route');
+      console.warn('No valid geometry or polyline data found in DHL route');
     }
     
     // Add connector polylines from pinned locations to route start/end nodes
