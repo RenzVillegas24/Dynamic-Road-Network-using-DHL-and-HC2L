@@ -44,9 +44,10 @@ struct EdgeGeometry {
     NodeID source;
     NodeID target;
     distance_t length;
+    string road_name;  // Road name from OSM data
     vector<pair<double, double>> coords; // lon, lat pairs
     
-    EdgeGeometry() : source(0), target(0), length(0) {}
+    EdgeGeometry() : source(0), target(0), length(0), road_name("") {}
 };
 
 // Helper structure for GPS coordinates
@@ -835,6 +836,15 @@ map<NodeID, vector<Neighbor>> load_edges(const string& filename, map<pair<NodeID
             string oneway_str = fields[10];                                 // oneway is at index 10
             string geometry_json = fields[11];                              // geometry is at index 11
             
+            // Load road name from column 6
+            string road_name = "";
+            if (fields.size() > 6 && !fields[6].empty()) {
+                road_name = fields[6];
+                // Trim whitespace
+                road_name.erase(0, road_name.find_first_not_of(" \t\n\r"));
+                road_name.erase(road_name.find_last_not_of(" \t\n\r") + 1);
+            }
+            
             // Load highway type from column 7
             string highway_type = "road";  // Default
             if (fields.size() > 7 && !fields[7].empty()) {
@@ -930,6 +940,7 @@ map<NodeID, vector<Neighbor>> load_edges(const string& filename, map<pair<NodeID
             geom.source = source;
             geom.target = target;
             geom.length = length;
+            geom.road_name = road_name;
             geom.coords = coords;
             edge_geometries[{source, target}] = geom;
             
@@ -956,6 +967,7 @@ map<NodeID, vector<Neighbor>> load_edges(const string& filename, map<pair<NodeID
                 EdgeGeometry rev_geom = geom;
                 rev_geom.source = target;
                 rev_geom.target = source;
+                rev_geom.road_name = road_name;  // Same road name
                 reverse(rev_geom.coords.begin(), rev_geom.coords.end());
                 edge_geometries[{target, source}] = rev_geom;
             } else {
@@ -969,6 +981,7 @@ map<NodeID, vector<Neighbor>> load_edges(const string& filename, map<pair<NodeID
                 EdgeGeometry rev_geom = geom;
                 rev_geom.source = target;
                 rev_geom.target = source;
+                rev_geom.road_name = road_name;  // Same road name
                 reverse(rev_geom.coords.begin(), rev_geom.coords.end());
                 edge_geometries[{target, source}] = rev_geom;
             }
@@ -1523,22 +1536,28 @@ void output_json_response(bool success, const string& error_message = "",
             cout << "]," << endl;
             
             // Add comprehensive edge details
-            // 1. Get highway type
+            // 1. Get road name
+            string edge_road_name = "";
+            if (edge_geometries.count(edge_key)) {
+                edge_road_name = edge_geometries.at(edge_key).road_name;
+            }
+            
+            // 2. Get highway type
             string edge_highway_type = "unknown";
             if (g_highway_types.count(edge_key)) {
                 edge_highway_type = g_highway_types.at(edge_key);
             }
             
-            // 2. Get edge length (actual GPS distance)
+            // 3. Get edge length (actual GPS distance)
             double edge_distance = 0.0;
             if (edge_geometries.count(edge_key)) {
                 edge_distance = edge_geometries.at(edge_key).length;
             }
             
-            // 3. Get free-flow speed for this highway type
+            // 4. Get free-flow speed for this highway type
             double free_flow_speed = get_highway_speed(edge_highway_type);
             
-            // 4. Check if edge is closed due to incident
+            // 5. Check if edge is closed due to incident
             bool is_closed = false;
             string incident_type = "none";
             double incident_confidence = 0.0;
@@ -1549,7 +1568,7 @@ void output_json_response(bool success, const string& error_message = "",
                 incident_confidence = incident.confidence;
             }
             
-            // 5. Add flow/traffic information for this edge
+            // 6. Add flow/traffic information for this edge
             if (flow_data.count(edge_key)) {
                 const auto& flow = flow_data.at(edge_key);
                 cout << "        \"color\": \"" << flow.color_code << "\"," << endl;
@@ -1566,7 +1585,8 @@ void output_json_response(bool success, const string& error_message = "",
                 cout << "        \"speed_reduction\": 0.0," << endl;
             }
             
-            // 6. Add detailed edge metadata
+            // 7. Add detailed edge metadata
+            cout << "        \"road_name\": \"" << edge_road_name << "\"," << endl;
             cout << "        \"distance_meters\": " << fixed << setprecision(1) << edge_distance << "," << endl;
             cout << "        \"highway_type\": \"" << edge_highway_type << "\"," << endl;
             cout << "        \"free_flow_speed_kmh\": " << fixed << setprecision(1) << free_flow_speed << "," << endl;
