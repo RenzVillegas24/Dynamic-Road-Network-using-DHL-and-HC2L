@@ -88,7 +88,7 @@ class Config:
     
     # Processed graph files (binary format for C++ algorithms)
     DHL_GRAPH_FILE = PROCESSED_DATA_DIR / 'quezon_city.graph'
-    DHL_INDEX_FILE = PROCESSED_DATA_DIR / 'quezon_city.dhl.index'
+    DHL_INDEX_FILE = PROCESSED_DATA_DIR / 'quezon_city_dhl'  # Index builder creates: quezon_city_dhl
     HC2L_GRAPH_FILE = PROCESSED_DATA_DIR / 'quezon_city.graph'
     HC2L_INDEX_FILE = PROCESSED_DATA_DIR / 'quezon_city.hc2l.index'
     

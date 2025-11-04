@@ -585,6 +585,21 @@ function updatePerformanceMetrics(metrics) {
 }
   
 
+// Wrapper function for updateAdminPerformanceMetrics (called from main routing logic)
+function updateMetricsDisplay(metrics) {
+    console.log('📊 updateMetricsDisplay called with metrics:', metrics);
+    
+    // Create a route data object with metrics for compatibility
+    const routeData = {
+        success: true,
+        metrics: metrics,
+        algorithm: metrics.algorithm || 'Unknown'
+    };
+    
+    // Call the existing admin metrics updater
+    updateAdminPerformanceMetrics(routeData);
+}
+
 function updateRouteMetrics(routeData) {
     if (!routeData.metrics && !routeData.route) {
       resetBottomInfoBar();

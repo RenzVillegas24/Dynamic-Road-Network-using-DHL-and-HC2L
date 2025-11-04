@@ -12,7 +12,6 @@ from config import Config
 from coordinate_mapper import NodeMapper
 from gps_hc2l_router import GPSRoutingService
 from dhl_router import DHLRouter
-import request_new_datasets as rq
 
 # Import auto-disruption service
 from auto_disruption_service import init_auto_disruption_service, shutdown_auto_disruption_service, get_auto_disruption_service
@@ -120,12 +119,40 @@ def index():
 
 @app.route('/request_new_dataset')
 def request_new_dataset():
-    rq.generate_all_datasets()
+    # Call unified data generator
+    import subprocess
+    import sys
+    
+    try:
+        # Get the root directory (parent of Main/)
+        root_dir = Path(__file__).parent.parent
+        generator_script = root_dir / "unified_data_generator.py"
+        
+        # Run unified data generator with real traffic data
+        result = subprocess.run(
+            [sys.executable, str(generator_script), "--mode", "both", "--scenarios", "0"],
+            cwd=str(root_dir),
+            capture_output=True,
+            text=True,
+            timeout=300  # 5 minutes timeout
+        )
+        
+        if result.returncode == 0:
+            return jsonify({
+                'success': True,
+                'message': 'New dataset generated successfully with real traffic data'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': f'Dataset generation failed: {result.stderr}'
+            })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Error: {str(e)}'
+        })
 
-    return jsonify({
-        'success': True,
-        'message': 'New dataset added successfully'
-    })
 
 @app.route('/report_disruption', methods=['POST'])
 def report_disruption():
@@ -808,6 +835,12 @@ def compute_dhc2l_route():
             directions = route_result['route']['turn_by_turn_directions']
             # print(f"Turn-by-turn directions ({len(directions)} steps): {directions[:3]}...")  # First 3 steps
         
+        # Debug: Check HC2L geometry
+        hc2l_geometry = route_result.get('route', {}).get('geometry', [])
+        print(f"🔍 HC2L geometry in Flask: {len(hc2l_geometry)} segments")
+        if hc2l_geometry:
+            print(f"🔍 HC2L First segment keys: {list(hc2l_geometry[0].keys()) if hc2l_geometry else 'No segments'}")
+        
         return jsonify({
             'success': True,
             'route': {
@@ -821,7 +854,8 @@ def compute_dhc2l_route():
                 'road_segments': route_result.get('route', {}).get('road_segments', []),
                 'route_summary': route_result.get('route', {}).get('route_summary', ''),
                 'turn_by_turn_directions': route_result.get('route', {}).get('turn_by_turn_directions', []),
-                'display_format': route_result.get('route', {}).get('display_format', {})
+                'display_format': route_result.get('route', {}).get('display_format', {}),
+                'geometry': route_result.get('route', {}).get('geometry', [])  # Edge details with distance, highway type, speeds, traffic status
             },
             'metrics': summary,
             'algorithm': summary.get('algorithm', 'D-HC2L Dynamic'),  # Use algorithm from summary
@@ -1287,6 +1321,7 @@ def compute_dhl_route():
             'success': True,
             'route': {
                 'polylines': polylines,
+                'geometry': route_result.get('route', {}).get('geometry', []),  # Add C++ geometry with edge details
                 'start_point': {'lat': start_snap_lat, 'lng': start_snap_lng},
                 'end_point': {'lat': dest_snap_lat, 'lng': dest_snap_lng},
                 'pin_start': {'lat': start_pin_lat, 'lng': start_pin_lng},

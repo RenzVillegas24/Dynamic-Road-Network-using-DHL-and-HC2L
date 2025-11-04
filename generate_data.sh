@@ -32,6 +32,21 @@ DATA_DIR="$MAIN_DIR/data"
 RAW_DIR="$DATA_DIR/raw"
 PROCESSED_DIR="$DATA_DIR/processed"
 
+# Activate conda environment if it exists
+if [ -d "$SCRIPT_DIR/.conda" ]; then
+    echo -e "${GREEN}✓ Activating conda environment${NC}"
+    # Source conda.sh to make conda available
+    if [ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]; then
+        source "$HOME/miniconda3/etc/profile.d/conda.sh"
+    elif [ -f "$HOME/anaconda3/etc/profile.d/conda.sh" ]; then
+        source "$HOME/anaconda3/etc/profile.d/conda.sh"
+    elif [ -f "/opt/conda/etc/profile.d/conda.sh" ]; then
+        source "/opt/conda/etc/profile.d/conda.sh"
+    fi
+    # Activate the local conda environment
+    conda activate "$SCRIPT_DIR/.conda" 2>/dev/null || true
+fi
+
 # Python executable
 PYTHON_CMD="python"
 if ! command -v python &> /dev/null; then
@@ -45,19 +60,38 @@ fi
 
 echo -e "${GREEN}✓ Using Python: $PYTHON_CMD${NC}"
 
-# Step 0: Generate OSM datasets and geometry cache
-echo -e "${BLUE}Step 0: Generating OSM datasets and geometry cache...${NC}"
+# Load environment variables from .env file
+if [ -f "$MAIN_DIR/.env" ]; then
+    echo -e "${GREEN}✓ Loading environment from .env file${NC}"
+    set -a  # automatically export all variables
+    source "$MAIN_DIR/.env"
+    set +a
+else
+    echo -e "${YELLOW}⚠ .env file not found at $MAIN_DIR/.env${NC}"
+fi
+
+# Step 0: Generate OSM datasets using unified data generator
+echo -e "${BLUE}Step 0: Generating OSM datasets and traffic scenarios...${NC}"
 echo ""
 
-cd "$MAIN_DIR"
+cd "$SCRIPT_DIR"
 
-echo -e "${YELLOW}  Running request_new_datasets.py to generate:${NC}"
-echo -e "${YELLOW}    - CSV files (nodes, edges, mapping)${NC}"
-echo -e "${YELLOW}    - Graph files (.gr format)${NC}"
-echo -e "${YELLOW}    - OSM geometry cache for smooth curves${NC}"
+echo -e "${YELLOW}  Running unified_data_generator.py to generate:${NC}"
+echo -e "${YELLOW}    - CSV files (nodes, edges)${NC}"
+echo -e "${YELLOW}    - Base graph files (.gr format)${NC}"
+echo -e "${YELLOW}    - Real traffic scenarios (if HERE_API_KEY is set)${NC}"
 echo ""
 
-if ! $PYTHON_CMD request_new_datasets.py; then
+# Check if HERE_API_KEY is set, use synthetic mode if not
+if [ -z "${HERE_API_KEY}" ]; then
+    echo -e "${YELLOW}  ⚠ HERE_API_KEY not set, using synthetic mode${NC}"
+    MODE="synthetic"
+else
+    echo -e "${GREEN}  ✓ HERE_API_KEY found, using real traffic data${NC}"
+    MODE="both"
+fi
+
+if ! $PYTHON_CMD unified_data_generator.py --mode "$MODE" --scenarios 0 --place "Quezon City, Philippines"; then
     echo -e "${RED}✗ Error: Failed to generate datasets${NC}"
     echo -e "${YELLOW}  Please check the error messages above and ensure:${NC}"
     echo -e "${YELLOW}    - Python dependencies are installed (osmnx, pandas, etc.)${NC}"
@@ -65,7 +99,7 @@ if ! $PYTHON_CMD request_new_datasets.py; then
     exit 1
 fi
 
-echo -e "${GREEN}✓ OSM datasets and geometry cache generated successfully${NC}"
+echo -e "${GREEN}✓ OSM datasets generated successfully${NC}"
 echo ""
 
 # Return to script directory
@@ -79,21 +113,21 @@ fi
 
 echo -e "${GREEN}✓ CSV data files found${NC}"
 
-# Check if .gr files exist
-if [ ! -f "$PROCESSED_DIR/qc_from_csv.gr" ]; then
-    echo -e "${RED}✗ Error: Graph file not found: $PROCESSED_DIR/qc_from_csv.gr${NC}"
+# Check if base graph file exists
+if [ ! -f "$PROCESSED_DIR/quezon_city.graph" ]; then
+    echo -e "${RED}✗ Error: Base graph file not found: $PROCESSED_DIR/quezon_city.graph${NC}"
     exit 1
 fi
 
-echo -e "${GREEN}✓ Graph files found${NC}"
+echo -e "${GREEN}✓ Base graph file found${NC}"
 
 # Check if OSM geometry cache was created
 if [ ! -f "$DATA_DIR/osm_geometry.graphml" ]; then
-    echo -e "${YELLOW}  ⚠ OSM geometry cache not found at: $DATA_DIR/osm_geometry.graphml${NC}"
-    echo -e "${YELLOW}    Smooth road curves may not be available${NC}"
+    echo -e "${YELLOW}  ⚠ OSM geometry cache not found${NC}"
+    echo -e "${YELLOW}    Note: Using unified data generator (geometry from OSMnx)${NC}"
 else
     CACHE_SIZE=$(du -h "$DATA_DIR/osm_geometry.graphml" | cut -f1)
-    echo -e "${GREEN}✓ OSM geometry cache created: $CACHE_SIZE${NC}"
+    echo -e "${GREEN}✓ OSM geometry cache found: $CACHE_SIZE${NC}"
 fi
 
 echo ""
@@ -108,21 +142,11 @@ fi
 echo -e "${GREEN}✓ Index executables found${NC}"
 echo ""
 
-# Step 1: Build graph file (binary format)
-echo -e "${BLUE}Step 1: Converting .gr to binary graph format...${NC}"
+# Step 1: Build graph file (already created by unified generator)
+echo -e "${BLUE}Step 1: Graph file ready...${NC}"
 
-# The graph file is the same for both algorithms
-GR_INPUT="$PROCESSED_DIR/qc_from_csv.gr"
 GRAPH_OUTPUT="$PROCESSED_DIR/quezon_city.graph"
-
-echo -e "${YELLOW}  Converting: $GR_INPUT${NC}"
-echo -e "${YELLOW}  Output: $GRAPH_OUTPUT${NC}"
-
-# Create a simple tool to convert .gr to binary graph format
-# For now, we'll copy the .gr file with .graph extension as a placeholder
-# In a full implementation, you'd convert to the actual binary format
-cp "$GR_INPUT" "$GRAPH_OUTPUT"
-echo -e "${GREEN}  ✓ Graph file created${NC}"
+echo -e "${GREEN}  ✓ Using graph file: $GRAPH_OUTPUT${NC}"
 
 echo ""
 

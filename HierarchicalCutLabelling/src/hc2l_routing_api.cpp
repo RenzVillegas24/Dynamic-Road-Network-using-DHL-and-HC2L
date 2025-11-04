@@ -27,9 +27,18 @@
 #include <set>
 #include <queue>
 #include <algorithm>
+#include <sys/stat.h>
 
 using namespace road_network;
 using namespace std;
+
+// Optimize I/O for large outputs
+inline void setup_fast_io() {
+    ios_base::sync_with_stdio(false);
+    cout.tie(nullptr);
+    // Reserve buffer size for large JSON output
+    cout.rdbuf()->pubsetbuf(nullptr, 256 * 1024);  // 256KB buffer
+}
 
 // Helper structure for edge with geometry
 struct EdgeGeometry {
@@ -73,6 +82,55 @@ struct TrafficFlowData {
     TrafficFlowData() : jam_factor(0.0), current_speed(0.0), free_flow_speed(50.0), 
                        speed_reduction(0.0), flow_status("free_flow"), color_code("green") {}
 };
+
+// Incident/Disruption Data: stores disruption details per edge
+struct IncidentData {
+    string type;                // "accident", "construction", "closure", "congestion", "weather"
+    double severity;            // 0.0 to 1.0 (higher = more severe)
+    double weight_multiplier;   // Cost multiplier for routing (1.0 = normal, >1.0 = avoid)
+    int is_closed;              // 1 = road closed, 0 = passable
+    double confidence;          // 0.0 to 1.0 (data reliability)
+    string highway_type;        // "motorway", "trunk", "primary", "secondary", "tertiary", "residential"
+    double impact_score;        // Combined impact metric
+    distance_t old_weight;      // Original edge weight
+    distance_t new_weight;      // Updated weight with disruption
+    
+    IncidentData() : type("unknown"), severity(0.0), weight_multiplier(1.0), 
+                     is_closed(0), confidence(1.0), highway_type("unknown"),
+                     impact_score(0.0), old_weight(0), new_weight(0) {}
+};
+
+// Disruption Cache: stores parsed disruption data to avoid re-parsing
+struct DisruptionCache {
+    map<pair<NodeID, NodeID>, IncidentData> incidents;
+    map<pair<NodeID, NodeID>, TrafficFlowData> flow_data;
+    time_t file_modified_time;
+    string file_path;
+    int total_incidents;
+    int closures;
+    int active_disruptions;
+    
+    DisruptionCache() : file_modified_time(0), total_incidents(0), 
+                       closures(0), active_disruptions(0) {}
+    
+    bool is_valid(const string& filepath) const {
+        if (filepath != file_path) return false;
+        
+        struct stat file_stat;
+        if (stat(filepath.c_str(), &file_stat) != 0) return false;
+        
+        return file_stat.st_mtime == file_modified_time;
+    }
+};
+
+// Global disruption cache (persists across requests)
+static DisruptionCache g_disruption_cache;
+
+// Global highway type map: stores highway_type for each edge (loaded from CSV)
+static map<pair<NodeID, NodeID>, string> g_highway_types;
+
+// Forward declarations
+vector<string> parse_csv_line(const string& line);
 
 // Alternative Route: stores route candidates with ETA metrics
 struct AlternativeRoute {
@@ -280,6 +338,370 @@ double calculate_eta_with_flow(
     return total_eta;
 }
 
+// ============================================================
+// HIGHWAY CLASSIFICATION & ROUTING COST FUNCTIONS
+// ============================================================
+
+// Get highway type priority weight (lower = better/faster road)
+// Motorways are fastest (1.0x), residential slowest (3.0x)
+double get_highway_weight(const string& highway_type) {
+    static const map<string, double> weights = {
+        {"motorway", 1.0},       // Fastest: divided highway, high speed
+        {"motorway_link", 1.05}, // Highway on/off ramps
+        {"trunk", 1.1},          // Major roads, high capacity
+        {"trunk_link", 1.15},
+        {"primary", 1.3},        // Major connecting roads
+        {"primary_link", 1.35},
+        {"secondary", 1.6},      // Medium importance roads
+        {"secondary_link", 1.65},
+        {"tertiary", 2.0},       // Local connector roads
+        {"tertiary_link", 2.05},
+        {"unclassified", 2.3},   // Minor roads
+        {"residential", 2.8},    // Slow residential streets
+        {"living_street", 3.0},  // Very low speed zones
+        {"service", 2.5},        // Service roads, parking lots
+        {"road", 2.0}            // Unknown type default
+    };
+    
+    auto it = weights.find(highway_type);
+    return (it != weights.end()) ? it->second : 2.0; // Default to "road" weight
+}
+
+// Get free-flow speed for highway type (km/h)
+double get_highway_speed(const string& highway_type) {
+    static const map<string, double> speeds = {
+        {"motorway", 100.0},
+        {"motorway_link", 80.0},
+        {"trunk", 80.0},
+        {"trunk_link", 60.0},
+        {"primary", 60.0},
+        {"primary_link", 50.0},
+        {"secondary", 50.0},
+        {"secondary_link", 40.0},
+        {"tertiary", 40.0},
+        {"tertiary_link", 30.0},
+        {"unclassified", 30.0},
+        {"residential", 25.0},
+        {"living_street", 20.0},
+        {"service", 20.0},
+        {"road", 40.0}
+    };
+    
+    auto it = speeds.find(highway_type);
+    return (it != speeds.end()) ? it->second : 40.0;
+}
+
+// Get incident severity multiplier based on incident type
+// Higher multiplier = route around this incident more aggressively
+double get_incident_severity(const string& incident_type) {
+    static const map<string, double> severities = {
+        {"closure", 999.0},      // Impassable - effectively infinite cost
+        {"accident", 5.0},       // Major incident - avoid heavily
+        {"construction", 2.5},   // Work zone - avoid moderately
+        {"congestion", 1.8},     // Heavy traffic - avoid if alternatives exist
+        {"weather", 1.5},        // Weather impact - minor avoidance
+        {"unknown", 1.3}         // Default - slight avoidance
+    };
+    
+    auto it = severities.find(incident_type);
+    return (it != severities.end()) ? it->second : 1.3;
+}
+
+// Calculate edge cost with ALL factors: distance, highway type, flow, incidents
+// This is the CRITICAL function that integrates everything
+distance_t calculate_edge_cost(
+    NodeID from, NodeID to,
+    distance_t base_distance,
+    const string& highway_type,
+    const map<pair<NodeID, NodeID>, TrafficFlowData>& flow_data,
+    const map<pair<NodeID, NodeID>, IncidentData>& incident_data,
+    const map<NodeID, GPSCoordinate>& coordinates) {
+    
+    auto edge_key = make_pair(from, to);
+    
+    // Start with base distance (or GPS distance if coordinates available)
+    double cost = base_distance;
+    
+    // Use GPS distance if available (more accurate)
+    if (coordinates.count(from) && coordinates.count(to)) {
+        const auto& coord_from = coordinates.at(from);
+        const auto& coord_to = coordinates.at(to);
+        double gps_distance = haversine_distance(
+            coord_from.latitude, coord_from.longitude,
+            coord_to.latitude, coord_to.longitude
+        );
+        cost = gps_distance;
+    }
+    
+    // Apply highway type weight (prefer higher-class roads)
+    double highway_weight = get_highway_weight(highway_type);
+    cost *= highway_weight;
+    
+    // Apply traffic flow penalty (if flow data available)
+    if (flow_data.count(edge_key)) {
+        const TrafficFlowData& flow = flow_data.at(edge_key);
+        
+        // Use jam_factor to increase cost: 0.0 = free, 10.0 = blocked
+        // Formula: cost *= (1.0 + jam_factor * 0.5)
+        // At jam_factor=10, cost increases by 5x
+        double flow_multiplier = 1.0 + (flow.jam_factor / 10.0) * 4.0;
+        cost *= flow_multiplier;
+    }
+    
+    // Apply incident penalty (if incident present)
+    if (incident_data.count(edge_key)) {
+        const IncidentData& incident = incident_data.at(edge_key);
+        
+        // Road closure: make effectively impassable
+        if (incident.is_closed) {
+            return 999999999; // Very high cost (effectively infinite)
+        }
+        
+        // Apply incident type severity
+        double incident_multiplier = get_incident_severity(incident.type);
+        cost *= incident_multiplier;
+        
+        // Also apply custom weight multiplier if provided
+        cost *= incident.weight_multiplier;
+    }
+    
+    return static_cast<distance_t>(cost);
+}
+
+// ============================================================
+// DISRUPTION CACHE MANAGEMENT
+// ============================================================
+
+// Load and cache disruption data from file
+// ENHANCED: Supports both formats:
+//   1. Full format: source target new_weight jam_factor current_speed free_flow_speed impact_score confidence highway is_closed type
+//   2. CSV format: source,target,...,speed_kph,freeFlow_kph,jamFactor,isClosed,...
+bool load_disruptions_with_cache(
+    const string& disruption_file,
+    map<pair<NodeID, NodeID>, IncidentData>& incidents_out,
+    map<pair<NodeID, NodeID>, TrafficFlowData>& flow_out,
+    const map<NodeID, vector<Neighbor>>& adj_list,
+    const map<pair<NodeID, NodeID>, EdgeGeometry>& edge_geometries = map<pair<NodeID, NodeID>, EdgeGeometry>()) {
+    
+    // Check if cache is valid
+    if (g_disruption_cache.is_valid(disruption_file)) {
+        cerr << "✅ Using cached disruption data (file unchanged)" << endl;
+        incidents_out = g_disruption_cache.incidents;
+        flow_out = g_disruption_cache.flow_data;
+        return true;
+    }
+    
+    // Cache invalid or file changed - reload
+    cerr << "🔄 Loading disruptions from file (cache miss or file updated)" << endl;
+    
+    ifstream disrupt_file(disruption_file);
+    if (!disrupt_file.is_open()) {
+        cerr << "⚠️  Could not open disruption file: " << disruption_file << endl;
+        return false;
+    }
+    
+    incidents_out.clear();
+    flow_out.clear();
+    
+    int total_count = 0;
+    int closures = 0;
+    int active_disruptions = 0;
+    
+    string line;
+    bool is_csv_format = false;
+    int source_col = -1, target_col = -1, speed_col = -1, freeflow_col = -1;
+    int jam_col = -1, closed_col = -1, length_col = -1;
+    
+    // Read and parse header to detect format
+    if (getline(disrupt_file, line)) {
+        // Check if it's CSV format (contains commas and header)
+        if (line.find(',') != string::npos && line.find("source") != string::npos) {
+            is_csv_format = true;
+            cerr << "   Detected CSV format with header" << endl;
+            
+            // Parse CSV header to find column indices
+            vector<string> headers = parse_csv_line(line);
+            for (size_t i = 0; i < headers.size(); i++) {
+                string h = headers[i];
+                // Trim whitespace
+                h.erase(0, h.find_first_not_of(" \t\n\r"));
+                h.erase(h.find_last_not_of(" \t\n\r") + 1);
+                
+                // Exact match to avoid matching "source_lat" when looking for "source"
+                if (h == "source") source_col = i;
+                else if (h == "target") target_col = i;
+                else if (h == "speed_kph") speed_col = i;
+                else if (h == "freeFlow_kph") freeflow_col = i;
+                else if (h == "jamFactor") jam_col = i;
+                else if (h == "isClosed") closed_col = i;
+                else if (h == "segmentLength") length_col = i;
+            }
+            
+            cerr << "   Column mapping: source=" << source_col << ", target=" << target_col 
+                 << ", speed=" << speed_col << ", freeflow=" << freeflow_col 
+                 << ", jam=" << jam_col << ", closed=" << closed_col << endl;
+        } else {
+            // Space-separated format - rewind to process this line as data
+            disrupt_file.seekg(0);
+        }
+    }
+    
+    while (getline(disrupt_file, line)) {
+        if (line.empty() || line[0] == 'c' || line[0] == 'p') continue;
+        
+        NodeID source, target;
+        distance_t new_weight = 0;
+        double jam_factor = 5.0, current_speed = 0.0, free_flow_speed = 50.0;
+        double impact_score = 0.5, confidence = 0.7;
+        string highway_type = "unknown", disruption_type = "unknown";
+        int is_closed = 0;
+        
+        if (is_csv_format) {
+            // Parse CSV line
+            vector<string> fields = parse_csv_line(line);
+            
+            // Skip if we don't have at least source and target columns
+            if (source_col < 0 || target_col < 0 || 
+                (int)fields.size() <= max(source_col, target_col)) continue;
+            
+            try {
+                source = stoul(fields[source_col]);
+                target = stoul(fields[target_col]);
+                
+                if (speed_col >= 0 && speed_col < (int)fields.size()) 
+                    current_speed = stod(fields[speed_col]);
+                if (freeflow_col >= 0 && freeflow_col < (int)fields.size()) 
+                    free_flow_speed = stod(fields[freeflow_col]);
+                if (jam_col >= 0 && jam_col < (int)fields.size()) 
+                    jam_factor = stod(fields[jam_col]);
+                if (closed_col >= 0 && closed_col < (int)fields.size()) {
+                    string closed_str = fields[closed_col];
+                    is_closed = (closed_str == "True" || closed_str == "true" || closed_str == "1") ? 1 : 0;
+                }
+                if (length_col >= 0 && length_col < (int)fields.size()) {
+                    new_weight = static_cast<distance_t>(stod(fields[length_col]));
+                }
+                
+                // Determine disruption type from data
+                if (is_closed) {
+                    disruption_type = "closure";
+                } else if (jam_factor >= 8.0) {
+                    disruption_type = "accident";
+                } else if (jam_factor >= 5.0) {
+                    disruption_type = "congestion";
+                } else if (current_speed < free_flow_speed * 0.5) {
+                    disruption_type = "construction";
+                } else {
+                    disruption_type = "congestion";
+                }
+                
+            } catch (...) {
+                continue;
+            }
+        } else {
+            // Space-separated format (original)
+            istringstream iss(line);
+            if (!(iss >> source >> target >> new_weight)) continue;
+            
+            // Parse enhanced fields (optional)
+            iss >> jam_factor >> current_speed >> free_flow_speed 
+                >> impact_score >> confidence >> highway_type 
+                >> is_closed >> disruption_type;
+        }
+        
+        auto edge_key = make_pair(source, target);
+        
+        // Find old weight
+        distance_t old_weight = 0;
+        if (adj_list.count(source)) {
+            for (const auto& neighbor : adj_list.at(source)) {
+                if (neighbor.node == target) {
+                    old_weight = neighbor.distance;
+                    break;
+                }
+            }
+        }
+        
+        // If new_weight not set, calculate from speed reduction
+        if (new_weight == 0 && old_weight > 0) {
+            if (is_closed) {
+                new_weight = 999999;
+            } else if (current_speed > 0) {
+                // Scale weight by speed reduction: new = old * (freeflow / current)
+                new_weight = static_cast<distance_t>(old_weight * (free_flow_speed / max(current_speed, 1.0)));
+            } else {
+                new_weight = old_weight;
+            }
+        }
+        
+        // Look up highway type from edge geometries if not provided
+        if (highway_type == "unknown" && edge_geometries.count(edge_key)) {
+            // Edge geometries don't have highway type, so we'll need to pass it separately
+            // For now, estimate from road characteristics
+            if (free_flow_speed >= 80) highway_type = "motorway";
+            else if (free_flow_speed >= 60) highway_type = "trunk";
+            else if (free_flow_speed >= 50) highway_type = "primary";
+            else if (free_flow_speed >= 40) highway_type = "secondary";
+            else if (free_flow_speed >= 30) highway_type = "tertiary";
+            else highway_type = "residential";
+        }
+        
+        // Calculate impact score if not provided
+        if (impact_score == 0.5) {
+            double weight_change = (old_weight > 0) ? (double)(new_weight - old_weight) / old_weight : 0.0;
+            double jam_impact = jam_factor / 10.0;
+            double closure_factor = is_closed ? 1.0 : 0.0;
+            impact_score = min(1.0, max(0.0, weight_change * 0.5 + jam_impact * 0.3 + closure_factor * 0.2));
+        }
+        
+        // Store incident data
+        IncidentData incident;
+        incident.type = disruption_type;
+        incident.is_closed = is_closed;
+        incident.highway_type = highway_type;
+        incident.confidence = confidence;
+        incident.impact_score = impact_score;
+        incident.old_weight = old_weight;
+        incident.new_weight = new_weight;
+        
+        // Calculate severity
+        incident.severity = (new_weight > old_weight && old_weight > 0) ? 
+                           (double)(new_weight - old_weight) / old_weight : 0.0;
+        incident.weight_multiplier = get_incident_severity(disruption_type);
+        
+        incidents_out[edge_key] = incident;
+        
+        // Store flow data
+        flow_out[edge_key] = get_flow_color(jam_factor, current_speed, free_flow_speed);
+        
+        total_count++;
+        if (is_closed || new_weight >= 999999.0) {
+            closures++;
+        } else {
+            active_disruptions++;
+        }
+    }
+    
+    disrupt_file.close();
+    
+    // Update cache
+    struct stat file_stat;
+    if (stat(disruption_file.c_str(), &file_stat) == 0) {
+        g_disruption_cache.file_modified_time = file_stat.st_mtime;
+    }
+    g_disruption_cache.file_path = disruption_file;
+    g_disruption_cache.incidents = incidents_out;
+    g_disruption_cache.flow_data = flow_out;
+    g_disruption_cache.total_incidents = total_count;
+    g_disruption_cache.closures = closures;
+    g_disruption_cache.active_disruptions = active_disruptions;
+    
+    cerr << "✅ Loaded " << total_count << " disruptions (Closures: " << closures 
+         << ", Active: " << active_disruptions << ")" << endl;
+    
+    return true;
+}
+
 // Generate K alternative routes using penalty-based search
 vector<AlternativeRoute> generate_alternative_routes(
     NodeID start, NodeID dest,
@@ -415,6 +837,40 @@ string format_eta_time(double seconds) {
 }
 
 // Load node GPS coordinates from CSV file
+// Load OSM ID to sequential ID mapping from CSV
+map<NodeID, NodeID> load_node_id_mapping(const string& filename) {
+    map<NodeID, NodeID> mapping;  // osm_id -> sequential_id
+    ifstream file(filename);
+    
+    if (!file.is_open()) {
+        cerr << "Warning: Could not open node ID mapping file: " << filename << endl;
+        return mapping;
+    }
+    
+    string line;
+    getline(file, line); // Skip header
+    
+    while (getline(file, line)) {
+        stringstream ss(line);
+        string osm_id_str, seq_id_str;
+        
+        if (getline(ss, osm_id_str, ',') && getline(ss, seq_id_str, ',')) {
+            try {
+                NodeID osm_id = stoul(osm_id_str);
+                NodeID seq_id = stoul(seq_id_str);
+                mapping[osm_id] = seq_id;
+            } catch (...) {
+                continue;
+            }
+        }
+    }
+    
+    file.close();
+    cerr << "✅ Loaded " << mapping.size() << " node ID mappings" << endl;
+    return mapping;
+}
+
+// Load node coordinates from CSV
 map<NodeID, GPSCoordinate> load_node_coordinates(const string& filename) {
     map<NodeID, GPSCoordinate> coordinates;
     ifstream file(filename);
@@ -490,16 +946,25 @@ map<NodeID, vector<Neighbor>> load_edges(const string& filename, map<pair<NodeID
     while (getline(file, line)) {
         vector<string> fields = parse_csv_line(line);
         
-        if (fields.size() < 7) {
+        if (fields.size() < 12) {  // Need at least 12 fields for geometry at index 11
             continue;
         }
         
         try {
-            NodeID source = stoul(fields[0]);
-            NodeID target = stoul(fields[1]);
-            distance_t length = static_cast<distance_t>(stod(fields[2]));
-            string oneway_str = fields[5];
-            string geometry_json = fields[6];
+            NodeID source = stoul(fields[0]);  // Column 0: source
+            NodeID target = stoul(fields[1]);  // Column 1: target
+            distance_t length = static_cast<distance_t>(stod(fields[8]));  // Column 8: length
+            string oneway_str = fields[10];  // Column 10: oneway
+            string geometry_json = fields[11];  // Column 11: geometry
+            
+            // Load highway type from column 7
+            string highway_type = "road";  // Default
+            if (fields.size() > 7 && !fields[7].empty()) {
+                highway_type = fields[7];
+                // Trim whitespace
+                highway_type.erase(0, highway_type.find_first_not_of(" \t\n\r"));
+                highway_type.erase(highway_type.find_last_not_of(" \t\n\r") + 1);
+            }
             
             // Remove surrounding quotes from geometry JSON if present
             if (!geometry_json.empty() && geometry_json.front() == '"' && geometry_json.back() == '"') {
@@ -592,9 +1057,11 @@ map<NodeID, vector<Neighbor>> load_edges(const string& filename, map<pair<NodeID
             if (oneway == 1) {
                 // One-way forward only
                 adj_list[source].push_back(Neighbor(target, length));
+                g_highway_types[{source, target}] = highway_type;
             } else if (oneway == -1) {
                 // One-way reverse only
                 adj_list[target].push_back(Neighbor(source, length));
+                g_highway_types[{target, source}] = highway_type;
                 // Also store reverse geometry
                 EdgeGeometry rev_geom = geom;
                 rev_geom.source = target;
@@ -605,6 +1072,8 @@ map<NodeID, vector<Neighbor>> load_edges(const string& filename, map<pair<NodeID
                 // Bidirectional
                 adj_list[source].push_back(Neighbor(target, length));
                 adj_list[target].push_back(Neighbor(source, length));
+                g_highway_types[{source, target}] = highway_type;
+                g_highway_types[{target, source}] = highway_type;
                 
                 // Store reverse geometry
                 EdgeGeometry rev_geom = geom;
@@ -749,10 +1218,19 @@ bool lazy_repair_path(
 // PATH FINDING
 // ============================================================
 
-// SIMPLIFIED PATH FINDING: Just use Dijkstra with the road network
-// CRITICAL: This function MUST return ALL intermediate nodes on the shortest path
-// including intersection nodes at sharp turns and road junctions
-vector<NodeID> find_shortest_path(NodeID start, NodeID dest, const map<NodeID, vector<Neighbor>>& adj_list) {
+// ============================================================
+// PATH FINDING WITH COMPREHENSIVE COST CALCULATION
+// ============================================================
+
+// ENHANCED PATH FINDING: Dijkstra with highway, flow, and incident awareness
+// This version considers: GPS distance, highway type, traffic flow, and incidents
+vector<NodeID> find_shortest_path(
+    NodeID start, NodeID dest, 
+    const map<NodeID, vector<Neighbor>>& adj_list,
+    const map<NodeID, GPSCoordinate>& coordinates,
+    const map<pair<NodeID, NodeID>, TrafficFlowData>& flow_data,
+    const map<pair<NodeID, NodeID>, IncidentData>& incident_data) {
+    
     vector<NodeID> path;
     
     if (start == dest) {
@@ -783,7 +1261,28 @@ vector<NodeID> find_shortest_path(NodeID start, NodeID dest, const map<NodeID, v
         if (adj_list.count(u)) {
             for (const auto& neighbor : adj_list.at(u)) {
                 NodeID v = neighbor.node;
-                distance_t new_dist = dist[u] + neighbor.distance;
+                
+                // *** CRITICAL: Use comprehensive cost calculation ***
+                // This considers: GPS distance, highway type, flow, incidents
+                auto edge_key = make_pair(u, v);
+                string highway_type = "road"; // Default
+                
+                // Get highway type from global map (loaded from CSV for ALL edges)
+                if (g_highway_types.count(edge_key)) {
+                    highway_type = g_highway_types[edge_key];
+                }
+                // Fallback to incident data if not in global map
+                else if (incident_data.count(edge_key)) {
+                    highway_type = incident_data.at(edge_key).highway_type;
+                }
+                
+                // Calculate edge cost with ALL factors
+                distance_t edge_cost = calculate_edge_cost(
+                    u, v, neighbor.distance, highway_type,
+                    flow_data, incident_data, coordinates
+                );
+                
+                distance_t new_dist = dist[u] + edge_cost;
                 
                 if (!dist.count(v) || new_dist < dist[v]) {
                     dist[v] = new_dist;
@@ -811,7 +1310,7 @@ vector<NodeID> find_shortest_path(NodeID start, NodeID dest, const map<NodeID, v
         reverse(path.begin(), path.end());
     }
     
-    // DEBUG: Log the path for verification
+    // DEBUG: Log the path for verification with cost breakdown
     if (path.size() > 0) {
         cerr << "✓ Path found with " << path.size() << " nodes: ";
         for (size_t i = 0; i < path.size() && i < 10; i++) {
@@ -820,9 +1319,40 @@ vector<NodeID> find_shortest_path(NodeID start, NodeID dest, const map<NodeID, v
         }
         if (path.size() > 10) cerr << " ... (" << (path.size() - 10) << " more nodes)";
         cerr << endl;
+        
+        // Log cost breakdown for first few edges
+        cerr << "   Cost breakdown (first 3 edges):" << endl;
+        for (size_t i = 0; i < min(size_t(3), path.size() - 1); i++) {
+            auto edge_key = make_pair(path[i], path[i+1]);
+            cerr << "     Edge " << path[i] << "→" << path[i+1] << ": ";
+            
+            if (incident_data.count(edge_key)) {
+                const auto& inc = incident_data.at(edge_key);
+                cerr << "Highway=" << inc.highway_type << " ";
+                if (inc.is_closed) cerr << "[CLOSED] ";
+                else cerr << "Type=" << inc.type << " ";
+            }
+            
+            if (flow_data.count(edge_key)) {
+                const auto& flow = flow_data.at(edge_key);
+                cerr << "Jam=" << flow.jam_factor << " Status=" << flow.flow_status;
+            }
+            
+            cerr << endl;
+        }
     }
     
     return path;
+}
+
+// Simplified version without disruption data (backward compatibility)
+vector<NodeID> find_shortest_path(NodeID start, NodeID dest, const map<NodeID, vector<Neighbor>>& adj_list) {
+    // Call enhanced version with empty disruption maps
+    static map<NodeID, GPSCoordinate> empty_coords;
+    static map<pair<NodeID, NodeID>, TrafficFlowData> empty_flow;
+    static map<pair<NodeID, NodeID>, IncidentData> empty_incidents;
+    
+    return find_shortest_path(start, dest, adj_list, empty_coords, empty_flow, empty_incidents);
 }
 
 // Find the position of a snap point along an edge (0.0 to 1.0)
@@ -1003,21 +1533,23 @@ void output_json_response(bool success, const string& error_message = "",
         
         cout << "  \"gps_mapping\": {" << endl;
         cout << "    \"start_node\": " << start_node << "," << endl;
-        cout << "    \"dest_node\": " << dest_node << "," << endl;
+        cout << "    \"dest_node\": " << dest_node << endl;
         
         if (coordinates.count(start_node)) {
+            cout << "," << endl;
             auto& coord = coordinates.at(start_node);
             cout << "    \"start_node_lat\": " << fixed << setprecision(6) << coord.latitude << "," << endl;
-            cout << "    \"start_node_lng\": " << fixed << setprecision(6) << coord.longitude << "," << endl;
+            cout << "    \"start_node_lng\": " << fixed << setprecision(6) << coord.longitude << endl;
         }
         
         if (coordinates.count(dest_node)) {
+            cout << "," << endl;
             auto& coord = coordinates.at(dest_node);
             cout << "    \"dest_node_lat\": " << fixed << setprecision(6) << coord.latitude << "," << endl;
             cout << "    \"dest_node_lng\": " << fixed << setprecision(6) << coord.longitude << endl;
         }
         
-        cout << "  }," << endl;
+        cout << endl << "  }," << endl;
         
         cout << "  \"metrics\": {" << endl;
         cout << "    \"total_distance_units\": " << distance << "," << endl;
@@ -1215,22 +1747,48 @@ void output_json_response(bool success, const string& error_message = "",
             cout << "        \"from\": " << from << "," << endl;
             cout << "        \"to\": " << to << "," << endl;
             
-            // Add flow data if available
             auto edge_key = make_pair(from, to);
+            
+            // 1. Get highway type for this edge
+            string edge_highway_type = "unknown";
+            if (g_highway_types.count(edge_key)) {
+                edge_highway_type = g_highway_types.at(edge_key);
+            }
+            
+            // 2. Get edge length (actual GPS distance)
+            double edge_distance = 0.0;
+            if (edge_geometries.count(edge_key)) {
+                edge_distance = edge_geometries.at(edge_key).length;
+            }
+            
+            // 3. Get free-flow speed for this highway type
+            double free_flow_speed = get_highway_speed(edge_highway_type);
+            
+            // 4. Check if edge is closed due to incident
+            bool is_closed = false;
+            string incident_type = "none";
+            double incident_confidence = 0.0;
+            if (g_disruption_cache.incidents.count(edge_key)) {
+                const auto& incident = g_disruption_cache.incidents.at(edge_key);
+                is_closed = (incident.is_closed == 1);
+                incident_type = incident.type;
+                incident_confidence = incident.confidence;
+            }
+            
+            // 5. Add flow/traffic information for this edge
             if (flow_data.count(edge_key)) {
                 const TrafficFlowData& flow = flow_data.at(edge_key);
-                cout << "        \"jam_factor\": " << fixed << setprecision(2) << flow.jam_factor << "," << endl;
-                cout << "        \"flow_status\": \"" << flow.flow_status << "\"," << endl;
                 cout << "        \"color\": \"" << flow.color_code << "\"," << endl;
-                cout << "        \"current_speed_kmh\": " << fixed << setprecision(1) << flow.current_speed << "," << endl;
-                cout << "        \"free_flow_speed_kmh\": " << fixed << setprecision(1) << flow.free_flow_speed << "," << endl;
+                cout << "        \"flow_status\": \"" << flow.flow_status << "\"," << endl;
+                cout << "        \"jam_factor\": " << fixed << setprecision(2) << flow.jam_factor << "," << endl;
+                cout << "        \"speed_kmh\": " << fixed << setprecision(1) << flow.current_speed << "," << endl;
                 cout << "        \"speed_reduction\": " << fixed << setprecision(3) << flow.speed_reduction << "," << endl;
             } else {
                 // Default values when no flow data available - HC2L default color (blue)
                 cout << "        \"color\": \"#3b82f6\"," << endl;
                 cout << "        \"flow_status\": \"default\"," << endl;
                 cout << "        \"jam_factor\": 0.0," << endl;
-                cout << "        \"speed_kmh\": 0.0," << endl;
+                cout << "        \"speed_kmh\": " << fixed << setprecision(1) << free_flow_speed << "," << endl;
                 cout << "        \"speed_reduction\": 0.0," << endl;
             }
             
@@ -1276,22 +1834,13 @@ void output_json_response(bool success, const string& error_message = "",
             
             cout << "]," << endl;
             
-            // Add flow color information for this edge
-            if (flow_data.count(edge_key)) {
-                const auto& flow = flow_data.at(edge_key);
-                cout << "        \"color\": \"" << flow.color_code << "\"," << endl;
-                cout << "        \"flow_status\": \"" << flow.flow_status << "\"," << endl;
-                cout << "        \"jam_factor\": " << fixed << setprecision(2) << flow.jam_factor << "," << endl;
-                cout << "        \"speed_kmh\": " << fixed << setprecision(1) << flow.current_speed << "," << endl;
-                cout << "        \"speed_reduction\": " << fixed << setprecision(3) << flow.speed_reduction << endl;
-            } else {
-                // Default values when no flow data available - HC2L default color (blue)
-                cout << "        \"color\": \"#3b82f6\"," << endl;
-                cout << "        \"flow_status\": \"default\"," << endl;
-                cout << "        \"jam_factor\": 0.0," << endl;
-                cout << "        \"speed_kmh\": 0.0," << endl;
-                cout << "        \"speed_reduction\": 0.0" << endl;
-            }
+            // 6. Add detailed edge metadata
+            cout << "        \"distance_meters\": " << fixed << setprecision(1) << edge_distance << "," << endl;
+            cout << "        \"highway_type\": \"" << edge_highway_type << "\"," << endl;
+            cout << "        \"free_flow_speed_kmh\": " << fixed << setprecision(1) << free_flow_speed << "," << endl;
+            cout << "        \"is_closed\": " << (is_closed ? "true" : "false") << "," << endl;
+            cout << "        \"incident_type\": \"" << incident_type << "\"," << endl;
+            cout << "        \"incident_confidence\": " << fixed << setprecision(2) << incident_confidence << endl;
             
             cout << "      }";
             if (i < edge_loop_end - 1 || (same_edge && !can_meet_on_same_edge)) cout << ",";
@@ -1372,6 +1921,9 @@ void output_json_response(bool success, const string& error_message = "",
 }
 
 int main(int argc, char* argv[]) {
+    // Optimize I/O for large JSON output
+    setup_fast_io();
+    
     // Accept 18 args (no disruption) or 19 args (with disruption file) or 20 args (with disruption + tau)
     // Args: 14 routing params + 3 data files + optional disruption_file + optional tau_threshold
     if (argc != 18 && argc != 19 && argc != 20) {
@@ -1402,6 +1954,11 @@ int main(int argc, char* argv[]) {
         string edges_csv = argv[16];
         string index_file = argv[17];
         
+        // Derive node ID mapping file path from nodes_csv path
+        // nodes_csv is like "/path/to/data/raw/quezon_city_nodes.csv"
+        // mapping file is "/path/to/data/raw/node_id_mapping.csv"
+        string mapping_file = nodes_csv.substr(0, nodes_csv.find_last_of('/') + 1) + "node_id_mapping.csv";
+        
         // Parse optional disruption file (arg 18)
         string disruption_file = "";
         bool use_disruptions = false;
@@ -1429,6 +1986,20 @@ int main(int argc, char* argv[]) {
         int nodes_repaired = 0;
         bool cache_hit = false;
         
+        // Load node ID mapping (OSM ID -> Sequential ID)
+        cerr << "📋 Loading node ID mapping from: " << mapping_file << endl;
+        auto osm_to_seq = load_node_id_mapping(mapping_file);
+        if (osm_to_seq.empty()) {
+            output_json_response(false, "Failed to load node ID mapping");
+            return 1;
+        }
+        
+        // Create reverse mapping (Sequential ID -> OSM ID)
+        map<NodeID, NodeID> seq_to_osm;
+        for (const auto& [osm, seq] : osm_to_seq) {
+            seq_to_osm[seq] = osm;
+        }
+        
         // Load data
         auto coordinates = load_node_coordinates(nodes_csv);
         if (coordinates.empty()) {
@@ -1450,66 +2021,46 @@ int main(int argc, char* argv[]) {
             output_json_response(false, "Failed to open index file");
             return 1;
         }
+        cerr << "📚 Loading HC2L index..." << endl;
         ContractionIndex ci(index_stream);
         index_stream.close();
         auto index_load_end = chrono::high_resolution_clock::now();
         double index_load_time_ms = chrono::duration<double, milli>(index_load_end - index_load_start).count();
+        cerr << "✅ HC2L index loaded in " << index_load_time_ms << "ms" << endl;
         
         // ============================================================
         // LAZYHC2L: Process disruptions and flow data if provided
         // ============================================================
+        cerr << "🔧 Initializing LazyHC2L state..." << endl;
         map<pair<NodeID, NodeID>, TrafficFlowData> flow_data;
+        map<pair<NodeID, NodeID>, IncidentData> incident_data;
+        cerr << "✅ LazyHC2L state initialized" << endl;
         
         if (use_disruptions) {
             cerr << "🔧 Processing disruptions from: " << disruption_file << endl;
             cerr << "   Tau threshold: " << tau_threshold << endl;
             
-            // Load disruption file with enhanced format
-            // Enhanced format: source target new_weight jam_factor current_speed free_flow_speed 
-            //                  impact_score confidence highway is_closed type
-            ifstream disrupt_file(disruption_file);
-            if (disrupt_file.is_open()) {
-                string line;
+            // *** USE CACHED DISRUPTION LOADER ***
+            bool load_success = load_disruptions_with_cache(
+                disruption_file, incident_data, flow_data, adj_list, edge_geometries
+            );
+            
+            if (!load_success) {
+                cerr << "⚠️  Failed to load disruptions" << endl;
+                use_disruptions = false;
+            } else {
+                // Process incidents: update graph and mark dirty nodes
                 int disruption_count = 0;
                 int closed_roads_count = 0;
                 
-                while (getline(disrupt_file, line)) {
-                    if (line.empty() || line[0] == 'c' || line[0] == 'p') continue;
-                    
-                    istringstream iss(line);
-                    NodeID source, target;
-                    distance_t new_weight, old_weight = 0;
-                    
-                    // Default values for backward compatibility
-                    double jam_factor_val = 5.0;
-                    double current_speed = 0.0;
-                    double free_flow_speed = 50.0;
-                    double impact_score = 0.5, confidence = 0.7;
-                    string highway_type = "unknown", disruption_type = "unknown";
-                    int is_closed = 0;
-                    
-                    // Parse basic disruption data
-                    if (!(iss >> source >> target >> new_weight)) continue;
-                    
-                    // Try to parse enhanced fields (optional - backward compatible)
-                    iss >> jam_factor_val >> current_speed >> free_flow_speed 
-                        >> impact_score >> confidence >> highway_type 
-                        >> is_closed >> disruption_type;
-                    
-                    // Find old weight from adj_list
-                    if (adj_list.count(source)) {
-                        for (const auto& neighbor : adj_list.at(source)) {
-                            if (neighbor.node == target) {
-                                old_weight = neighbor.distance;
-                                break;
-                            }
-                        }
-                    }
+                for (const auto& [edge_key, incident] : incident_data) {
+                    NodeID source = edge_key.first;
+                    NodeID target = edge_key.second;
                     
                     // Handle road closures: remove edge from graph
-                    if (is_closed == 1 || new_weight >= 999999.0) {
+                    if (incident.is_closed || incident.new_weight >= 999999.0) {
                         cerr << "   🚧 Road CLOSED: Edge " << source << "->" << target 
-                             << " (Type: " << disruption_type << ")" << endl;
+                             << " (Type: " << incident.type << ", Highway: " << incident.highway_type << ")" << endl;
                         closed_roads_count++;
                         
                         // Remove edge from adjacency list to make it unreachable
@@ -1523,98 +2074,123 @@ int main(int argc, char* argv[]) {
                         }
                         
                         disruption_impact_score = 1.0; // Maximum impact for closures
-                        disruption_count++;
-                        continue; // Skip normal processing for closed roads
-                    }
-                    
-                    // Store flow data for this edge (for visualization)
-                    auto edge_key = make_pair(source, target);
-                    flow_data[edge_key] = get_flow_color(jam_factor_val, current_speed, free_flow_speed);
-                    
-                    // Use provided impact_score or calculate from weight change
-                    double weight_change_ratio = (old_weight > 0) ? 
-                        (double)(new_weight - old_weight) / old_weight : 1.0;
-                    
-                    // Use the geospatial matching impact score if available, otherwise calculate
-                    double final_impact = (impact_score > 0.0) ? impact_score : 
-                                          compute_impact_score(weight_change_ratio, 
-                                                              jam_factor_val / 10.0, 
-                                                              (new_weight > old_weight * 5) ? 1.0 : 0.0);
-                    
-                    disruption_impact_score = max(disruption_impact_score, final_impact);
-                    
-                    // Decide update strategy based on impact and threshold
-                    if (should_immediate_update(final_impact, tau_threshold)) {
-                        update_strategy = "immediate_update";
-                        lazy_reason = "ImpactScore >= tau: " + 
-                                     to_string(final_impact) + " >= " + to_string(tau_threshold);
-                        cerr << "   ⚡ Immediate update for edge " << source << "->" << target 
-                             << " (Impact=" << final_impact << ", JamFactor=" << jam_factor_val 
-                             << ", Highway=" << highway_type << ", Confidence=" << confidence << ")" << endl;
+                    } else {
+                        // Active disruption - decide update strategy
+                        double final_impact = incident.impact_score;
+                        disruption_impact_score = max(disruption_impact_score, final_impact);
                         
-                        // Update edge weight in adj_list
-                        if (adj_list.count(source)) {
-                            for (auto& neighbor : adj_list[source]) {
-                                if (neighbor.node == target) {
-                                    neighbor.distance = new_weight;
-                                    break;
+                        // Get flow data for logging
+                        double jam_factor_val = 5.0;
+                        if (flow_data.count(edge_key)) {
+                            jam_factor_val = flow_data.at(edge_key).jam_factor;
+                        }
+                        
+                        // Decide update strategy based on impact and threshold
+                        if (should_immediate_update(final_impact, tau_threshold)) {
+                            update_strategy = "immediate_update";
+                            lazy_reason = "ImpactScore >= tau: " + 
+                                         to_string(final_impact) + " >= " + to_string(tau_threshold);
+                            cerr << "   ⚡ Immediate update for edge " << source << "->" << target 
+                                 << " (Impact=" << final_impact << ", Jam=" << jam_factor_val 
+                                 << ", Highway=" << incident.highway_type << ", Type=" << incident.type << ")" << endl;
+                            
+                            // Update edge weight in adj_list
+                            if (adj_list.count(source)) {
+                                for (auto& neighbor : adj_list[source]) {
+                                    if (neighbor.node == target) {
+                                        neighbor.distance = incident.new_weight;
+                                        break;
+                                    }
                                 }
                             }
+                            // In real implementation: rebuild labels here
+                        } else {
+                            if (update_strategy != "immediate_update") {
+                                update_strategy = "lazy_mark";
+                                lazy_reason = "ImpactScore < tau: " + 
+                                             to_string(final_impact) + " < " + to_string(tau_threshold);
+                            }
+                            mark_nodes_dirty(source, target, adj_list, lazy_state, final_impact);
+                            cerr << "   💤 Lazy mark for edge " << source << "->" << target 
+                                 << " (Impact=" << final_impact << ", Jam=" << jam_factor_val 
+                                 << ", Highway=" << incident.highway_type << ", Type=" << incident.type << ")" << endl;
                         }
-                        // In real implementation: rebuild labels here
-                    } else {
-                        if (update_strategy != "immediate_update") {
-                            update_strategy = "lazy_mark";
-                            lazy_reason = "ImpactScore < tau: " + 
-                                         to_string(final_impact) + " < " + to_string(tau_threshold);
-                        }
-                        mark_nodes_dirty(source, target, adj_list, lazy_state, final_impact);
-                        cerr << "   💤 Lazy mark for edge " << source << "->" << target 
-                             << " (Impact=" << final_impact << ", JamFactor=" << jam_factor_val 
-                             << ", Highway=" << highway_type << ", Confidence=" << confidence 
-                             << ", Color=" << flow_data[edge_key].color_code << ")" << endl;
                     }
                     
                     disruption_count++;
                 }
                 
-                disrupt_file.close();
-                cerr << "✅ Processed " << disruption_count << " disruptions with enhanced data" << endl;
+                cerr << "✅ Processed " << disruption_count << " disruptions with caching" << endl;
                 cerr << "   - Closed roads: " << closed_roads_count << endl;
                 cerr << "   - Active disruptions: " << (disruption_count - closed_roads_count) << endl;
                 cerr << "   - Strategy: " << update_strategy << endl;
                 cerr << "   - Dirty nodes: " << lazy_state.dirty_labels.size() << endl;
                 cerr << "   - Flow segments: " << flow_data.size() << endl;
-            } else {
-                cerr << "⚠️  Could not open disruption file: " << disruption_file << endl;
-                use_disruptions = false;
             }
         }
         
         // Determine routing endpoints based on one-way constraints
-        vector<NodeID> start_candidates, dest_candidates;
+        cerr << "🎯 Determining routing endpoints..." << endl;
+        vector<NodeID> start_candidates_osm, dest_candidates_osm;
         
-        // Start edge candidates
+        // Start edge candidates (OSM IDs)
         if (start_edge_oneway == 1) {
-            start_candidates.push_back(start_edge_target); // Exit from target
+            start_candidates_osm.push_back(start_edge_target); // Exit from target
         } else if (start_edge_oneway == -1) {
-            start_candidates.push_back(start_edge_source); // Exit from source
+            start_candidates_osm.push_back(start_edge_source); // Exit from source
         } else {
-            start_candidates.push_back(start_edge_source);
-            start_candidates.push_back(start_edge_target);
+            start_candidates_osm.push_back(start_edge_source);
+            start_candidates_osm.push_back(start_edge_target);
         }
         
-        // Dest edge candidates
+        // Dest edge candidates (OSM IDs)
         if (dest_edge_oneway == 1) {
-            dest_candidates.push_back(dest_edge_source); // Arrive at source
+            dest_candidates_osm.push_back(dest_edge_source); // Arrive at source
         } else if (dest_edge_oneway == -1) {
-            dest_candidates.push_back(dest_edge_target); // Arrive at target
+            dest_candidates_osm.push_back(dest_edge_target); // Arrive at target
         } else {
-            dest_candidates.push_back(dest_edge_source);
-            dest_candidates.push_back(dest_edge_target);
+            dest_candidates_osm.push_back(dest_edge_source);
+            dest_candidates_osm.push_back(dest_edge_target);
+        }
+        
+        cerr << "  Start candidates (OSM): ";
+        for (NodeID s : start_candidates_osm) cerr << s << " ";
+        cerr << endl;
+        cerr << "  Dest candidates (OSM): ";
+        for (NodeID d : dest_candidates_osm) cerr << d << " ";
+        cerr << endl;
+        
+        // Convert OSM IDs to sequential IDs for routing
+        vector<NodeID> start_candidates, dest_candidates;
+        for (NodeID osm_id : start_candidates_osm) {
+            if (osm_to_seq.count(osm_id)) {
+                start_candidates.push_back(osm_to_seq.at(osm_id));
+            } else {
+                cerr << "⚠️  Warning: Start OSM ID " << osm_id << " not found in mapping" << endl;
+            }
+        }
+        for (NodeID osm_id : dest_candidates_osm) {
+            if (osm_to_seq.count(osm_id)) {
+                dest_candidates.push_back(osm_to_seq.at(osm_id));
+            } else {
+                cerr << "⚠️  Warning: Dest OSM ID " << osm_id << " not found in mapping" << endl;
+            }
+        }
+        
+        cerr << "  Start candidates (Sequential): ";
+        for (NodeID s : start_candidates) cerr << s << " ";
+        cerr << endl;
+        cerr << "  Dest candidates (Sequential): ";
+        for (NodeID d : dest_candidates) cerr << d << " ";
+        cerr << endl;
+        
+        if (start_candidates.empty() || dest_candidates.empty()) {
+            output_json_response(false, "Failed to map OSM IDs to sequential IDs");
+            return 1;
         }
         
         // Find best route using HC2L labels
+        // cerr << "🔍 Querying HC2L index..." << endl;
         auto start_time = chrono::high_resolution_clock::now();
         
         distance_t best_distance = numeric_limits<distance_t>::max();
@@ -1622,7 +2198,9 @@ int main(int argc, char* argv[]) {
         
         for (NodeID s : start_candidates) {
             for (NodeID d : dest_candidates) {
+                // cerr << "  Checking distance from " << s << " to " << d << "..." << endl;
                 distance_t dist = ci.get_distance(s, d);
+                // cerr << "    Distance: " << dist << endl;
                 if (dist < best_distance) {
                     best_distance = dist;
                     best_start = s;
@@ -1634,13 +2212,26 @@ int main(int argc, char* argv[]) {
         auto end_time = chrono::high_resolution_clock::now();
         double query_time_ms = chrono::duration<double, milli>(end_time - start_time).count();
         
+        // cerr << "✅ Best route found: " << best_start << " -> " << best_dest << " (distance: " << best_distance << ")" << endl;
+        
         if (best_start == 0 || best_dest == 0) {
             output_json_response(false, "No valid path found");
             return 1;
         }
         
-        // Find actual path using Dijkstra
-        vector<NodeID> path = find_shortest_path(best_start, best_dest, adj_list);
+        // Convert sequential IDs back to OSM IDs for path finding
+        // (adj_list and coordinates use OSM IDs as keys)
+        NodeID best_start_osm = seq_to_osm.at(best_start);
+        NodeID best_dest_osm = seq_to_osm.at(best_dest);
+        // cerr << "  Sequential IDs: " << best_start << " -> " << best_dest << endl;
+        // cerr << "  OSM IDs: " << best_start_osm << " -> " << best_dest_osm << endl;
+        
+        // cerr << "🛣️  Finding actual path with Dijkstra..." << endl;
+        // Find actual path using Dijkstra with comprehensive cost calculation
+        // *** USES ENHANCED VERSION WITH HIGHWAY, FLOW, AND INCIDENT DATA ***
+        vector<NodeID> path = find_shortest_path(best_start_osm, best_dest_osm, adj_list, 
+                                                  coordinates, flow_data, incident_data);
+        // cerr << "✅ Path found with " << path.size() << " nodes" << endl;
         
         // VALIDATION: Check for missing edges between path nodes
         // This helps detect if intermediate nodes are being missed at sharp turns

@@ -28,19 +28,25 @@ class RoadNameMapper:
                 for row in reader:
                     source = int(row['source'])
                     target = int(row['target'])
-                    road_name = row['name'].strip() if row['name'].strip() else 'Unnamed Road'
-                    highway_type = row['highway'] if 'highway' in row else 'unclassified'
+                    
+                    # Handle both 'road_name' and 'name' column names
+                    road_name = row.get('road_name', row.get('name', '')).strip()
+                    if not road_name:
+                        road_name = 'Unnamed Road'
+                    
+                    # Handle both 'highway_type' and 'highway' column names
+                    highway_type = row.get('highway_type', row.get('highway', 'unclassified'))
                     
                     # Store bidirectional mapping (most roads are bidirectional)
                     self.edge_to_road[(source, target)] = {
                         'name': road_name,
                         'highway': highway_type,
-                        'length': float(row['length']) if row['length'] else 0.0
+                        'length': float(row['length']) if row.get('length') else 0.0
                     }
                     self.edge_to_road[(target, source)] = {
                         'name': road_name,
                         'highway': highway_type,
-                        'length': float(row['length']) if row['length'] else 0.0
+                        'length': float(row['length']) if row.get('length') else 0.0
                     }
                     
                     # Build node connections for path analysis
@@ -67,18 +73,78 @@ class RoadNameMapper:
         road_info = self.edge_to_road.get((source_node, target_node))
         if road_info:
             return road_info['name']
-        return f"Unknown Road (Node {source_node} → {target_node})"
+        
+        # Try reverse direction (might be one-way edge stored in reverse)
+        road_info_reverse = self.edge_to_road.get((target_node, source_node))
+        if road_info_reverse:
+            return road_info_reverse['name']
+        
+        # Fallback: Try to find road name through common connections
+        road_name = self._find_road_through_connections(source_node, target_node)
+        if road_name != 'Unnamed Road':
+            return road_name
+        
+        # Last resort: just return 'Unnamed Road' without node IDs (cleaner)
+        return 'Unnamed Road'
     
     def get_road_info(self, source_node: int, target_node: int) -> Dict:
         """Get detailed road information for a node-to-node transition"""
         road_info = self.edge_to_road.get((source_node, target_node))
         if road_info:
             return road_info
+        
+        # Try reverse direction
+        road_info_reverse = self.edge_to_road.get((target_node, source_node))
+        if road_info_reverse:
+            return road_info_reverse
+        
+        # Try to find through connections
+        road_name = self._find_road_through_connections(source_node, target_node)
+        
         return {
-            'name': f"Unknown Road (Node {source_node} → {target_node})",
-            'highway': 'unknown',
+            'name': road_name,
+            'highway': 'unclassified',
             'length': 0.0
         }
+    
+    def _find_road_through_connections(self, source_node: int, target_node: int) -> str:
+        """
+        Try to find road name by looking at connections from source and target nodes.
+        If they share a common road name in their connections, use that.
+        """
+        try:
+            # Get connections for both nodes
+            source_connections = self.node_connections.get(source_node, [])
+            target_connections = self.node_connections.get(target_node, [])
+            
+            # Find roads that both nodes connect to
+            source_roads = {road_name for _, road_name in source_connections}
+            target_roads = {road_name for _, road_name in target_connections}
+            
+            # Find common roads (excluding unnamed)
+            common_roads = source_roads & target_roads
+            common_roads = {road for road in common_roads if road and road != 'Unnamed Road'}
+            
+            if common_roads:
+                # Return the first common road (prioritize longer names as they're more specific)
+                return max(common_roads, key=len)
+            
+            # If no common roads, try to use the most common road from source node
+            if source_roads:
+                named_roads = {road for road in source_roads if road and road != 'Unnamed Road'}
+                if named_roads:
+                    return max(named_roads, key=len)
+            
+            # If that fails, try target node's most common road
+            if target_roads:
+                named_roads = {road for road in target_roads if road and road != 'Unnamed Road'}
+                if named_roads:
+                    return max(named_roads, key=len)
+                    
+        except Exception as e:
+            print(f"⚠️  Error finding road through connections: {e}")
+        
+        return 'Unnamed Road'
     
     def get_route_with_road_names(self, node_path: List[int]) -> List[Dict]:
         """
@@ -128,8 +194,9 @@ class RoadNameMapper:
             next_segment = segments[i]
             
             # If same road name, merge the segments
+            # Don't merge unnamed roads to avoid combining unrelated segments
             if (current_segment['road_name'] == next_segment['road_name'] and 
-                current_segment['road_name'] != 'Unknown Road'):
+                current_segment['road_name'] not in ['Unnamed Road', 'Unknown Road']):
                 
                 # Update the end node and total length
                 current_segment['to_node'] = next_segment['to_node']
@@ -150,7 +217,11 @@ class RoadNameMapper:
             elif i == len(merged) - 1:
                 segment['instruction'] = f"Continue on {segment['road_name']} to destination"
             else:
-                segment['instruction'] = f"Turn onto {segment['road_name']}"
+                # Skip turn instructions for unnamed roads (just say "Continue")
+                if segment['road_name'] in ['Unnamed Road', 'Unknown Road']:
+                    segment['instruction'] = f"Continue straight"
+                else:
+                    segment['instruction'] = f"Turn onto {segment['road_name']}"
         
         return merged
     
@@ -161,11 +232,17 @@ class RoadNameMapper:
         if not road_segments:
             return "No route information available"
         
-        # Create a concise route description
+        # Create a concise route description (exclude unnamed/unknown roads)
         road_names = []
         for segment in road_segments:
-            if segment['road_name'] not in road_names and 'Unknown Road' not in segment['road_name']:
-                road_names.append(segment['road_name'])
+            road_name = segment['road_name']
+            if (road_name not in road_names and 
+                road_name not in ['Unnamed Road', 'Unknown Road'] and
+                'Unknown Road' not in road_name):
+                road_names.append(road_name)
+        
+        if not road_names:
+            return "Route via local roads"
         
         if len(road_names) <= 3:
             return " → ".join(road_names)

@@ -165,8 +165,8 @@ function clearDisruptionMarkers() {
 
 // Function to get selected algorithm from admin panel
 function getSelectedAlgorithm() {
-    const selectedRadio = document.querySelector('input[name="algo-dataset"]:checked');
-    return selectedRadio ? selectedRadio.value : 'dhc2l-base';
+    const selectedRadio = document.querySelector('input[name="algorithm"]:checked');
+    return selectedRadio ? selectedRadio.value : 'hc2l';
 }
 
 // Function to update the Alternative Route UI based on current state
@@ -1019,29 +1019,147 @@ function displayDHLRoute(routeData) {
         // Convert coordinates to Leaflet format [lng, lat] -> [lat, lng]
         const pathCoords = coords.map(coord => [coord[1], coord[0]]);
         
-        // Get color from segment (hex format or color name)
+        // Get color from segment (use actual color from C++ data)
         let segmentColor = segment.color || '#8b5cf6'; // Default DHL violet
         
         // Create polyline with segment-specific color
         const polyline = L.polyline(pathCoords, {
           color: segmentColor,
           opacity: 0.8,
-          weight: 5
+          weight: 6,
+          className: 'route-segment-clickable'
         }).addTo(map);
         
-        // Add popup with traffic info if available
-        if (segment.flow_status && segment.flow_status !== 'default') {
-          const popupContent = `
-            <div class="text-sm">
-              <strong>Segment ${index + 1}</strong><br>
-              Status: ${segment.flow_status}<br>
-              Jam Factor: ${segment.jam_factor.toFixed(1)}<br>
-              Speed: ${segment.speed_kmh.toFixed(1)} km/h<br>
-              Reduction: ${(segment.speed_reduction * 100).toFixed(1)}%
-            </div>
-          `;
-          polyline.bindPopup(popupContent);
+        // Build comprehensive popup with all edge details
+        const distance_m = segment.distance_meters || 0;
+        const distance_km = (distance_m / 1000).toFixed(2);
+        const highway_type = segment.highway_type || 'unknown';
+        const free_flow_speed = segment.free_flow_speed_kmh || 0;
+        const current_speed = segment.speed_kmh || free_flow_speed;
+        const jam_factor = segment.jam_factor || 0;
+        const flow_status = segment.flow_status || 'default';
+        const is_closed = segment.is_closed || false;
+        const incident_type = segment.incident_type || 'none';
+        const incident_confidence = segment.incident_confidence || 0;
+        
+        // Determine status badge color
+        let statusColor = '#10b981'; // green for free flow
+        if (is_closed) {
+          statusColor = '#ef4444'; // red for closed
+        } else if (flow_status === 'heavy') {
+          statusColor = '#dc2626'; // dark red
+        } else if (flow_status === 'medium') {
+          statusColor = '#f59e0b'; // amber
+        } else if (flow_status === 'light') {
+          statusColor = '#fbbf24'; // yellow
         }
+        
+        const popupContent = `
+          <div class="p-2" style="min-width: 280px;">
+            <div class="font-bold text-base mb-2 border-b pb-2">
+              🛣️ Segment ${index + 1} of ${route.geometry.length}
+            </div>
+            
+            <div class="space-y-2 text-sm">
+              <div class="flex justify-between items-center">
+                <span class="text-gray-600">Edge:</span>
+                <span class="font-mono font-semibold">${segment.from} → ${segment.to}</span>
+              </div>
+              
+              <div class="flex justify-between items-center">
+                <span class="text-gray-600">Distance:</span>
+                <span class="font-bold text-blue-600">${distance_km} km (${distance_m.toFixed(0)}m)</span>
+              </div>
+              
+              <div class="flex justify-between items-center">
+                <span class="text-gray-600">Highway Type:</span>
+                <span class="px-2 py-0.5 bg-slate-100 rounded text-xs font-semibold">${highway_type}</span>
+              </div>
+              
+              <div class="flex justify-between items-center">
+                <span class="text-gray-600">Traffic Status:</span>
+                <span class="px-2 py-0.5 rounded text-xs font-semibold text-white" style="background-color: ${statusColor}">
+                  ${flow_status.toUpperCase()}
+                </span>
+              </div>
+              
+              ${!is_closed ? `
+              <div class="flex justify-between items-center">
+                <span class="text-gray-600">Current Speed:</span>
+                <span class="font-semibold">${current_speed.toFixed(1)} km/h</span>
+              </div>
+              
+              <div class="flex justify-between items-center">
+                <span class="text-gray-600">Free Flow Speed:</span>
+                <span class="text-gray-500">${free_flow_speed.toFixed(1)} km/h</span>
+              </div>
+              
+              <div class="flex justify-between items-center">
+                <span class="text-gray-600">Jam Factor:</span>
+                <span class="${jam_factor > 5 ? 'text-red-600 font-bold' : 'text-green-600'}">${jam_factor.toFixed(1)}</span>
+              </div>
+              ` : ''}
+              
+              ${is_closed ? `
+              <div class="mt-2 p-2 bg-red-50 border border-red-200 rounded">
+                <div class="flex items-center gap-2">
+                  <span class="text-red-600 font-bold">🚫 ROAD CLOSED</span>
+                </div>
+                <div class="text-xs text-red-600 mt-1">
+                  Incident: ${incident_type}<br>
+                  Confidence: ${(incident_confidence * 100).toFixed(0)}%
+                </div>
+              </div>
+              ` : ''}
+              
+              ${incident_type !== 'none' && !is_closed ? `
+              <div class="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                <div class="text-xs">
+                  <span class="font-semibold text-yellow-800">⚠️ ${incident_type}</span><br>
+                  Confidence: ${(incident_confidence * 100).toFixed(0)}%
+                </div>
+              </div>
+              ` : ''}
+            </div>
+          </div>
+        `;
+        
+        polyline.bindPopup(popupContent, {
+          maxWidth: 320,
+          className: 'route-segment-popup'
+        });
+        
+        // Add click event to highlight and show details
+        polyline.on('click', function(e) {
+          console.log(`🖱️ Clicked segment ${index + 1}:`, segment);
+          
+          // Highlight this segment
+          routePolylines.forEach((p, i) => {
+            if (i === index) {
+              p.setStyle({ weight: 10, opacity: 1.0 });
+            } else {
+              p.setStyle({ weight: 6, opacity: 0.5 });
+            }
+          });
+          
+          // Open popup
+          polyline.openPopup();
+        });
+        
+        // Add hover effect
+        polyline.on('mouseover', function(e) {
+          if (this.getElement()) {
+            this.setStyle({ weight: 8 });
+          }
+        });
+        
+        polyline.on('mouseout', function(e) {
+          // Check if this segment is highlighted
+          const isHighlighted = this.options.weight === 10;
+          if (!isHighlighted) {
+            this.setStyle({ weight: 6 });
+          }
+        });
         
         routePolylines.push(polyline);
       });
@@ -1083,6 +1201,249 @@ function displayDHLRoute(routeData) {
     addDHLConnectorPolylines(routeData);
     
     // Fit map to show the route (including connectors) using Leaflet
+    if (routePolylines.length > 0) {
+      const bounds = L.latLngBounds();
+      
+      // Add route points to bounds
+      routePolylines.forEach(polyline => {
+        const latLngs = polyline.getLatLngs();
+        latLngs.forEach(latLng => bounds.extend(latLng));
+      });
+      
+      // Add pinned locations to bounds
+      if (startLocation) bounds.extend([startLocation.lat, startLocation.lng]);
+      if (destLocation) bounds.extend([destLocation.lat, destLocation.lng]);
+      
+      map.fitBounds(bounds);
+    }
+    
+    // Update route metrics in bottom info bar
+    if (routeData.metrics) {
+      updateRouteMetrics(routeData);
+    }
+}
+
+// HC2L Route Display Function (same features as DHL)
+function displayDHC2LRoute(routeData) {
+    console.log('🔵 Displaying HC2L route:', routeData);
+    
+    // Clear only route polylines, keep location markers
+    if (routePolylines && routePolylines.length > 0) {
+        routePolylines.forEach(polyline => {
+            if (polyline && map) {
+                map.removeLayer(polyline);
+            }
+        });
+        routePolylines = [];
+    }
+    
+    if (!routeData.success || !routeData.route) {
+      console.error('❌ Invalid HC2L route data:', routeData);
+      return;
+    }
+    
+    const route = routeData.route;
+    
+    // Debug: Check if geometry exists
+    console.log('🔍 HC2L route.geometry:', route.geometry);
+    console.log('🔍 HC2L geometry length:', route.geometry ? route.geometry.length : 'undefined');
+    if (route.geometry && route.geometry.length > 0) {
+      console.log('🔍 HC2L First segment:', route.geometry[0]);
+    }
+    
+    // Display route geometry with colors on map using Leaflet
+    if (route.geometry && route.geometry.length > 0) {
+      console.log(`✅ HC2L: Processing ${route.geometry.length} geometry segments`);
+      route.geometry.forEach((segment, index) => {
+        // Extract coordinates from segment
+        const coords = segment.coordinates;
+        if (!coords || coords.length < 2) {
+          console.warn('Segment has insufficient coordinates:', segment);
+          return;
+        }
+        
+        // Convert coordinates to Leaflet format [lng, lat] -> [lat, lng]
+        const pathCoords = coords.map(coord => [coord[1], coord[0]]);
+        
+        // Get color from segment (use actual color from C++ data)
+        let segmentColor = segment.color || '#0066FF'; // Default HC2L blue
+        
+        // Create polyline with segment-specific color
+        const polyline = L.polyline(pathCoords, {
+          color: segmentColor,
+          opacity: 0.8,
+          weight: 6,
+          className: 'route-segment-clickable'
+        }).addTo(map);
+        
+        // Build comprehensive popup with all edge details
+        const distance_m = segment.distance_meters || 0;
+        const distance_km = (distance_m / 1000).toFixed(2);
+        const highway_type = segment.highway_type || 'unknown';
+        const free_flow_speed = segment.free_flow_speed_kmh || 0;
+        const current_speed = segment.speed_kmh || free_flow_speed;
+        const jam_factor = segment.jam_factor || 0;
+        const flow_status = segment.flow_status || 'default';
+        const is_closed = segment.is_closed || false;
+        const incident_type = segment.incident_type || 'none';
+        const incident_confidence = segment.incident_confidence || 0;
+        
+        // Determine status badge color
+        let statusColor = '#10b981'; // green for free flow
+        if (is_closed) {
+          statusColor = '#ef4444'; // red for closed
+        } else if (flow_status === 'heavy') {
+          statusColor = '#dc2626'; // dark red
+        } else if (flow_status === 'medium') {
+          statusColor = '#f59e0b'; // amber
+        } else if (flow_status === 'light') {
+          statusColor = '#fbbf24'; // yellow
+        }
+        
+        const popupContent = `
+          <div class="p-2" style="min-width: 280px;">
+            <div class="font-bold text-base mb-2 border-b pb-2">
+              🛣️ Segment ${index + 1} of ${route.geometry.length}
+            </div>
+            
+            <div class="space-y-2 text-sm">
+              <div class="flex justify-between items-center">
+                <span class="text-gray-600">Edge:</span>
+                <span class="font-mono font-semibold">${segment.from} → ${segment.to}</span>
+              </div>
+              
+              <div class="flex justify-between items-center">
+                <span class="text-gray-600">Distance:</span>
+                <span class="font-bold text-blue-600">${distance_km} km (${distance_m.toFixed(0)}m)</span>
+              </div>
+              
+              <div class="flex justify-between items-center">
+                <span class="text-gray-600">Highway Type:</span>
+                <span class="px-2 py-0.5 bg-slate-100 rounded text-xs font-semibold">${highway_type}</span>
+              </div>
+              
+              <div class="flex justify-between items-center">
+                <span class="text-gray-600">Traffic Status:</span>
+                <span class="px-2 py-0.5 rounded text-xs font-semibold text-white" style="background-color: ${statusColor}">
+                  ${flow_status.toUpperCase()}
+                </span>
+              </div>
+              
+              ${!is_closed ? `
+              <div class="flex justify-between items-center">
+                <span class="text-gray-600">Current Speed:</span>
+                <span class="font-semibold">${current_speed.toFixed(1)} km/h</span>
+              </div>
+              
+              <div class="flex justify-between items-center">
+                <span class="text-gray-600">Free Flow Speed:</span>
+                <span class="text-gray-500">${free_flow_speed.toFixed(1)} km/h</span>
+              </div>
+              
+              <div class="flex justify-between items-center">
+                <span class="text-gray-600">Jam Factor:</span>
+                <span class="${jam_factor > 5 ? 'text-red-600 font-bold' : 'text-green-600'}">${jam_factor.toFixed(1)}</span>
+              </div>
+              ` : ''}
+              
+              ${is_closed ? `
+              <div class="mt-2 p-2 bg-red-50 border border-red-200 rounded">
+                <div class="flex items-center gap-2">
+                  <span class="text-red-600 font-bold">🚫 ROAD CLOSED</span>
+                </div>
+                <div class="text-xs text-red-600 mt-1">
+                  Incident: ${incident_type}<br>
+                  Confidence: ${(incident_confidence * 100).toFixed(0)}%
+                </div>
+              </div>
+              ` : ''}
+              
+              ${incident_type !== 'none' && !is_closed ? `
+              <div class="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                <div class="text-xs">
+                  <span class="font-semibold text-yellow-800">⚠️ ${incident_type}</span><br>
+                  Confidence: ${(incident_confidence * 100).toFixed(0)}%
+                </div>
+              </div>
+              ` : ''}
+            </div>
+          </div>
+        `;
+        
+        polyline.bindPopup(popupContent, {
+          maxWidth: 320,
+          className: 'route-segment-popup'
+        });
+        
+        // Add click event to highlight and show details
+        polyline.on('click', function(e) {
+          console.log(`🖱️ Clicked HC2L segment ${index + 1}:`, segment);
+          
+          // Highlight this segment
+          routePolylines.forEach((p, i) => {
+            if (i === index) {
+              p.setStyle({ weight: 10, opacity: 1.0 });
+            } else {
+              p.setStyle({ weight: 6, opacity: 0.5 });
+            }
+          });
+          
+          // Open popup
+          polyline.openPopup();
+        });
+        
+        // Add hover effect
+        polyline.on('mouseover', function(e) {
+          if (this.getElement()) {
+            this.setStyle({ weight: 8 });
+          }
+        });
+        
+        polyline.on('mouseout', function(e) {
+          // Check if this segment is highlighted
+          const isHighlighted = this.options.weight === 10;
+          if (!isHighlighted) {
+            this.setStyle({ weight: 6 });
+          }
+        });
+        
+        routePolylines.push(polyline);
+      });
+      
+      console.log(`✅ Added ${route.geometry.length} colored HC2L segments to map`);
+    } else if (route.polylines && route.polylines.length > 0) {
+      // Legacy fallback for old polylines format
+      route.polylines.forEach(polylineData => {
+        let pathCoords;
+        if (polylineData.path) {
+          pathCoords = polylineData.path.map(p => [p.lat, p.lng]);
+        } else if (polylineData.coordinates) {
+          pathCoords = polylineData.coordinates.map(coord => {
+            if (Array.isArray(coord)) {
+              return [coord[0], coord[1]];
+            } else {
+              return [coord.lat, coord.lng];
+            }
+          });
+        } else {
+          return;
+        }
+        
+        const polyline = L.polyline(pathCoords, {
+          color: polylineData.strokeColor || polylineData.color || '#0066FF',
+          opacity: 0.8,
+          weight: 5
+        }).addTo(map);
+        
+        routePolylines.push(polyline);
+      });
+      
+      console.log(`✅ Added ${route.polylines.length} HC2L polylines (legacy)`);
+    } else {
+      console.warn('No valid geometry or polyline data found in HC2L route');
+    }
+    
+    // Fit map to show the route using Leaflet
     if (routePolylines.length > 0) {
       const bounds = L.latLngBounds();
       

@@ -71,10 +71,10 @@ class OSMRoadSnapper:
                 source = int(row['source'])
                 target = int(row['target'])
                 length = float(row['length'])
-                name = row.get('name', 'Unnamed Road')
-                highway = row.get('highway', 'unclassified')
+                name = row.get('road_name', row.get('name', 'Unnamed Road'))  # Try 'road_name' first, then 'name'
+                highway = row.get('highway_type', row.get('highway', 'unclassified'))  # Try 'highway_type' first
                 oneway = row.get('oneway', '0')
-                geometry_json = row.get('geometry_coords', '[]')
+                geometry_json = row.get('geometry_coords', row.get('geometry', '[]'))  # Try both column names
                 
                 # Parse geometry
                 try:

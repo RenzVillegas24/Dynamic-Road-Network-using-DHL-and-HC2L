@@ -1,388 +1,415 @@
 #!/bin/bash
-# All-in-One Setup Script for Dynamic Road Network (Linux/macOS)
-# Supports both automatic and manual setup with conda environment
+################################################################################
+# Dynamic Road Network - Complete Setup Script
+################################################################################
+# This script handles the complete workflow:
+# 1. Setup & validation
+# 2. Build C++ algorithms (DHL and HC2L)
+# 3. Generate data (network + traffic scenarios)
+# 4. Build indexes
+# 5. Run the Flask web server with real-time traffic updates
+#
+# Usage:
+#   ./setup.sh                    # Interactive menu
+#   ./setup.sh --build            # Build only
+#   ./setup.sh --data             # Generate data only
+#   ./setup.sh --full             # Complete setup
+#   ./setup.sh --server           # Run server only
+#   ./setup.sh --clean            # Remove generated files
+################################################################################
 
-set -e
+set -e  # Exit on error
 
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-PROJECT_ROOT="$SCRIPT_DIR"
-MAIN_DIR="$PROJECT_ROOT/Main"
-ENV_NAME="roadnet"
-CONDA_ENV_PATH="$PROJECT_ROOT/.conda"
-
-# Colors for output
+# Color codes
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Main Menu
-main_menu() {
-    clear
-    echo ""
-    echo "  Dynamic Road Network - Setup Script"
-    echo ""
-    echo ""
-    echo "Choose setup mode:"
-    echo "  1. Automatic Setup (Recommended - Does everything)"
-    echo "  2. Manual Setup (Step by step)"
-    echo "  3. Exit"
-    echo ""
-    read -p "Enter your choice (1-3): " setup_mode
-    echo ""
+# Script metadata
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROJECT_ROOT="$SCRIPT_DIR"
+MAIN_DIR="$PROJECT_ROOT/Main"
+BUILD_DIR="$MAIN_DIR/build"
+DATA_DIR="$MAIN_DIR/data"
+PROCESSED_DATA_DIR="$DATA_DIR/processed"
+DISRUPTIONS_DIR="$DATA_DIR/disruptions"
 
-    case $setup_mode in
-        1) auto_setup ;;
-        2) manual_menu ;;
-        3) exit 0 ;;
-        *) echo "Invalid choice."; sleep 2; main_menu ;;
-    esac
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
+
+print_header() {
+    echo -e "\n${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BLUE}$1${NC}"
+    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
 }
 
-# 
-# AUTOMATIC SETUP
-# 
-auto_setup() {
-    clear
-    echo ""
-    echo "  AUTOMATIC SETUP MODE"
-    echo ""
-    echo ""
-    echo "This will automatically:"
-    echo "  [1] Check prerequisites (Python, Conda, g++)"
-    echo "  [2] Create conda environment with all dependencies"
-    echo "  [3] Create directory structure"
-    echo "  [4] Setup .env configuration"
-    echo "  [5] Build C++ executables"
-    echo "  [6] Optionally generate data and indexes"
-    echo ""
-    read -p "Press Enter to continue..."
-    echo ""
+print_success() {
+    echo -e "${GREEN}✓ $1${NC}"
+}
 
-    check_prerequisites || return 1
-    create_conda_env || return 1
-    create_directories
-    setup_env_file
-    build_executables
+print_info() {
+    echo -e "${BLUE}ℹ $1${NC}"
+}
 
+print_warning() {
+    echo -e "${YELLOW}⚠ $1${NC}"
+}
+
+print_error() {
+    echo -e "${RED}✗ $1${NC}"
+}
+
+print_menu() {
+    echo -e "\n${BLUE}Available commands:${NC}"
+    echo -e "  ${GREEN}./setup.sh --full${NC}        Complete setup (build + data + indexes + server)"
+    echo -e "  ${GREEN}./setup.sh --build${NC}       Build C++ algorithms only"
+    echo -e "  ${GREEN}./setup.sh --data${NC}        Generate traffic data and base network"
+    echo -e "  ${GREEN}./setup.sh --indexes${NC}     Build routing indexes"
+    echo -e "  ${GREEN}./setup.sh --server${NC}      Run Flask web server"
+    echo -e "  ${GREEN}./setup.sh --clean${NC}       Remove all generated files"
+    echo -e "  ${GREEN}./setup.sh --help${NC}        Show this help message"
     echo ""
-    read -p "Generate OSM data and build indexes now? (y/n): " gen_data
-    if [[ "$gen_data" =~ ^[Yy]$ ]]; then
-        generate_data
+}
+
+check_requirements() {
+    print_header "Step 1/5: Checking Requirements"
+
+    # Check g++ compiler
+    if ! command -v g++ &> /dev/null; then
+        print_error "g++ compiler not found!"
+        echo ""
+        echo "Please install g++ (build-essential):"
+        echo "  Ubuntu/Debian: sudo apt-get install build-essential"
+        echo "  Fedora: sudo dnf install gcc-c++"
+        echo "  macOS: xcode-select --install"
+        exit 1
     fi
-
-    echo ""
-    echo ""
-    echo "  AUTOMATIC SETUP COMPLETE!"
-    echo ""
-    echo ""
-    echo "Your environment is ready! To start:"
-    echo "  1. Activate: conda activate .conda"
-    echo "  2. Run: ./run_server.sh"
-    echo ""
-    read -p "Press Enter to exit..."
-    exit 0
-}
-
-# 
-# MANUAL SETUP MENU
-# 
-manual_menu() {
-    while true; do
-        clear
-        echo ""
-        echo "  MANUAL SETUP MODE"
-        echo ""
-        echo ""
-        echo "Choose an option:"
-        echo "  1. Create/Update Conda Environment"
-        echo "  2. Create Directory Structure"
-        echo "  3. Setup .env Configuration"
-        echo "  4. Build C++ Executables"
-        echo "  5. Generate Data and Indexes"
-        echo "  6. Check Installation Status"
-        echo "  7. Back to Main Menu"
-        echo ""
-        read -p "Enter your choice (1-7): " manual_choice
-        echo ""
-
-        case $manual_choice in
-            1) create_conda_env; read -p "Press Enter to continue..." ;;
-            2) create_directories; read -p "Press Enter to continue..." ;;
-            3) setup_env_file; read -p "Press Enter to continue..." ;;
-            4) build_executables; read -p "Press Enter to continue..." ;;
-            5) generate_data; read -p "Press Enter to continue..." ;;
-            6) check_status; read -p "Press Enter to continue..." ;;
-            7) main_menu ;;
-            *) echo "Invalid choice."; sleep 2 ;;
-        esac
-    done
-}
-
-# 
-# FUNCTIONS
-# 
-
-check_prerequisites() {
-    echo "[Step] Checking Prerequisites..."
-    echo ""
+    print_success "g++ compiler found"
 
     # Check Python
     if ! command -v python3 &> /dev/null; then
-        echo -e "${RED}[ERROR]${NC} Python 3 not found. Install Python 3.8+ from https://www.python.org/"
-        return 1
+        print_error "Python 3 not found!"
+        exit 1
     fi
-    PYTHON_VERSION=$(python3 --version | cut -d' ' -f2)
-    echo -e "${GREEN}[OK]${NC} Python $PYTHON_VERSION found"
+    print_success "Python 3 found: $(python3 --version)"
 
-    # Check Conda
-    if ! command -v conda &> /dev/null; then
-        echo -e "${RED}[ERROR]${NC} Conda not found. Install Miniconda from https://docs.conda.io/en/latest/miniconda.html"
-        return 1
-    fi
-    CONDA_VERSION=$(conda --version | cut -d' ' -f2)
-    echo -e "${GREEN}[OK]${NC} Conda $CONDA_VERSION found"
-
-    # Check g++
-    if ! command -v g++ &> /dev/null; then
-        echo -e "${YELLOW}[WARNING]${NC} g++ not found. You'll need g++ to build C++ executables."
-        echo "Install: sudo apt-get install build-essential (Ubuntu/Debian)"
+    # Check conda environment (optional but recommended)
+    if [ -f "$PROJECT_ROOT/.conda/pyvenv.cfg" ] || [ -f "$PROJECT_ROOT/.conda/bin/python" ]; then
+        print_success "Conda environment detected"
     else
-        GCC_VERSION=$(g++ --version | head -n1)
-        echo -e "${GREEN}[OK]${NC} $GCC_VERSION found"
+        print_warning "Conda environment not found (using system Python)"
     fi
 
-    echo ""
-    return 0
+    # Create necessary directories
+    mkdir -p "$BUILD_DIR/dhl"
+    mkdir -p "$BUILD_DIR/hc2l"
+    mkdir -p "$DATA_DIR/raw"
+    mkdir -p "$PROCESSED_DATA_DIR"
+    mkdir -p "$DISRUPTIONS_DIR"
+    print_success "Data directories created"
 }
 
-create_conda_env() {
-    echo ""
-    echo "  Creating Conda Environment"
-    echo ""
-    echo ""
+build_dhl() {
+    print_header "Building DHL (Dual-Hierarchy Labelling)"
 
-    # Check if environment.yml exists
-    if [ ! -f "$PROJECT_ROOT/environment.yml" ]; then
-        echo -e "${RED}[ERROR]${NC} environment.yml not found"
+    cd "$PROJECT_ROOT/DualHierarchyLabelling"
+
+    # Build routing API
+    print_info "Compiling DHL routing API..."
+    if g++ -std=c++2a -O3 -Wall -Wextra -pthread \
+        -o "$BUILD_DIR/dhl/dhl_routing_api" \
+        src/dhl_routing_api.cpp src/road_network.cpp src/util.cpp; then
+        print_success "DHL routing API compiled"
+    else
+        print_error "DHL routing API compilation failed!"
         return 1
     fi
 
-    # Check if environment already exists
-    if [ -d "$CONDA_ENV_PATH" ]; then
-        echo -e "${YELLOW}[INFO]${NC} Environment already exists at .conda/"
-        read -p "Update existing environment? (y/n): " update_env
-        if [[ "$update_env" =~ ^[Yy]$ ]]; then
-            echo "[INFO] Updating environment..."
-            conda env update -f "$PROJECT_ROOT/environment.yml" -p "$CONDA_ENV_PATH" || {
-                echo -e "${RED}[ERROR]${NC} Failed to update environment"
-                return 1
-            }
-            echo -e "${GREEN}[OK]${NC} Environment updated"
-        fi
+    # Build index executable
+    print_info "Compiling DHL index builder..."
+    if g++ -std=c++2a -O3 -Wall -Wextra -pthread \
+        -o "$BUILD_DIR/dhl/index" \
+        src/index.cpp src/road_network.cpp src/util.cpp; then
+        print_success "DHL index builder compiled"
     else
-        echo "[INFO] Creating conda environment from environment.yml..."
-        echo "Environment will be created at: .conda/"
-        echo "This may take 5-10 minutes..."
-        echo ""
-        conda env create -f "$PROJECT_ROOT/environment.yml" -p "$CONDA_ENV_PATH" || {
-            echo -e "${RED}[ERROR]${NC} Failed to create environment"
-            return 1
-        }
-        echo -e "${GREEN}[OK]${NC} Environment created successfully at .conda/"
+        print_error "DHL index builder compilation failed!"
+        return 1
     fi
-
-    echo ""
-    echo "Testing packages..."
-    source "$(conda info --base)/etc/profile.d/conda.sh"
-    conda activate "$CONDA_ENV_PATH"
-    python -c "import pyogrio, geopandas, flask; print('[OK] All critical packages imported successfully')" 2>/dev/null || {
-        echo -e "${YELLOW}[WARNING]${NC} Some packages may not be working correctly"
-    }
-    echo ""
-    return 0
 }
 
-create_directories() {
-    echo ""
-    echo "  Creating Directory Structure"
-    echo ""
-    echo ""
+build_hc2l() {
+    print_header "Building HC2L (Hierarchical Cut 2-Hop Labelling)"
 
-    mkdir -p "$MAIN_DIR/data/raw"
-    mkdir -p "$MAIN_DIR/data/processed"
-    mkdir -p "$MAIN_DIR/data/disruptions"
-    mkdir -p "$MAIN_DIR/build/dhl"
-    mkdir -p "$MAIN_DIR/build/hc2l"
-    mkdir -p "$MAIN_DIR/cache"
+    cd "$PROJECT_ROOT/HierarchicalCutLabelling"
 
-    echo -e "${GREEN}[OK]${NC} Created Main/data/raw/"
-    echo -e "${GREEN}[OK]${NC} Created Main/data/processed/"
-    echo -e "${GREEN}[OK]${NC} Created Main/data/disruptions/"
-    echo -e "${GREEN}[OK]${NC} Created Main/build/dhl/"
-    echo -e "${GREEN}[OK]${NC} Created Main/build/hc2l/"
-    echo -e "${GREEN}[OK]${NC} Created Main/cache/"
-    echo ""
-}
-
-setup_env_file() {
-    echo ""
-    echo "  Setting up .env Configuration"
-    echo ""
-    echo ""
-
-    if [ -f "$MAIN_DIR/.env" ]; then
-        echo "[INFO] .env file already exists"
-        read -p "Overwrite existing .env? (y/n): " overwrite
-        if [[ ! "$overwrite" =~ ^[Yy]$ ]]; then
-            echo "[SKIP] Keeping existing .env file"
-            return 0
-        fi
-    fi
-
-    if [ -f "$MAIN_DIR/.env.example" ]; then
-        cp "$MAIN_DIR/.env.example" "$MAIN_DIR/.env"
-        echo -e "${GREEN}[OK]${NC} Created .env from template"
+    # Build routing API
+    print_info "Compiling HC2L routing API..."
+    if g++ -std=c++20 -O3 -Wall -Wextra \
+        -o "$BUILD_DIR/hc2l/hc2l_routing_api" \
+        src/hc2l_routing_api.cpp src/road_network.cpp src/util.cpp; then
+        print_success "HC2L routing API compiled"
     else
-        echo "[INFO] Creating basic .env file"
-        cat > "$MAIN_DIR/.env" << EOF
-GOOGLE_MAPS_API_KEY=your_api_key_here
-FLASK_ENV=development
-FLASK_DEBUG=True
-FLASK_HOST=0.0.0.0
-FLASK_PORT=5000
-EOF
-        echo -e "${GREEN}[OK]${NC} Created basic .env file"
-    fi
-
-    echo ""
-    echo -e "${YELLOW}[IMPORTANT]${NC} Please edit Main/.env and add your Google Maps API key"
-    read -p "Open .env file now? (y/n): " edit_now
-    if [[ "$edit_now" =~ ^[Yy]$ ]]; then
-        ${EDITOR:-nano} "$MAIN_DIR/.env"
-    fi
-    echo ""
-}
-
-build_executables() {
-    echo ""
-    echo "  Building C++ Executables"
-    echo ""
-    echo ""
-
-    if ! command -v g++ &> /dev/null; then
-        echo -e "${RED}[ERROR]${NC} g++ not found. Cannot build executables."
-        echo "Install build tools, then try again."
+        print_error "HC2L routing API compilation failed!"
         return 1
     fi
 
-    if [ -f "$PROJECT_ROOT/build_all.sh" ]; then
-        chmod +x "$PROJECT_ROOT/build_all.sh"
-        "$PROJECT_ROOT/build_all.sh" || {
-            echo -e "${RED}[ERROR]${NC} Build failed"
-            return 1
-        }
-        echo -e "${GREEN}[OK]${NC} Executables built successfully"
+    # Build index executable
+    print_info "Compiling HC2L index builder..."
+    if g++ -std=c++20 -O3 -Wall -Wextra \
+        -o "$BUILD_DIR/hc2l/index" \
+        src/index.cpp src/road_network.cpp src/util.cpp; then
+        print_success "HC2L index builder compiled"
     else
-        echo -e "${RED}[ERROR]${NC} build_all.sh not found"
+        print_error "HC2L index builder compilation failed!"
         return 1
     fi
-    echo ""
 }
 
 generate_data() {
-    echo ""
-    echo "  Generating Data and Indexes"
-    echo ""
-    echo ""
-    echo "This process takes 15-20 minutes and requires:"
-    echo "  - Active internet connection"
-    echo "  - Conda environment activated"
-    echo ""
-    read -p "Continue? (y/n): " confirm
-    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
-        return 0
-    fi
+    print_header "Step 2/5: Generating Traffic Data & Network"
 
-    echo ""
-    echo "[Step 1/2] Activating conda environment..."
-    source "$(conda info --base)/etc/profile.d/conda.sh"
-    conda activate "$CONDA_ENV_PATH"
-
-    echo "[Step 2/2] Generating OSM data and building indexes (this takes time)..."
     cd "$MAIN_DIR"
-    python request_new_datasets.py || {
-        echo -e "${RED}[ERROR]${NC} Data generation and index building failed"
-        cd "$PROJECT_ROOT"
+
+    # Generate unified data (base network + 1 scenario)
+    print_info "Generating base network and traffic scenario..."
+    python3 ../unified_data_generator.py --mode both --scenarios 1 --place "Quezon City, Philippines" || {
+        print_error "Data generation failed!"
         return 1
     }
 
-    cd "$PROJECT_ROOT"
+    print_success "Data generation complete"
+    print_info "Output files:"
+    echo "  - Nodes: $DATA_DIR/raw/quezon_city_nodes.csv"
+    echo "  - Edges: $DATA_DIR/raw/quezon_city_edges.csv"
+    echo "  - Scenario: $DISRUPTIONS_DIR/qc_scenario_for_cpp_1.csv"
+}
+
+build_indexes() {
+    print_header "Step 3/5: Building Routing Indexes"
+
+    cd "$MAIN_DIR"
+
+    # Check if graph files exist
+    if [ ! -f "$PROCESSED_DATA_DIR/quezon_city.graph" ]; then
+        print_warning "Graph file not found. Have you run data generation?"
+        return 1
+    fi
+
+    # Build DHL index
+    # DHL index requires: <input_graph> <output_base_path>
+    # Output files: quezon_city_dhl, quezon_city_ch
+    print_info "Building DHL index..."
+    if "$BUILD_DIR/dhl/index" "$PROCESSED_DATA_DIR/quezon_city.graph" "$PROCESSED_DATA_DIR/quezon_city" 2>&1; then
+        print_success "DHL index built"
+        print_info "  - DHL index: $PROCESSED_DATA_DIR/quezon_city_dhl"
+        print_info "  - CH data:   $PROCESSED_DATA_DIR/quezon_city_ch"
+    else
+        print_error "DHL index build failed!"
+        print_error "Make sure graph file exists: $PROCESSED_DATA_DIR/quezon_city.graph"
+        return 1
+    fi
+
+    # Build HC2L index
+    # HC2L reads from stdin and writes to stdout
+    print_info "Building HC2L index..."
+    if cat "$PROCESSED_DATA_DIR/quezon_city.graph" | "$BUILD_DIR/hc2l/index" > "$PROCESSED_DATA_DIR/quezon_city.hc2l.index" 2>&1; then
+        print_success "HC2L index built"
+        print_info "  - HC2L index: $PROCESSED_DATA_DIR/quezon_city.hc2l.index"
+    else
+        print_error "HC2L index build failed!"
+        return 1
+    fi
+
+    print_success "All indexes built successfully"
+    print_info "Index files created in: $PROCESSED_DATA_DIR/"    # Build HC2L index
+    # HC2L reads from stdin and writes to stdout
+    # Output file: quezon_city.hc2l.index
+    print_info "Building HC2L index..."
+    if cat "$PROCESSED_DATA_DIR/quezon_city.graph" | "$BUILD_DIR/hc2l/index" > "$PROCESSED_DATA_DIR/quezon_city.hc2l.index"; then
+        print_success "HC2L index built"
+        print_info "  - HC2L index: $PROCESSED_DATA_DIR/quezon_city.hc2l.index"
+    else
+        print_error "HC2L index build failed!"
+        return 1
+    fi
+
+    print_success "All indexes built successfully"
+    print_info "Index files created in: $PROCESSED_DATA_DIR/"
+}
+
+run_server() {
+    print_header "Step 5/5: Starting Flask Server"
+
+    cd "$MAIN_DIR"
+
+    print_info "Cleaning up any existing processes..."
+    pkill -f "flask_server.py" 2>/dev/null || true
+    pkill -f "unified_data_generator.py" 2>/dev/null || true
+    sleep 1
+
+    print_info "Starting Flask web server..."
+    print_info "Server URL: http://localhost:5000"
+    print_info "Press Ctrl+C to stop"
     echo ""
-    echo -e "${GREEN}[OK]${NC} Data generation and indexing complete!"
+
+    # Start Flask in foreground
+    python3 flask_server.py
+}
+
+run_full_setup() {
+    print_header "DYNAMIC ROAD NETWORK - COMPLETE SETUP"
+
+    # Step 1: Check requirements
+    check_requirements
+
+    # Step 2: Build C++ algorithms
+    print_header "Step 2/5: Building C++ Algorithms"
+    build_dhl || exit 1
+    build_hc2l || exit 1
+    print_success "All algorithms compiled successfully"
+
+    # Step 3: Generate data
+    generate_data || exit 1
+
+    # Step 4: Build indexes
+    build_indexes || exit 1
+
+    # Success
+    print_header "✓ SETUP COMPLETE!"
+    echo -e "${GREEN}The system is ready to use!${NC}\n"
+    echo "Next step: Run the server"
+    echo -e "  ${GREEN}./setup.sh --server${NC}\n"
+}
+
+clean_generated_files() {
+    print_header "Cleaning Generated Files"
+
+    print_warning "This will remove all generated data and indexes."
+    echo "Files to be removed:"
+    echo "  - $DATA_DIR/"
+    echo "  - $BUILD_DIR/"
+    echo ""
+    read -p "Continue? (y/N) " -n 1 -r
+    echo ""
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        rm -rf "$DATA_DIR"
+        rm -rf "$BUILD_DIR"
+        print_success "Cleaned successfully"
+    else
+        print_info "Cleanup cancelled"
+    fi
+}
+
+show_help() {
+    echo ""
+    echo "╔═══════════════════════════════════════════════════════════════════╗"
+    echo "║   Dynamic Road Network - Complete Setup Script                    ║"
+    echo "║   Handles: Build, Data Generation, Index Building, Server Run     ║"
+    echo "╚═══════════════════════════════════════════════════════════════════╝"
+    echo ""
+    print_menu
+    echo -e "Modes:"
+    echo -e "  ${YELLOW}--flow${NC}        Use only flow data (no incidents)"
+    echo -e "  ${YELLOW}--incidents${NC}   Use only incidents (no flow)"
+    echo -e "  ${YELLOW}--both${NC}        Use both flow and incidents (default)"
+    echo -e "  ${YELLOW}--synthetic${NC}   Use synthetic data (no HERE API)"
+    echo ""
+    echo -e "Examples:"
+    echo -e "  ${GREEN}./setup.sh --full${NC}              # Complete workflow"
+    echo -e "  ${GREEN}./setup.sh --full --flow${NC}       # Build & run with flow data only"
+    echo -e "  ${GREEN}./setup.sh --build${NC}             # Compile C++ only"
+    echo -e "  ${GREEN}./setup.sh --data --synthetic${NC}  # Generate synthetic data"
     echo ""
 }
 
-check_status() {
-    echo ""
-    echo "  Installation Status"
-    echo ""
-    echo ""
+# ============================================================================
+# MAIN ENTRY POINT
+# ============================================================================
 
-    # Check conda environment
-    if [ -d "$CONDA_ENV_PATH" ]; then
-        echo -e "${GREEN}[OK]${NC} Conda environment exists at .conda/"
-    elif conda env list | grep -q "^$ENV_NAME "; then
-        echo -e "${GREEN}[OK]${NC} Conda environment '$ENV_NAME' exists (named)"
-    else
-        echo -e "${RED}[X]${NC} Conda environment not found"
-    fi
+# Default mode
+MODE="both"
+ACTION="menu"
 
-    # Check directories
-    if [ -d "$MAIN_DIR/data" ]; then
-        echo -e "${GREEN}[OK]${NC} Data directories exist"
-    else
-        echo -e "${RED}[X]${NC} Data directories missing"
-    fi
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --full)
+            ACTION="full"
+            ;;
+        --build)
+            ACTION="build"
+            ;;
+        --data)
+            ACTION="data"
+            ;;
+        --indexes)
+            ACTION="indexes"
+            ;;
+        --server)
+            ACTION="server"
+            ;;
+        --clean)
+            ACTION="clean"
+            ;;
+        --help|-h)
+            ACTION="help"
+            ;;
+        --flow)
+            MODE="flow"
+            ;;
+        --incidents)
+            MODE="incidents"
+            ;;
+        --both)
+            MODE="both"
+            ;;
+        --synthetic)
+            MODE="synthetic"
+            ;;
+        *)
+            print_error "Unknown option: $1"
+            show_help
+            exit 1
+            ;;
+    esac
+    shift
+done
 
-    # Check .env
-    if [ -f "$MAIN_DIR/.env" ]; then
-        echo -e "${GREEN}[OK]${NC} .env file exists"
-    else
-        echo -e "${RED}[X]${NC} .env file missing"
-    fi
+# Execute actions
+case $ACTION in
+    help)
+        show_help
+        ;;
+    full)
+        run_full_setup
+        ;;
+    build)
+        check_requirements
+        print_header "Building C++ Algorithms"
+        build_dhl || exit 1
+        build_hc2l || exit 1
+        print_success "Build complete"
+        ;;
+    data)
+        mkdir -p "$DATA_DIR/raw" "$PROCESSED_DATA_DIR" "$DISRUPTIONS_DIR"
+        cd "$MAIN_DIR"
+        python3 ../unified_data_generator.py --mode "$MODE" --scenarios 1 --place "Quezon City, Philippines" || exit 1
+        ;;
+    indexes)
+        build_indexes || exit 1
+        ;;
+    server)
+        run_server
+        ;;
+    clean)
+        clean_generated_files
+        ;;
+    menu)
+        show_help
+        ;;
+esac
 
-    # Check executables
-    if [ -f "$MAIN_DIR/build/dhl/dhl_routing_api" ]; then
-        echo -e "${GREEN}[OK]${NC} DHL executable exists"
-    else
-        echo -e "${RED}[X]${NC} DHL executable missing"
-    fi
-
-    if [ -f "$MAIN_DIR/build/hc2l/hc2l_routing_api" ]; then
-        echo -e "${GREEN}[OK]${NC} HC2L executable exists"
-    else
-        echo -e "${RED}[X]${NC} HC2L executable missing"
-    fi
-
-    # Check data files
-    if [ -f "$MAIN_DIR/data/raw/quezon_city_nodes.csv" ]; then
-        echo -e "${GREEN}[OK]${NC} Data files exist"
-    else
-        echo -e "${RED}[X]${NC} Data files missing"
-    fi
-
-    # Check indexes
-    if [ -f "$MAIN_DIR/data/processed/quezon_city.dhl.index" ]; then
-        echo -e "${GREEN}[OK]${NC} Index files exist"
-    else
-        echo -e "${RED}[X]${NC} Index files missing"
-    fi
-
-    echo ""
-    echo "Run check_gdal.py for detailed package verification"
-    echo ""
-}
-
-# Start the script
-main_menu
+exit 0

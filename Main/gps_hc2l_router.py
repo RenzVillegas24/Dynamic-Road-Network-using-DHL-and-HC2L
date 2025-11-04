@@ -222,6 +222,10 @@ class GPSRoutingService:
                     route_data = self._enhance_route_with_coordinates(route_data)
                     route_data = self._enhance_route_with_road_names(route_data)
                 
+                # Debug: Verify geometry is in route_data before returning
+                geometry_count = len(route_data.get('route', {}).get('geometry', []))
+                print(f"🔍 HC2L Router: Returning route_data with {geometry_count} geometry segments")
+                
                 return route_data
                 
             except json.JSONDecodeError as e:
@@ -251,6 +255,10 @@ class GPSRoutingService:
         try:
             # Check if C++ API already provided geometry
             api_geometry = route_data.get('route', {}).get('geometry', [])
+            
+            # Preserve geometry for frontend (contains edge details: distance, highway type, speeds, traffic status)
+            if api_geometry:
+                route_data['route']['geometry'] = api_geometry
             
             if api_geometry:
                 # Use geometry from C++ API (already includes road curves from CSV)

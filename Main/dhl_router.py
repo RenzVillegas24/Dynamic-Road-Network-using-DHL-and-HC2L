@@ -272,6 +272,7 @@ class DHLRouter:
                 'path_nodes': path_nodes,
                 'coordinates': coordinates,
                 'polylines': [],
+                'geometry': api_geometry,  # Add C++ geometry data with full edge details
                 'start_node': dhl_data.get('gps_mapping', {}).get('start_node', 0),
                 'dest_node': dhl_data.get('gps_mapping', {}).get('dest_node', 0),
                 'route_summary': dhl_data.get('route', {}).get('complete_trace', ''),

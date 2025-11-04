@@ -100,6 +100,27 @@
       display: none !important;
     }
 
+    /* Route segment styling */
+    .route-segment-clickable {
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .route-segment-clickable:hover {
+      filter: brightness(1.2);
+      stroke-width: 8px !important;
+    }
+
+    .route-segment-popup .leaflet-popup-content-wrapper {
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    .route-segment-popup .leaflet-popup-content {
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
     /* Walking distance label styling */
     .walking-distance-label {
       background: rgba(117, 117, 117, 0.95) !important;
@@ -1365,17 +1386,22 @@
             const displayText = distance > 5
               ? `${locationText.substring(0, 40)}... → Road Node (${distance.toFixed(0)}m)`
               : locationText;
-            document.getElementById('start-location-text').textContent = displayText;
+            const startTextEl = document.getElementById('start-location-text');
+            if (startTextEl) startTextEl.textContent = displayText;
           })
           .catch(() => {
             const displayText = distance > 5
               ? `Location → Road Node ${nodeData.node_id} (${distance.toFixed(0)}m)`
               : `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-            document.getElementById('start-location-text').textContent = displayText;
+            const startTextEl = document.getElementById('start-location-text');
+            if (startTextEl) startTextEl.textContent = displayText;
           });
 
-        document.getElementById('start-location-text').classList.remove('text-slate-500');
-        document.getElementById('start-location-text').classList.add('text-slate-900', 'font-semibold');
+        const startTextEl = document.getElementById('start-location-text');
+        if (startTextEl) {
+          startTextEl.classList.remove('text-slate-500');
+          startTextEl.classList.add('text-slate-900', 'font-semibold');
+        }
 
         const message = distance > 5
           ? `Start location set (${distance.toFixed(0)}m from road)`
@@ -1506,17 +1532,22 @@
             const displayText = distance > 5
               ? `${locationText.substring(0, 40)}... → Road Node (${distance.toFixed(0)}m)`
               : locationText;
-            document.getElementById('dest-location-text').textContent = displayText;
+            const destTextEl = document.getElementById('dest-location-text');
+            if (destTextEl) destTextEl.textContent = displayText;
           })
           .catch(() => {
             const displayText = distance > 5
               ? `Location → Road Node ${nodeData.node_id} (${distance.toFixed(0)}m)`
               : `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-            document.getElementById('dest-location-text').textContent = displayText;
+            const destTextEl = document.getElementById('dest-location-text');
+            if (destTextEl) destTextEl.textContent = displayText;
           });
 
-        document.getElementById('dest-location-text').classList.remove('text-slate-500');
-        document.getElementById('dest-location-text').classList.add('text-slate-900', 'font-semibold');
+        const destTextEl = document.getElementById('dest-location-text');
+        if (destTextEl) {
+          destTextEl.classList.remove('text-slate-500');
+          destTextEl.classList.add('text-slate-900', 'font-semibold');
+        }
 
         const message = distance > 5
           ? `Destination set (${distance.toFixed(0)}m from road)`
@@ -1591,146 +1622,8 @@
     }
 
 
-    // D-HC2L Route Display Functions
-    function displayDHC2LRoute(routeData) {
-      // Clear only route polylines, keep location markers
-      if (routePolylines && routePolylines.length > 0) {
-        routePolylines.forEach(polyline => {
-          if (polyline && map) {
-            map.removeLayer(polyline);
-          }
-        });
-        routePolylines = [];
-      }
-
-      // Display route geometry with colors on map using Leaflet
-      if (routeData.route && routeData.route.geometry && routeData.route.geometry.length > 0) {
-        console.log('Displaying D-HC2L route with', routeData.route.geometry.length, 'colored segments');
-
-        routeData.route.geometry.forEach((segment, index) => {
-          try {
-            // Extract coordinates from segment
-            const coords = segment.coordinates;
-            if (!coords || coords.length < 2) {
-              console.warn('Segment has insufficient coordinates:', segment);
-              return;
-            }
-            
-            // Convert coordinates to Leaflet format [lng, lat] -> [lat, lng]
-            const pathCoords = coords.map(coord => [coord[1], coord[0]]);
-            
-            // Get color from segment (hex format)
-            let segmentColor = segment.color || '#3b82f6'; // Default HC2L blue
-            
-            // Create polyline with segment-specific color
-            const polyline = L.polyline(pathCoords, {
-              color: segmentColor,
-              opacity: 0.8,
-              weight: 5
-            }).addTo(map);
-            
-            // Add popup with traffic info if available
-            if (segment.flow_status && segment.flow_status !== 'default') {
-              const popupContent = `
-                <div class="text-sm">
-                  <strong>Segment ${index + 1}</strong><br>
-                  Status: ${segment.flow_status}<br>
-                  Jam Factor: ${segment.jam_factor.toFixed(1)}<br>
-                  Speed: ${segment.speed_kmh.toFixed(1)} km/h<br>
-                  Reduction: ${(segment.speed_reduction * 100).toFixed(1)}%
-                </div>
-              `;
-              polyline.bindPopup(popupContent);
-            }
-            
-            routePolylines.push(polyline);
-
-            console.log(`Segment ${index + 1} added with ${pathCoords.length} points, color: ${segmentColor}`);
-          } catch (error) {
-            console.error(`Error creating segment ${index + 1}:`, error);
-          }
-        });
-
-        console.log(`✅ Added ${routeData.route.geometry.length} colored HC2L segments to map`);
-
-        // Add connector polylines from pinned locations to route start/end nodes
-        addConnectorPolylines(routeData);
-
-        // Fit map to show the route
-        if (routePolylines.length > 0) {
-          const bounds = L.latLngBounds();
-
-          // Include start and destination markers
-          if (window.startLocation) bounds.extend([window.startLocation.lat, window.startLocation.lng]);
-          if (window.destLocation) bounds.extend([window.destLocation.lat, window.destLocation.lng]);
-
-          // Include route points from geometry
-          routeData.route.geometry.forEach(segment => {
-            if (segment.coordinates) {
-              segment.coordinates.forEach(coord => {
-                bounds.extend([coord[1], coord[0]]); // [lng, lat] -> [lat, lng]
-              });
-            }
-          });
-
-          map.fitBounds(bounds);
-          console.log('Map bounds fitted to route');
-        }
-      } else if (routeData.route && routeData.route.polylines) {
-        // Legacy fallback for old polylines format
-        console.log('Displaying D-HC2L route with', routeData.route.polylines.length, 'polylines (legacy)');
-
-        routeData.route.polylines.forEach((polylineData, index) => {
-          try {
-            let polylinePath;
-            if (polylineData.coordinates) {
-              polylinePath = polylineData.coordinates.map(coord => [coord[0], coord[1]]);
-            } else if (polylineData.path) {
-              polylinePath = polylineData.path.map(p => [p.lat, p.lng]);
-            } else {
-              console.warn('Unknown polyline format:', polylineData);
-              return;
-            }
-
-            const polyline = L.polyline(polylinePath, {
-              color: polylineData.strokeColor || polylineData.color || '#3b82f6',
-              opacity: 0.8,
-              weight: 5
-            }).addTo(map);
-
-            routePolylines.push(polyline);
-          } catch (error) {
-            console.error(`Error creating polyline ${index + 1}:`, error);
-          }
-        });
-
-        addConnectorPolylines(routeData);
-
-        if (routePolylines.length > 0) {
-          const bounds = L.latLngBounds();
-          if (window.startLocation) bounds.extend([window.startLocation.lat, window.startLocation.lng]);
-          if (window.destLocation) bounds.extend([window.destLocation.lat, window.destLocation.lng]);
-
-          routeData.route.polylines.forEach(polylineData => {
-            if (polylineData.coordinates) {
-              polylineData.coordinates.forEach(coord => {
-                bounds.extend([coord[0], coord[1]]);
-              });
-            } else if (polylineData.path) {
-              polylineData.path.forEach(point => {
-                bounds.extend([point.lat, point.lng]);
-              });
-            }
-          });
-
-          map.fitBounds(bounds);
-        }
-      } else {
-        console.warn('No geometry or polylines found in route data:', routeData);
-      }
-
-      console.log('D-HC2L route display complete');
-    }
+    // NOTE: displayDHC2LRoute() is now defined in static/js/functions.js
+    // The version below has been removed to use the centralized function with full interactive features
 
 
     function addConnectorPolylines(routeData) {

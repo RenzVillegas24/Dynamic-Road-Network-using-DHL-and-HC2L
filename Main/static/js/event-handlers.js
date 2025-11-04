@@ -92,6 +92,12 @@ function initializeEventHandlers() {
     const selectedAlgorithm = getSelectedAlgorithm();
     console.log('Selected algorithm:', selectedAlgorithm);
     
+    // Get dataset selection to determine if disruptions should be used
+    const datasetRadio = document.querySelector('input[name="dataset"]:checked');
+    const selectedDataset = datasetRadio ? datasetRadio.value : 'none';
+    const useDisruptions = selectedDataset !== 'none';
+    console.log('Selected dataset:', selectedDataset, 'useDisruptions:', useDisruptions);
+    
     // Clear any existing routes
     clearRoutes();
     
@@ -106,229 +112,64 @@ function initializeEventHandlers() {
       
       // Route computation based on selected algorithm
       switch (selectedAlgorithm) {
-        case 'dhl-base':
-          // Clear any existing disruption markers since we're using base dataset
-          clearDisruptionMarkers();
-          routeData = await computeDHLRoute(false);
+        case 'dhl':
+          // DHL only
+          if (useDisruptions) {
+            // await loadActiveDisruptionsForAlgorithm('DHL');
+          } else {
+            clearDisruptionMarkers();
+          }
+          routeData = await computeDHLRoute(useDisruptions);
           if (routeData) displayDHLRoute(routeData);
           break;
           
-        case 'dhl-disrupted':
-          // Load active disruptions on the map first
-          await loadActiveDisruptionsForAlgorithm('DHL (Disrupted)');
-          routeData = await computeDHLRoute(true);
-          if (routeData) displayDHLRoute(routeData);
-          break;
-          
-        case 'dhc2l-base':
-          // Clear any existing disruption markers since we're using base dataset
-          clearDisruptionMarkers();
-          routeData = await computeDHC2LRoute(false);
+        case 'hc2l':
+          // HC2L only
+          if (useDisruptions) {
+            // await loadActiveDisruptionsForAlgorithm('HC2L');
+          } else {
+            clearDisruptionMarkers();
+          }
+          routeData = await computeDHC2LRoute(useDisruptions, currentThreshold);
           if (routeData) displayDHC2LRoute(routeData);
           break;
           
-        case 'dhc2l-disrupted':
-          // Load active disruptions on the map first
-          await loadActiveDisruptionsForAlgorithm('D-HC2L (Disrupted)');
-          routeData = await computeDHC2LRoute(true);
-          if (routeData) displayDHC2LRoute(routeData);
-          break;
-          
-        case 'comparison-base':
-          // Clear any existing disruption markers since we're using base dataset
-          clearDisruptionMarkers();
-          // Use dedicated comparison endpoint for base datasets
-          console.log('Starting comparison mode - base datasets');
-          showUpdateToast('Computing algorithm comparison (base datasets)...', 'info');
-          
-          try {
-            const response = await fetch('/compare_algorithms', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                start_lat: window.startLocation.lat,
-                start_lng: window.startLocation.lng,
-                dest_lat: window.destLocation.lat,
-                dest_lng: window.destLocation.lng,
-                use_disruptions: false,
-                threshold: currentThreshold
-              })
-            });
-            
-            if (!response.ok) {
-              throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            
-            const comparisonData = await response.json();
-            console.log('Received comparison data:', comparisonData);
-            
-            if (comparisonData.success) {
-              // Display both routes with different colors and patterns using Leaflet
-              const routes = comparisonData.routes;
-              
-              if (routes.dhl && routes.dhl.polylines) {
-                // Display DHL route with solid purple line (thicker, on top)
-                routes.dhl.polylines.forEach(polyline => {
-                  const pathCoords = polyline.path.map(p => [p.lat, p.lng]);
-                  
-                  const dhlPolyline = L.polyline(pathCoords, {
-                    color: '#9333ea', // Purple for DHL
-                    opacity: 0.9,
-                    weight: 6 // Thicker for DHL
-                  }).addTo(map);
-                  
-                  routePolylines.push(dhlPolyline);
-                });
-                console.log('✅ DHL route displayed in solid purple');
-                
-                // Add DHL connector polylines
-                addDHLConnectorPolylines({ route: routes.dhl });
-              }
-              
-              if (routes.dhc2l && routes.dhc2l.polylines) {
-                // Display D-HC2L route with dashed blue line (thinner, underneath)
-                routes.dhc2l.polylines.forEach(polyline => {
-                  const pathCoords = polyline.path.map(p => [p.lat, p.lng]);
-                  
-                  const dhc2lPolyline = L.polyline(pathCoords, {
-                    color: '#3b82f6', // Blue for D-HC2L (Lazy HC2L)
-                    opacity: 0.9,
-                    weight: 4, // Thinner for D-HC2L
-                    dashArray: '10, 5' // Dashed pattern
-                  }).addTo(map);
-                  
-                  routePolylines.push(dhc2lPolyline);
-                });
-                console.log('✅ D-HC2L route displayed in dashed blue');
-                
-                // Add D-HC2L connector polylines
-                addConnectorPolylines({ route: routes.dhc2l });
-              }
-              
-              // Use DHL metrics for performance display if available
-              routeData = {
-                success: true,
-                route: routes.dhl || routes.dhc2l || {},
-                routes: routes, // Include both routes for comparison display
-                metrics: routes.dhl ? routes.dhl.summary : (routes.dhc2l ? routes.dhc2l.summary : {}),
-                algorithm: 'Algorithm Comparison (Base)'
-              };
-              
-              // Update bottom info bar with comparison data
-              updateRouteMetrics(routeData);
-              
-              // Update algorithm comparison modal with actual metrics
-              updateAlgorithmComparisonModal(routes.dhl, routes.dhc2l);
-              
-              showUpdateToast('Both algorithms displayed! Solid Purple = DHL, Dashed Blue = D-HC2L', 'success');
-            } else {
-              throw new Error(comparisonData.error || 'Comparison computation failed');
-            }
-          } catch (error) {
-            console.error('Comparison mode error:', error);
-            throw error;
+        case 'both':
+          // Both algorithms - comparison mode
+          if (useDisruptions) {
+            // await loadActiveDisruptionsForAlgorithm('Algorithm Comparison');
+          } else {
+            clearDisruptionMarkers();
           }
-          break;
+          showUpdateToast('Computing comparison routes...', 'info');
           
-        case 'comparison-disrupted':
-          // Load active disruptions on the map first
-          await loadActiveDisruptionsForAlgorithm('Algorithm Comparison (Disrupted)');
-          // Use dedicated comparison endpoint for disrupted datasets
-          console.log('Starting comparison mode - disrupted datasets');
-          showUpdateToast('Computing algorithm comparison (disrupted datasets)...', 'info');
+          // Compute both routes in parallel
+          const [hc2lResult, dhlResult] = await Promise.all([
+            computeDHC2LRoute(useDisruptions, currentThreshold),
+            computeDHLRoute(useDisruptions)
+          ]);
           
-          try {
-            const response = await fetch('/compare_algorithms', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                start_lat: window.startLocation.lat,
-                start_lng: window.startLocation.lng,
-                dest_lat: window.destLocation.lat,
-                dest_lng: window.destLocation.lng,
-                use_disruptions: true
-              })
-            });
-            
-            if (!response.ok) {
-              throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            
-            const comparisonData = await response.json();
-            console.log('Received comparison data:', comparisonData);
-            
-            if (comparisonData.success) {
-              // Display both routes with different colors and patterns using Leaflet
-              const routes = comparisonData.routes;
-              
-              if (routes.dhl && routes.dhl.polylines) {
-                // Display DHL route with solid purple line (thicker, on top)
-                routes.dhl.polylines.forEach(polyline => {
-                  const pathCoords = polyline.path.map(p => [p.lat, p.lng]);
-                  
-                  const dhlPolyline = L.polyline(pathCoords, {
-                    color: '#9333ea', // Purple for DHL
-                    opacity: 0.9,
-                    weight: 6 // Thicker for DHL
-                  }).addTo(map);
-                  
-                  routePolylines.push(dhlPolyline);
-                });
-                console.log('✅ DHL route displayed in solid purple');
-                
-                // Add DHL connector polylines
-                addDHLConnectorPolylines({ route: routes.dhl });
-              }
-              
-              if (routes.dhc2l && routes.dhc2l.polylines) {
-                // Display D-HC2L route with dashed blue line (thinner, underneath)
-                routes.dhc2l.polylines.forEach(polyline => {
-                  const pathCoords = polyline.path.map(p => [p.lat, p.lng]);
-                  
-                  const dhc2lPolyline = L.polyline(pathCoords, {
-                    color: '#3b82f6', // Blue for D-HC2L (Lazy HC2L)
-                    opacity: 0.9,
-                    weight: 4, // Thinner for D-HC2L
-                    dashArray: '10, 5' // Dashed pattern
-                  }).addTo(map);
-                  
-                  routePolylines.push(dhc2lPolyline);
-                });
-                console.log('✅ D-HC2L route displayed in dashed blue');
-                
-                // Add D-HC2L connector polylines
-                addConnectorPolylines({ route: routes.dhc2l });
-              }
-              
-              // Use DHL metrics for performance display if available
-              routeData = {
-                success: true,
-                route: routes.dhl || routes.dhc2l || {},
-                routes: routes, // Include both routes for comparison display
-                metrics: routes.dhl ? routes.dhl.summary : (routes.dhc2l ? routes.dhc2l.summary : {}),
-                algorithm: 'Algorithm Comparison (Disrupted)'
-              };
-              
-              // Update bottom info bar with comparison data
-              // updateRouteMetrics(routeData);
-              updateAlgorithmComparisonModal(routes.dhl, routes.dhc2l);
-              showUpdateToast('Both algorithms displayed! Solid Purple = DHL, Dashed Blue = D-HC2L', 'success');
-            } else {
-              throw new Error(comparisonData.error || 'Comparison computation failed');
-            }
-          } catch (error) {
-            console.error('Comparison mode error:', error);
-            throw error;
+          // Display both routes
+          if (hc2lResult && hc2lResult.success) {
+            displayDHC2LRoute(hc2lResult);
           }
+          
+          if (dhlResult && dhlResult.success) {
+            displayDHLRoute(dhlResult);
+          }
+          
+          // Show comparison metrics
+          if (hc2lResult && dhlResult && hc2lResult.success && dhlResult.success) {
+            showComparisonMetrics(hc2lResult.metrics, dhlResult.metrics);
+            showUpdateToast('Comparison routes computed successfully', 'success');
+          }
+          
+          routeData = { hc2l: hc2lResult, dhl: dhlResult };
           break;
           
         default:
           console.warn('Unknown algorithm selected:', selectedAlgorithm);
-          routeData = await computeDHC2LRoute(false);
+          routeData = await computeDHC2LRoute(useDisruptions, currentThreshold);
           if (routeData) displayDHC2LRoute(routeData);
       }
       
