@@ -705,6 +705,29 @@ function calculateHaversineDistance(lat1, lng1, lat2, lng2) {
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     return R * c;
 }
+
+// Function to make a hex color lighter (for unhighlighted segments)
+function lightenColor(hex, percent) {
+    // Remove # if present
+    hex = hex.replace('#', '');
+    
+    // Convert to RGB
+    let r = parseInt(hex.substring(0, 2), 16);
+    let g = parseInt(hex.substring(2, 4), 16);
+    let b = parseInt(hex.substring(4, 6), 16);
+    
+    // Lighten by mixing with white
+    r = Math.min(255, Math.floor(r + (255 - r) * percent));
+    g = Math.min(255, Math.floor(g + (255 - g) * percent));
+    b = Math.min(255, Math.floor(b + (255 - b) * percent));
+    
+    // Convert back to hex
+    const rr = r.toString(16).padStart(2, '0');
+    const gg = g.toString(16).padStart(2, '0');
+    const bb = b.toString(16).padStart(2, '0');
+    
+    return `#${rr}${gg}${bb}`;
+}
   
 function updateRouteSteps(route) {
     try {
@@ -1057,10 +1080,15 @@ function displayDHLRoute(routeData) {
         const popupContent = `
           <div class="p-2" style="min-width: 280px;">
             <div class="font-bold text-base mb-2 border-b pb-2">
-              🛣️ Segment ${index + 1} of ${route.geometry.length}
+              🛣️ DHL Segment ${index + 1} of ${route.geometry.length}
             </div>
             
             <div class="space-y-2 text-sm">
+              <div class="flex justify-between items-center">
+                <span class="text-gray-600">Road Name:</span>
+                <span class="font-semibold text-indigo-700">${segment.road_name || segment.name || 'Unknown Road'}</span>
+              </div>
+              
               <div class="flex justify-between items-center">
                 <span class="text-gray-600">Edge:</span>
                 <span class="font-mono font-semibold">${segment.from} → ${segment.to}</span>
@@ -1129,21 +1157,35 @@ function displayDHLRoute(routeData) {
           className: 'route-segment-popup'
         });
         
+        // Store original color for each polyline
+        polyline._originalColor = segmentColor;
+        polyline._segmentIndex = index;
+        
         // Add click event to highlight and show details
         polyline.on('click', function(e) {
-          console.log(`🖱️ Clicked segment ${index + 1}:`, segment);
+          console.log(`🖱️ Clicked DHL segment ${index + 1}:`, segment);
           
-          // Highlight this segment
+          // Highlight this segment and lighten others
           routePolylines.forEach((p, i) => {
             if (i === index) {
-              p.setStyle({ weight: 10, opacity: 1.0 });
+              p.setStyle({ weight: 10, color: p._originalColor });
+              p._isHighlighted = true;
             } else {
-              p.setStyle({ weight: 6, opacity: 0.5 });
+              p.setStyle({ weight: 6, color: lightenColor(p._originalColor, 0.5) });
+              p._isHighlighted = false;
             }
           });
           
           // Open popup
           polyline.openPopup();
+        });
+        
+        // Reset all segments when popup closes
+        polyline.on('popupclose', function(e) {
+          routePolylines.forEach(p => {
+            p.setStyle({ weight: 6, color: p._originalColor });
+            p._isHighlighted = false;
+          });
         });
         
         // Add hover effect
@@ -1303,10 +1345,15 @@ function displayDHC2LRoute(routeData) {
         const popupContent = `
           <div class="p-2" style="min-width: 280px;">
             <div class="font-bold text-base mb-2 border-b pb-2">
-              🛣️ Segment ${index + 1} of ${route.geometry.length}
+              🛣️ HC2L Segment ${index + 1} of ${route.geometry.length}
             </div>
             
             <div class="space-y-2 text-sm">
+              <div class="flex justify-between items-center">
+                <span class="text-gray-600">Road Name:</span>
+                <span class="font-semibold text-blue-700">${segment.road_name || segment.name || 'Unknown Road'}</span>
+              </div>
+              
               <div class="flex justify-between items-center">
                 <span class="text-gray-600">Edge:</span>
                 <span class="font-mono font-semibold">${segment.from} → ${segment.to}</span>
@@ -1375,16 +1422,22 @@ function displayDHC2LRoute(routeData) {
           className: 'route-segment-popup'
         });
         
+        // Store original color for each polyline
+        polyline._originalColor = segmentColor;
+        polyline._segmentIndex = index;
+        
         // Add click event to highlight and show details
         polyline.on('click', function(e) {
           console.log(`🖱️ Clicked HC2L segment ${index + 1}:`, segment);
           
-          // Highlight this segment
+          // Highlight this segment and lighten others
           routePolylines.forEach((p, i) => {
             if (i === index) {
-              p.setStyle({ weight: 10, opacity: 1.0 });
+              p.setStyle({ weight: 10, color: p._originalColor });
+              p._isHighlighted = true;
             } else {
-              p.setStyle({ weight: 6, opacity: 0.5 });
+              p.setStyle({ weight: 6, color: lightenColor(p._originalColor, 0.5) });
+              p._isHighlighted = false;
             }
           });
           
@@ -1392,17 +1445,24 @@ function displayDHC2LRoute(routeData) {
           polyline.openPopup();
         });
         
+        // Reset all segments when popup closes
+        polyline.on('popupclose', function(e) {
+          routePolylines.forEach(p => {
+            p.setStyle({ weight: 6, color: p._originalColor });
+            p._isHighlighted = false;
+          });
+        });
+        
         // Add hover effect
         polyline.on('mouseover', function(e) {
-          if (this.getElement()) {
+          if (this.getElement() && !this._isHighlighted) {
             this.setStyle({ weight: 8 });
           }
         });
         
         polyline.on('mouseout', function(e) {
-          // Check if this segment is highlighted
-          const isHighlighted = this.options.weight === 10;
-          if (!isHighlighted) {
+          // Reset weight if not highlighted
+          if (!this._isHighlighted) {
             this.setStyle({ weight: 6 });
           }
         });
