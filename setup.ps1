@@ -410,6 +410,27 @@ function Generate-Data {
     Push-Location $ProjectRoot
 
     try {
+        # Check if OSM graph files exist, generate if needed
+        $graphFile = Join-Path $ProcessedDataDir "quezon_city.graph"
+        $edgesFile = Join-Path $DataDir "raw\quezon_city_edges.csv"
+        
+        if (!(Test-Path $graphFile) -or !(Test-Path $edgesFile)) {
+            Write-Info "OSM graph files not found. Generating from OpenStreetMap..."
+            Write-Warning2 "This will download OSM data for Quezon City (may take 5-10 minutes)"
+            
+            & $script:PythonCmd osm_graph_generator.py
+            
+            if ($LASTEXITCODE -ne 0) {
+                Write-Error2 "OSM graph generation failed!"
+                return $false
+            }
+            
+            Write-Success "OSM graph generated successfully"
+        }
+        else {
+            Write-Success "OSM graph files found"
+        }
+        
         # Generate traffic data using new hash-based matching system
         Write-Info "Generating traffic data using hash-based matching..."
         Write-Info "Mode: $Mode (flow/incidents/both)"
@@ -425,6 +446,9 @@ function Generate-Data {
         Write-Info "Output files:"
         Write-Host "  - Traffic CSV: $DisruptionsDir\current_traffic_$Mode.csv"
         Write-Host "  - Traffic GR: $DisruptionsDir\current_traffic_$Mode.gr"
+        Write-Host "  - Base graph: $ProcessedDataDir\quezon_city.graph"
+        Write-Host "  - OSM edges: $DataDir\raw\quezon_city_edges.csv"
+        Write-Host "  - OSM nodes: $DataDir\raw\quezon_city_nodes.csv"
         Write-Host "  - Matched edges: Main\here_osm\matched_edges.csv (732 hashes)"
     }
     finally {

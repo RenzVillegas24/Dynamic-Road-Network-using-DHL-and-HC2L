@@ -14,6 +14,7 @@ Usage:
 import os
 import sys
 import argparse
+import subprocess
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -27,6 +28,76 @@ from realtime_traffic_service import RealtimeTrafficService
 
 # Load environment
 load_dotenv()
+
+
+def check_and_generate_graph():
+    """Check if OSM graph files exist, generate if needed"""
+    required_files = [
+        Config.EDGES_CSV,
+        Config.NODES_CSV,
+        Config.PROCESSED_DATA_DIR / "quezon_city.graph"
+    ]
+    
+    missing_files = [f for f in required_files if not f.exists()]
+    
+    if missing_files:
+        print("\n" + "="*70)
+        print("⚠️  OSM GRAPH FILES MISSING")
+        print("="*70)
+        print("\nMissing files:")
+        for f in missing_files:
+            print(f"  ❌ {f}")
+        print()
+        
+        response = input("Would you like to download and generate the OSM graph now? (Y/n): ").strip().lower()
+        
+        if response in ['', 'y', 'yes']:
+            print("\n🚀 Starting OSM graph generation...")
+            print("This will download OpenStreetMap data for Quezon City.")
+            print("This may take 5-10 minutes depending on your internet connection.\n")
+            
+            try:
+                # Run osm_graph_generator.py
+                generator_script = SCRIPT_DIR / "osm_graph_generator.py"
+                
+                if not generator_script.exists():
+                    print(f"❌ Error: {generator_script} not found!")
+                    return False
+                
+                # Use conda python if available
+                if (SCRIPT_DIR / ".conda" / "bin" / "python").exists():
+                    python_cmd = str(SCRIPT_DIR / ".conda" / "bin" / "python")
+                else:
+                    python_cmd = sys.executable
+                
+                result = subprocess.run(
+                    [python_cmd, str(generator_script)],
+                    cwd=str(SCRIPT_DIR),
+                    check=True
+                )
+                
+                if result.returncode == 0:
+                    print("\n✅ Graph generation completed successfully!")
+                    return True
+                else:
+                    print(f"\n❌ Graph generation failed with code {result.returncode}")
+                    return False
+                    
+            except subprocess.CalledProcessError as e:
+                print(f"\n❌ Error generating graph: {e}")
+                return False
+            except Exception as e:
+                print(f"\n❌ Unexpected error: {e}")
+                import traceback
+                traceback.print_exc()
+                return False
+        else:
+            print("\n❌ Cannot proceed without OSM graph files.")
+            print("\nTo generate manually, run:")
+            print("  python osm_graph_generator.py")
+            return False
+    
+    return True
 
 
 def main():
@@ -53,6 +124,12 @@ def main():
     )
     
     args = parser.parse_args()
+    
+    # First, check if OSM graph exists
+    print("🔍 Checking for required OSM graph files...")
+    if not check_and_generate_graph():
+        print("\n❌ Exiting: OSM graph files are required")
+        return 1
     
     print("\n" + "="*70)
     print("Unified Data Generator V2 - Hash-Based Traffic Matching")

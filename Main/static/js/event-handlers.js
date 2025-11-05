@@ -699,12 +699,52 @@ function getHighwayWeight(type) {
     return weights[type] || 1;
 }
 
+// Handle algorithm selection change to show/hide threshold section
+function handleAlgorithmChange() {
+    const algorithmRadios = document.querySelectorAll('input[name="algorithm"]');
+    const thresholdContainer = document.getElementById('threshold-container');
+    
+    algorithmRadios.forEach(radio => {
+        radio.addEventListener('change', () => {
+            const selectedAlgorithm = radio.value;
+            
+            // Show threshold only for HC2L (LazyHC2L uses threshold)
+            // Hide threshold for DHL and Both modes
+            if (selectedAlgorithm === 'hc2l') {
+                if (thresholdContainer) {
+                    thresholdContainer.style.display = 'block';
+                    showUpdateToast('Threshold (τ) controls LazyHC2L update strategy', 'info');
+                }
+            } else {
+                if (thresholdContainer) {
+                    thresholdContainer.style.display = 'none';
+                    if (selectedAlgorithm === 'dhl') {
+                        showUpdateToast('DHL uses immediate updates (no threshold needed)', 'info');
+                    } else {
+                        showUpdateToast('Comparison mode: threshold applies to HC2L only', 'info');
+                    }
+                }
+            }
+        });
+    });
+    
+    // Initial state based on default selection
+    const selectedAlgorithm = document.querySelector('input[name="algorithm"]:checked')?.value;
+    if (selectedAlgorithm !== 'hc2l' && thresholdContainer) {
+        thresholdContainer.style.display = 'none';
+    }
+}
+
 // Initialize when DOM is ready
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeEventHandlers);
+    document.addEventListener('DOMContentLoaded', () => {
+        initializeEventHandlers();
+        handleAlgorithmChange();
+    });
 } else {
     // DOM already loaded
     initializeEventHandlers();
+    handleAlgorithmChange();
 }
 
 

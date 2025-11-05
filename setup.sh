@@ -240,6 +240,21 @@ generate_data() {
         PYTHON_CMD="python3"
     fi
 
+    # Check if OSM graph files exist, generate if needed
+    if [ ! -f "$PROCESSED_DATA_DIR/quezon_city.graph" ] || [ ! -f "$DATA_DIR/raw/quezon_city_edges.csv" ]; then
+        print_info "OSM graph files not found. Generating from OpenStreetMap..."
+        print_warning "This will download OSM data for Quezon City (may take 5-10 minutes)"
+        
+        $PYTHON_CMD osm_graph_generator.py || {
+            print_error "OSM graph generation failed!"
+            return 1
+        }
+        
+        print_success "OSM graph generated successfully"
+    else
+        print_success "OSM graph files found"
+    fi
+
     # Generate traffic data using new hash-based matching system
     print_info "Generating traffic data using hash-based matching..."
     print_info "Mode: $MODE (flow/incidents/both)"
@@ -253,6 +268,9 @@ generate_data() {
     print_info "Output files:"
     echo "  - Traffic CSV: $DISRUPTIONS_DIR/current_traffic_${MODE}.csv"
     echo "  - Traffic GR: $DISRUPTIONS_DIR/current_traffic_${MODE}.gr"
+    echo "  - Base graph: $PROCESSED_DATA_DIR/quezon_city.graph"
+    echo "  - OSM edges: $DATA_DIR/raw/quezon_city_edges.csv"
+    echo "  - OSM nodes: $DATA_DIR/raw/quezon_city_nodes.csv"
     echo "  - Matched edges: Main/here_osm/matched_edges.csv (732 hashes)"
 }
 
