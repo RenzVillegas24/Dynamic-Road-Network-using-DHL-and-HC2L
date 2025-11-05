@@ -484,8 +484,15 @@ bool load_disruptions_with_cache(
     const map<NodeID, vector<Neighbor>>& adj_list,
     const map<pair<NodeID, NodeID>, EdgeGeometry>& edge_geometries = map<pair<NodeID, NodeID>, EdgeGeometry>()) {
     
+    // FORCE CSV: Convert .gr file path to .csv
+    string actual_file = disruption_file;
+    if (actual_file.size() > 3 && actual_file.substr(actual_file.size() - 3) == ".gr") {
+        actual_file = actual_file.substr(0, actual_file.size() - 3) + ".csv";
+        cerr << "🔧 FORCE CSV: Converted .gr to .csv: " << actual_file << endl;
+    }
+    
     // Check if cache is valid
-    if (g_disruption_cache.is_valid(disruption_file)) {
+    if (g_disruption_cache.is_valid(actual_file)) {
         cerr << "✅ Using cached disruption data (file unchanged)" << endl;
         incidents_out = g_disruption_cache.incidents;
         flow_out = g_disruption_cache.flow_data;
@@ -493,11 +500,11 @@ bool load_disruptions_with_cache(
     }
     
     // Cache invalid or file changed - reload
-    cerr << "🔄 Loading disruptions from file (cache miss or file updated)" << endl;
+    cerr << "🔄 Loading disruptions from CSV file (cache miss or file updated)" << endl;
     
-    ifstream disrupt_file(disruption_file);
+    ifstream disrupt_file(actual_file);
     if (!disrupt_file.is_open()) {
-        cerr << "⚠️  Could not open disruption file: " << disruption_file << endl;
+        cerr << "⚠️  Could not open disruption file: " << actual_file << endl;
         return false;
     }
     
@@ -509,42 +516,36 @@ bool load_disruptions_with_cache(
     int active_disruptions = 0;
     
     string line;
-    bool is_csv_format = false;
+    // FORCE CSV FORMAT - always use CSV parsing
+    bool is_csv_format = true;
     int source_col = -1, target_col = -1, speed_col = -1, freeflow_col = -1;
     int jam_col = -1, closed_col = -1, length_col = -1;
     
-    // Read and parse header to detect format
+    // Read and parse CSV header
     if (getline(disrupt_file, line)) {
-        // Check if it's CSV format (contains commas and header)
-        if (line.find(',') != string::npos && line.find("source") != string::npos) {
-            is_csv_format = true;
-            cerr << "   Detected CSV format with header" << endl;
+        cerr << "   📋 Parsing CSV header..." << endl;
+        
+        // Parse CSV header to find column indices
+        vector<string> headers = parse_csv_line(line);
+        for (size_t i = 0; i < headers.size(); i++) {
+            string h = headers[i];
+            // Trim whitespace
+            h.erase(0, h.find_first_not_of(" \t\n\r"));
+            h.erase(h.find_last_not_of(" \t\n\r") + 1);
             
-            // Parse CSV header to find column indices
-            vector<string> headers = parse_csv_line(line);
-            for (size_t i = 0; i < headers.size(); i++) {
-                string h = headers[i];
-                // Trim whitespace
-                h.erase(0, h.find_first_not_of(" \t\n\r"));
-                h.erase(h.find_last_not_of(" \t\n\r") + 1);
-                
-                // Exact match to avoid matching "source_lat" when looking for "source"
-                if (h == "source") source_col = i;
-                else if (h == "target") target_col = i;
-                else if (h == "speed_kph") speed_col = i;
-                else if (h == "freeFlow_kph") freeflow_col = i;
-                else if (h == "jamFactor") jam_col = i;
-                else if (h == "isClosed") closed_col = i;
-                else if (h == "segmentLength") length_col = i;
-            }
-            
-            cerr << "   Column mapping: source=" << source_col << ", target=" << target_col 
-                 << ", speed=" << speed_col << ", freeflow=" << freeflow_col 
-                 << ", jam=" << jam_col << ", closed=" << closed_col << endl;
-        } else {
-            // Space-separated format - rewind to process this line as data
-            disrupt_file.seekg(0);
+            // Exact match to avoid matching "source_lat" when looking for "source"
+            if (h == "source") source_col = i;
+            else if (h == "target") target_col = i;
+            else if (h == "speed_kph") speed_col = i;
+            else if (h == "freeFlow_kph") freeflow_col = i;
+            else if (h == "jamFactor") jam_col = i;
+            else if (h == "isClosed") closed_col = i;
+            else if (h == "segmentLength") length_col = i;
         }
+        
+        cerr << "   Column mapping: source=" << source_col << ", target=" << target_col 
+             << ", speed=" << speed_col << ", freeflow=" << freeflow_col 
+             << ", jam=" << jam_col << ", closed=" << closed_col << endl;
     }
     
     while (getline(disrupt_file, line)) {
@@ -1572,9 +1573,11 @@ void output_json_response(bool success, const string& error_message = "",
         cout << "    \"uses_disruptions\": " << (use_disruptions ? "true" : "false") << "," << endl;
         cout << "    \"interpolation_used\": false," << endl;
         
-        // Calculate and add distance and ETA metrics
+        // Calculate and add distance and ETA metrics using ACTUAL traffic data
         double calculated_distance = calculate_route_distance(path, coordinates);
-        double eta_seconds = calculate_eta_seconds(calculated_distance, 5.0);
+        
+        // CRITICAL FIX: Use actual traffic speeds from flow_data instead of jam_factor estimate
+        double eta_seconds = calculate_eta_with_flow(path, flow_data, coordinates);
         string eta_formatted = format_eta_time(eta_seconds);
         
         cout << "    \"calculated_distance_meters\": " << fixed << setprecision(1) << calculated_distance << "," << endl;

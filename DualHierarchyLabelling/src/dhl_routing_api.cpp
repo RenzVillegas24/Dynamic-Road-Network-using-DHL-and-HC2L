@@ -244,7 +244,58 @@ SpeedProfile get_current_speed_profile(int hour = -1) {
     }
 }
 
-// Calculate ETA in seconds from distance and jam factor
+// Calculate ETA in seconds using actual traffic flow data from edges
+double calculate_eta_with_traffic(
+    const vector<NodeID>& path,
+    const map<pair<NodeID, NodeID>, TrafficFlowData>& flow_data,
+    const map<NodeID, GPSCoordinate>& coordinates) {
+    
+    if (path.size() < 2) return 0.0;
+    
+    double total_eta = 0.0;
+    
+    for (size_t i = 0; i < path.size() - 1; i++) {
+        NodeID from = path[i];
+        NodeID to = path[i + 1];
+        auto edge_key = make_pair(from, to);
+        
+        // Calculate edge distance using GPS coordinates
+        double edge_distance = 0.0;
+        if (coordinates.count(from) && coordinates.count(to)) {
+            const auto& coord_from = coordinates.at(from);
+            const auto& coord_to = coordinates.at(to);
+            edge_distance = haversine_distance(
+                coord_from.latitude, coord_from.longitude,
+                coord_to.latitude, coord_to.longitude
+            );
+        }
+        
+        if (edge_distance <= 0) continue;
+        
+        // Get ACTUAL current speed from traffic flow data
+        double current_speed_kmh = 40.0; // Default fallback
+        if (flow_data.count(edge_key)) {
+            const auto& flow = flow_data.at(edge_key);
+            if (flow.current_speed > 0) {
+                current_speed_kmh = flow.current_speed;
+            } else if (flow.free_flow_speed > 0) {
+                // Use free flow speed if current speed not available
+                current_speed_kmh = flow.free_flow_speed;
+            }
+        }
+        
+        // Ensure minimum speed
+        current_speed_kmh = max(current_speed_kmh, 1.0);
+        
+        // Calculate time for this edge: distance (m) / (speed_kmh / 3.6) = time (s)
+        double edge_eta = edge_distance / (current_speed_kmh / 3.6);
+        total_eta += edge_eta;
+    }
+    
+    return total_eta;
+}
+
+// Calculate ETA in seconds from distance and jam factor (DEPRECATED - use calculate_eta_with_traffic)
 double calculate_eta_seconds(
     double distance_m,
     double jam_factor = 5.0,  // 0-10 scale
@@ -468,8 +519,15 @@ bool load_disruptions_with_cache(
     const map<NodeID, vector<Neighbor>>& adj_list,
     const map<pair<NodeID, NodeID>, EdgeGeometry>& edge_geometries) {
     
+    // FORCE CSV: Convert .gr file path to .csv
+    string actual_file = disruption_file;
+    if (actual_file.size() > 3 && actual_file.substr(actual_file.size() - 3) == ".gr") {
+        actual_file = actual_file.substr(0, actual_file.size() - 3) + ".csv";
+        cerr << "🔧 FORCE CSV: Converted .gr to .csv: " << actual_file << endl;
+    }
+    
     // Check if cache is valid
-    if (g_disruption_cache.is_valid(disruption_file)) {
+    if (g_disruption_cache.is_valid(actual_file)) {
         cerr << "✅ Using cached disruption data (file unchanged)" << endl;
         incidents_out = g_disruption_cache.incidents;
         flow_out = g_disruption_cache.flow_data;
@@ -477,11 +535,11 @@ bool load_disruptions_with_cache(
     }
     
     // Cache invalid or file changed - reload
-    cerr << "🔄 Loading disruptions from file (cache miss or file updated)" << endl;
+    cerr << "🔄 Loading disruptions from CSV file (cache miss or file updated)" << endl;
     
-    ifstream disrupt_file(disruption_file);
+    ifstream disrupt_file(actual_file);
     if (!disrupt_file.is_open()) {
-        cerr << "⚠️  Could not open disruption file: " << disruption_file << endl;
+        cerr << "⚠️  Could not open disruption file: " << actual_file << endl;
         return false;
     }
     
@@ -492,8 +550,8 @@ bool load_disruptions_with_cache(
     int closures = 0;
     int active_disruptions = 0;
     
-    // Auto-detect format: CSV vs space-separated
-    bool is_csv_format = false;
+    // FORCE CSV FORMAT - always use CSV parsing
+    bool is_csv_format = true;
     map<string, int> csv_column_indices;
     
     string first_line;
@@ -616,7 +674,7 @@ bool load_disruptions_with_cache(
                 
                 // Calculate new weight if not road closure
                 if (!is_closed) {
-                    // Get old weight from adjacency list
+                    // Get old weight from adjacency list (base distance)
                     distance_t old_weight = 0;
                     if (adj_list.count(source)) {
                         for (const auto& neighbor : adj_list.at(source)) {
@@ -627,12 +685,23 @@ bool load_disruptions_with_cache(
                         }
                     }
                     
-                    // Calculate comprehensive cost using the same formula as pathfinding
-                    double highway_weight = get_highway_weight(highway_type);
-                    double flow_multiplier = 1.0 + (jam_factor / 10.0) * 4.0; // Same as find_shortest_path
-                    double incident_multiplier = get_incident_severity(disruption_type);
-                    
-                    new_weight = old_weight * highway_weight * flow_multiplier * incident_multiplier;
+                    // CRITICAL FIX: Calculate new weight based on actual traffic speeds
+                    // Formula: new_weight = distance * (freeflow_speed / current_speed)
+                    // This makes congested edges "longer" in terms of travel time
+                    if (current_speed > 0 && free_flow_speed > 0) {
+                        // Speed-based weight adjustment (time = distance / speed)
+                        double speed_ratio = free_flow_speed / max(current_speed, 1.0);
+                        new_weight = static_cast<distance_t>(old_weight * speed_ratio);
+                        
+                        cerr << "   📊 Edge " << source << "→" << target 
+                             << ": base=" << old_weight 
+                             << "m, speed_ratio=" << speed_ratio 
+                             << ", new=" << new_weight << "m" << endl;
+                    } else {
+                        // Fallback to jam factor if speeds not available
+                        double flow_multiplier = 1.0 + (jam_factor / 10.0) * 4.0;
+                        new_weight = static_cast<distance_t>(old_weight * flow_multiplier);
+                    }
                 }
                 
             } catch (const exception& e) {
@@ -1345,9 +1414,11 @@ void output_json_response(bool success, const string& error_message = "",
         cout << "    \"tau_threshold\": " << fixed << setprecision(2) << tau_threshold << "," << endl;
         cout << "    \"interpolation_used\": false," << endl;
         
-        // Calculate and add distance and ETA metrics
+        // Calculate and add distance and ETA metrics using ACTUAL traffic data
         double calculated_distance = calculate_route_distance(path, coordinates);
-        double eta_seconds = calculate_eta_seconds(calculated_distance, 5.0);
+        
+        // CRITICAL FIX: Use actual traffic speeds from flow_data instead of jam_factor estimate
+        double eta_seconds = calculate_eta_with_traffic(path, flow_data, coordinates);
         string eta_formatted = format_eta_time(eta_seconds);
         
         cout << "    \"calculated_distance_meters\": " << fixed << setprecision(1) << calculated_distance << "," << endl;
