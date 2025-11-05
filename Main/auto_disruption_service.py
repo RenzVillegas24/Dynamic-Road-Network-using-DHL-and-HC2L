@@ -91,21 +91,30 @@ class AutoDisruptionService:
         logger.info(f"🗑️  Cleared {count} active route(s)")
     
     def _get_disruption_hash(self) -> Optional[str]:
-        """Get hash of current disruption files to detect changes"""
+        """Get hash of current traffic files to detect changes"""
         try:
             from config import Config
             import hashlib
             
+            # Check new hash-based traffic files (symlinks always point to latest)
             files_to_check = [
-                Config.DISRUPTIONS_DIR / "dynamic_disruptions_hc2l.gr",
-                Config.DISRUPTIONS_DIR / "dynamic_disruptions_dhl.gr",
-                Config.DISRUPTIONS_DIR / "dynamic_disruptions_current.gr"
+                Config.DISRUPTIONS_DIR / "current_traffic_flow.gr",
+                Config.DISRUPTIONS_DIR / "current_traffic_incidents.gr",
+                Config.DISRUPTIONS_DIR / "current_traffic_both.gr",
+                Config.DISRUPTIONS_DIR / "current_traffic_flow.csv",
+                Config.DISRUPTIONS_DIR / "current_traffic_both.csv"
             ]
             
             combined_content = ""
             for file_path in files_to_check:
                 if file_path.exists():
-                    combined_content += file_path.read_text()
+                    try:
+                        # For symlinks, get the actual file modification time
+                        real_path = file_path.resolve()
+                        mtime = real_path.stat().st_mtime
+                        combined_content += f"{file_path.name}:{mtime}:"
+                    except Exception as e:
+                        logger.debug(f"Error reading {file_path}: {e}")
             
             if combined_content:
                 return hashlib.md5(combined_content.encode()).hexdigest()
@@ -142,29 +151,44 @@ class AutoDisruptionService:
             logger.error(f"Error triggering recalculation: {e}")
     
     def _run_loop(self):
-        """Main service loop"""
+        """Main service loop - fetches traffic data and monitors changes"""
         logger.info("🔄 Auto-disruption service loop started")
+        
+        # Import traffic service
+        try:
+            from realtime_traffic_service import RealtimeTrafficService
+            traffic_service = RealtimeTrafficService()
+            logger.info("✅ RealtimeTrafficService initialized in background thread")
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize traffic service: {e}")
+            traffic_service = None
         
         while self.running:
             try:
+                # Fetch latest traffic data if service is available
+                if traffic_service:
+                    try:
+                        logger.info("🌐 Fetching latest traffic data...")
+                        metadata = traffic_service.fetch_and_save(mode='both')
+                        logger.info(f"✅ Traffic data updated: {metadata.get('total_edges', 0)} edges")
+                    except Exception as e:
+                        logger.error(f"❌ Error fetching traffic data: {e}")
+                
                 # Check if there are active routes
-                if not self.active_routes:
-                    time.sleep(10)  # Check every 10s if no active routes
-                    continue
-                
-                # Check for disruption file changes
-                current_hash = self._get_disruption_hash()
-                
-                if current_hash and current_hash != self.last_disruption_hash:
-                    if self.last_disruption_hash is not None:  # Skip first time
-                        logger.info(f"🚦 Disruption files changed!")
-                        
-                        # Trigger recalculation for all active routes
-                        for route_id, route_info in list(self.active_routes.items()):
-                            self._trigger_route_recalculation(route_id, route_info)
-                            route_info['last_update'] = datetime.now().isoformat()
+                if self.active_routes:
+                    # Check for disruption file changes
+                    current_hash = self._get_disruption_hash()
                     
-                    self.last_disruption_hash = current_hash
+                    if current_hash and current_hash != self.last_disruption_hash:
+                        if self.last_disruption_hash is not None:  # Skip first time
+                            logger.info(f"🚦 Traffic data changed!")
+                            
+                            # Trigger recalculation for all active routes
+                            for route_id, route_info in list(self.active_routes.items()):
+                                self._trigger_route_recalculation(route_id, route_info)
+                                route_info['last_update'] = datetime.now().isoformat()
+                        
+                        self.last_disruption_hash = current_hash
                 
                 # Sleep for the configured interval
                 time.sleep(self.update_interval)

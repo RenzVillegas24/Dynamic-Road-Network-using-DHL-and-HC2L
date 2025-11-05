@@ -8,8 +8,10 @@ const trafficVisualization = {
   osmGraphLayer: null,
   incidentsLayer: null,
   trafficOverlayLayer: null,
+  rawTrafficLayer: null,  // For non-matched HERE data
   currentRoute: null,
-  trafficMode: 'both' // 'incidents', 'flow', or 'both'
+  trafficMode: 'both', // 'incidents', 'flow', or 'both'
+  showMatched: true  // Toggle between matched and raw traffic
 };
 
 /**
@@ -18,7 +20,7 @@ const trafficVisualization = {
 function loadOSMGraph() {
   console.log('Loading OSM Graph...');
   
-  fetch('/get_osm_graph_edges?limit=1000')
+  fetch('/get_osm_graph_edges?limit=100000')
     .then(response => response.json())
     .then(data => {
       if (data.success) {
@@ -207,9 +209,39 @@ function clearActiveIncidents() {
  * Apply traffic overlay
  * @param {string} mode - 'incidents', 'flow', or 'both'
  * @param {boolean} routeOnly - If true, show traffic only for current route
+ * @param {boolean} showMatched - If true, show matched edges; if false, show raw HERE data
  */
-function applyTrafficOverlay(mode, routeOnly) {
-  console.log(`Applying Traffic Overlay (mode: ${mode}, routeOnly: ${routeOnly})`);
+function applyTrafficOverlay(mode, routeOnly, showMatched = true) {
+  console.log(`Applying Traffic Overlay (mode: ${mode}, routeOnly: ${routeOnly}, showMatched: ${showMatched})`);
+  
+  // Update state
+  trafficVisualization.trafficMode = mode;
+  trafficVisualization.showMatched = showMatched;
+  
+  if (showMatched) {
+    // Clear raw traffic layer if it exists
+    if (trafficVisualization.rawTrafficLayer) {
+      trafficVisualization.rawTrafficLayer.clearLayers();
+    }
+    
+    // Show matched edges (existing implementation)
+    applyMatchedTrafficOverlay(mode, routeOnly);
+  } else {
+    // Clear matched traffic layer if it exists
+    if (trafficVisualization.trafficOverlayLayer) {
+      trafficVisualization.trafficOverlayLayer.clearLayers();
+    }
+    
+    // Show raw HERE traffic data
+    applyRawTrafficOverlay(mode);
+  }
+}
+
+/**
+ * Apply matched traffic overlay (original implementation)
+ */
+function applyMatchedTrafficOverlay(mode, routeOnly) {
+  console.log(`Applying Matched Traffic Overlay...`);
   
   // Create layer group if it doesn't exist
   if (!trafficVisualization.trafficOverlayLayer) {
@@ -218,9 +250,6 @@ function applyTrafficOverlay(mode, routeOnly) {
   
   // Clear existing overlay
   trafficVisualization.trafficOverlayLayer.clearLayers();
-  
-  // Update traffic mode
-  trafficVisualization.trafficMode = mode;
   
   // Load disruptions based on mode
   fetch('/get_active_disruptions')
@@ -323,7 +352,177 @@ function clearTrafficOverlay() {
     map.removeLayer(trafficVisualization.trafficOverlayLayer);
     trafficVisualization.trafficOverlayLayer = null;
   }
+  if (trafficVisualization.rawTrafficLayer) {
+    trafficVisualization.rawTrafficLayer.clearLayers();
+    map.removeLayer(trafficVisualization.rawTrafficLayer);
+    trafficVisualization.rawTrafficLayer = null;
+  }
   console.log('Traffic Overlay cleared');
+}
+
+/**
+ * Apply raw HERE traffic overlay (non-matched to OSM edges)
+ * @param {string} mode - 'incidents', 'flow', or 'both'
+ */
+function applyRawTrafficOverlay(mode) {
+  console.log(`Applying Raw HERE Traffic Overlay (mode: ${mode})...`);
+  
+  // Create layer group if it doesn't exist
+  if (!trafficVisualization.rawTrafficLayer) {
+    trafficVisualization.rawTrafficLayer = L.layerGroup().addTo(map);
+  }
+  
+  // Clear existing overlay
+  trafficVisualization.rawTrafficLayer.clearLayers();
+  
+  // Fetch raw HERE traffic data
+  fetch('/get_raw_here_traffic')
+    .then(response => response.json())
+    .then(data => {
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to load raw traffic data');
+      }
+      
+      let segmentsAdded = 0;
+      
+      // Process flow segments
+      if (mode === 'flow' || mode === 'both') {
+        data.data.flow_segments.forEach(segment => {
+          // Color based on severity
+          let color, opacity, weight;
+          
+          switch (segment.severity) {
+            case 'Heavy':
+              color = '#ef4444';
+              opacity = 0.8;
+              weight = 5;
+              break;
+            case 'Medium':
+              color = '#f59e0b';
+              opacity = 0.7;
+              weight = 4;
+              break;
+            default:
+              color = '#10b981';
+              opacity = 0.6;
+              weight = 3;
+          }
+          
+          const polyline = L.polyline(segment.coordinates, {
+            color: color,
+            weight: weight,
+            opacity: opacity
+          });
+          
+          polyline.bindPopup(`
+            <div class="p-3">
+              <h3 class="font-bold text-lg mb-2">🚦 ${segment.description}</h3>
+              <div class="space-y-1 text-sm">
+                <p><span class="font-semibold">Type:</span> <span class="text-purple-600">Raw Flow Data (Non-matched)</span></p>
+                <p><span class="font-semibold">Severity:</span> 
+                  <span class="px-2 py-1 rounded" style="background-color: ${color}; color: white;">
+                    ${segment.severity}
+                  </span>
+                </p>
+                <p><span class="font-semibold">Speed:</span> ${segment.speed_kph.toFixed(1)} km/h</p>
+                <p><span class="font-semibold">Free Flow:</span> ${segment.free_flow_kph.toFixed(1)} km/h</p>
+                <p><span class="font-semibold">Jam Factor:</span> ${segment.jam_factor.toFixed(1)}/10</p>
+                <p><span class="font-semibold">Confidence:</span> ${(segment.confidence * 100).toFixed(0)}%</p>
+              </div>
+            </div>
+          `);
+          
+          trafficVisualization.rawTrafficLayer.addLayer(polyline);
+          segmentsAdded++;
+        });
+      }
+      
+      // Process incidents
+      if (mode === 'incidents' || mode === 'both') {
+        data.data.incidents.forEach(incident => {
+          // Color based on severity
+          let color, opacity, weight;
+          
+          if (incident.road_closed) {
+            color = '#000000';
+            opacity = 0.9;
+            weight = 6;
+          } else {
+            switch (incident.severity) {
+              case 'Heavy':
+                color = '#ef4444';
+                opacity = 0.8;
+                weight = 5;
+                break;
+              case 'Medium':
+                color = '#f59e0b';
+                opacity = 0.7;
+                weight = 4;
+                break;
+              default:
+                color = '#10b981';
+                opacity = 0.6;
+                weight = 3;
+            }
+          }
+          
+          const polyline = L.polyline(incident.coordinates, {
+            color: color,
+            weight: weight,
+            opacity: opacity,
+            dashArray: '5, 10'  // Dashed line for incidents
+          });
+          
+          // Get icon for incident type
+          const icons = {
+            'accident': '🚗',
+            'construction': '🏗️',
+            'congestion': '🚦',
+            'disabledVehicle': '🚙',
+            'massTransit': '🚇',
+            'plannedEvent': '📅',
+            'roadHazard': '⚠️',
+            'roadClosure': '🚧',
+            'weather': '🌧️',
+            'laneRestriction': '⚠️',
+            'other': '📍'
+          };
+          
+          const icon = icons[incident.type] || '📍';
+          
+          polyline.bindPopup(`
+            <div class="p-3">
+              <div class="flex items-center mb-2">
+                <span class="text-2xl mr-2">${icon}</span>
+                <h3 class="font-bold text-lg">${incident.type}</h3>
+              </div>
+              <div class="space-y-1 text-sm">
+                <p><span class="font-semibold">Description:</span> ${incident.description}</p>
+                <p><span class="font-semibold">Type:</span> <span class="text-purple-600">Raw Incident Data (Non-matched)</span></p>
+                <p><span class="font-semibold">Severity:</span> 
+                  <span class="px-2 py-1 rounded" style="background-color: ${color}; color: white;">
+                    ${incident.severity}
+                  </span>
+                </p>
+                <p><span class="font-semibold">Criticality:</span> ${incident.criticality}</p>
+                ${incident.road_closed ? '<p class="text-red-600 font-bold">⛔ Road Closed</p>' : ''}
+                ${incident.start_time ? `<p class="text-xs text-gray-600">Start: ${new Date(incident.start_time).toLocaleString()}</p>` : ''}
+              </div>
+            </div>
+          `);
+          
+          trafficVisualization.rawTrafficLayer.addLayer(polyline);
+          segmentsAdded++;
+        });
+      }
+      
+      console.log(`✅ Raw traffic overlay applied (${segmentsAdded} segments)`);
+      showUpdateToast(`Showing ${segmentsAdded} raw HERE traffic segments`, 'info');
+    })
+    .catch(error => {
+      console.error('Error applying raw traffic overlay:', error);
+      showUpdateToast('Error applying raw traffic overlay', 'error');
+    });
 }
 
 /**

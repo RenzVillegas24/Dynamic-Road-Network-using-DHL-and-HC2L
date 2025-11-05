@@ -832,6 +832,14 @@
               <span class="text-sm font-medium text-indigo-900">For Current Route Only</span>
               <input type="checkbox" id="traffic-route-only" class="toggle-checkbox" />
             </label>
+            
+            <!-- Show Matched/Non-matched Toggle (nested under route-only) -->
+            <div class="ml-4 mt-2">
+              <label class="flex items-center justify-between py-2 px-3 hover:bg-teal-100 rounded-lg cursor-pointer">
+                <span class="text-sm font-medium text-teal-900">Show Matched Edges</span>
+                <input type="checkbox" id="traffic-show-matched" class="toggle-checkbox" checked />
+              </label>
+            </div>
           </div>
           
           <!-- Traffic Data Mode (conditional) -->
@@ -1210,20 +1218,13 @@
         // Center on Quezon City, Philippines
         const center = [14.6760, 121.0437]; // Quezon City center
 
-        // Define Quezon City bounds (approximate boundaries)
-        const quezonCityBounds = L.latLngBounds(
-          L.latLng(14.5800, 120.9825),  // Southwest corner
-          L.latLng(14.7800, 121.1300)   // Northeast corner
-        );
-
         map = L.map("google-map", {
           center: center,
           zoom: 13,
           minZoom: 12,           // Prevent zooming out too far
           maxZoom: 19,           // Allow detailed zoom
           zoomControl: true,
-          maxBounds: quezonCityBounds,          // Restrict panning to Quezon City
-          maxBoundsViscosity: 1.0               // Make bounds rigid (can't pan outside)
+          maxBoundsViscosity: 1.0  // Make bounds rigid (can't pan outside)
         });
 
         // Add OpenStreetMap tiles
@@ -1232,32 +1233,8 @@
           maxZoom: 19
         }).addTo(map);
 
-        // Add subtle fade overlay to emphasize Quezon City focus
-        // Create an inverted polygon that covers everything except Quezon City
-        const worldBounds = [
-          [-90, -180],
-          [-90, 180],
-          [90, 180],
-          [90, -180],
-          [-90, -180]
-        ];
-
-        const quezonCityHole = [
-          [14.5800, 121.0000],
-          [14.5800, 121.1300],
-          [14.7800, 121.1300],
-          [14.7800, 120.9850],
-          [14.5800, 120.9850]
-        ];
-
-        // Create polygon with hole (world minus Quezon City)
-        L.polygon([worldBounds, quezonCityHole], {
-          color: 'transparent',
-          fillColor: '#000000',
-          fillOpacity: 0.3,
-          interactive: false,
-          className: 'focus-overlay'
-        }).addTo(map);
+        // Load and apply Quezon City boundaries mask
+        loadQuezonCityBoundaries();
 
         // Hide placeholder since maps loaded successfully
         document.getElementById("map-placeholder").classList.add("hidden");
@@ -1269,6 +1246,66 @@
         document.getElementById("map-placeholder").classList.remove("hidden");
         showUpdateToast("Failed to load OpenStreetMap", 'warning');
       }
+    }
+
+    // Load Quezon City boundaries from GeoJSON and apply masking
+    function loadQuezonCityBoundaries() {
+      fetch('{{ url_for("static", filename="quezon_city_boundaries.geojson") }}')
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          return response.json();
+        })
+        .then(geojsonData => {
+          // Extract the main boundary polygon
+          if (geojsonData.features && geojsonData.features.length > 0) {
+            const feature = geojsonData.features[0];
+            if (feature.geometry && feature.geometry.type === 'Polygon') {
+              const coordinates = feature.geometry.coordinates[0];
+              
+              // Convert GeoJSON coordinates (lon, lat) to Leaflet format (lat, lon)
+              const latLngCoordinates = coordinates.map(coord => [coord[1], coord[0]]);
+              
+              // Get bounds from the polygon
+              const bounds = L.latLngBounds(latLngCoordinates);
+              
+              // Set max bounds to restrict panning
+              map.setMaxBounds(bounds);
+              
+              // Create the mask polygon (world minus Quezon City)
+              const worldBounds = [
+                [-90, -180],
+                [-90, 180],
+                [90, 180],
+                [90, -180],
+                [-90, -180]
+              ];
+              
+              // Create polygon with hole for the mask effect
+              L.polygon([worldBounds, latLngCoordinates], {
+                color: 'transparent',
+                fillColor: '#000000',
+                fillOpacity: 0.3,
+                interactive: false,
+                className: 'focus-overlay'
+              }).addTo(map);
+              
+              console.log('✅ Quezon City boundaries loaded and applied successfully');
+              showUpdateToast("Quezon City boundaries applied", 'success');
+            }
+          }
+        })
+        .catch(error => {
+          console.warn('Could not load GeoJSON boundaries, using approximate bounds:', error);
+          // Fallback to approximate bounds if GeoJSON fails to load
+          const approximateBounds = L.latLngBounds(
+            L.latLng(14.5800, 120.9825),  // Southwest corner
+            L.latLng(14.7800, 121.1300)   // Northeast corner
+          );
+          
+          map.setMaxBounds(approximateBounds);
+        });
     }
 
     // Helper function to handle start location pin with snap-to-road
@@ -2480,6 +2517,7 @@
       const showActiveIncidents = document.getElementById('show-active-incidents');
       const showTrafficOverlay = document.getElementById('show-traffic-overlay');
       const trafficRouteOnly = document.getElementById('traffic-route-only');
+      const trafficShowMatched = document.getElementById('traffic-show-matched');
       const trafficDataMode = document.getElementById('traffic-data-mode');
       const routeOnlyContainer = document.getElementById('route-only-container');
       const trafficModeContainer = document.getElementById('traffic-mode-container');
@@ -2516,9 +2554,10 @@
             // Apply traffic overlay with current mode
             const mode = trafficDataMode ? trafficDataMode.value : 'both';
             const routeOnly = trafficRouteOnly ? trafficRouteOnly.checked : false;
+            const showMatched = trafficShowMatched ? trafficShowMatched.checked : true;
             
             if (typeof applyTrafficOverlay === 'function') {
-              applyTrafficOverlay(mode, routeOnly);
+              applyTrafficOverlay(mode, routeOnly, showMatched);
             }
             showUpdateToast(`Traffic Overlay enabled (${mode} mode)`, 'info');
           } else {
@@ -2534,9 +2573,10 @@
       if (trafficRouteOnly) {
         trafficRouteOnly.addEventListener('change', (e) => {
           const mode = trafficDataMode ? trafficDataMode.value : 'both';
+          const showMatched = trafficShowMatched ? trafficShowMatched.checked : true;
           
           if (typeof applyTrafficOverlay === 'function') {
-            applyTrafficOverlay(mode, e.target.checked);
+            applyTrafficOverlay(mode, e.target.checked, showMatched);
           }
           
           const msg = e.target.checked ? 
@@ -2546,10 +2586,27 @@
         });
       }
 
+      if (trafficShowMatched) {
+        trafficShowMatched.addEventListener('change', (e) => {
+          const mode = trafficDataMode ? trafficDataMode.value : 'both';
+          const routeOnly = trafficRouteOnly ? trafficRouteOnly.checked : false;
+          
+          if (typeof applyTrafficOverlay === 'function') {
+            applyTrafficOverlay(mode, routeOnly, e.target.checked);
+          }
+          
+          const msg = e.target.checked ? 
+            'Showing matched edges (mapped to OSM roads)' : 
+            'Showing raw HERE traffic data';
+          showUpdateToast(msg, 'info');
+        });
+      }
+
       if (trafficDataMode) {
         trafficDataMode.addEventListener('change', (e) => {
           const mode = e.target.value;
           const routeOnly = trafficRouteOnly ? trafficRouteOnly.checked : false;
+          const showMatched = trafficShowMatched ? trafficShowMatched.checked : true;
           
           // Update backend traffic mode
           fetch('/set_traffic_mode', {
@@ -2565,7 +2622,7 @@
               // Refresh traffic overlay if enabled
               if (showTrafficOverlay && showTrafficOverlay.checked) {
                 if (typeof applyTrafficOverlay === 'function') {
-                  applyTrafficOverlay(mode, routeOnly);
+                  applyTrafficOverlay(mode, routeOnly, showMatched);
                 }
               }
               

@@ -19,8 +19,8 @@ from auto_disruption_service import init_auto_disruption_service, shutdown_auto_
 # Import Google Maps service
 from google_maps_service import GoogleMapsService
 
-# Import HERE Traffic service
-from here_traffic_service import get_here_traffic_service
+# Import HERE Traffic service (V2 - hash-based)
+from realtime_traffic_service import RealtimeTrafficService
 
 
 app = Flask(__name__)
@@ -54,6 +54,14 @@ except Exception as e:
     print(f"❌ Error initializing Google Maps Service: {e}")
     gmaps_service = None
 
+# Initialize HERE Traffic Service (V2 - hash-based)
+try:
+    traffic_service = RealtimeTrafficService()
+    print("✅ HERE Traffic Service V2 initialized successfully")
+except Exception as e:
+    print(f"❌ Error initializing HERE Traffic Service: {e}")
+    traffic_service = None
+
 # Initialize auto-disruption service (90 second updates)
 auto_service = init_auto_disruption_service(app, update_interval=90)
 
@@ -63,7 +71,8 @@ atexit.register(shutdown_auto_disruption_service)
 
 def get_dynamic_disruption_file(algorithm: str = 'hc2l', dataset_mode: str = None) -> str:
     """
-    Get the path to the current dynamic disruption file based on dataset selection.
+    Get the path to the current traffic disruption file based on dataset selection.
+    Now uses hash-based traffic matching files instead of scenarios.
     
     Args:
         algorithm: 'hc2l' or 'dhl' (for backward compatibility)
@@ -72,9 +81,12 @@ def get_dynamic_disruption_file(algorithm: str = 'hc2l', dataset_mode: str = Non
     Returns:
         Path to disruption file as string, or empty string if no disruptions
     """
-    # If no dataset mode specified, try to get from HERE traffic service
+    # If no dataset mode specified, try to get from traffic service
     if dataset_mode is None:
-        dataset_mode = getattr(here_service, 'traffic_mode', 'none')
+        if traffic_service:
+            dataset_mode = traffic_service.traffic_mode if hasattr(traffic_service, 'traffic_mode') else 'flow'
+        else:
+            dataset_mode = 'flow'
     
     print(f"🔍 Looking for disruption file - Algorithm: {algorithm.upper()}, Dataset: {dataset_mode.upper()}")
     
@@ -83,33 +95,21 @@ def get_dynamic_disruption_file(algorithm: str = 'hc2l', dataset_mode: str = Non
         print(f"ℹ️  Dataset mode is NONE - no disruptions will be used")
         return ""
     
-    # Map dataset mode to file name
+    # Map dataset mode to new hash-based traffic files (symlinks to latest)
     disruption_files = {
-        'incidents': Config.DISRUPTIONS_DIR / "dynamic_disruptions_incidents.gr",
-        'flow': Config.DISRUPTIONS_DIR / "dynamic_disruptions_flow.gr",
-        'both': Config.DISRUPTIONS_DIR / "dynamic_disruptions_both.gr"
+        'incidents': Config.DISRUPTIONS_DIR / "current_traffic_incidents.gr",
+        'flow': Config.DISRUPTIONS_DIR / "current_traffic_flow.gr",
+        'both': Config.DISRUPTIONS_DIR / "current_traffic_both.gr"
     }
     
     # Get the appropriate file for the dataset mode
-    dynamic_file = disruption_files.get(dataset_mode)
+    traffic_file = disruption_files.get(dataset_mode)
     
-    if dynamic_file and dynamic_file.exists():
-        print(f"✅ Using {dataset_mode.upper()} disruption file: {dynamic_file}")
-        return str(dynamic_file)
+    if traffic_file and traffic_file.exists():
+        print(f"✅ Using {dataset_mode.upper()} traffic file: {traffic_file}")
+        return str(traffic_file)
     
-    # Fall back to generic current symlink
-    current_file = Config.DISRUPTIONS_DIR / "dynamic_disruptions_current.gr"
-    if current_file.exists():
-        print(f"🔄 Using current disruption symlink: {current_file}")
-        return str(current_file)
-    
-    # Fall back to static scenario file
-    static_file = Config.PROCESSED_DATA_DIR / "qc_disrupted_scenario_1.gr"
-    if static_file.exists():
-        print(f"📋 Using static disruption file: {static_file}")
-        return str(static_file)
-    
-    print(f"⚠️  No disruption file found for dataset mode: {dataset_mode}")
+    print(f"⚠️  No traffic file found for dataset mode: {dataset_mode}")
     return ""
 
 
@@ -119,33 +119,21 @@ def index():
 
 @app.route('/request_new_dataset')
 def request_new_dataset():
-    # Call unified data generator
-    import subprocess
-    import sys
-    
+    """Fetch latest traffic data using hash-based matching"""
     try:
-        # Get the root directory (parent of Main/)
-        root_dir = Path(__file__).parent.parent
-        generator_script = root_dir / "unified_data_generator.py"
-        
-        # Run unified data generator with real traffic data
-        result = subprocess.run(
-            [sys.executable, str(generator_script), "--mode", "both", "--scenarios", "0"],
-            cwd=str(root_dir),
-            capture_output=True,
-            text=True,
-            timeout=300  # 5 minutes timeout
-        )
-        
-        if result.returncode == 0:
+        if traffic_service:
+            # Fetch and save latest traffic data
+            metadata = traffic_service.fetch_and_save(mode='both')
+            
             return jsonify({
                 'success': True,
-                'message': 'New dataset generated successfully with real traffic data'
+                'message': f'Traffic data updated: {metadata.get("total_edges", 0)} edges affected',
+                'metadata': metadata
             })
         else:
             return jsonify({
                 'success': False,
-                'message': f'Dataset generation failed: {result.stderr}'
+                'message': 'Traffic service not initialized'
             })
     except Exception as e:
         return jsonify({
@@ -932,34 +920,47 @@ def compare_routes():
 @app.route('/get_active_disruptions')
 def get_active_disruptions():
     """
-    Get all active disruptions from HERE API data
-    Uses API-provided incident types and criticality, not speed-based classification
+    Get all active disruptions from HERE API data using hash-based matching
+    Maps HERE traffic data to actual road network edges using pre-matched edges
     """
     try:
-        here_service = get_here_traffic_service()
+        # Use the hash-based traffic matcher (already initialized in traffic_service)
+        from config import Config
+        from traffic_hash_matcher import TrafficHashMatcher
+        
+        # Initialize hash matcher with pre-matched edges
+        print("🚀 Initializing TrafficHashMatcher for traffic overlay...")
+        matcher = traffic_service.matcher
         
         disruptions_by_type = {}
         total_disruptions = 0
+        matched_edges_count = 0
         
         # ============================================================
         # FETCH INCIDENTS (primary data source for incident types)
         # ============================================================
-        incidents = here_service.fetch_traffic_incidents()
+        incidents = traffic_service.fetch_incidents_data()
         
-        print(f"\n📊 Processing {len(incidents)} HERE Traffic incidents...")
+        print(f"\n📊 Processing {len(incidents)} HERE Traffic incidents with hash-based matching...")
         
         for incident in incidents:
             try:
-                # Extract HERE API fields directly - NO classification needed!
+                # Extract HERE API fields directly
                 incident_details = incident.get('incidentDetails', {})
-                incident_type = incident_details.get('type', 'other')  # API provides this!
-                criticality = incident_details.get('criticality', 'low')  # API provides this!
+                incident_type = incident_details.get('type', 'other')
+                criticality = incident_details.get('criticality', 'low')
                 road_closed = incident_details.get('roadClosed', False)
                 
-                location = incident.get('location', {})
+                # Match incident to edges using hash-based matcher
+                matched_edges = matcher.match_traffic_incident_item(incident)
+                
+                if not matched_edges:
+                    print(f"   ⚠️  No edges matched for incident: {incident_type}")
+                    continue
+                
+                matched_edges_count += len(matched_edges)
                 
                 # Map HERE incident types to our display types
-                # (these are already classified by HERE API!)
                 type_map = {
                     'accident': 'Accident',
                     'construction': 'Construction',
@@ -985,144 +986,129 @@ def get_active_disruptions():
                 display_type = type_map.get(incident_type, 'Other')
                 severity = criticality_map.get(criticality, 'Light')
                 
-                # Extract location geometry
-                shape = location.get('shape', {})
-                links = shape.get('links', [])
+                # Calculate jam factor based on HERE data
+                if road_closed or incident_type == 'roadClosure':
+                    jam_factor = 10.0
+                elif criticality == 'critical':
+                    jam_factor = 8.0
+                elif criticality == 'major':
+                    jam_factor = 6.0
+                elif criticality == 'minor':
+                    jam_factor = 4.0
+                else:
+                    jam_factor = 2.0
                 
-                if links:
-                    # Get start and end coordinates from first and last link
-                    first_link = links[0].get('points', [])
-                    last_link = links[-1].get('points', [])
+                # Calculate speed reduction
+                if road_closed or incident_type == 'roadClosure':
+                    speed_reduction = 1.0
+                    current_speed_kph = 0
+                else:
+                    speed_reduction = 1.0 - (jam_factor / 10.0)
+                    current_speed_kph = 50 * (1 - speed_reduction)
+                
+                # Create disruption entries for each matched edge (TrafficEdge objects)
+                for edge in matched_edges:
+                    disruption = {
+                        'source_id': edge.source,
+                        'target_id': edge.target,
+                        'source_lat': edge.source_lat,
+                        'source_lng': edge.source_lon,
+                        'target_lat': edge.target_lat,
+                        'target_lng': edge.target_lon,
+                        'road_name': incident_details.get('description', {}).get('value', 'Unknown Road'),
+                        'incident_type': display_type,
+                        'severity': severity,
+                        'speed_kph': edge.speed_kph,
+                        'free_flow_kph': edge.freeFlow_kph,
+                        'jam_factor': edge.jamFactor,
+                        'is_closed': edge.isClosed,
+                        'slowdown_ratio': round(1.0 - speed_reduction, 3),
+                        'criticality': criticality,
+                        'here_type': incident_type,
+                        'start_time': incident_details.get('startTime', ''),
+                        'end_time': incident_details.get('endTime', '')
+                    }
                     
-                    if first_link and last_link:
-                        start_point = first_link[0]
-                        end_point = last_link[-1]
-                        
-                        # Calculate jam factor based on HERE data
-                        if road_closed or incident_type == 'roadClosure':
-                            jam_factor = 10.0  # Complete closure
-                        elif criticality == 'critical':
-                            jam_factor = 8.0
-                        elif criticality == 'major':
-                            jam_factor = 6.0
-                        elif criticality == 'minor':
-                            jam_factor = 4.0
-                        else:
-                            jam_factor = 2.0
-                        
-                        # Calculate estimated speed reduction
-                        if road_closed or incident_type == 'roadClosure':
-                            speed_reduction = 1.0
-                            current_speed_kph = 0
-                        else:
-                            speed_reduction = 1.0 - (jam_factor / 10.0)
-                            current_speed_kph = 50 * (1 - speed_reduction)  # Assume 50 km/h free flow
-                        
-                        # Create disruption entry
-                        disruption = {
-                            'source_id': 0,  # Not available from HERE
-                            'target_id': 0,  # Not available from HERE
-                            'source_lat': float(start_point.get('lat', 0)),
-                            'source_lng': float(start_point.get('lng', 0)),
-                            'target_lat': float(end_point.get('lat', 0)),
-                            'target_lng': float(end_point.get('lng', 0)),
-                            'road_name': incident_details.get('description', {}).get('value', 'Unknown Road'),
-                            'incident_type': display_type,
-                            'severity': severity,
-                            'speed_kph': current_speed_kph,
-                            'free_flow_kph': 50.0,
-                            'jam_factor': jam_factor,
-                            'is_closed': road_closed,
-                            'slowdown_ratio': round(1.0 - speed_reduction, 3),
-                            'segment_length': location.get('length', 0),
-                            'criticality': criticality,  # Keep raw HERE value for reference
-                            'here_type': incident_type,  # Keep raw HERE type for reference
-                            'start_time': incident_details.get('startTime', ''),
-                            'end_time': incident_details.get('endTime', '')
-                        }
-                        
-                        # Group by incident type
-                        if display_type not in disruptions_by_type:
-                            disruptions_by_type[display_type] = []
-                        disruptions_by_type[display_type].append(disruption)
-                        total_disruptions += 1
-                        
-                        print(f"   ✅ {display_type} ({severity}) at {disruption['road_name']}")
+                    # Group by incident type
+                    if display_type not in disruptions_by_type:
+                        disruptions_by_type[display_type] = []
+                    disruptions_by_type[display_type].append(disruption)
+                    total_disruptions += 1
+                
+                print(f"   ✅ {display_type} ({severity}) matched to {len(matched_edges)} edges")
                     
             except Exception as e:
                 print(f"   ⚠️  Error processing incident: {e}")
+                import traceback
+                traceback.print_exc()
                 continue
         
         # ============================================================
         # FETCH FLOW DATA (congestion/traffic conditions)
         # ============================================================
-        flow_data = here_service.fetch_traffic_flow()
+        flow_data = traffic_service.fetch_flow_data()
         
         print(f"\n📊 Processing {len(flow_data)} HERE Traffic flow segments...")
         
         for flow in flow_data:
             try:
                 current_flow = flow.get('currentFlow', {})
+                free_flow = flow.get('freeFlow', {})
                 jam_factor = float(current_flow.get('jamFactor', 0.0))
                 speed = float(current_flow.get('speed', 0.0))
-                free_flow_speed = float(current_flow.get('freeFlowSpeed', 50.0))
+                free_flow_speed = float(free_flow.get('speed', 50.0))
                 confidence = float(current_flow.get('confidence', 0.0))
                 
                 # Skip if no significant congestion
                 if jam_factor < 2.0:
                     continue
                 
-                location = flow.get('location', {})
-                shape = location.get('shape', {})
-                links = shape.get('links', [])
+                # Match flow segment to edges using hash-based matcher
+                matched_edges = matcher.match_traffic_flow_item(flow)
                 
-                if links:
-                    first_link = links[0].get('points', [])
-                    last_link = links[-1].get('points', [])
+                if not matched_edges:
+                    continue  # Skip silently for flow - too many segments
+                
+                matched_edges_count += len(matched_edges)
+                
+                # Map jam factor to severity
+                if jam_factor >= 8.0:
+                    severity = 'Heavy'
+                elif jam_factor >= 5.0:
+                    severity = 'Medium'
+                else:
+                    severity = 'Light'
+                
+                # Create disruption entries for each matched edge (TrafficEdge objects)
+                for edge in matched_edges:
+                    # Create disruption entry for flow
+                    disruption = {
+                        'source_id': edge.source,
+                        'target_id': edge.target,
+                        'source_lat': edge.source_lat,
+                        'source_lng': edge.source_lon,
+                        'target_lat': edge.target_lat,
+                        'target_lng': edge.target_lon,
+                        'road_name': flow.get('location', {}).get('description', 'Traffic Congestion'),
+                        'incident_type': 'Congestion',
+                        'severity': severity,
+                        'speed_kph': edge.speed_kph,
+                        'free_flow_kph': edge.freeFlow_kph,
+                        'jam_factor': edge.jamFactor,
+                        'is_closed': edge.isClosed,
+                        'slowdown_ratio': round(max(0, 1.0 - (speed / free_flow_speed if free_flow_speed > 0 else 1)), 3),
+                        'confidence': confidence,
+                        'here_type': 'flow'
+                    }
                     
-                    if first_link and last_link:
-                        start_point = first_link[0]
-                        end_point = last_link[-1]
-                        
-                        # Map jam factor to severity
-                        if jam_factor >= 8.0:
-                            severity = 'Heavy'
-                        elif jam_factor >= 5.0:
-                            severity = 'Medium'
-                        else:
-                            severity = 'Light'
-                        
-                        # Create disruption entry for flow
-                        disruption = {
-                            'source_id': 0,
-                            'target_id': 0,
-                            'source_lat': float(start_point.get('lat', 0)),
-                            'source_lng': float(start_point.get('lng', 0)),
-                            'target_lat': float(end_point.get('lat', 0)),
-                            'target_lng': float(end_point.get('lng', 0)),
-                            'road_name': 'Traffic Congestion',
-                            'incident_type': 'Congestion',
-                            'severity': severity,
-                            'speed_kph': speed * 3.6,  # Convert m/s to km/h
-                            'free_flow_kph': free_flow_speed * 3.6,
-                            'jam_factor': jam_factor,
-                            'is_closed': False,
-                            'slowdown_ratio': round(max(0, 1.0 - (speed / free_flow_speed if free_flow_speed > 0 else 1)), 3),
-                            'segment_length': location.get('length', 0),
-                            'confidence': confidence,
-                            'here_type': 'flow'
-                        }
-                        
-                        # Group congestion separately
-                        if 'Congestion' not in disruptions_by_type:
-                            disruptions_by_type['Congestion'] = []
-                        disruptions_by_type['Congestion'].append(disruption)
-                        total_disruptions += 1
-                        
-                        print(f"   ✅ Congestion ({severity}) at jam_factor={jam_factor:.1f}")
+                    # Group congestion separately
+                    if 'Congestion' not in disruptions_by_type:
+                        disruptions_by_type['Congestion'] = []
+                    disruptions_by_type['Congestion'].append(disruption)
+                    total_disruptions += 1
                 
             except Exception as e:
-                print(f"   ⚠️  Error processing flow segment: {e}")
+                # Silently skip problematic flow items - there are many
                 continue
         
         # Calculate statistics
@@ -1135,17 +1121,19 @@ def get_active_disruptions():
         
         print(f"\n📈 Summary:")
         print(f"   Total disruptions: {total_disruptions}")
+        print(f"   Matched edges: {matched_edges_count}")
         print(f"   By type: {type_counts}")
         print(f"   By severity: {severity_counts}")
         
         return jsonify({
             'success': True,
             'total_disruptions': total_disruptions,
+            'matched_edges_count': matched_edges_count,
             'disruptions_by_type': disruptions_by_type,
             'type_counts': type_counts,
             'severity_counts': severity_counts,
             'timestamp': time.time(),
-            'note': 'Using HERE API incident types directly - no speed-based classification'
+            'note': 'Using HERE API with hash-based edge matching - pre-matched edges from CSV'
         })
         
     except Exception as e:
@@ -1155,6 +1143,327 @@ def get_active_disruptions():
         return jsonify({
             'success': False,
             'error': f"Error loading disruptions: {str(e)}"
+        })
+
+
+@app.route('/get_raw_here_traffic')
+def get_raw_here_traffic():
+    """
+    Get raw HERE API traffic data (non-matched to OSM edges)
+    Returns original HERE flow segments and incidents with their geometries
+    """
+    try:
+        here_service = traffic_service
+        
+        raw_traffic = {
+            'flow_segments': [],
+            'incidents': []
+        }
+        
+        # Fetch flow data
+        flow_data = traffic_service.fetch_flow_data()
+        print(f"📊 Fetching {len(flow_data)} raw HERE flow segments...")
+        
+        for flow in flow_data:
+            try:
+                current_flow = flow.get('currentFlow', {})
+                jam_factor = float(current_flow.get('jamFactor', 0.0))
+                speed = float(current_flow.get('speed', 0.0))
+                free_flow_speed = float(current_flow.get('freeFlowSpeed', 50.0))
+                confidence = float(current_flow.get('confidence', 0.0))
+                
+                # Extract location/shape data
+                location = flow.get('location', {})
+                shape = location.get('shape', {})
+                links = shape.get('links', [])
+                
+                # Parse coordinates from shape
+                coordinates = []
+                for link in links:
+                    points = link.get('points', [])
+                    for point in points:
+                        lat = point.get('lat', 0)
+                        lng = point.get('lng', 0)
+                        if lat and lng:
+                            coordinates.append([lat, lng])
+                
+                if not coordinates:
+                    continue
+                
+                # Map jam factor to severity
+                if jam_factor >= 8.0:
+                    severity = 'Heavy'
+                elif jam_factor >= 5.0:
+                    severity = 'Medium'
+                else:
+                    severity = 'Light'
+                
+                raw_traffic['flow_segments'].append({
+                    'coordinates': coordinates,
+                    'jam_factor': jam_factor,
+                    'speed_kph': speed * 3.6,  # m/s to km/h
+                    'free_flow_kph': free_flow_speed * 3.6,
+                    'severity': severity,
+                    'confidence': confidence,
+                    'type': 'flow',
+                    'description': location.get('description', 'Traffic Flow')
+                })
+                
+            except Exception as e:
+                continue
+        
+        # Fetch incidents
+        incidents = traffic_service.fetch_incidents_data()
+        print(f"📊 Fetching {len(incidents)} raw HERE incidents...")
+        
+        for incident in incidents:
+            try:
+                incident_details = incident.get('incidentDetails', {})
+                incident_type = incident_details.get('type', 'other')
+                criticality = incident_details.get('criticality', 'low')
+                road_closed = incident_details.get('roadClosed', False)
+                
+                location = incident.get('location', {})
+                shape = location.get('shape', {})
+                links = shape.get('links', [])
+                
+                # Parse coordinates from shape
+                coordinates = []
+                for link in links:
+                    points = link.get('points', [])
+                    for point in points:
+                        lat = point.get('lat', 0)
+                        lng = point.get('lng', 0)
+                        if lat and lng:
+                            coordinates.append([lat, lng])
+                
+                if not coordinates:
+                    continue
+                
+                # Map criticality to severity
+                criticality_map = {
+                    'low': 'Light',
+                    'minor': 'Light',
+                    'major': 'Medium',
+                    'critical': 'Heavy'
+                }
+                
+                severity = criticality_map.get(criticality, 'Light')
+                
+                raw_traffic['incidents'].append({
+                    'coordinates': coordinates,
+                    'type': incident_type,
+                    'severity': severity,
+                    'criticality': criticality,
+                    'road_closed': road_closed,
+                    'description': incident_details.get('description', {}).get('value', 'Incident'),
+                    'start_time': incident_details.get('startTime', ''),
+                    'end_time': incident_details.get('endTime', '')
+                })
+                
+            except Exception as e:
+                continue
+        
+        print(f"✅ Returning {len(raw_traffic['flow_segments'])} flow segments and {len(raw_traffic['incidents'])} incidents")
+        
+        return jsonify({
+            'success': True,
+            'data': raw_traffic,
+            'total_flow': len(raw_traffic['flow_segments']),
+            'total_incidents': len(raw_traffic['incidents'])
+        })
+        
+    except Exception as e:
+        print(f"❌ Error in get_raw_here_traffic: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': f"Error loading raw traffic: {str(e)}"
+        })
+
+
+@app.route('/get_traffic_with_geometry')
+def get_traffic_with_geometry():
+    """
+    Get traffic data with full OSM road geometries
+    Returns matched traffic edges with their LineString geometries from quezon_city_edges.csv
+    """
+    try:
+        print("\n🗺️  Fetching traffic data with OSM geometries...")
+        
+        # Load OSM edges with geometry
+        edges_df = pd.read_csv(Config.EDGES_CSV)
+        print(f"   📂 Loaded {len(edges_df)} OSM edges with geometry")
+        
+        # Create edge lookup dictionary (source,target) -> edge_data
+        edge_lookup = {}
+        for _, edge in edges_df.iterrows():
+            key = (int(edge['source']), int(edge['target']))
+            edge_lookup[key] = {
+                'geometry': eval(edge['geometry']) if isinstance(edge['geometry'], str) else edge['geometry'],
+                'road_name': edge.get('road_name', 'Unknown Road'),
+                'highway_type': edge.get('highway_type', 'unknown'),
+                'length': float(edge.get('length', 0)),
+                'freeFlow_kph': float(edge.get('freeFlow_kph', 50.0)) if pd.notna(edge.get('freeFlow_kph')) else 50.0
+            }
+        
+        # Fetch current traffic disruptions
+        matcher = traffic_service.matcher
+        
+        # Fetch flow and incident data
+        flow_data = traffic_service.fetch_flow_data()
+        incidents_data = traffic_service.fetch_incidents_data()
+        
+        print(f"   🌐 Fetched {len(flow_data)} flow segments, {len(incidents_data)} incidents")
+        
+        traffic_segments = []
+        matched_count = 0
+        unmatched_count = 0
+        
+        # Process flow data
+        for flow in flow_data:
+            try:
+                # Match to OSM edges
+                matched_edges = matcher.match_traffic_flow_item(flow)
+                
+                if not matched_edges:
+                    unmatched_count += 1
+                    continue
+                
+                matched_count += 1
+                
+                # Get traffic metrics
+                current_flow = flow.get('currentFlow', {})
+                jam_factor = float(current_flow.get('jamFactor', 0.0))
+                speed_kph = float(current_flow.get('speed', 0.0)) * 3.6  # m/s to km/h
+                confidence = float(current_flow.get('confidence', 0.0))
+                
+                # Map jam factor to severity
+                if jam_factor >= 8.0:
+                    severity = 'Heavy'
+                elif jam_factor >= 5.0:
+                    severity = 'Medium'
+                else:
+                    severity = 'Light'
+                
+                # Create segments with geometry for each matched edge
+                for edge in matched_edges:
+                    edge_key = (edge.source, edge.target)
+                    edge_data = edge_lookup.get(edge_key)
+                    
+                    if not edge_data:
+                        continue
+                    
+                    traffic_segments.append({
+                        'type': 'flow',
+                        'incident_type': 'Congestion',
+                        'severity': severity,
+                        'geometry': edge_data['geometry'],
+                        'road_name': edge_data['road_name'],
+                        'highway_type': edge_data['highway_type'],
+                        'length': edge_data['length'],
+                        'speed_kph': edge.speed_kph,
+                        'free_flow_kph': edge.freeFlow_kph,
+                        'jam_factor': edge.jamFactor,
+                        'is_closed': edge.isClosed,
+                        'confidence': confidence,
+                        'source': edge.source,
+                        'target': edge.target
+                    })
+                    
+            except Exception as e:
+                print(f"   ⚠️  Error processing flow: {e}")
+                continue
+        
+        # Process incidents
+        for incident in incidents_data:
+            try:
+                # Match to OSM edges
+                matched_edges = matcher.match_traffic_incident_item(incident)
+                
+                if not matched_edges:
+                    unmatched_count += 1
+                    continue
+                
+                matched_count += 1
+                
+                # Extract incident details
+                incident_details = incident.get('incidentDetails', {})
+                incident_type = incident_details.get('type', 'other')
+                criticality = incident_details.get('criticality', 'low')
+                road_closed = incident_details.get('roadClosed', False)
+                
+                # Map incident type
+                type_map = {
+                    'accident': 'Accident',
+                    'construction': 'Construction',
+                    'roadClosure': 'Road Closure',
+                    'roadHazard': 'Road Hazard',
+                    'disabledVehicle': 'Disabled Vehicle',
+                    'weather': 'Weather',
+                    'other': 'Other'
+                }
+                display_type = type_map.get(incident_type, 'Other')
+                
+                # Map criticality to severity
+                criticality_map = {
+                    'low': 'Light',
+                    'minor': 'Light',
+                    'major': 'Medium',
+                    'critical': 'Heavy'
+                }
+                severity = criticality_map.get(criticality, 'Light')
+                
+                # Create segments with geometry for each matched edge
+                for edge in matched_edges:
+                    edge_key = (edge.source, edge.target)
+                    edge_data = edge_lookup.get(edge_key)
+                    
+                    if not edge_data:
+                        continue
+                    
+                    traffic_segments.append({
+                        'type': 'incident',
+                        'incident_type': display_type,
+                        'severity': severity,
+                        'geometry': edge_data['geometry'],
+                        'road_name': edge_data['road_name'],
+                        'highway_type': edge_data['highway_type'],
+                        'length': edge_data['length'],
+                        'speed_kph': edge.speed_kph,
+                        'free_flow_kph': edge.freeFlow_kph,
+                        'jam_factor': edge.jamFactor,
+                        'is_closed': edge.isClosed,
+                        'criticality': criticality,
+                        'description': incident_details.get('description', {}).get('value', 'Incident'),
+                        'source': edge.source,
+                        'target': edge.target
+                    })
+                    
+            except Exception as e:
+                print(f"   ⚠️  Error processing incident: {e}")
+                continue
+        
+        print(f"   ✅ Generated {len(traffic_segments)} traffic segments with geometry")
+        print(f"   📊 Matched: {matched_count}, Unmatched: {unmatched_count}")
+        
+        return jsonify({
+            'success': True,
+            'segments': traffic_segments,
+            'total_segments': len(traffic_segments),
+            'matched_count': matched_count,
+            'unmatched_count': unmatched_count,
+            'timestamp': time.time()
+        })
+        
+    except Exception as e:
+        print(f"❌ Error in get_traffic_with_geometry: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': f"Error loading traffic with geometry: {str(e)}"
         })
 
 
@@ -1931,7 +2240,7 @@ def fetch_here_traffic():
             })
         
         # Get HERE traffic service
-        here_service = get_here_traffic_service()
+        here_service = traffic_service
         
         # Determine output file
         if algorithm in ['hc2l', 'dhl']:
@@ -1939,24 +2248,13 @@ def fetch_here_traffic():
         else:
             output_file = Config.DISRUPTIONS_DIR / "here_traffic_disruptions_current.gr"
         
-        # Fetch and generate disruptions with specified traffic mode
-        edges_count, metadata = here_service.fetch_and_generate_disruptions(
-            Config.EDGES_CSV,
-            output_file,
-            traffic_mode=traffic_mode
-        )
+        # Fetch and save traffic data using new hash-based system
+        metadata = traffic_service.fetch_and_save(mode=traffic_mode)
+        edges_count = metadata.get('total_edges', 0)
         
-        # If apply_immediately, copy to dynamic disruptions file
+        # If apply_immediately, the files are already created as current_traffic_*.gr
         if apply_immediately and edges_count > 0:
-            import shutil
-            if algorithm in ['hc2l', 'dhl']:
-                dynamic_file = Config.DISRUPTIONS_DIR / f"dynamic_disruptions_{algorithm}.gr"
-            else:
-                dynamic_file = Config.DISRUPTIONS_DIR / "dynamic_disruptions_current.gr"
-            
-            shutil.copy(output_file, dynamic_file)
-            metadata['applied_to'] = str(dynamic_file)
-            print(f"✅ Applied HERE traffic disruptions ({traffic_mode} mode) to {dynamic_file}")
+            print(f"✅ Traffic data updated ({traffic_mode} mode): {edges_count} edges")
         
         return jsonify({
             'success': True,
@@ -1997,8 +2295,8 @@ def set_traffic_mode():
             })
         
         # Get HERE traffic service and set mode
-        here_service = get_here_traffic_service()
-        here_service.set_traffic_mode(mode)
+        here_service = traffic_service
+        traffic_service.set_traffic_mode(mode)
         
         return jsonify({
             'success': True,
@@ -2017,13 +2315,13 @@ def set_traffic_mode():
 def get_traffic_status():
     """Get current traffic mode and statistics"""
     try:
-        here_service = get_here_traffic_service()
+        here_service = traffic_service
         
         return jsonify({
             'success': True,
-            'traffic_mode': here_service.traffic_mode,
-            'api_key_configured': bool(here_service.api_key),
-            'bbox': here_service.bbox
+            'traffic_mode': traffic_service.traffic_mode,
+            'api_key_configured': bool(traffic_service.api_key),
+            'bbox': traffic_service.bbox
         })
         
     except Exception as e:
