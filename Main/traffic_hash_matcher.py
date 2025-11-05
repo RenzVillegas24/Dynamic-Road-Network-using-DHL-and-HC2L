@@ -48,6 +48,10 @@ class TrafficEdge:
     jamFactor: float = 0.0
     isClosed: bool = False
     
+    # Road attributes (from OSM edge data)
+    highway_type: str = 'unknown'
+    road_name: str = ''
+    
     def to_dict(self) -> Dict:
         """Convert to dictionary for CSV export"""
         return {
@@ -61,7 +65,9 @@ class TrafficEdge:
             'speed_kph': self.speed_kph,
             'freeFlow_kph': self.freeFlow_kph,
             'jamFactor': self.jamFactor,
-            'isClosed': self.isClosed
+            'isClosed': self.isClosed,
+            'highway_type': self.highway_type,
+            'road_name': self.road_name
         }
 
 
@@ -79,29 +85,83 @@ class TrafficHashMatcher:
         """
         self.matched_edges_csv = matched_edges_csv
         self.hash_to_edges: Dict[str, List[TrafficEdge]] = {}
+        
+        # Load OSM edges for highway_type lookup
+        from config import Config
+        osm_edges_csv = Config.EDGES_CSV
+        self.edge_attributes = self._load_edge_attributes(osm_edges_csv)
+        
         self._load_matched_edges()
         
         print(f"✅ TrafficHashMatcher initialized: {len(self.hash_to_edges)} unique traffic hashes, "
               f"{sum(len(edges) for edges in self.hash_to_edges.values())} total edges")
     
+    def _load_edge_attributes(self, edges_csv: Path) -> Dict:
+        """Load highway_type and road_name from OSM edges CSV"""
+        print(f"📂 Loading OSM edge attributes from {edges_csv}...")
+        
+        edge_attrs = {}
+        try:
+            df = pd.read_csv(edges_csv)
+            for _, row in df.iterrows():
+                key = (int(row['source']), int(row['target']))
+                highway = str(row.get('highway_type', 'unknown')).strip()
+                # Handle NaN values
+                if pd.isna(row.get('highway_type')):
+                    highway = 'unknown'
+                edge_attrs[key] = {
+                    'highway_type': highway,
+                    'road_name': str(row.get('road_name', '')).strip()
+                }
+            print(f"   Loaded attributes for {len(edge_attrs)} OSM edges")
+            # Debug: show a sample
+            if edge_attrs:
+                sample_key = list(edge_attrs.keys())[0]
+                print(f"   Sample: {sample_key} -> {edge_attrs[sample_key]}")
+        except Exception as e:
+            print(f"   ⚠️  Could not load edge attributes: {e}")
+            import traceback
+            traceback.print_exc()
+        
+        return edge_attrs
+    
     def _load_matched_edges(self):
-        """Load matched edges CSV into hash lookup table"""
+        """Load matched edges CSV into hash lookup table with highway_type"""
         print(f"📂 Loading matched edges from {self.matched_edges_csv}...")
         
         df = pd.read_csv(self.matched_edges_csv)
         
+        # Debug counters
+        found_attrs = 0
+        missing_attrs = 0
+        
         # Group by traffic_hash
         for _, row in df.iterrows():
             traffic_hash = row['traffic_hash']
+            source = int(row['source'])
+            target = int(row['target'])
+            
+            # Get highway_type from OSM edges
+            edge_key = (source, target)
+            attrs = self.edge_attributes.get(edge_key, {})
+            highway_type = attrs.get('highway_type', 'unknown')
+            road_name = attrs.get('road_name', '')
+            
+            if attrs:
+                found_attrs += 1
+            else:
+                missing_attrs += 1
             
             edge = TrafficEdge(
                 traffic_hash=traffic_hash,
-                source=int(row['source']),
-                target=int(row['target']),
+                source=source,
+                target=target,
                 source_lat=float(row['source_lat']),
                 source_lon=float(row['source_lon']),
                 target_lat=float(row['target_lat']),
-                target_lon=float(row['target_lon'])
+                target_lon=float(row['target_lon']),
+                highway_type=highway_type,
+                road_name=road_name
             )
             
             if traffic_hash not in self.hash_to_edges:
@@ -110,6 +170,7 @@ class TrafficHashMatcher:
             self.hash_to_edges[traffic_hash].append(edge)
         
         print(f"   Loaded {len(self.hash_to_edges)} unique traffic segments")
+        print(f"   Matched attributes: {found_attrs}/{found_attrs + missing_attrs} edges")
     
     @staticmethod
     def hash_location_javascript_style(location: Dict) -> str:
@@ -209,7 +270,7 @@ class TrafficHashMatcher:
         # Populate traffic metrics for all matched edges
         result_edges = []
         for edge in matched_edges:
-            # Create a copy with traffic data
+            # Create a copy with traffic data (preserving highway_type and road_name)
             traffic_edge = TrafficEdge(
                 traffic_hash=edge.traffic_hash,
                 source=edge.source,
@@ -221,7 +282,9 @@ class TrafficHashMatcher:
                 speed_kph=speed_kph,
                 freeFlow_kph=free_flow_kph,
                 jamFactor=jam_factor,
-                isClosed=False  # Flow data doesn't indicate closures
+                isClosed=False,  # Flow data doesn't indicate closures
+                highway_type=edge.highway_type,  # Preserve from loaded edge
+                road_name=edge.road_name  # Preserve from loaded edge
             )
             result_edges.append(traffic_edge)
         
@@ -274,7 +337,9 @@ class TrafficHashMatcher:
                 speed_kph=0.0 if is_closed else 10.0,  # Low speed for incidents
                 freeFlow_kph=50.0,  # Assume reasonable free flow
                 jamFactor=jam_factor,
-                isClosed=is_closed
+                isClosed=is_closed,
+                highway_type=edge.highway_type,  # Preserve from loaded edge
+                road_name=edge.road_name  # Preserve from loaded edge
             )
             result_edges.append(traffic_edge)
         

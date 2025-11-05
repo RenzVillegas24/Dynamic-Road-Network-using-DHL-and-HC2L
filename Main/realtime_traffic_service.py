@@ -200,7 +200,26 @@ class RealtimeTrafficService:
     
     def save_traffic_gr(self, df: pd.DataFrame, mode: str) -> Path:
         """
-        Save traffic data to .gr format for C++ routing APIs
+        Save traffic data to ENHANCED .gr format for C++ routing APIs
+        
+        ENHANCED FORMAT allows C++ algorithms to directly consider:
+        ✅ jam_factor: Traffic congestion (0.0 = free flow, 10.0 = blocked)
+        ✅ current_speed: Actual speed in km/h from HERE API
+        ✅ free_flow_speed: Free flow speed in km/h from HERE API
+        ✅ highway: Road type (motorway, primary, secondary, residential, etc.)
+        ✅ is_closed: Road closure flag (1 = closed, 0 = open)
+        ✅ type: Incident/traffic type (closure, accident, congestion, flow, etc.)
+        ✅ impact_score: Traffic impact metric (0.0-1.0)
+        ✅ confidence: Data reliability score (0.0-1.0)
+        
+        Format: a source target weight jam_factor current_speed free_flow_speed impact_score confidence highway is_closed type
+        Example: a 84509345 430697473 1000 0.00 11.11 0.00 0.500 0.90 secondary 0 flow
+        
+        The C++ code in hc2l_routing_api.cpp parses this extended format and uses:
+        - weight: For shortest path computation
+        - jam_factor: To penalize congested roads (cost *= 1.0 + jam_factor/10.0 * 4.0)
+        - highway: To prefer higher-class roads (motorway=0.5x, residential=2.0x)
+        - is_closed: To block closed roads (weight = 999999999)
         
         Args:
             df: DataFrame with traffic edges
@@ -223,37 +242,64 @@ class RealtimeTrafficService:
         num_nodes = max(nodes) if nodes else 0
         num_edges = len(df)
         
-        # Write .gr file
+        # Write .gr file with ENHANCED format
         with open(filepath, 'w') as f:
             # Header
-            f.write(f"c Traffic data from HERE API\n")
+            f.write(f"c Traffic data from HERE API - ENHANCED FORMAT\n")
             f.write(f"c Mode: {mode}\n")
             f.write(f"c Timestamp: {datetime.now().isoformat()}\n")
             f.write(f"c Edges: {num_edges}\n")
+            f.write(f"c Format: a source target weight jam_factor current_speed free_flow_speed impact_score confidence highway is_closed type\n")
             f.write(f"p sp {num_nodes} {num_edges}\n")
             
-            # Edges with weight based on jam factor
+            # Edges with FULL traffic metrics
             for _, row in df.iterrows():
                 source = int(row['source'])
                 target = int(row['target'])
                 
-                # Calculate weight from jam factor and speed
+                # Extract traffic metrics
                 jam_factor = float(row['jamFactor'])
                 speed_kph = float(row['speed_kph'])
                 free_flow_kph = float(row['freeFlow_kph'])
                 is_closed = bool(row['isClosed'])
                 
-                # Weight formula: higher jam factor = higher weight
+                # Get highway type (from matched edges CSV)
+                highway_type = str(row.get('highway_type', 'unknown')).replace(' ', '_')
+                
+                # Calculate weight from jam factor and speed
                 if is_closed:
                     weight = 999999  # Very high penalty for closed roads
+                    incident_type = 'closure'
                 elif free_flow_kph > 0:
                     # Weight proportional to travel time
-                    # Higher jam factor means slower speed, higher weight
                     weight = int(1000 * (1.0 + jam_factor / 10.0))
+                    # Determine incident type from jam factor
+                    if jam_factor >= 8.0:
+                        incident_type = 'accident'
+                    elif jam_factor >= 5.0:
+                        incident_type = 'congestion'
+                    else:
+                        incident_type = 'flow'
                 else:
                     weight = int(1000 * (1.0 + jam_factor / 10.0))
+                    incident_type = 'flow'
                 
-                f.write(f"a {source} {target} {weight}\n")
+                # Calculate impact score (0.0 to 1.0)
+                if is_closed:
+                    impact_score = 1.0
+                else:
+                    # Based on speed reduction
+                    speed_ratio = speed_kph / free_flow_kph if free_flow_kph > 0 else 0.5
+                    impact_score = round(1.0 - speed_ratio, 3)
+                
+                # Confidence (assume high for HERE API data)
+                confidence = 0.9
+                
+                # Write ENHANCED format: source target weight jam_factor speed free_flow impact confidence highway closed type
+                f.write(f"a {source} {target} {weight} "
+                       f"{jam_factor:.2f} {speed_kph:.2f} {free_flow_kph:.2f} "
+                       f"{impact_score:.3f} {confidence:.2f} {highway_type} "
+                       f"{1 if is_closed else 0} {incident_type}\n")
         
         print(f"   💾 Saved .gr: {filepath}")
         

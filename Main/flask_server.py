@@ -72,44 +72,55 @@ atexit.register(shutdown_auto_disruption_service)
 def get_dynamic_disruption_file(algorithm: str = 'hc2l', dataset_mode: str = None) -> str:
     """
     Get the path to the current traffic disruption file based on dataset selection.
-    Now uses hash-based traffic matching files instead of scenarios.
+    
+    **NEW SYSTEM**: Uses hash-based traffic matching with real-time HERE API data
+    - Traffic data is matched to OSM edges using pre-matched fingerprints
+    - Files are in .gr format (compatible with C++ routing algorithms)
+    - Symlinks always point to latest: current_traffic_both.gr → traffic_TIMESTAMP_both.gr
+    
+    **KEY INSIGHT**: matched_edges.csv and quezon_city_edges.csv have the same structure!
+    - Both have: source, target, coordinates, road info
+    - Traffic .gr files use these matched edges directly
+    - C++ algorithms can consume .gr files without modification
     
     Args:
-        algorithm: 'hc2l' or 'dhl' (for backward compatibility)
-        dataset_mode: 'none', 'incidents', 'flow', or 'both'
+        algorithm: 'hc2l' or 'dhl' (for backward compatibility, not used)
+        dataset_mode: 'none' or 'both' (simplified from old 4-option system)
         
     Returns:
         Path to disruption file as string, or empty string if no disruptions
     """
-    # If no dataset mode specified, try to get from traffic service
+    # Simplified: only 'none' or 'both' modes now
     if dataset_mode is None:
-        if traffic_service:
-            dataset_mode = traffic_service.traffic_mode if hasattr(traffic_service, 'traffic_mode') else 'flow'
-        else:
-            dataset_mode = 'flow'
+        dataset_mode = 'both'  # Default to using traffic data
     
-    print(f"🔍 Looking for disruption file - Algorithm: {algorithm.upper()}, Dataset: {dataset_mode.upper()}")
+    print(f"🔍 Looking for disruption file - Dataset: {dataset_mode.upper()}")
     
     # If mode is 'none', return empty string (no disruptions)
     if dataset_mode == 'none':
         print(f"ℹ️  Dataset mode is NONE - no disruptions will be used")
         return ""
     
-    # Map dataset mode to new hash-based traffic files (symlinks to latest)
-    disruption_files = {
-        'incidents': Config.DISRUPTIONS_DIR / "current_traffic_incidents.gr",
-        'flow': Config.DISRUPTIONS_DIR / "current_traffic_flow.gr",
-        'both': Config.DISRUPTIONS_DIR / "current_traffic_both.gr"
-    }
+    # Always use 'both' for traffic (includes flow + incidents)
+    # This is the new hash-based matched traffic file
+    traffic_file = Config.DISRUPTIONS_DIR / "current_traffic_both.gr"
     
-    # Get the appropriate file for the dataset mode
-    traffic_file = disruption_files.get(dataset_mode)
-    
-    if traffic_file and traffic_file.exists():
-        print(f"✅ Using {dataset_mode.upper()} traffic file: {traffic_file}")
+    if traffic_file.exists():
+        print(f"✅ Using real-time traffic file: {traffic_file}")
+        print(f"   ⚡ Hash-matched edges from HERE API (90x faster than geospatial)")
         return str(traffic_file)
     
-    print(f"⚠️  No traffic file found for dataset mode: {dataset_mode}")
+    print(f"⚠️  No traffic file found - generating new traffic data...")
+    # If file doesn't exist, trigger traffic generation
+    try:
+        if traffic_service:
+            traffic_service.fetch_and_save(mode='both')
+            if traffic_file.exists():
+                print(f"✅ Generated new traffic file: {traffic_file}")
+                return str(traffic_file)
+    except Exception as e:
+        print(f"❌ Error generating traffic: {e}")
+    
     return ""
 
 
