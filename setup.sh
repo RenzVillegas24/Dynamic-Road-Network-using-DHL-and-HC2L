@@ -10,13 +10,18 @@
 # 5. Run the Flask web server with real-time traffic updates
 #
 # Usage:
-#   ./setup.sh                    # Interactive menu
-#   ./setup.sh --build            # Build only
-#   ./setup.sh --data             # Generate data only
-#   ./setup.sh --full             # Complete setup
-#   ./setup.sh --server           # Run server only
-#   ./setup.sh --clean            # Remove generated files
+#   .\setup.sh                    # Interactive menu
+#   .\setup.sh -full              # Complete setup
+#   .\setup.sh -conda-setup       # Create conda environment
+#   .\setup.sh -build             # Build only
+#   .\setup.sh -data              # Generate data only
+#   .\setup.sh -indexes           # Build indexes only
+#   .\setup.sh -server            # Run server only
+#   .\setup.sh -clean             # Remove generated files
+#   .\setup.sh -help              # Show help
 ################################################################################
+
+
 
 set -e  # Exit on error
 
@@ -65,6 +70,7 @@ print_error() {
 print_menu() {
     echo -e "\n${BLUE}Available commands:${NC}"
     echo -e "  ${GREEN}./setup.sh --full${NC}        Complete setup (build + data + indexes + server)"
+    echo -e "  ${GREEN}./setup.sh --conda-setup${NC}  Create conda environment from environment.yml"
     echo -e "  ${GREEN}./setup.sh --build${NC}       Build C++ algorithms only"
     echo -e "  ${GREEN}./setup.sh --data${NC}        Generate traffic data and base network"
     echo -e "  ${GREEN}./setup.sh --indexes${NC}     Build routing indexes"
@@ -126,6 +132,44 @@ check_requirements() {
     mkdir -p "$DISRUPTIONS_DIR"
     mkdir -p "$MAIN_DIR/cache"
     print_success "Data directories created"
+}
+
+create_conda_env() {
+    print_header "Creating Conda Environment"
+
+    # Check if conda is installed
+    if ! command -v conda &> /dev/null; then
+        print_error "conda not found!"
+        echo ""
+        echo "Please install Miniconda or Anaconda:"
+        echo "  Miniconda (Recommended): https://docs.conda.io/projects/miniconda/en/latest/"
+        echo "  Anaconda: https://www.anaconda.com/download"
+        exit 1
+    fi
+    print_success "conda found: $(conda --version)"
+
+    # Check if environment.yml exists
+    if [ ! -f "$PROJECT_ROOT/environment.yml" ]; then
+        print_error "environment.yml not found in $PROJECT_ROOT"
+        return 1
+    fi
+
+    # Create the conda environment
+    print_info "Creating conda environment from environment.yml..."
+    print_info "This may take several minutes..."
+    
+    if conda env create --prefix "$PROJECT_ROOT/.conda" --file "$PROJECT_ROOT/environment.yml" --force-reinstall; then
+        print_success "Conda environment created successfully"
+        print_info "Location: $PROJECT_ROOT/.conda"
+        echo ""
+        print_info "To activate the environment, run:"
+        echo -e "  ${GREEN}conda activate $PROJECT_ROOT/.conda${NC}"
+        echo ""
+        return 0
+    else
+        print_error "Failed to create conda environment"
+        return 1
+    fi
 }
 
 build_dhl() {
@@ -344,6 +388,7 @@ show_help() {
     echo ""
     echo -e "Examples:"
     echo -e "  ${GREEN}./setup.sh --full${NC}              # Complete workflow with optimized matching"
+    echo -e "  ${GREEN}./setup.sh --conda-setup${NC}       # Setup conda environment"
     echo -e "  ${GREEN}./setup.sh --full --flow${NC}       # Build & run with flow data only"
     echo -e "  ${GREEN}./setup.sh --build${NC}             # Compile C++ only"
     echo -e "  ${GREEN}./setup.sh --data --synthetic${NC}  # Generate synthetic data"
@@ -369,6 +414,9 @@ while [[ $# -gt 0 ]]; do
     case $1 in
         --full)
             ACTION="full"
+            ;;
+        --conda-setup)
+            ACTION="conda-setup"
             ;;
         --build)
             ACTION="build"
@@ -416,6 +464,9 @@ case $ACTION in
         ;;
     full)
         run_full_setup
+        ;;
+    conda-setup)
+        create_conda_env || exit 1
         ;;
     build)
         check_requirements

@@ -10,16 +10,20 @@
 #
 # Usage:
 #   .\setup.ps1                    # Interactive menu
+#   .\setup.ps1 -Full              # Complete setup
+#   .\setup.ps1 -CondaSetup        # Create conda environment
 #   .\setup.ps1 -Build             # Build only
 #   .\setup.ps1 -Data              # Generate data only
-#   .\setup.ps1 -Full              # Complete setup
+#   .\setup.ps1 -Indexes           # Build indexes only
 #   .\setup.ps1 -Server            # Run server only
 #   .\setup.ps1 -Clean             # Remove generated files
+#   .\setup.ps1 -Help              # Show help
 ################################################################################
 
 [CmdletBinding()]
 param(
     [switch]$Full,
+    [switch]$CondaSetup,
     [switch]$Build,
     [switch]$Data,
     [switch]$Indexes,
@@ -81,6 +85,9 @@ function Show-Menu {
     Write-Host "  " -NoNewline
     Write-Host ".\setup.ps1 -Full" -ForegroundColor Green -NoNewline
     Write-Host "        Complete setup (build + data + indexes + server)"
+    Write-Host "  " -NoNewline
+    Write-Host ".\setup.ps1 -CondaSetup" -ForegroundColor Green -NoNewline
+    Write-Host "   Create conda environment"
     Write-Host "  " -NoNewline
     Write-Host ".\setup.ps1 -Build" -ForegroundColor Green -NoNewline
     Write-Host "       Build C++ algorithms only"
@@ -202,6 +209,57 @@ function Test-Requirements {
         }
     }
     Write-Success "Data directories created"
+}
+
+function Create-CondaEnvironment {
+    Write-Header "Creating Conda Environment"
+
+    # Check if conda is installed
+    if (!(Get-Command conda -ErrorAction SilentlyContinue)) {
+        Write-Error2 "conda not found!"
+        Write-Host ""
+        Write-Host "Please install Miniconda or Anaconda:" -ForegroundColor Yellow
+        Write-Host "  Miniconda (Recommended): https://docs.conda.io/projects/miniconda/en/latest/"
+        Write-Host "  Anaconda: https://www.anaconda.com/download"
+        return $false
+    }
+    Write-Success "conda found: $(conda --version)"
+
+    # Check if environment.yml exists
+    $envFile = Join-Path $ProjectRoot "environment.yml"
+    if (!(Test-Path $envFile)) {
+        Write-Error2 "environment.yml not found in $ProjectRoot"
+        return $false
+    }
+
+    # Create the conda environment
+    Write-Info "Creating conda environment from environment.yml..."
+    Write-Info "This may take several minutes..."
+    Write-Host ""
+    
+    $condaEnvPath = Join-Path $ProjectRoot ".conda"
+    
+    try {
+        & conda env create --prefix $condaEnvPath --file $envFile --force-reinstall 2>&1 | Out-Host
+        
+        if ($LASTEXITCODE -eq 0) {
+            Write-Success "Conda environment created successfully"
+            Write-Info "Location: $condaEnvPath"
+            Write-Host ""
+            Write-Info "To activate the environment, run:"
+            Write-Host "  conda activate $condaEnvPath" -ForegroundColor Green
+            Write-Host ""
+            return $true
+        }
+        else {
+            Write-Error2 "Failed to create conda environment"
+            return $false
+        }
+    }
+    catch {
+        Write-Error2 "Error creating conda environment: $_"
+        return $false
+    }
 }
 
 function Build-DHL {
@@ -536,6 +594,9 @@ function Show-Help {
     Write-Host ".\setup.ps1 -Full" -ForegroundColor Green -NoNewline
     Write-Host "              # Complete workflow with optimized matching"
     Write-Host "  " -NoNewline
+    Write-Host ".\setup.ps1 -CondaSetup" -ForegroundColor Green -NoNewline
+    Write-Host "          # Setup conda environment"
+    Write-Host "  " -NoNewline
     Write-Host ".\setup.ps1 -Full -Mode flow" -ForegroundColor Green -NoNewline
     Write-Host "   # Build & run with flow data only"
     Write-Host "  " -NoNewline
@@ -563,6 +624,9 @@ if ($Help) {
 }
 elseif ($Full) {
     Invoke-FullSetup
+}
+elseif ($CondaSetup) {
+    Create-CondaEnvironment | Out-Null
 }
 elseif ($Build) {
     Test-Requirements

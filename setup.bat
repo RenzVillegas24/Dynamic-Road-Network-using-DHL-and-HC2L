@@ -10,16 +10,19 @@ REM # 4. Build indexes
 REM # 5. Run the Flask web server with real-time traffic updates
 REM #
 REM # Usage:
-REM #   setup.bat                    # Interactive menu
-REM #   setup.bat --build            # Build only
-REM #   setup.bat --data             # Generate data only
-REM #   setup.bat --full             # Complete setup
-REM #   setup.bat --server           # Run server only
-REM #   setup.bat --clean            # Remove generated files
+REM #   setup.bat                      # Interactive menu
+REM #   setup.bat -full                # Complete setup
+REM #   setup.bat -conda-setup         # Create conda environment
+REM #   setup.bat -build               # Build only
+REM #   setup.bat -data                # Generate data only
+REM #   setup.bat -indexes             # Build indexes only
+REM #   setup.bat -server              # Run server only
+REM #   setup.bat -clean               # Remove generated files
+REM #   setup.bat -help                # Show help
 REM ################################################################################
 
 setlocal enabledelayedexpansion
-
+    
 REM Script metadata
 set "SCRIPT_DIR=%~dp0"
 set "PROJECT_ROOT=%SCRIPT_DIR%"
@@ -37,6 +40,7 @@ REM Parse command line arguments
 :parse_args
 if "%~1"=="" goto execute
 if /i "%~1"=="--full" set "ACTION=full" & shift & goto parse_args
+if /i "%~1"=="--conda-setup" set "ACTION=conda-setup" & shift & goto parse_args
 if /i "%~1"=="--build" set "ACTION=build" & shift & goto parse_args
 if /i "%~1"=="--data" set "ACTION=data" & shift & goto parse_args
 if /i "%~1"=="--indexes" set "ACTION=indexes" & shift & goto parse_args
@@ -55,6 +59,7 @@ exit /b 1
 :execute
 if "%ACTION%"=="help" call :show_help & exit /b 0
 if "%ACTION%"=="full" call :run_full_setup & exit /b %errorlevel%
+if "%ACTION%"=="conda-setup" call :create_conda_env & exit /b %errorlevel%
 if "%ACTION%"=="build" call :build_only & exit /b %errorlevel%
 if "%ACTION%"=="data" call :data_only & exit /b %errorlevel%
 if "%ACTION%"=="indexes" call :indexes_only & exit /b %errorlevel%
@@ -100,6 +105,7 @@ echo ╚════════════════════════
 echo.
 echo Available commands:
 echo   setup.bat --full        Complete setup (build + data + indexes + server)
+echo   setup.bat --conda-setup Create conda environment from environment.yml
 echo   setup.bat --build       Build C++ algorithms only
 echo   setup.bat --data        Generate traffic data and base network
 echo   setup.bat --indexes     Build routing indexes
@@ -115,6 +121,7 @@ echo   --synthetic   Use synthetic data (no HERE API)
 echo.
 echo Examples:
 echo   setup.bat --full              # Complete workflow
+echo   setup.bat --conda-setup       # Setup conda environment
 echo   setup.bat --full --flow       # Build with flow data only
 echo   setup.bat --build             # Compile C++ only
 echo   setup.bat --data --synthetic  # Generate synthetic data
@@ -122,6 +129,51 @@ echo.
 echo Note: For better experience on Windows, consider using setup.ps1 (PowerShell)
 echo.
 exit /b 0
+
+:create_conda_env
+call :print_header "Creating Conda Environment"
+
+REM Check if conda is installed
+where conda >nul 2>&1
+if %errorlevel% neq 0 (
+    call :print_error "conda not found!"
+    echo.
+    echo Please install Miniconda or Anaconda:
+    echo   Miniconda (Recommended): https://docs.conda.io/projects/miniconda/en/latest/
+    echo   Anaconda: https://www.anaconda.com/download
+    echo.
+    exit /b 1
+)
+
+for /f "tokens=*" %%i in ('conda --version 2^>^&1') do set "CONDA_VERSION=%%i"
+call :print_success "!CONDA_VERSION! found"
+
+REM Check if environment.yml exists
+if not exist "%PROJECT_ROOT%environment.yml" (
+    call :print_error "environment.yml not found in %PROJECT_ROOT%"
+    exit /b 1
+)
+
+REM Create the conda environment
+call :print_info "Creating conda environment from environment.yml..."
+call :print_info "This may take several minutes..."
+echo.
+
+set "CONDA_PATH=%PROJECT_ROOT%.conda"
+call conda env create --prefix "%CONDA_PATH%" --file "%PROJECT_ROOT%environment.yml" --force-reinstall
+
+if %errorlevel% equ 0 (
+    call :print_success "Conda environment created successfully"
+    call :print_info "Location: !CONDA_PATH!"
+    echo.
+    call :print_info "To activate the environment, run:"
+    echo   conda activate !CONDA_PATH!
+    echo.
+    exit /b 0
+) else (
+    call :print_error "Failed to create conda environment"
+    exit /b 1
+)
 
 :check_requirements
 call :print_header "Step 1/5: Checking Requirements"
