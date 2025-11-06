@@ -1990,40 +1990,142 @@
           await handleOSMDestLocationPin(lat, lng);
 
         } else if (pinningMode === 'report') {
-          if (reportMarker) map.removeLayer(reportMarker);
-
-          const violetIcon = L.icon({
-            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-violet.png',
-            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-            iconSize: [25, 41],
-            iconAnchor: [12, 41],
-            popupAnchor: [1, -34],
-            shadowSize: [41, 41]
-          });
-
-          reportMarker = L.marker([lat, lng], {
-            icon: violetIcon,
-            title: "Report Location"
-          }).addTo(map);
-
-          reportLocation = { lat, lng };
-
-          fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
-            .then(response => response.json())
-            .then(data => {
-              if (data.display_name) {
-                document.getElementById('pin-disruption-text').textContent = data.display_name;
-              } else {
-                document.getElementById('pin-disruption-text').textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-              }
-            })
-            .catch(() => {
-              document.getElementById('pin-disruption-text').textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+          // Use OSM road snapping for incident reporting
+          try {
+            showUpdateToast("Snapping to nearest road...", 'info');
+            
+            // Find nearest road using OSM snapping
+            const snapResponse = await fetch('/find_nearest_osm_road', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ lat, lng, max_distance: 100 })
             });
-
-          document.getElementById('disruption-coords').textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-          document.getElementById('disruption-coords').classList.remove('hidden');
-          showUpdateToast("Disruption location pinned", 'success');
+            
+            const snapData = await snapResponse.json();
+            
+            if (!snapData.success) {
+              showUpdateToast('No road found within 100m. Click closer to a road.', 'warning');
+              return;
+            }
+            
+            // Clear previous markers
+            if (reportMarker) map.removeLayer(reportMarker);
+            if (window.reportSnapMarker) {
+              map.removeLayer(window.reportSnapMarker);
+              window.reportSnapMarker = null;
+            }
+            if (window.reportConnectorLine) {
+              map.removeLayer(window.reportConnectorLine);
+              window.reportConnectorLine = null;
+            }
+            
+            // Create semi-transparent marker at clicked location
+            const violetIcon = L.icon({
+              iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-violet.png',
+              shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+              iconSize: [25, 41],
+              iconAnchor: [12, 41],
+              popupAnchor: [1, -34],
+              shadowSize: [41, 41],
+              className: 'report-location-marker'
+            });
+            
+            reportMarker = L.marker([lat, lng], {
+              icon: violetIcon,
+              title: "Report Location (Click Point)",
+              opacity: 0.6
+            }).addTo(map);
+            
+            // Create solid snap marker at road
+            const snapIcon = L.divIcon({
+              className: 'snap-marker',
+              html: '<div style="background: #8B5CF6; border: 3px solid white; border-radius: 50%; width: 16px; height: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.4);"></div>',
+              iconSize: [16, 16],
+              iconAnchor: [8, 8]
+            });
+            
+            window.reportSnapMarker = L.marker(
+              [snapData.snapped_point.lat, snapData.snapped_point.lng],
+              {
+                icon: snapIcon,
+                title: `Snapped to: ${snapData.road_name}`
+              }
+            ).addTo(map);
+            
+            // Draw connector line if distance > 5m
+            const distance = snapData.distance_m;
+            if (distance > 5) {
+              window.reportConnectorLine = L.polyline([
+                [lat, lng],
+                [snapData.snapped_point.lat, snapData.snapped_point.lng]
+              ], {
+                color: '#8B5CF6',
+                weight: 2,
+                dashArray: '5, 10',
+                opacity: 0.7
+              }).addTo(map);
+              
+              window.reportConnectorLine.bindPopup(
+                `Incident will be placed on road<br>` +
+                `Road: ${snapData.road_name}<br>` +
+                `Distance: ${distance.toFixed(0)}m`
+              );
+            }
+            
+            // Store both original and snapped locations
+            reportLocation = {
+              lat: snapData.snapped_point.lat,
+              lng: snapData.snapped_point.lng,
+              original_lat: lat,
+              original_lng: lng,
+              snap_distance: distance,
+              road_name: snapData.road_name,
+              osm_nodes: snapData.osm_nodes,
+              routing_nodes: snapData.routing_nodes
+            };
+            
+            // Update UI with road name
+            const roadName = snapData.road_name || 'Unknown Road';
+            document.getElementById('pin-disruption-text').textContent = 
+              distance > 5 ? `${roadName} (${distance.toFixed(0)}m from click)` : roadName;
+            
+            document.getElementById('disruption-coords').textContent = 
+              `${snapData.snapped_point.lat.toFixed(6)}, ${snapData.snapped_point.lng.toFixed(6)} (on road)`;
+            document.getElementById('disruption-coords').classList.remove('hidden');
+            
+            const message = distance > 5
+              ? `Location snapped to ${roadName} (${distance.toFixed(0)}m away)`
+              : `Location pinned on ${roadName}`;
+            showUpdateToast(message, 'success');
+            
+          } catch (error) {
+            console.error('Error snapping to road:', error);
+            showUpdateToast('Error snapping to road. Using clicked location.', 'warning');
+            
+            // Fallback to simple marker without snapping
+            if (reportMarker) map.removeLayer(reportMarker);
+            
+            const violetIcon = L.icon({
+              iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-violet.png',
+              shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+              iconSize: [25, 41],
+              iconAnchor: [12, 41],
+              popupAnchor: [1, -34],
+              shadowSize: [41, 41]
+            });
+            
+            reportMarker = L.marker([lat, lng], {
+              icon: violetIcon,
+              title: "Report Location"
+            }).addTo(map);
+            
+            reportLocation = { lat, lng };
+            
+            document.getElementById('pin-disruption-text').textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+            document.getElementById('disruption-coords').textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+            document.getElementById('disruption-coords').classList.remove('hidden');
+          }
+          
           pinningMode = null;
           map.getContainer().style.cursor = 'default';
         }
@@ -2959,19 +3061,40 @@
       const routeOnlyContainer = document.getElementById('route-only-container');
 
       if (showActiveIncidents) {
-        showActiveIncidents.addEventListener('change', (e) => {
+        showActiveIncidents.addEventListener('change', async (e) => {
           if (e.target.checked) {
             // Load and display active incidents
-            if (typeof loadActiveIncidents === 'function') {
-              loadActiveIncidents();
+            showUpdateToast('Loading active incidents...', 'info');
+            try {
+              const response = await fetch('/get_active_disruptions');
+              const data = await response.json();
+              
+              if (data.success) {
+                // Display incidents as markers on the map
+                if (typeof showAllDisruptionsOnMap === 'function') {
+                  showAllDisruptionsOnMap(data);
+                  showUpdateToast(`Showing ${data.total_disruptions} active incidents`, 'success');
+                } else {
+                  console.error('showAllDisruptionsOnMap function not found');
+                  showUpdateToast('Error: Display function not available', 'warning');
+                }
+              } else {
+                throw new Error(data.error || 'Failed to load incidents');
+              }
+            } catch (error) {
+              console.error('Error loading incidents:', error);
+              showUpdateToast(`Error loading incidents: ${error.message}`, 'warning');
+              // Uncheck the toggle
+              e.target.checked = false;
             }
-            showUpdateToast('Active Incidents displayed', 'info');
           } else {
             // Hide active incidents
-            if (typeof clearActiveIncidents === 'function') {
-              clearActiveIncidents();
+            if (typeof clearDisruptionMarkers === 'function') {
+              clearDisruptionMarkers();
+              showUpdateToast('Active incidents hidden', 'info');
+            } else {
+              console.error('clearDisruptionMarkers function not found');
             }
-            showUpdateToast('Active Incidents hidden', 'info');
           }
         });
       }

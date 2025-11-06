@@ -499,13 +499,79 @@ function initializeEventHandlers() {
         if (data.success) {
             showUpdateToast(data.message || 'Disruption reported successfully!', 'success');
             
-            // Reset form and remove marker
+            // Add incident marker to the map immediately
+            if (map && typeof L !== 'undefined') {
+              const severityColorMap = {
+                'heavy': '#ef4444',
+                'medium': '#f59e0b',
+                'light': '#10b981'
+              };
+              const markerColor = severityColorMap[severity] || '#f59e0b';
+              
+              const incidentIcon = L.divIcon({
+                html: `<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="16" cy="16" r="14" fill="${markerColor}" stroke="white" stroke-width="2"/>
+                        <text x="16" y="21" text-anchor="middle" fill="white" font-size="14" font-weight="bold">!</text>
+                      </svg>`,
+                className: 'reported-incident-marker',
+                iconSize: [32, 32],
+                iconAnchor: [16, 32]
+              });
+              
+              const incidentMarker = L.marker([reportLocation.lat, reportLocation.lng], {
+                icon: incidentIcon,
+                title: `${incidentType} (${severity}) - Just reported`
+              }).addTo(map);
+              
+              // Add popup with info
+              const popupContent = `
+                <div class="p-2">
+                  <h3 class="font-bold text-sm">${data.road_name || 'Reported Location'}</h3>
+                  <p class="text-xs text-gray-600">${incidentType}</p>
+                  <p class="text-xs">Severity: <span class="font-semibold" style="color: ${markerColor}">${severity}</span></p>
+                  <p class="text-xs">Speed: ${customSpeed} km/h</p>
+                  ${isClosed ? '<p class="text-xs text-red-600 font-bold">⚠️ ROAD BLOCKED</p>' : ''}
+                  <p class="text-xs text-green-600 mt-1">✅ Just reported</p>
+                </div>
+              `;
+              
+              incidentMarker.bindPopup(popupContent);
+              incidentMarker.openPopup(); // Show popup immediately
+              
+              // Store in disruptionMarkers array
+              if (typeof disruptionMarkers !== 'undefined') {
+                disruptionMarkers.push(incidentMarker);
+              } else {
+                // Create array if it doesn't exist
+                window.disruptionMarkers = window.disruptionMarkers || [];
+                window.disruptionMarkers.push(incidentMarker);
+              }
+              
+              console.log('✅ Incident marker added to map');
+              
+              // Ensure the "Show Active Incidents" toggle is checked
+              const showIncidentsToggle = document.getElementById('show-active-incidents');
+              if (showIncidentsToggle && !showIncidentsToggle.checked) {
+                showIncidentsToggle.checked = true;
+                console.log('✅ Auto-enabled "Show Active Incidents" toggle');
+              }
+            }
+            
+            // Reset form and remove report markers (but keep the incident marker)
             document.getElementById('report-form').reset();
             if (reportMarker) {
                 map.removeLayer(reportMarker);
                 reportMarker = null;
-                reportLocation = null;
             }
+            if (window.reportSnapMarker) {
+                map.removeLayer(window.reportSnapMarker);
+                window.reportSnapMarker = null;
+            }
+            if (window.reportConnectorLine) {
+                map.removeLayer(window.reportConnectorLine);
+                window.reportConnectorLine = null;
+            }
+            reportLocation = null;
             
             // Close report panel
             const reportPanel = document.getElementById('report-panel');
