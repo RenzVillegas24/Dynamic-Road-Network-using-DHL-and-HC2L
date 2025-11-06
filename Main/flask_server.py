@@ -1341,6 +1341,7 @@ def get_traffic_with_geometry():
     """
     Get traffic data with full OSM road geometries
     Returns matched traffic edges with their LineString geometries from quezon_city_edges.csv
+    Loads from the latest disruption CSV files instead of fetching from API
     """
     try:
         print("\n🗺️  Fetching traffic data with OSM geometries...")
@@ -1353,46 +1354,66 @@ def get_traffic_with_geometry():
         edge_lookup = {}
         for _, edge in edges_df.iterrows():
             key = (int(edge['source']), int(edge['target']))
+            # Parse geometry - it's stored as a string representation of a list
+            geometry_str = edge['geometry']
+            if isinstance(geometry_str, str):
+                try:
+                    # Use eval to parse the string into a list
+                    geometry = eval(geometry_str)
+                except:
+                    # Fallback: create simple line from source to target
+                    geometry = [[edge['source_lat'], edge['source_lon']], 
+                               [edge['target_lat'], edge['target_lon']]]
+            else:
+                geometry = geometry_str
+                
             edge_lookup[key] = {
-                'geometry': eval(edge['geometry']) if isinstance(edge['geometry'], str) else edge['geometry'],
+                'geometry': geometry,
                 'road_name': edge.get('road_name', 'Unknown Road'),
                 'highway_type': edge.get('highway_type', 'unknown'),
                 'length': float(edge.get('length', 0)),
                 'freeFlow_kph': float(edge.get('freeFlow_kph', 50.0)) if pd.notna(edge.get('freeFlow_kph')) else 50.0
             }
         
-        # Fetch current traffic disruptions
-        matcher = traffic_service.matcher
+        print(f"   📍 Created lookup for {len(edge_lookup)} edges with geometries")
         
-        # Fetch flow and incident data
-        flow_data = traffic_service.fetch_flow_data()
-        incidents_data = traffic_service.fetch_incidents_data()
+        # Find latest disruption files
+        import glob
+        import os
         
-        print(f"   🌐 Fetched {len(flow_data)} flow segments, {len(incidents_data)} incidents")
+        disruptions_dir = Config.DISRUPTIONS_DIR
+        flow_files = glob.glob(str(disruptions_dir / 'traffic_*_flow.csv'))
+        incident_files = glob.glob(str(disruptions_dir / 'traffic_*_incidents.csv'))
+        both_files = glob.glob(str(disruptions_dir / 'traffic_*_both.csv'))
         
+        # Get the most recent file from each category
+        latest_flow_file = max(flow_files, key=os.path.getmtime) if flow_files else None
+        latest_incident_file = max(incident_files, key=os.path.getmtime) if incident_files else None
+        latest_both_file = max(both_files, key=os.path.getmtime) if both_files else None
+        
+        # Determine which file to use (prefer 'both', then combine flow+incidents)
         traffic_segments = []
-        matched_count = 0
-        unmatched_count = 0
         
-        # Process flow data
-        for flow in flow_data:
-            try:
-                # Match to OSM edges
-                matched_edges = matcher.match_traffic_flow_item(flow)
+        if latest_both_file:
+            print(f"   📊 Loading traffic data from: {os.path.basename(latest_both_file)}")
+            traffic_df = pd.read_csv(latest_both_file)
+            
+            print(f"   📋 Columns in disruption file: {list(traffic_df.columns)}")
+            
+            # Process each row
+            for idx, row in traffic_df.iterrows():
+                edge_key = (int(row['source']), int(row['target']))
+                edge_data = edge_lookup.get(edge_key)
                 
-                if not matched_edges:
-                    unmatched_count += 1
+                if not edge_data:
                     continue
                 
-                matched_count += 1
+                # Debug first few segments
+                if idx < 3:
+                    print(f"   🔍 Sample segment {idx}: source={row['source']}, target={row['target']}, road={row.get('road_name', 'N/A')}, geometry_points={len(edge_data['geometry'])}")
                 
-                # Get traffic metrics
-                current_flow = flow.get('currentFlow', {})
-                jam_factor = float(current_flow.get('jamFactor', 0.0))
-                speed_kph = float(current_flow.get('speed', 0.0)) * 3.6  # m/s to km/h
-                confidence = float(current_flow.get('confidence', 0.0))
-                
-                # Map jam factor to severity
+                # Determine severity based on jam factor
+                jam_factor = float(row.get('jamFactor', 0.0))
                 if jam_factor >= 8.0:
                     severity = 'Heavy'
                 elif jam_factor >= 5.0:
@@ -1400,113 +1421,106 @@ def get_traffic_with_geometry():
                 else:
                     severity = 'Light'
                 
-                # Create segments with geometry for each matched edge
-                for edge in matched_edges:
-                    edge_key = (edge.source, edge.target)
+                # Determine incident type (default to Congestion for flow data)
+                incident_type = row.get('incident_type', 'Congestion')
+                
+                traffic_segments.append({
+                    'type': 'flow',  # Most disruption data is flow-based
+                    'incident_type': incident_type,
+                    'severity': severity,
+                    'geometry': edge_data['geometry'],
+                    'road_name': row.get('road_name', edge_data['road_name']),
+                    'highway_type': row.get('highway_type', edge_data['highway_type']),
+                    'length': edge_data['length'],
+                    'speed_kph': float(row['speed_kph']),
+                    'free_flow_kph': float(row['freeFlow_kph']),
+                    'jam_factor': jam_factor,
+                    'is_closed': bool(row.get('isClosed', False)),
+                    'source': int(row['source']),
+                    'target': int(row['target'])
+                })
+        else:
+            # Load from separate flow and incident files
+            if latest_flow_file:
+                print(f"   📊 Loading flow data from: {os.path.basename(latest_flow_file)}")
+                flow_df = pd.read_csv(latest_flow_file)
+                
+                for _, row in flow_df.iterrows():
+                    edge_key = (int(row['source']), int(row['target']))
                     edge_data = edge_lookup.get(edge_key)
                     
                     if not edge_data:
                         continue
+                    
+                    jam_factor = float(row.get('jamFactor', 0.0))
+                    if jam_factor >= 8.0:
+                        severity = 'Heavy'
+                    elif jam_factor >= 5.0:
+                        severity = 'Medium'
+                    else:
+                        severity = 'Light'
                     
                     traffic_segments.append({
                         'type': 'flow',
                         'incident_type': 'Congestion',
                         'severity': severity,
                         'geometry': edge_data['geometry'],
-                        'road_name': edge_data['road_name'],
-                        'highway_type': edge_data['highway_type'],
+                        'road_name': row.get('road_name', edge_data['road_name']),
+                        'highway_type': row.get('highway_type', edge_data['highway_type']),
                         'length': edge_data['length'],
-                        'speed_kph': edge.speed_kph,
-                        'free_flow_kph': edge.freeFlow_kph,
-                        'jam_factor': edge.jamFactor,
-                        'is_closed': edge.isClosed,
-                        'confidence': confidence,
-                        'source': edge.source,
-                        'target': edge.target
+                        'speed_kph': float(row['speed_kph']),
+                        'free_flow_kph': float(row['freeFlow_kph']),
+                        'jam_factor': jam_factor,
+                        'is_closed': bool(row.get('isClosed', False)),
+                        'source': int(row['source']),
+                        'target': int(row['target'])
                     })
-                    
-            except Exception as e:
-                print(f"   ⚠️  Error processing flow: {e}")
-                continue
-        
-        # Process incidents
-        for incident in incidents_data:
-            try:
-                # Match to OSM edges
-                matched_edges = matcher.match_traffic_incident_item(incident)
+            
+            if latest_incident_file:
+                print(f"   📊 Loading incident data from: {os.path.basename(latest_incident_file)}")
+                incident_df = pd.read_csv(latest_incident_file)
                 
-                if not matched_edges:
-                    unmatched_count += 1
-                    continue
-                
-                matched_count += 1
-                
-                # Extract incident details
-                incident_details = incident.get('incidentDetails', {})
-                incident_type = incident_details.get('type', 'other')
-                criticality = incident_details.get('criticality', 'low')
-                road_closed = incident_details.get('roadClosed', False)
-                
-                # Map incident type
-                type_map = {
-                    'accident': 'Accident',
-                    'construction': 'Construction',
-                    'roadClosure': 'Road Closure',
-                    'roadHazard': 'Road Hazard',
-                    'disabledVehicle': 'Disabled Vehicle',
-                    'weather': 'Weather',
-                    'other': 'Other'
-                }
-                display_type = type_map.get(incident_type, 'Other')
-                
-                # Map criticality to severity
-                criticality_map = {
-                    'low': 'Light',
-                    'minor': 'Light',
-                    'major': 'Medium',
-                    'critical': 'Heavy'
-                }
-                severity = criticality_map.get(criticality, 'Light')
-                
-                # Create segments with geometry for each matched edge
-                for edge in matched_edges:
-                    edge_key = (edge.source, edge.target)
+                for _, row in incident_df.iterrows():
+                    edge_key = (int(row['source']), int(row['target']))
                     edge_data = edge_lookup.get(edge_key)
                     
                     if not edge_data:
                         continue
                     
+                    jam_factor = float(row.get('jamFactor', 0.0))
+                    if jam_factor >= 8.0:
+                        severity = 'Heavy'
+                    elif jam_factor >= 5.0:
+                        severity = 'Medium'
+                    else:
+                        severity = 'Light'
+                    
                     traffic_segments.append({
                         'type': 'incident',
-                        'incident_type': display_type,
+                        'incident_type': row.get('incident_type', 'Other'),
                         'severity': severity,
                         'geometry': edge_data['geometry'],
-                        'road_name': edge_data['road_name'],
-                        'highway_type': edge_data['highway_type'],
+                        'road_name': row.get('road_name', edge_data['road_name']),
+                        'highway_type': row.get('highway_type', edge_data['highway_type']),
                         'length': edge_data['length'],
-                        'speed_kph': edge.speed_kph,
-                        'free_flow_kph': edge.freeFlow_kph,
-                        'jam_factor': edge.jamFactor,
-                        'is_closed': edge.isClosed,
-                        'criticality': criticality,
-                        'description': incident_details.get('description', {}).get('value', 'Incident'),
-                        'source': edge.source,
-                        'target': edge.target
+                        'speed_kph': float(row['speed_kph']),
+                        'free_flow_kph': float(row['freeFlow_kph']),
+                        'jam_factor': jam_factor,
+                        'is_closed': bool(row.get('isClosed', False)),
+                        'description': row.get('description', 'Incident'),
+                        'source': int(row['source']),
+                        'target': int(row['target'])
                     })
-                    
-            except Exception as e:
-                print(f"   ⚠️  Error processing incident: {e}")
-                continue
+        
+        if not traffic_segments:
+            print("   ⚠️  No disruption files found or no traffic data available")
         
         print(f"   ✅ Generated {len(traffic_segments)} traffic segments with geometry")
-        print(f"   📊 Matched: {matched_count}, Unmatched: {unmatched_count}")
         
         return jsonify({
             'success': True,
             'segments': traffic_segments,
             'total_segments': len(traffic_segments),
-            'matched_count': matched_count,
-            'unmatched_count': unmatched_count,
             'timestamp': time.time()
         })
         

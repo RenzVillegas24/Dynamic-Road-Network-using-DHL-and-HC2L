@@ -881,24 +881,6 @@
               <span class="text-sm font-medium text-indigo-900">For Current Route Only</span>
               <input type="checkbox" id="traffic-route-only" class="toggle-checkbox" />
             </label>
-            
-            <!-- Show Matched/Non-matched Toggle (nested under route-only) -->
-            <div class="ml-4 mt-2">
-              <label class="flex items-center justify-between py-2 px-3 hover:bg-teal-100 rounded-lg cursor-pointer">
-                <span class="text-sm font-medium text-teal-900">Show Matched Edges</span>
-                <input type="checkbox" id="traffic-show-matched" class="toggle-checkbox" checked />
-              </label>
-            </div>
-          </div>
-          
-          <!-- Traffic Data Mode (conditional) -->
-          <div id="traffic-mode-container" class="hidden mt-3 pt-3 border-t border-purple-200">
-            <label class="block text-sm font-medium text-purple-900 mb-2">Traffic Data Mode</label>
-            <select id="traffic-data-mode" class="w-full px-3 py-2 bg-white border-2 border-purple-300 rounded-lg text-sm font-medium text-purple-900 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all">
-              <option value="both">Both (Incidents + Flow)</option>
-              <option value="incidents">Incidents Only</option>
-              <option value="flow">Flow Only</option>
-            </select>
           </div>
         </div>
 
@@ -2521,10 +2503,7 @@
       const showActiveIncidents = document.getElementById('show-active-incidents');
       const showTrafficOverlay = document.getElementById('show-traffic-overlay');
       const trafficRouteOnly = document.getElementById('traffic-route-only');
-      const trafficShowMatched = document.getElementById('traffic-show-matched');
-      const trafficDataMode = document.getElementById('traffic-data-mode');
       const routeOnlyContainer = document.getElementById('route-only-container');
-      const trafficModeContainer = document.getElementById('traffic-mode-container');
 
       if (showActiveIncidents) {
         showActiveIncidents.addEventListener('change', (e) => {
@@ -2550,20 +2529,15 @@
           if (routeOnlyContainer) {
             routeOnlyContainer.classList.toggle('hidden', !e.target.checked);
           }
-          if (trafficModeContainer) {
-            trafficModeContainer.classList.toggle('hidden', !e.target.checked);
-          }
 
           if (e.target.checked) {
-            // Apply traffic overlay with current mode
-            const mode = trafficDataMode ? trafficDataMode.value : 'both';
+            // Apply traffic overlay (always show all traffic flow)
             const routeOnly = trafficRouteOnly ? trafficRouteOnly.checked : false;
-            const showMatched = trafficShowMatched ? trafficShowMatched.checked : true;
             
             if (typeof applyTrafficOverlay === 'function') {
-              applyTrafficOverlay(mode, routeOnly, showMatched);
+              applyTrafficOverlay('both', routeOnly);
             }
-            showUpdateToast(`Traffic Overlay enabled (${mode} mode)`, 'info');
+            showUpdateToast('Traffic Overlay enabled', 'info');
           } else {
             // Clear traffic overlay
             if (typeof clearTrafficOverlay === 'function') {
@@ -2576,11 +2550,8 @@
 
       if (trafficRouteOnly) {
         trafficRouteOnly.addEventListener('change', (e) => {
-          const mode = trafficDataMode ? trafficDataMode.value : 'both';
-          const showMatched = trafficShowMatched ? trafficShowMatched.checked : true;
-          
           if (typeof applyTrafficOverlay === 'function') {
-            applyTrafficOverlay(mode, e.target.checked, showMatched);
+            applyTrafficOverlay('both', e.target.checked);
           }
           
           const msg = e.target.checked ? 
@@ -2590,57 +2561,6 @@
         });
       }
 
-      if (trafficShowMatched) {
-        trafficShowMatched.addEventListener('change', (e) => {
-          const mode = trafficDataMode ? trafficDataMode.value : 'both';
-          const routeOnly = trafficRouteOnly ? trafficRouteOnly.checked : false;
-          
-          if (typeof applyTrafficOverlay === 'function') {
-            applyTrafficOverlay(mode, routeOnly, e.target.checked);
-          }
-          
-          const msg = e.target.checked ? 
-            'Showing matched edges (mapped to OSM roads)' : 
-            'Showing raw HERE traffic data';
-          showUpdateToast(msg, 'info');
-        });
-      }
-
-      if (trafficDataMode) {
-        trafficDataMode.addEventListener('change', (e) => {
-          const mode = e.target.value;
-          const routeOnly = trafficRouteOnly ? trafficRouteOnly.checked : false;
-          const showMatched = trafficShowMatched ? trafficShowMatched.checked : true;
-          
-          // Update backend traffic mode
-          fetch('/set_traffic_mode', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({mode: mode})
-          })
-          .then(response => response.json())
-          .then(data => {
-            if (data.success) {
-              console.log('Traffic mode set to:', mode);
-              
-              // Refresh traffic overlay if enabled
-              if (showTrafficOverlay && showTrafficOverlay.checked) {
-                if (typeof applyTrafficOverlay === 'function') {
-                  applyTrafficOverlay(mode, routeOnly, showMatched);
-                }
-              }
-              
-              showUpdateToast(`Traffic mode: ${data.mode.toUpperCase()}`, 'success');
-            } else {
-              showUpdateToast('Failed to set traffic mode', 'error');
-            }
-          })
-          .catch(error => {
-            console.error('Error setting traffic mode:', error);
-            showUpdateToast('Error updating traffic mode', 'error');
-          });
-        });
-      }
 
       // Wire up Run Demo button
       const runDemoBtn = document.getElementById('run-demo-btn');

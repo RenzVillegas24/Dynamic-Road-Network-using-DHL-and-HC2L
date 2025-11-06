@@ -35,8 +35,46 @@ using namespace std;
 inline void setup_fast_io() {
     ios_base::sync_with_stdio(false);
     cout.tie(nullptr);
-    // Reserve buffer size for large JSON output
-    cout.rdbuf()->pubsetbuf(nullptr, 256 * 1024);  // 256KB buffer
+    // Reserve buffer size for large JSON output (increased from 256KB to 2MB)
+    cout.rdbuf()->pubsetbuf(nullptr, 2 * 1024 * 1024);  // 2MB buffer
+}
+
+// Sanitize numeric values for JSON output (convert NaN/Inf to 0)
+inline double sanitize_json_number(double value) {
+    if (std::isnan(value) || std::isinf(value)) {
+        return 0.0;
+    }
+    return value;
+}
+
+// Escape string for JSON output (escape quotes and backslashes)
+inline string escape_json_string(const string& input) {
+    string output;
+    output.reserve(input.size() + 10); // Reserve extra space for escapes
+    
+    for (char c : input) {
+        switch (c) {
+            case '"':  output += "\\\""; break;
+            case '\\': output += "\\\\"; break;
+            case '\b': output += "\\b"; break;
+            case '\f': output += "\\f"; break;
+            case '\n': output += "\\n"; break;
+            case '\r': output += "\\r"; break;
+            case '\t': output += "\\t"; break;
+            default:
+                if (c < 32) {
+                    // Control characters - output as \u00XX
+                    char buf[7];
+                    snprintf(buf, sizeof(buf), "\\u%04x", static_cast<unsigned char>(c));
+                    output += buf;
+                } else {
+                    output += c;
+                }
+                break;
+        }
+    }
+    
+    return output;
 }
 
 // Helper structure for edge with geometry
@@ -1677,20 +1715,20 @@ void output_json_response(bool success, const string& error_message = "",
                 const auto& flow = flow_data.at(edge_key);
                 cout << "        \"color\": \"" << flow.color_code << "\"," << endl;
                 cout << "        \"flow_status\": \"" << flow.flow_status << "\"," << endl;
-                cout << "        \"jam_factor\": " << fixed << setprecision(2) << flow.jam_factor << "," << endl;
-                cout << "        \"speed_kmh\": " << fixed << setprecision(1) << flow.current_speed << "," << endl;
-                cout << "        \"speed_reduction\": " << fixed << setprecision(3) << flow.speed_reduction << "," << endl;
+                cout << "        \"jam_factor\": " << fixed << setprecision(2) << sanitize_json_number(flow.jam_factor) << "," << endl;
+                cout << "        \"speed_kmh\": " << fixed << setprecision(1) << sanitize_json_number(flow.current_speed) << "," << endl;
+                cout << "        \"speed_reduction\": " << fixed << setprecision(3) << sanitize_json_number(flow.speed_reduction) << "," << endl;
             } else {
                 // Default values when no flow data available - DHL default color (violet/purple)
                 cout << "        \"color\": \"#8b5cf6\"," << endl;
                 cout << "        \"flow_status\": \"default\"," << endl;
                 cout << "        \"jam_factor\": 0.0," << endl;
-                cout << "        \"speed_kmh\": " << fixed << setprecision(1) << free_flow_speed << "," << endl;
+                cout << "        \"speed_kmh\": " << fixed << setprecision(1) << sanitize_json_number(free_flow_speed) << "," << endl;
                 cout << "        \"speed_reduction\": 0.0," << endl;
             }
             
             // 7. Add detailed edge metadata
-            cout << "        \"road_name\": \"" << edge_road_name << "\"," << endl;
+            cout << "        \"road_name\": \"" << escape_json_string(edge_road_name) << "\"," << endl;
             cout << "        \"distance_meters\": " << fixed << setprecision(1) << edge_distance << "," << endl;
             cout << "        \"highway_type\": \"" << edge_highway_type << "\"," << endl;
             cout << "        \"free_flow_speed_kmh\": " << fixed << setprecision(1) << free_flow_speed << "," << endl;
