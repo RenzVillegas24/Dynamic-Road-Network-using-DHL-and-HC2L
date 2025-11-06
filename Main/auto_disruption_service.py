@@ -1,7 +1,8 @@
 """
 Automatic Disruption Update Service for Active Routes
-Runs as a background thread to update disruptions every 60-120 seconds
-and triggers route recalculation when changes are detected
+Runs as a background thread to fetch traffic data from HERE API 
+every 60 seconds (1 minute) and triggers route recalculation when 
+changes are detected
 """
 
 import threading
@@ -20,16 +21,17 @@ logger = logging.getLogger(__name__)
 class AutoDisruptionService:
     """
     Background service that automatically updates disruptions
-    and triggers route recalculation for active routes
+    by fetching traffic data from HERE API and triggers route 
+    recalculation for active routes
     """
     
-    def __init__(self, app, update_interval: int = 90):
+    def __init__(self, app, update_interval: int = 60):
         """
         Initialize the auto-disruption service
         
         Args:
             app: Flask app instance
-            update_interval: Seconds between updates (default: 90)
+            update_interval: Seconds between updates (default: 60 - 1 minute)
         """
         self.app = app
         self.update_interval = update_interval
@@ -150,31 +152,53 @@ class AutoDisruptionService:
         except Exception as e:
             logger.error(f"Error triggering recalculation: {e}")
     
+    def _fetch_traffic_data(self):
+        """Fetch latest traffic data using the traffic service"""
+        try:
+            from realtime_traffic_service import RealtimeTrafficService
+            
+            # Initialize traffic service
+            traffic_service = RealtimeTrafficService()
+            
+            # Fetch and save traffic data
+            logger.info("🌐 Fetching latest traffic data from HERE API...")
+            metadata = traffic_service.fetch_and_save(mode='both')
+            
+            logger.info(f"✅ Traffic update complete: {metadata.get('total_edges', 0)} edges affected")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Error fetching traffic data: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+    
     def _run_loop(self):
-        """Main service loop - monitors file changes only (NO AUTO-FETCH)"""
-        logger.info("🔄 Auto-disruption service loop started (MONITORING ONLY)")
-        logger.info("   NOTE: Auto-fetch disabled - use manual refresh in UI")
+        """Main service loop - automatically fetches traffic data every update_interval"""
+        logger.info("🔄 Auto-disruption service loop started (AUTO-FETCH ENABLED)")
+        logger.info(f"   Fetching traffic data every {self.update_interval} seconds")
         
         while self.running:
             try:
-                # DISABLED: Auto-fetch traffic data
-                # Files are now manually refreshed via UI only
+                # Fetch latest traffic data from HERE API
+                fetch_success = self._fetch_traffic_data()
                 
-                # Check if there are active routes
-                if self.active_routes:
-                    # Check for disruption file changes
-                    current_hash = self._get_disruption_hash()
-                    
-                    if current_hash and current_hash != self.last_disruption_hash:
-                        if self.last_disruption_hash is not None:  # Skip first time
-                            logger.info(f"🚦 Traffic data changed!")
-                            
-                            # Trigger recalculation for all active routes
-                            for route_id, route_info in list(self.active_routes.items()):
-                                self._trigger_route_recalculation(route_id, route_info)
-                                route_info['last_update'] = datetime.now().isoformat()
+                if fetch_success:
+                    # Check if there are active routes
+                    if self.active_routes:
+                        # Get new disruption hash after fetch
+                        current_hash = self._get_disruption_hash()
                         
-                        self.last_disruption_hash = current_hash
+                        if current_hash and current_hash != self.last_disruption_hash:
+                            if self.last_disruption_hash is not None:  # Skip first time
+                                logger.info(f"🚦 Traffic data changed - triggering route updates")
+                                
+                                # Trigger recalculation for all active routes
+                                for route_id, route_info in list(self.active_routes.items()):
+                                    self._trigger_route_recalculation(route_id, route_info)
+                                    route_info['last_update'] = datetime.now().isoformat()
+                            
+                            self.last_disruption_hash = current_hash
                 
                 # Sleep for the configured interval
                 time.sleep(self.update_interval)
@@ -192,13 +216,13 @@ class AutoDisruptionService:
 auto_disruption_service: Optional[AutoDisruptionService] = None
 
 
-def init_auto_disruption_service(app, update_interval: int = 90):
+def init_auto_disruption_service(app, update_interval: int = 60):
     """
     Initialize and start the auto-disruption service
     
     Args:
         app: Flask app instance
-        update_interval: Seconds between checks (default: 90)
+        update_interval: Seconds between checks (default: 60 - 1 minute)
     """
     global auto_disruption_service
     

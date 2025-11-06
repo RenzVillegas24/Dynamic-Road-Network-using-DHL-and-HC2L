@@ -409,8 +409,9 @@ call :print_info "Cleaning up any existing processes..."
 taskkill /F /FI "IMAGENAME eq python.exe" /FI "WINDOWTITLE eq *flask_server.py*" 2>nul
 timeout /t 1 /nobreak >nul
 
-call :print_info "Starting Flask web server..."
+call :print_info "Starting Flask web server with auto-update enabled..."
 call :print_info "Server URL: http://localhost:5000"
+call :print_info "Auto-update: Traffic data refreshes every 60 seconds (1 minute)"
 call :print_info "Press Ctrl+C to stop"
 echo.
 

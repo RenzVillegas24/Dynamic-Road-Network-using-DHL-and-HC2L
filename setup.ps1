@@ -526,8 +526,9 @@ function Start-Server {
         Get-Process | Where-Object { $_.ProcessName -like "*python*" -and $_.CommandLine -like "*unified_data_generator.py*" } | Stop-Process -Force -ErrorAction SilentlyContinue
         Start-Sleep -Seconds 1
 
-        Write-Info "Starting Flask web server..."
+        Write-Info "Starting Flask web server with auto-update enabled..."
         Write-Info "Server URL: http://localhost:5000"
+        Write-Info "Auto-update: Traffic data refreshes every 60 seconds (1 minute)"
         Write-Info "Press Ctrl+C to stop"
         Write-Host ""
 

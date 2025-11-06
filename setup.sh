@@ -337,8 +337,9 @@ run_server() {
     pkill -f "unified_data_generator.py" 2>/dev/null || true
     sleep 1
 
-    print_info "Starting Flask web server..."
+    print_info "Starting Flask web server with auto-update enabled..."
     print_info "Server URL: http://localhost:5000"
+    print_info "Auto-update: Traffic data refreshes every 60 seconds (1 minute)"
     print_info "Press Ctrl+C to stop"
     echo ""
 

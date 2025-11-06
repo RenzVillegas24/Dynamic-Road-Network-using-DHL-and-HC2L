@@ -62,12 +62,11 @@ except Exception as e:
     print(f"❌ Error initializing HERE Traffic Service: {e}")
     traffic_service = None
 
-# DISABLED: Auto-disruption service (manual refresh only)
-# auto_service = init_auto_disruption_service(app, update_interval=90)
-auto_service = None
+# Auto-disruption service with 1-minute updates
+auto_service = init_auto_disruption_service(app, update_interval=60)
 
-# Shutdown service on exit (if enabled)
-# atexit.register(shutdown_auto_disruption_service)
+# Shutdown service on exit
+atexit.register(shutdown_auto_disruption_service)
 
 # ============================================================
 # GLOBAL CACHES - Prevent reloading data on every request
