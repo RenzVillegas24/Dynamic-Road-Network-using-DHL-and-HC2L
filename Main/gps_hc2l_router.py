@@ -402,6 +402,19 @@ class GPSRoutingService:
         
         metrics = route_data.get('metrics', {})
         
+        # ENHANCED: Extract labeling info from HC2L C++ nested object
+        labeling_info = metrics.get('labeling_info', {})
+        
+        # Extract labeling size and time from C++ labeling_info
+        labeling_size_mb = labeling_info.get('index_size_mb', 0.0)
+        labeling_time_ms = labeling_info.get('index_load_time_ms', 0.0)
+        
+        # Fallback to direct metrics if labeling_info not available
+        if labeling_size_mb == 0.0:
+            labeling_size_mb = metrics.get('labeling_size_mb', 0.0)
+        if labeling_time_ms == 0.0:
+            labeling_time_ms = metrics.get('labeling_time_ms', 0.0)
+        
         summary = {
             'algorithm': route_data.get('algorithm', 'D-HC2L Dynamic GPS'),
             'algorithm_base': route_data.get('algorithm_base', 'D-HC2L'),
@@ -419,9 +432,10 @@ class GPSRoutingService:
             'mode_explanation': metrics.get('mode_explanation', ''),
             'labels_status': metrics.get('labels_status', 'original'),
             
-            # NEW: Add labeling metrics
-            'labeling_size_mb': metrics.get('labeling_size_mb', 0.0),
-            'labeling_time_ms': metrics.get('labeling_time_seconds', 0.0)
+            # ENHANCED: Add labeling metrics from C++ labeling_info
+            'labeling_size_mb': labeling_size_mb,
+            'labeling_time_ms': labeling_time_ms,
+            'labeling_info': labeling_info  # Pass through complete labeling_info for debugging
         }
         
         # Add disruption comparison if available

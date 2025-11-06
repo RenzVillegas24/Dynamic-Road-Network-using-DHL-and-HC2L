@@ -1407,6 +1407,7 @@ void output_json_response(bool success, const string& error_message = "",
                          NodeID start_edge_source = 0, NodeID start_edge_target = 0, int start_edge_oneway = 0,
                          NodeID dest_edge_source = 0, NodeID dest_edge_target = 0, int dest_edge_oneway = 0,
                          distance_t distance = 0, double query_time_ms = 0, double index_load_time_ms = 0,
+                         double index_size_mb = 0.0, double index_size_bytes = 0.0,
                          const vector<NodeID>& path = vector<NodeID>(),
                          const map<NodeID, GPSCoordinate>& coordinates = map<NodeID, GPSCoordinate>(),
                          const map<pair<NodeID, NodeID>, EdgeGeometry>& edge_geometries = map<pair<NodeID, NodeID>, EdgeGeometry>(),
@@ -1474,6 +1475,8 @@ void output_json_response(bool success, const string& error_message = "",
         cout << "    \"total_distance_units\": " << distance << "," << endl;
         cout << "    \"query_time_ms\": " << fixed << setprecision(3) << query_time_ms << "," << endl;
         cout << "    \"labeling_time_ms\": " << fixed << setprecision(3) << index_load_time_ms << "," << endl;
+        cout << "    \"labeling_size_mb\": " << fixed << setprecision(2) << index_size_mb << "," << endl;
+        cout << "    \"labeling_size_bytes\": " << fixed << setprecision(0) << index_size_bytes << "," << endl;
         cout << "    \"path_length\": " << path.size() << "," << endl;
         cout << "    \"uses_disruptions\": " << (use_disruptions ? "true" : "false") << "," << endl;
         cout << "    \"tau_threshold\": " << fixed << setprecision(2) << tau_threshold << "," << endl;
@@ -1879,6 +1882,16 @@ int main(int argc, char* argv[]) {
         // Load DHL index and measure time
         auto index_load_start = chrono::high_resolution_clock::now();
         
+        // Get index file size for metrics
+        struct stat index_stat;
+        double index_size_bytes = 0.0;
+        double index_size_mb = 0.0;
+        if (stat(index_file.c_str(), &index_stat) == 0) {
+            index_size_bytes = static_cast<double>(index_stat.st_size);
+            index_size_mb = index_size_bytes / (1024.0 * 1024.0);
+            cerr << "📦 DHL Index file size: " << index_size_mb << " MB" << endl;
+        }
+        
         ifstream index_stream(index_file, ios::binary);
         if (!index_stream.is_open()) {
             output_json_response(false, "Failed to open index file");
@@ -2187,7 +2200,9 @@ int main(int argc, char* argv[]) {
                            dest_pin_lat, dest_pin_lng, dest_snap_lat, dest_snap_lng,
                            start_edge_source, start_edge_target, start_edge_oneway,
                            dest_edge_source, dest_edge_target, dest_edge_oneway,
-                           best_distance, query_time_ms, index_load_time_ms, path, coordinates,
+                           best_distance, query_time_ms, index_load_time_ms,
+                           index_size_mb, index_size_bytes,
+                           path, coordinates,
                            edge_geometries, use_disruptions, tau_threshold,
                            disruption_file, disruption_impact_score,
                            update_strategy, update_reason, nodes_updated, flow_data, incident_data);

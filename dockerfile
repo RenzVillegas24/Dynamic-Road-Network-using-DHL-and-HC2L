@@ -35,15 +35,15 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # Install Python and system dependencies
 RUN apt-get update && apt-get install -y \
-    python3.10 \
+    python3 \
     python3-pip \
     gdal-bin \
     libgdal-dev \
     libspatialindex-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Set Python 3.10 as default
-RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.10 1 \
+# Set Python 3 as default
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3 1 \
     && update-alternatives --install /usr/bin/pip pip /usr/bin/pip3 1
 
 # Set working directory
@@ -54,11 +54,27 @@ ENV GDAL_CONFIG=/usr/bin/gdal-config
 ENV GDAL_DATA=/usr/share/gdal
 
 # Copy requirements first for better caching
-COPY requirements-docker.txt requirements.txt ./
+COPY requirements.txt .
 
-# Install Python dependencies
+# Install Python dependencies with compatible versions for Python 3.10
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements-docker.txt
+    pip install --no-cache-dir \
+    Flask==3.1.2 \
+    Werkzeug==3.1.3 \
+    pandas==2.2.0 \
+    numpy==1.26.4 \
+    osmnx==2.0.6 \
+    geopandas==1.1.1 \
+    shapely==2.1.2 \
+    pyproj==3.6.1 \
+    pyogrio==0.11.1 \
+    rtree==1.3.0 \
+    requests==2.32.5 \
+    polyline==2.0.2 \
+    scipy==1.15.1 \
+    python-dotenv==1.1.1 \
+    matplotlib>=3.7.0 \
+    networkx==3.5
 
 # Copy built binaries from builder stage
 COPY --from=builder /build/DualHierarchyLabelling/index /app/Main/build/dhl/index

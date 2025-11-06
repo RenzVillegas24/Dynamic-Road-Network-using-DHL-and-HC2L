@@ -9,9 +9,19 @@ function updateAdminPerformanceMetrics(routeData) {
     if (algorithm.includes('Comparison')) {
         console.log('Comparison mode detected - setting Performance Metrics to "--"');
         
+        // Core metrics
         document.getElementById('perf-labeling-time').textContent = '--';
         document.getElementById('perf-labeling-size').textContent = '--';
         document.getElementById('perf-query-time').textContent = '--';
+        
+        // Route metrics
+        document.getElementById('perf-path-length').textContent = '--';
+        document.getElementById('perf-route-distance').textContent = '--';
+        document.getElementById('perf-eta').textContent = '--';
+        
+        // Hide advanced sections
+        document.getElementById('perf-advanced-section').classList.add('hidden');
+        document.getElementById('perf-lazy-section').classList.add('hidden');
         
         // Reset mode badge for comparison mode
         const modeBadge = document.getElementById('update-mode-badge');
@@ -26,15 +36,40 @@ function updateAdminPerformanceMetrics(routeData) {
     
     // Update based on algorithm type for individual algorithms
     if (metrics.algorithm && metrics.algorithm.includes('DHL')) {
-      // DHL metrics
+      // ENHANCED: DHL metrics from C++ algorithm
+      // DHL C++ outputs: labeling_time_ms, labeling_size_mb (from index file size), query_time_ms
+      console.log('📊 DHL Metrics from C++:', metrics);
+      
+      // Extract labeling time (ms) - DHL outputs this directly
+      let dhlLabelingTimeMs = 0;
+      if (metrics.labeling_time_ms !== undefined && metrics.labeling_time_ms > 0) {
+        dhlLabelingTimeMs = metrics.labeling_time_ms;
+        console.log('✅ DHL Labeling Time:', dhlLabelingTimeMs, 'ms');
+      }
       document.getElementById('perf-labeling-time').textContent = 
-        metrics.labeling_time_ms ? `${(metrics.labeling_time_ms / 1000).toFixed(1)}s` : 'N/A';
+        dhlLabelingTimeMs > 0 ? `${dhlLabelingTimeMs.toFixed(1)} ms` : 'N/A';
       
+      // Extract labeling size (MB) - DHL calculates this from index file size
+      let dhlLabelingSizeMb = 0;
+      if (metrics.labeling_size_mb !== undefined && metrics.labeling_size_mb > 0) {
+        dhlLabelingSizeMb = metrics.labeling_size_mb;
+        console.log('✅ DHL Labeling Size:', dhlLabelingSizeMb, 'MB');
+      }
       document.getElementById('perf-labeling-size').textContent = 
-        metrics.labeling_size_mb ? `${metrics.labeling_size_mb.toFixed(1)} MB` : 'N/A';
+        dhlLabelingSizeMb > 0 ? `${dhlLabelingSizeMb.toFixed(2)} MB` : 'N/A';
       
+      // Extract query time (ms) - DHL outputs query_time_ms directly
+      let dhlQueryTimeMs = 0;
+      if (metrics.query_time_ms !== undefined && metrics.query_time_ms > 0) {
+        dhlQueryTimeMs = metrics.query_time_ms;
+        console.log('✅ DHL Query Time:', dhlQueryTimeMs, 'ms');
+      } else if (metrics.query_time_microseconds !== undefined && metrics.query_time_microseconds > 0) {
+        // Legacy: convert microseconds to milliseconds if needed
+        dhlQueryTimeMs = metrics.query_time_microseconds / 1000.0;
+        console.log('✅ DHL Query Time (converted from μs):', dhlQueryTimeMs, 'ms');
+      }
       document.getElementById('perf-query-time').textContent = 
-        metrics.query_time_microseconds ? `${(metrics.query_time_microseconds / 1000).toFixed(3)}μs` : 'N/A';
+        dhlQueryTimeMs > 0 ? `${dhlQueryTimeMs.toFixed(3)} ms` : 'N/A';
         
       // Reset mode badge for DHL (not applicable)
       const modeBadge = document.getElementById('update-mode-badge');
@@ -62,29 +97,45 @@ function updateAdminPerformanceMetrics(routeData) {
       const labelingInfo = metrics.labeling_info || {};
       console.log('🔍 DEBUG - labelingInfo object:', labelingInfo);
       
-      // Labeling time: try multiple possible locations
-      const labelingTimeMs = metrics.labeling_time_ms || 
-                            labelingInfo.index_load_time_ms ||
-                            0;
-      console.log('🔍 DEBUG - labelingTimeMs:', labelingTimeMs, 'from:', 
-                  metrics.labeling_time_ms ? 'metrics.labeling_time_ms' : 
-                  labelingInfo.index_load_time_ms ? 'labelingInfo.index_load_time_ms' : 'default 0');
+      // ENHANCED: Extract labeling time from C++ metrics
+      // HC2L C++ outputs: labeling_info.index_load_time_ms
+      let labelingTimeMs = 0;
+      if (labelingInfo.index_load_time_ms !== undefined && labelingInfo.index_load_time_ms > 0) {
+        labelingTimeMs = labelingInfo.index_load_time_ms;
+        console.log('✅ Using C++ index_load_time_ms:', labelingTimeMs, 'ms');
+      } else if (metrics.labeling_time_ms !== undefined && metrics.labeling_time_ms > 0) {
+        labelingTimeMs = metrics.labeling_time_ms;
+        console.log('✅ Using metrics.labeling_time_ms:', labelingTimeMs, 'ms');
+      } else {
+        console.warn('⚠️  No labeling time found in C++ metrics');
+      }
       document.getElementById('perf-labeling-time').textContent = 
         labelingTimeMs > 0 ? `${labelingTimeMs.toFixed(1)} ms` : 'N/A';
       
-      // Labeling size: try multiple possible locations
-      const labelingSizeMb = metrics.labeling_size_mb || 
-                            labelingInfo.index_size_mb ||
-                            0;
-      console.log('🔍 DEBUG - labelingSizeMb:', labelingSizeMb, 'from:', 
-                  metrics.labeling_size_mb ? 'metrics.labeling_size_mb' : 
-                  labelingInfo.index_size_mb ? 'labelingInfo.index_size_mb' : 'default 0');
+      // ENHANCED: Extract labeling size from C++ metrics
+      // HC2L C++ outputs: labeling_info.index_size_mb
+      let labelingSizeMb = 0;
+      if (labelingInfo.index_size_mb !== undefined && labelingInfo.index_size_mb > 0) {
+        labelingSizeMb = labelingInfo.index_size_mb;
+        console.log('✅ Using C++ index_size_mb:', labelingSizeMb, 'MB');
+      } else if (metrics.labeling_size_mb !== undefined && metrics.labeling_size_mb > 0) {
+        labelingSizeMb = metrics.labeling_size_mb;
+        console.log('✅ Using metrics.labeling_size_mb:', labelingSizeMb, 'MB');
+      } else {
+        console.warn('⚠️  No labeling size found in C++ metrics');
+      }
       document.getElementById('perf-labeling-size').textContent = 
-        labelingSizeMb > 0 ? `${labelingSizeMb.toFixed(1)} MB` : 'N/A';
+        labelingSizeMb > 0 ? `${labelingSizeMb.toFixed(2)} MB` : 'N/A';
       
-      // Query time
-      const queryTimeMs = metrics.query_time_ms || 0;
-      console.log('🔍 DEBUG - queryTimeMs:', queryTimeMs);
+      // ENHANCED: Extract query time from C++ metrics
+      // HC2L C++ outputs: query_time_ms directly in metrics
+      let queryTimeMs = 0;
+      if (metrics.query_time_ms !== undefined && metrics.query_time_ms > 0) {
+        queryTimeMs = metrics.query_time_ms;
+        console.log('✅ Using C++ query_time_ms:', queryTimeMs, 'ms');
+      } else {
+        console.warn('⚠️  No query time found in C++ metrics');
+      }
       document.getElementById('perf-query-time').textContent = 
         queryTimeMs > 0 ? `${queryTimeMs.toFixed(3)} ms` : 'N/A';
         
@@ -129,6 +180,83 @@ function updateAdminPerformanceMetrics(routeData) {
     //   document.getElementById('perf-segment-overlap').textContent = 
     //     `${metrics.edge_count || 0} edges`;
     }
+    
+    // ============================================================
+    // UPDATE ADDITIONAL METRICS (Common for both algorithms)
+    // ============================================================
+    
+    // Path Length
+    const pathLength = metrics.path_length || 0;
+    document.getElementById('perf-path-length').textContent = 
+      pathLength > 0 ? `${pathLength} nodes` : 'N/A';
+    
+    // Route Distance
+    const distanceKm = metrics.calculated_distance_km || 
+                       (metrics.calculated_distance_meters ? metrics.calculated_distance_meters / 1000 : 0);
+    document.getElementById('perf-route-distance').textContent = 
+      distanceKm > 0 ? `${distanceKm.toFixed(2)} km` : 'N/A';
+    
+    // Estimated ETA
+    const etaFormatted = metrics.eta_formatted || '--';
+    document.getElementById('perf-eta').textContent = etaFormatted;
+    
+    // ============================================================
+    // UPDATE HC2L ADVANCED METRICS (only for HC2L)
+    // ============================================================
+    const advancedSection = document.getElementById('perf-advanced-section');
+    if (labelingInfo && Object.keys(labelingInfo).length > 0) {
+      // Show advanced section for HC2L
+      advancedSection.classList.remove('hidden');
+      
+      // Total Labels
+      const totalLabels = labelingInfo.total_labels || 0;
+      document.getElementById('perf-total-labels').textContent = 
+        totalLabels > 0 ? totalLabels.toLocaleString() : 'N/A';
+      
+      // Hierarchy Height
+      const hierarchyHeight = labelingInfo.hierarchy_height || 0;
+      document.getElementById('perf-hierarchy-height').textContent = 
+        hierarchyHeight > 0 ? hierarchyHeight.toString() : 'N/A';
+      
+      // Average Cut Size
+      const avgCutSize = labelingInfo.average_cut_size || 0;
+      document.getElementById('perf-avg-cut-size').textContent = 
+        avgCutSize > 0 ? avgCutSize.toFixed(1) : 'N/A';
+    } else {
+      // Hide advanced section for DHL
+      advancedSection.classList.add('hidden');
+    }
+    
+    // ============================================================
+    // UPDATE LAZYHC2L METRICS (only when lazy mode is active)
+    // ============================================================
+    const lazySection = document.getElementById('perf-lazy-section');
+    const lazyHc2l = routeData.lazy_hc2l || {};
+    
+    if (lazyHc2l.enabled && lazyHc2l.update_strategy === 'lazy_update') {
+      // Show lazy section
+      lazySection.classList.remove('hidden');
+      
+      // Impact Score
+      const impactScore = lazyHc2l.disruption_impact_score || 0;
+      document.getElementById('perf-impact-score').textContent = 
+        impactScore > 0 ? impactScore.toFixed(3) : 'N/A';
+      
+      // Dirty Nodes
+      const dirtyNodes = lazyHc2l.dirty_nodes_marked || 0;
+      document.getElementById('perf-dirty-nodes').textContent = 
+        dirtyNodes > 0 ? dirtyNodes.toString() : '0';
+      
+      // Cache Status
+      const cacheHit = lazyHc2l.cache_hit || false;
+      document.getElementById('perf-cache-status').textContent = 
+        cacheHit ? '✅ Hit' : '❌ Miss';
+    } else {
+      // Hide lazy section
+      lazySection.classList.add('hidden');
+    }
+    
+    console.log('✅ All performance metrics updated successfully');
 }
 
 // Function to update algorithm comparison modal with DHL and D-HC2L route data

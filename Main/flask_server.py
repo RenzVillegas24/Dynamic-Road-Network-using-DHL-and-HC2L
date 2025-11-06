@@ -973,7 +973,7 @@ def get_osm_graph_edges():
                     'v': int(metadata['v']),
                     'name': metadata.get('name', 'Unnamed Road'),
                     'highway': metadata.get('highway', 'unknown'),
-                    'oneway': metadata.get('oneway', False),
+                    'oneway': metadata.get('oneway', 0),
                     'length': round(metadata.get('length', 0), 2)
                 })
             except Exception as e:
