@@ -201,6 +201,7 @@ double haversine_distance(double lat1, double lon1, double lat2, double lon2) {
 
 // Determine flow status and color code from jam factor
 // Reference: HERE API jam_factor scale (0.0 = free flow, 10.0 = blocked)
+// ALIGNED with Python traffic overlay severity mapping (flask_server.py line 1128-1133)
 TrafficFlowData get_flow_color(double jam_factor, double current_speed, double free_flow_speed) {
     TrafficFlowData flow;
     flow.jam_factor = jam_factor;
@@ -213,22 +214,15 @@ TrafficFlowData get_flow_color(double jam_factor, double current_speed, double f
         flow.speed_reduction = 0.0;
     }
     
-    // Color coding based on jam_factor (HERE API scale)
-    if (jam_factor < 2.0) {
-        flow.flow_status = "free_flow";
-        flow.color_code = "#10b981";    // Green (emerald)
-    } else if (jam_factor < 4.0) {
-        flow.flow_status = "light";
-        flow.color_code = "#fbbf24";    // Yellow (amber)
-    } else if (jam_factor < 7.0) {
-        flow.flow_status = "moderate";
-        flow.color_code = "#f59e0b";    // Orange
-    } else if (jam_factor < 9.0) {
-        flow.flow_status = "heavy";
-        flow.color_code = "#ef4444";    // Red
+    if (jam_factor >= 8.0) {
+        flow.flow_status = "heavy";      // Severity: Heavy
+        flow.color_code = "#ef4444";     // Red (matches Python overlay)
+    } else if (jam_factor >= 5.0) {
+        flow.flow_status = "medium";     // Severity: Medium
+        flow.color_code = "#f59e0b";     // Orange (matches Python overlay)
     } else {
-        flow.flow_status = "blocked";
-        flow.color_code = "#000000";    // Black
+        flow.flow_status = "light";      // Severity: Light
+        flow.color_code = "#10b981";     // Green (matches Python overlay)
     }
     
     return flow;
@@ -552,14 +546,15 @@ bool load_disruptions_with_cache(
     
     // Check if cache is valid
     if (g_disruption_cache.is_valid(actual_file)) {
-        cerr << "✅ Using cached disruption data (file unchanged)" << endl;
+        // SILENT CACHE HIT - don't spam logs on every route calculation
+        // Traffic data is already loaded and file hasn't changed
         incidents_out = g_disruption_cache.incidents;
         flow_out = g_disruption_cache.flow_data;
         return true;
     }
     
-    // Cache invalid or file changed - reload
-    cerr << "🔄 Loading disruptions from CSV file (cache miss or file updated)" << endl;
+    // Cache invalid or file changed - reload and notify
+    cerr << "🔄 Traffic data updated - Loading new disruptions from CSV file" << endl;
     
     ifstream disrupt_file(actual_file);
     if (!disrupt_file.is_open()) {
@@ -660,28 +655,86 @@ bool load_disruptions_with_cache(
                     }
                 }
                 
-                // Determine disruption type from data
+                // Infer disruption type from jam factor and closure status
                 if (is_closed) {
-                    disruption_type = "closure";
+                    disruption_type = "road_closure";
+                    new_weight = 999999.0;
                 } else if (jam_factor >= 8.0) {
                     disruption_type = "accident";
                 } else if (jam_factor >= 5.0) {
                     disruption_type = "congestion";
-                } else if (current_speed < free_flow_speed * 0.5) {
-                    disruption_type = "construction";
                 } else {
-                    disruption_type = "congestion";
+                    disruption_type = "normal";
                 }
                 
-            } catch (...) {
+                // Estimate highway type from free flow speed if not provided
+                if (free_flow_speed >= 80) {
+                    highway_type = "motorway";
+                } else if (free_flow_speed >= 60) {
+                    highway_type = "trunk";
+                } else if (free_flow_speed >= 50) {
+                    highway_type = "primary";
+                } else if (free_flow_speed >= 40) {
+                    highway_type = "secondary";
+                } else {
+                    highway_type = "residential";
+                }
+                
+                // Calculate impact score from available data
+                double speed_reduction = (free_flow_speed > 0) ? 
+                    (free_flow_speed - current_speed) / free_flow_speed : 0.0;
+                impact_score = min(1.0, max(0.0, jam_factor / 10.0 * 0.5 + speed_reduction * 0.5));
+                
+                // Calculate new weight if not road closure
+                if (!is_closed) {
+                    // Get old weight from adjacency list (base distance)
+                    distance_t old_weight = 0;
+                    if (adj_list.count(source)) {
+                        for (const auto& neighbor : adj_list.at(source)) {
+                            if (neighbor.node == target) {
+                                old_weight = neighbor.distance;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // CRITICAL FIX: Calculate new weight based on actual traffic speeds
+                    // Formula: new_weight = distance * (freeflow_speed / current_speed)
+                    // This makes congested edges "longer" in terms of travel time
+                    if (current_speed > 0.1 && free_flow_speed > 0.1) {
+                        // Speed-based weight adjustment (time = distance / speed)
+                        // Clamp speed ratio to reasonable range [1.0, 10.0]
+                        double speed_ratio = free_flow_speed / current_speed;
+                        speed_ratio = min(10.0, max(1.0, speed_ratio));
+                        new_weight = static_cast<distance_t>(old_weight * speed_ratio);
+                        
+                        // Only log significant changes
+                        if (speed_ratio > 1.5) {
+                            cerr << "   📊 Edge " << source << "→" << target 
+                                 << ": base=" << old_weight 
+                                 << "m, speed=" << current_speed 
+                                 << "/" << free_flow_speed << "km/h"
+                                 << ", ratio=" << speed_ratio 
+                                 << ", new=" << new_weight << "m" << endl;
+                        }
+                    } else {
+                        // Fallback to jam factor if speeds not available
+                        double flow_multiplier = 1.0 + (jam_factor / 10.0) * 4.0;
+                        new_weight = static_cast<distance_t>(old_weight * flow_multiplier);
+                    }
+                }
+                
+            } catch (const exception& e) {
+                cerr << "⚠️  Error parsing CSV line: " << e.what() << endl;
                 continue;
             }
         } else {
             // Space-separated format (original)
             istringstream iss(line);
+            
             if (!(iss >> source >> target >> new_weight)) continue;
             
-            // Parse enhanced fields (optional)
+            // Parse enhanced fields (optional - backward compatible)
             iss >> jam_factor >> current_speed >> free_flow_speed 
                 >> impact_score >> confidence >> highway_type 
                 >> is_closed >> disruption_type;
@@ -698,45 +751,6 @@ bool load_disruptions_with_cache(
                     break;
                 }
             }
-        }
-        
-        // If new_weight not set, calculate from speed reduction
-        if (new_weight == 0 && old_weight > 0) {
-            if (is_closed) {
-                new_weight = 999999;
-            } else if (current_speed > 0.1 && free_flow_speed > 0.1) {
-                // Scale weight by speed reduction: new = old * (freeflow / current)
-                // Clamp ratio to reasonable range [1.0, 10.0]
-                double speed_ratio = free_flow_speed / current_speed;
-                speed_ratio = min(10.0, max(1.0, speed_ratio));
-                new_weight = static_cast<distance_t>(old_weight * speed_ratio);
-            } else if (jam_factor > 0.0) {
-                // Use jam factor as fallback
-                double flow_multiplier = 1.0 + (jam_factor / 10.0) * 4.0;
-                new_weight = static_cast<distance_t>(old_weight * flow_multiplier);
-            } else {
-                new_weight = old_weight;
-            }
-        }
-        
-        // Look up highway type from edge geometries if not provided
-        if (highway_type == "unknown" && edge_geometries.count(edge_key)) {
-            // Edge geometries don't have highway type, so we'll need to pass it separately
-            // For now, estimate from road characteristics
-            if (free_flow_speed >= 80) highway_type = "motorway";
-            else if (free_flow_speed >= 60) highway_type = "trunk";
-            else if (free_flow_speed >= 50) highway_type = "primary";
-            else if (free_flow_speed >= 40) highway_type = "secondary";
-            else if (free_flow_speed >= 30) highway_type = "tertiary";
-            else highway_type = "residential";
-        }
-        
-        // Calculate impact score if not provided
-        if (impact_score == 0.5) {
-            double weight_change = (old_weight > 0) ? (double)(new_weight - old_weight) / old_weight : 0.0;
-            double jam_impact = jam_factor / 10.0;
-            double closure_factor = is_closed ? 1.0 : 0.0;
-            impact_score = min(1.0, max(0.0, weight_change * 0.5 + jam_impact * 0.3 + closure_factor * 0.2));
         }
         
         // Store incident data
@@ -1365,25 +1379,10 @@ vector<NodeID> find_shortest_path(
             for (const auto& neighbor : adj_list.at(u)) {
                 NodeID v = neighbor.node;
                 
-                // *** CRITICAL: Use comprehensive cost calculation ***
-                // This considers: GPS distance, highway type, flow, incidents
-                auto edge_key = make_pair(u, v);
-                string highway_type = "road"; // Default
-                
-                // Get highway type from global map (loaded from CSV for ALL edges)
-                if (g_highway_types.count(edge_key)) {
-                    highway_type = g_highway_types[edge_key];
-                }
-                // Fallback to incident data if not in global map
-                else if (incident_data.count(edge_key)) {
-                    highway_type = incident_data.at(edge_key).highway_type;
-                }
-                
-                // Calculate edge cost with ALL factors
-                distance_t edge_cost = calculate_edge_cost(
-                    u, v, neighbor.distance, highway_type,
-                    flow_data, incident_data, coordinates
-                );
+                // *** CRITICAL FIX: Use the UPDATED neighbor.distance directly ***
+                // We already updated neighbor.distance with traffic-aware weights when processing disruptions
+                // No need to recalculate - just use the updated value
+                distance_t edge_cost = neighbor.distance;
                 
                 distance_t new_dist = dist[u] + edge_cost;
                 
@@ -2126,6 +2125,16 @@ int main(int argc, char* argv[]) {
             return 1;
         }
         
+        // *** STORE ORIGINAL BASE WEIGHTS for "non" dataset mode ***
+        // When dataset_mode='none', we need to reset to these original values
+        map<pair<NodeID, NodeID>, distance_t> base_weights;
+        for (const auto& [source, neighbors] : adj_list) {
+            for (const auto& neighbor : neighbors) {
+                base_weights[{source, neighbor.node}] = neighbor.distance;
+            }
+        }
+        cerr << "💾 Stored " << base_weights.size() << " base edge weights for reset capability" << endl;
+        
         // Load HC2L index
         auto index_load_start = chrono::high_resolution_clock::now();
         ifstream index_stream(index_file, ios::binary);
@@ -2197,6 +2206,28 @@ int main(int argc, char* argv[]) {
                             jam_factor_val = flow_data.at(edge_key).jam_factor;
                         }
                         
+                        // *** TAU THRESHOLD CONTROLS TRAFFIC SENSITIVITY ***
+                        // tau = 0.0: Ignore traffic completely (use base distance only)
+                        // tau = 0.5: Moderate sensitivity (50% of traffic impact)
+                        // tau = 1.0: Maximum sensitivity (100% of traffic impact)
+                        
+                        // Calculate traffic-aware weight with tau sensitivity
+                        distance_t base_weight = incident.old_weight;  // Original distance
+                        distance_t traffic_penalty = incident.new_weight - incident.old_weight;  // Additional cost from traffic
+                        
+                        // Apply tau as sensitivity multiplier to traffic penalty
+                        distance_t adjusted_weight = base_weight + (traffic_penalty * tau_threshold);
+                        
+                        // Update edge weight in adj_list with tau-adjusted value
+                        if (adj_list.count(source)) {
+                            for (auto& neighbor : adj_list[source]) {
+                                if (neighbor.node == target) {
+                                    neighbor.distance = adjusted_weight;
+                                    break;
+                                }
+                            }
+                        }
+                        
                         // Decide update strategy based on impact and threshold
                         if (should_immediate_update(final_impact, tau_threshold)) {
                             update_strategy = "immediate_update";
@@ -2204,18 +2235,9 @@ int main(int argc, char* argv[]) {
                                          to_string(final_impact) + " >= " + to_string(tau_threshold);
                             cerr << "   ⚡ Immediate update for edge " << source << "->" << target 
                                  << " (Impact=" << final_impact << ", Jam=" << jam_factor_val 
-                                 << ", Highway=" << incident.highway_type << ", Type=" << incident.type << ")" << endl;
+                                 << ", Tau=" << tau_threshold << ", Weight=" << adjusted_weight << ")" << endl;
                             
-                            // Update edge weight in adj_list
-                            if (adj_list.count(source)) {
-                                for (auto& neighbor : adj_list[source]) {
-                                    if (neighbor.node == target) {
-                                        neighbor.distance = incident.new_weight;
-                                        break;
-                                    }
-                                }
-                            }
-                            // In real implementation: rebuild labels here
+                            // In real implementation: would rebuild labels here
                         } else {
                             if (update_strategy != "immediate_update") {
                                 update_strategy = "lazy_mark";
@@ -2225,7 +2247,7 @@ int main(int argc, char* argv[]) {
                             mark_nodes_dirty(source, target, adj_list, lazy_state, final_impact);
                             cerr << "   💤 Lazy mark for edge " << source << "->" << target 
                                  << " (Impact=" << final_impact << ", Jam=" << jam_factor_val 
-                                 << ", Highway=" << incident.highway_type << ", Type=" << incident.type << ")" << endl;
+                                 << ", Tau=" << tau_threshold << ", Weight=" << adjusted_weight << ")" << endl;
                         }
                     }
                     
@@ -2239,6 +2261,25 @@ int main(int argc, char* argv[]) {
                 cerr << "   - Dirty nodes: " << lazy_state.dirty_labels.size() << endl;
                 cerr << "   - Flow segments: " << flow_data.size() << endl;
             }
+        } else {
+            // *** DATASET MODE = 'NONE': RESET ALL EDGE WEIGHTS TO BASE VALUES ***
+            // This ensures fastest/shortest path calculation without traffic penalties
+            cerr << "🔄 Dataset mode 'none' - Resetting all edge weights to base values (ignoring traffic)" << endl;
+            
+            int reset_count = 0;
+            for (auto& [source, neighbors] : adj_list) {
+                for (auto& neighbor : neighbors) {
+                    auto edge_key = make_pair(source, neighbor.node);
+                    if (base_weights.count(edge_key)) {
+                        neighbor.distance = base_weights.at(edge_key);
+                        reset_count++;
+                    }
+                }
+            }
+            
+            cerr << "✅ Reset " << reset_count << " edges to base weights (tau sensitivity bypassed)" << endl;
+            update_strategy = "none";
+            lazy_reason = "Dataset mode 'none' - no disruptions loaded";
         }
         
         // Determine routing endpoints based on one-way constraints

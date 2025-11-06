@@ -175,7 +175,7 @@ double haversine_distance(double lat1, double lon1, double lat2, double lon2) {
 
 // Determine flow status and color code from jam factor
 // Reference: HERE API jam_factor scale (0.0 = free flow, 10.0 = blocked)
-// Color mapping: green → yellow → orange → red → black (increasing congestion)
+// ALIGNED with Python traffic overlay severity mapping (flask_server.py line 1128-1133)
 TrafficFlowData get_flow_color(double jam_factor, double current_speed, double free_flow_speed) {
     TrafficFlowData flow;
     flow.jam_factor = jam_factor;
@@ -188,23 +188,16 @@ TrafficFlowData get_flow_color(double jam_factor, double current_speed, double f
         flow.speed_reduction = 0.0;
     }
     
-    // Color coding based on jam_factor (HERE API scale)
-    // jam_factor: 0.0 = free flow, 10.0 = completely blocked
-    if (jam_factor < 2.0) {
-        flow.flow_status = "free_flow";
-        flow.color_code = "#10b981";    // Green (emerald)
-    } else if (jam_factor < 4.0) {
-        flow.flow_status = "light";
-        flow.color_code = "#fbbf24";    // Yellow (amber)
-    } else if (jam_factor < 7.0) {
-        flow.flow_status = "moderate";
-        flow.color_code = "#f59e0b";    // Orange
-    } else if (jam_factor < 9.0) {
-        flow.flow_status = "heavy";
-        flow.color_code = "#ef4444";    // Red
+
+    if (jam_factor >= 8.0) {
+        flow.flow_status = "heavy";      // Severity: Heavy
+        flow.color_code = "#ef4444";     // Red (matches Python overlay)
+    } else if (jam_factor >= 5.0) {
+        flow.flow_status = "medium";     // Severity: Medium
+        flow.color_code = "#f59e0b";     // Orange (matches Python overlay)
     } else {
-        flow.flow_status = "blocked";
-        flow.color_code = "#000000";    // Black
+        flow.flow_status = "light";      // Severity: Light
+        flow.color_code = "#10b981";     // Green (matches Python overlay)
     }
     
     return flow;
@@ -566,14 +559,15 @@ bool load_disruptions_with_cache(
     
     // Check if cache is valid
     if (g_disruption_cache.is_valid(actual_file)) {
-        cerr << "✅ Using cached disruption data (file unchanged)" << endl;
+        // SILENT CACHE HIT - don't spam logs on every route calculation
+        // Traffic data is already loaded and file hasn't changed
         incidents_out = g_disruption_cache.incidents;
         flow_out = g_disruption_cache.flow_data;
         return true;
     }
     
-    // Cache invalid or file changed - reload
-    cerr << "🔄 Loading disruptions from CSV file (cache miss or file updated)" << endl;
+    // Cache invalid or file changed - reload and notify
+    cerr << "🔄 Traffic data updated - Loading new disruptions from CSV file" << endl;
     
     ifstream disrupt_file(actual_file);
     if (!disrupt_file.is_open()) {

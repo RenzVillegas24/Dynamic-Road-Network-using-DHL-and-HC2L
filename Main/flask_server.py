@@ -69,16 +69,209 @@ auto_service = None
 # Shutdown service on exit (if enabled)
 # atexit.register(shutdown_auto_disruption_service)
 
+# ============================================================
+# GLOBAL CACHES - Prevent reloading data on every request
+# ============================================================
+
+# Cache for OSM edges with geometry (loaded once, reused across requests)
+_edges_cache = {
+    'data': None,          # Dataframe with all edges
+    'lookup': None,        # Dictionary for fast edge lookup by (source, target)
+    'file_mtime': 0,       # File modification time for cache invalidation
+    'loaded_at': 0         # Timestamp when cache was loaded
+}
+
+# Cache for traffic data (invalidates based on file modification time)
+_traffic_cache = {
+    'segments': None,       # Processed traffic segments with geometry
+    'file_path': None,      # Path to traffic file
+    'file_mtime': 0,        # File modification time
+    'loaded_at': 0          # Timestamp when cache was loaded
+}
+
+
+def load_edges_with_cache():
+    """
+    Load OSM edges with geometry using cache.
+    Only reloads if file has been modified since last load.
+    
+    Returns:
+        tuple: (edges_df, edge_lookup) or (None, None) on error
+    """
+    global _edges_cache
+    import os
+    
+    edges_file = str(Config.EDGES_CSV)
+    
+    try:
+        # Get current file modification time
+        current_mtime = os.path.getmtime(edges_file)
+        
+        # Check if cache is valid
+        if (_edges_cache['data'] is not None and 
+            _edges_cache['lookup'] is not None and
+            _edges_cache['file_mtime'] == current_mtime):
+            # Cache hit - reuse existing data
+            return _edges_cache['data'], _edges_cache['lookup']
+        
+        # Cache miss or invalidated - reload
+        print(f"🔄 Loading OSM edges with geometry from {Config.EDGES_CSV.name}...")
+        edges_df = pd.read_csv(edges_file)
+        print(f"   📂 Loaded {len(edges_df)} OSM edges")
+        
+        # Build edge lookup dictionary
+        edge_lookup = {}
+        for _, edge in edges_df.iterrows():
+            key = (int(edge['source']), int(edge['target']))
+            
+            # Parse geometry
+            geometry_str = edge['geometry']
+            if isinstance(geometry_str, str):
+                try:
+                    import json
+                    geometry = json.loads(geometry_str)
+                except (json.JSONDecodeError, ValueError):
+                    try:
+                        import ast
+                        geometry = ast.literal_eval(geometry_str)
+                    except (ValueError, SyntaxError):
+                        geometry = [[float(edge['source_lat']), float(edge['source_lon'])], 
+                                   [float(edge['target_lat']), float(edge['target_lon'])]]
+            else:
+                geometry = geometry_str
+            
+            if not isinstance(geometry, list) or len(geometry) < 2:
+                geometry = [[float(edge['source_lat']), float(edge['source_lon'])], 
+                           [float(edge['target_lat']), float(edge['target_lon'])]]
+                
+            edge_lookup[key] = {
+                'geometry': geometry,
+                'road_name': str(edge.get('road_name', 'Unknown Road')),
+                'highway_type': str(edge.get('highway_type', 'unknown')),
+                'length': float(edge.get('length', 0)),
+                'freeFlow_kph': float(edge.get('freeFlow_kph', 50.0)) if pd.notna(edge.get('freeFlow_kph')) else 50.0
+            }
+        
+        # Update cache
+        _edges_cache['data'] = edges_df
+        _edges_cache['lookup'] = edge_lookup
+        _edges_cache['file_mtime'] = current_mtime
+        _edges_cache['loaded_at'] = time.time()
+        
+        print(f"   ✅ Cached {len(edge_lookup)} edges with geometries")
+        return edges_df, edge_lookup
+        
+    except Exception as e:
+        print(f"   ❌ Error loading edges: {e}")
+        return None, None
+
+
+def load_traffic_with_cache(edge_lookup):
+    """
+    Load traffic data with geometry using cache.
+    Only reloads if traffic file has changed.
+    
+    Args:
+        edge_lookup: Dictionary mapping (source, target) to edge data
+        
+    Returns:
+        list: Traffic segments with geometry
+    """
+    global _traffic_cache
+    import glob
+    import os
+    
+    try:
+        # Find latest disruption files
+        disruptions_dir = Config.DISRUPTIONS_DIR
+        both_files = glob.glob(str(disruptions_dir / 'traffic_*_both.csv'))
+        
+        if not both_files:
+            print("   ℹ️  No traffic files found")
+            return []
+        
+        # Get most recent file
+        latest_file = max(both_files, key=os.path.getmtime)
+        current_mtime = os.path.getmtime(latest_file)
+        
+        # Check cache validity
+        if (_traffic_cache['segments'] is not None and
+            _traffic_cache['file_path'] == latest_file and
+            _traffic_cache['file_mtime'] == current_mtime):
+            # Cache hit
+            return _traffic_cache['segments']
+        
+        # Cache miss - reload traffic data
+        print(f"   🔄 Loading traffic data from: {os.path.basename(latest_file)}")
+        traffic_df = pd.read_csv(latest_file)
+        
+        traffic_segments = []
+        for _, row in traffic_df.iterrows():
+            edge_key = (int(row['source']), int(row['target']))
+            edge_data = edge_lookup.get(edge_key)
+            
+            if not edge_data:
+                continue
+            
+            # Determine severity
+            jam_factor = float(row.get('jamFactor', 0.0))
+            if jam_factor >= 8.0:
+                severity = 'Heavy'
+            elif jam_factor >= 5.0:
+                severity = 'Medium'
+            else:
+                severity = 'Light'
+            
+            # Sanitize geometry
+            geometry = edge_data['geometry']
+            if isinstance(geometry, list):
+                geometry = [[float(coord[0]), float(coord[1])] for coord in geometry 
+                           if len(coord) >= 2 and 
+                           not (pd.isna(coord[0]) or pd.isna(coord[1]) or 
+                                coord[0] == float('inf') or coord[1] == float('inf'))]
+            
+            if not geometry or len(geometry) < 2:
+                continue
+            
+            traffic_segments.append({
+                'type': 'flow',
+                'incident_type': str(row.get('incident_type', 'Congestion')),
+                'severity': severity,
+                'geometry': geometry,
+                'road_name': str(row.get('road_name', edge_data['road_name'])),
+                'highway_type': str(row.get('highway_type', edge_data['highway_type'])),
+                'length': float(edge_data['length']),
+                'speed_kph': float(row['speed_kph']),
+                'free_flow_kph': float(row['freeFlow_kph']),
+                'jam_factor': float(jam_factor),
+                'is_closed': bool(row.get('isClosed', False)),
+                'source': int(row['source']),
+                'target': int(row['target'])
+            })
+        
+        # Update cache
+        _traffic_cache['segments'] = traffic_segments
+        _traffic_cache['file_path'] = latest_file
+        _traffic_cache['file_mtime'] = current_mtime
+        _traffic_cache['loaded_at'] = time.time()
+        
+        print(f"   ✅ Cached {len(traffic_segments)} traffic segments")
+        return traffic_segments
+        
+    except Exception as e:
+        print(f"   ❌ Error loading traffic: {e}")
+        return []
+
 
 def get_dynamic_disruption_file(algorithm: str = 'hc2l', dataset_mode: str = None) -> str:
     """
     Get the path to the current traffic disruption CSV file.
     
-    **CSV-ONLY SYSTEM**: 
-    - Only uses CSV files (no .gr files)
-    - Returns latest CSV if less than 1 minute old
-    - Otherwise fetches new data from HERE API
-    - Maintains max 10 traffic files in disruptions directory
+    **CACHE-ONLY SYSTEM**: 
+    - Only uses existing CSV files (NO auto-fetching)
+    - Returns latest CSV file regardless of age
+    - Traffic updates must be manually triggered via /fetch_here_traffic endpoint
+    - This prevents automatic API calls on every route calculation
     
     Args:
         algorithm: 'hc2l' or 'dhl' (for backward compatibility, not used)
@@ -94,53 +287,22 @@ def get_dynamic_disruption_file(algorithm: str = 'hc2l', dataset_mode: str = Non
     if dataset_mode is None:
         dataset_mode = 'both'  # Default to using traffic data
     
-    print(f"🔍 Looking for disruption file - Dataset: {dataset_mode.upper()}")
-    
     # If mode is 'none', return empty string (no disruptions)
     if dataset_mode == 'none':
-        print(f"ℹ️  Dataset mode is NONE - no disruptions will be used")
         return ""
     
     # Find latest traffic CSV file
     traffic_pattern = f"traffic_*_{dataset_mode}.csv"
     traffic_files = sorted(Config.DISRUPTIONS_DIR.glob(traffic_pattern), reverse=True)
     
-    # Check if latest file exists and is less than 1 minute old
+    # Use latest file if available (regardless of age - CACHE ONLY)
     if traffic_files:
         latest_file = traffic_files[0]
         file_age = time.time() - latest_file.stat().st_mtime
-        
-        if file_age < 60:  # Less than 1 minute old
-            print(f"✅ Using recent traffic file ({file_age:.0f}s old): {latest_file.name}")
-            return str(latest_file)
-        else:
-            print(f"⚠️  Latest file is {file_age:.0f}s old (>60s) - fetching new data...")
-    else:
-        print(f"⚠️  No traffic files found - fetching new data...")
+        # Always use cached file, never auto-fetch
+        return str(latest_file)
     
-    # Fetch new traffic data
-    try:
-        if traffic_service:
-            # Cleanup old files first (keep max 10)
-            cleanup_old_traffic_files(dataset_mode, max_files=10)
-            
-            # Fetch and save new data (CSV only)
-            traffic_service.fetch_and_save(mode=dataset_mode)
-            
-            # Get the newly created file
-            traffic_files = sorted(Config.DISRUPTIONS_DIR.glob(traffic_pattern), reverse=True)
-            if traffic_files:
-                latest_file = traffic_files[0]
-                print(f"✅ Generated new traffic file: {latest_file.name}")
-                return str(latest_file)
-    except Exception as e:
-        print(f"❌ Error generating traffic: {e}")
-    
-    # Fallback to latest file even if old
-    if traffic_files:
-        print(f"⚠️  Using stale traffic file as fallback: {traffic_files[0].name}")
-        return str(traffic_files[0])
-    
+    # No traffic files found - return empty (do NOT auto-fetch)
     return ""
 
 
@@ -1339,257 +1501,31 @@ def get_raw_here_traffic():
 @app.route('/get_traffic_with_geometry')
 def get_traffic_with_geometry():
     """
-    Get traffic data with full OSM road geometries
+    Get traffic data with full OSM road geometries (CACHED VERSION)
     Returns matched traffic edges with their LineString geometries from quezon_city_edges.csv
-    Loads from the latest disruption CSV files instead of fetching from API
+    Uses intelligent caching to avoid reloading data on every request
     """
     try:
-        print("\n🗺️  Fetching traffic data with OSM geometries...")
+        # Load edges with cache (only reloads if file changed)
+        edges_df, edge_lookup = load_edges_with_cache()
         
-        # Load OSM edges with geometry
-        edges_df = pd.read_csv(Config.EDGES_CSV)
-        print(f"   📂 Loaded {len(edges_df)} OSM edges with geometry")
+        if edge_lookup is None:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to load OSM edges'
+            })
         
-        # Create edge lookup dictionary (source,target) -> edge_data
-        edge_lookup = {}
-        for _, edge in edges_df.iterrows():
-            key = (int(edge['source']), int(edge['target']))
-            # Parse geometry - it's stored as a string representation of a list
-            geometry_str = edge['geometry']
-            if isinstance(geometry_str, str):
-                try:
-                    # Try JSON parsing first (safer than eval)
-                    import json
-                    geometry = json.loads(geometry_str)
-                except (json.JSONDecodeError, ValueError):
-                    try:
-                        # Fallback to ast.literal_eval (safer than eval)
-                        import ast
-                        geometry = ast.literal_eval(geometry_str)
-                    except (ValueError, SyntaxError):
-                        # Last resort: create simple line from source to target
-                        geometry = [[float(edge['source_lat']), float(edge['source_lon'])], 
-                                   [float(edge['target_lat']), float(edge['target_lon'])]]
-            else:
-                geometry = geometry_str
-            
-            # Validate geometry is a list of coordinates
-            if not isinstance(geometry, list) or len(geometry) < 2:
-                geometry = [[float(edge['source_lat']), float(edge['source_lon'])], 
-                           [float(edge['target_lat']), float(edge['target_lon'])]]
-                
-            edge_lookup[key] = {
-                'geometry': geometry,
-                'road_name': str(edge.get('road_name', 'Unknown Road')),
-                'highway_type': str(edge.get('highway_type', 'unknown')),
-                'length': float(edge.get('length', 0)),
-                'freeFlow_kph': float(edge.get('freeFlow_kph', 50.0)) if pd.notna(edge.get('freeFlow_kph')) else 50.0
-            }
-        
-        print(f"   📍 Created lookup for {len(edge_lookup)} edges with geometries")
-        
-        # Find latest disruption files
-        import glob
-        import os
-        
-        disruptions_dir = Config.DISRUPTIONS_DIR
-        flow_files = glob.glob(str(disruptions_dir / 'traffic_*_flow.csv'))
-        incident_files = glob.glob(str(disruptions_dir / 'traffic_*_incidents.csv'))
-        both_files = glob.glob(str(disruptions_dir / 'traffic_*_both.csv'))
-        
-        # Get the most recent file from each category
-        latest_flow_file = max(flow_files, key=os.path.getmtime) if flow_files else None
-        latest_incident_file = max(incident_files, key=os.path.getmtime) if incident_files else None
-        latest_both_file = max(both_files, key=os.path.getmtime) if both_files else None
-        
-        # Determine which file to use (prefer 'both', then combine flow+incidents)
-        traffic_segments = []
-        
-        if latest_both_file:
-            print(f"   📊 Loading traffic data from: {os.path.basename(latest_both_file)}")
-            traffic_df = pd.read_csv(latest_both_file)
-            
-            print(f"   📋 Columns in disruption file: {list(traffic_df.columns)}")
-            
-            # Process each row
-            for idx, row in traffic_df.iterrows():
-                edge_key = (int(row['source']), int(row['target']))
-                edge_data = edge_lookup.get(edge_key)
-                
-                if not edge_data:
-                    continue
-                
-                # Debug first few segments
-                if idx < 3:
-                    print(f"   🔍 Sample segment {idx}: source={row['source']}, target={row['target']}, road={row.get('road_name', 'N/A')}, geometry_points={len(edge_data['geometry'])}")
-                
-                # Determine severity based on jam factor
-                jam_factor = float(row.get('jamFactor', 0.0))
-                if jam_factor >= 8.0:
-                    severity = 'Heavy'
-                elif jam_factor >= 5.0:
-                    severity = 'Medium'
-                else:
-                    severity = 'Light'
-                
-                # Determine incident type (default to Congestion for flow data)
-                incident_type = str(row.get('incident_type', 'Congestion'))
-                
-                # Sanitize geometry to ensure JSON serialization
-                geometry = edge_data['geometry']
-                if isinstance(geometry, list):
-                    # Ensure all coordinates are valid floats (not NaN or Inf)
-                    geometry = [[float(coord[0]), float(coord[1])] for coord in geometry 
-                               if len(coord) >= 2 and 
-                               not (pd.isna(coord[0]) or pd.isna(coord[1]) or 
-                                    coord[0] == float('inf') or coord[1] == float('inf'))]
-                
-                # Skip if geometry is invalid
-                if not geometry or len(geometry) < 2:
-                    continue
-                
-                traffic_segments.append({
-                    'type': 'flow',  # Most disruption data is flow-based
-                    'incident_type': incident_type,
-                    'severity': severity,
-                    'geometry': geometry,
-                    'road_name': str(row.get('road_name', edge_data['road_name'])),
-                    'highway_type': str(row.get('highway_type', edge_data['highway_type'])),
-                    'length': float(edge_data['length']),
-                    'speed_kph': float(row['speed_kph']),
-                    'free_flow_kph': float(row['freeFlow_kph']),
-                    'jam_factor': float(jam_factor),
-                    'is_closed': bool(row.get('isClosed', False)),
-                    'source': int(row['source']),
-                    'target': int(row['target'])
-                })
-        else:
-            # Load from separate flow and incident files
-            if latest_flow_file:
-                print(f"   📊 Loading flow data from: {os.path.basename(latest_flow_file)}")
-                flow_df = pd.read_csv(latest_flow_file)
-                
-                for _, row in flow_df.iterrows():
-                    edge_key = (int(row['source']), int(row['target']))
-                    edge_data = edge_lookup.get(edge_key)
-                    
-                    if not edge_data:
-                        continue
-                    
-                    jam_factor = float(row.get('jamFactor', 0.0))
-                    if jam_factor >= 8.0:
-                        severity = 'Heavy'
-                    elif jam_factor >= 5.0:
-                        severity = 'Medium'
-                    else:
-                        severity = 'Light'
-                    
-                    # Sanitize geometry to ensure JSON serialization
-                    geometry = edge_data['geometry']
-                    if isinstance(geometry, list):
-                        # Ensure all coordinates are valid floats (not NaN or Inf)
-                        geometry = [[float(coord[0]), float(coord[1])] for coord in geometry 
-                                   if len(coord) >= 2 and 
-                                   not (pd.isna(coord[0]) or pd.isna(coord[1]) or 
-                                        coord[0] == float('inf') or coord[1] == float('inf'))]
-                    
-                    # Skip if geometry is invalid
-                    if not geometry or len(geometry) < 2:
-                        continue
-                    
-                    traffic_segments.append({
-                        'type': 'flow',
-                        'incident_type': 'Congestion',
-                        'severity': severity,
-                        'geometry': geometry,
-                        'road_name': str(row.get('road_name', edge_data['road_name'])),
-                        'highway_type': str(row.get('highway_type', edge_data['highway_type'])),
-                        'length': float(edge_data['length']),
-                        'speed_kph': float(row['speed_kph']),
-                        'free_flow_kph': float(row['freeFlow_kph']),
-                        'jam_factor': float(jam_factor),
-                        'is_closed': bool(row.get('isClosed', False)),
-                        'source': int(row['source']),
-                        'target': int(row['target'])
-                    })
-            
-            if latest_incident_file:
-                print(f"   📊 Loading incident data from: {os.path.basename(latest_incident_file)}")
-                incident_df = pd.read_csv(latest_incident_file)
-                
-                for _, row in incident_df.iterrows():
-                    edge_key = (int(row['source']), int(row['target']))
-                    edge_data = edge_lookup.get(edge_key)
-                    
-                    if not edge_data:
-                        continue
-                    
-                    jam_factor = float(row.get('jamFactor', 0.0))
-                    if jam_factor >= 8.0:
-                        severity = 'Heavy'
-                    elif jam_factor >= 5.0:
-                        severity = 'Medium'
-                    else:
-                        severity = 'Light'
-                    
-                    # Sanitize geometry to ensure JSON serialization
-                    geometry = edge_data['geometry']
-                    if isinstance(geometry, list):
-                        # Ensure all coordinates are valid floats (not NaN or Inf)
-                        geometry = [[float(coord[0]), float(coord[1])] for coord in geometry 
-                                   if len(coord) >= 2 and 
-                                   not (pd.isna(coord[0]) or pd.isna(coord[1]) or 
-                                        coord[0] == float('inf') or coord[1] == float('inf'))]
-                    
-                    # Skip if geometry is invalid
-                    if not geometry or len(geometry) < 2:
-                        continue
-                    
-                    traffic_segments.append({
-                        'type': 'incident',
-                        'incident_type': str(row.get('incident_type', 'Other')),
-                        'severity': severity,
-                        'geometry': geometry,
-                        'road_name': str(row.get('road_name', edge_data['road_name'])),
-                        'highway_type': str(row.get('highway_type', edge_data['highway_type'])),
-                        'length': float(edge_data['length']),
-                        'speed_kph': float(row['speed_kph']),
-                        'free_flow_kph': float(row['freeFlow_kph']),
-                        'jam_factor': float(jam_factor),
-                        'is_closed': bool(row.get('isClosed', False)),
-                        'description': str(row.get('description', 'Incident')),
-                        'source': int(row['source']),
-                        'target': int(row['target'])
-                    })
-        
-        if not traffic_segments:
-            print("   ⚠️  No disruption files found or no traffic data available")
-        
-        print(f"   ✅ Generated {len(traffic_segments)} traffic segments with geometry")
-        
-        # Final validation: ensure all segments are JSON-serializable
-        try:
-            import json
-            json.dumps(traffic_segments)  # Test serialization
-        except (TypeError, ValueError) as e:
-            print(f"   ❌ JSON serialization error detected: {e}")
-            print(f"   🔍 Cleaning non-serializable data...")
-            # Remove problematic segments
-            clean_segments = []
-            for segment in traffic_segments:
-                try:
-                    json.dumps(segment)
-                    clean_segments.append(segment)
-                except:
-                    continue
-            traffic_segments = clean_segments
-            print(f"   ✅ Cleaned segments: {len(traffic_segments)} valid segments")
+        # Load traffic data with cache (only reloads if traffic file changed)
+        traffic_segments = load_traffic_with_cache(edge_lookup)
         
         return jsonify({
             'success': True,
             'segments': traffic_segments,
             'total_segments': len(traffic_segments),
-            'timestamp': time.time()
+            'cached': {
+                'edges_loaded_at': _edges_cache['loaded_at'],
+                'traffic_loaded_at': _traffic_cache['loaded_at']
+            }
         })
         
     except Exception as e:
@@ -1598,7 +1534,7 @@ def get_traffic_with_geometry():
         traceback.print_exc()
         return jsonify({
             'success': False,
-            'error': f"Error loading traffic with geometry: {str(e)}"
+            'error': f"Error loading traffic: {str(e)}"
         })
 
 
