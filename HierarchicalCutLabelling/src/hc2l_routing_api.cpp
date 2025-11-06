@@ -325,15 +325,36 @@ double calculate_eta_with_flow(
             );
         }
         
-        // Get flow data for this edge
+        if (edge_distance <= 0) continue;
+        
+        // CRITICAL FIX: Use actual speed from flow data if available
+        double current_speed_kmh = 0.0;
         double jam_factor = 5.0; // Default
+        
         if (flow_data.count(edge_key)) {
-            jam_factor = flow_data.at(edge_key).jam_factor;
+            const auto& flow = flow_data.at(edge_key);
+            jam_factor = flow.jam_factor;
+            
+            // Prefer actual current speed over jam factor calculation
+            if (flow.current_speed > 0.1) {
+                current_speed_kmh = flow.current_speed;
+            } else if (flow.free_flow_speed > 0.1) {
+                // Estimate from jam factor and free flow speed
+                double jam_reduction = min(1.0, jam_factor / 10.0);
+                current_speed_kmh = flow.free_flow_speed * (1.0 - jam_reduction * 0.9);
+            }
         }
         
-        // Calculate segment ETA
-        double segment_eta = calculate_eta_seconds(edge_distance, jam_factor, hour_of_day);
-        total_eta += segment_eta;
+        // Fallback to time-based calculation if no speed data
+        if (current_speed_kmh <= 0.1) {
+            double segment_eta = calculate_eta_seconds(edge_distance, jam_factor, hour_of_day);
+            total_eta += segment_eta;
+        } else {
+            // Use actual speed: time = distance / speed
+            current_speed_kmh = max(current_speed_kmh, 1.0); // Ensure minimum
+            double edge_eta = edge_distance / (current_speed_kmh / 3.6); // distance(m) / speed(m/s)
+            total_eta += edge_eta;
+        }
     }
     
     return total_eta;
@@ -645,9 +666,16 @@ bool load_disruptions_with_cache(
         if (new_weight == 0 && old_weight > 0) {
             if (is_closed) {
                 new_weight = 999999;
-            } else if (current_speed > 0) {
+            } else if (current_speed > 0.1 && free_flow_speed > 0.1) {
                 // Scale weight by speed reduction: new = old * (freeflow / current)
-                new_weight = static_cast<distance_t>(old_weight * (free_flow_speed / max(current_speed, 1.0)));
+                // Clamp ratio to reasonable range [1.0, 10.0]
+                double speed_ratio = free_flow_speed / current_speed;
+                speed_ratio = min(10.0, max(1.0, speed_ratio));
+                new_weight = static_cast<distance_t>(old_weight * speed_ratio);
+            } else if (jam_factor > 0.0) {
+                // Use jam factor as fallback
+                double flow_multiplier = 1.0 + (jam_factor / 10.0) * 4.0;
+                new_weight = static_cast<distance_t>(old_weight * flow_multiplier);
             } else {
                 new_weight = old_weight;
             }

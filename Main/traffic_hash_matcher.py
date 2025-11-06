@@ -308,9 +308,45 @@ class TrafficHashMatcher:
         current_flow = flow_item.get('currentFlow', {})
         free_flow = flow_item.get('freeFlow', {})
         
-        speed_kph = current_flow.get('speed', 0.0)
-        free_flow_kph = free_flow.get('speed', 0.0)
+        # HERE API returns speed in m/s, convert to km/h
+        speed_ms = current_flow.get('speed', 0.0)
+        free_flow_ms = free_flow.get('speed', 0.0)
+        
+        speed_kph = speed_ms * 3.6 if speed_ms > 0 else 0.0
+        free_flow_kph = free_flow_ms * 3.6 if free_flow_ms > 0 else 0.0
         jam_factor = current_flow.get('jamFactor', 0.0)
+        
+        # CRITICAL FIX: If free_flow_kph is 0 or missing, estimate from highway type
+        # This is essential for accurate weight calculations in C++
+        if free_flow_kph == 0.0:
+            # Use first matched edge's highway type to estimate free flow speed
+            if matched_edges:
+                highway = matched_edges[0].highway_type.lower() if matched_edges[0].highway_type else 'unknown'
+                if 'motorway' in highway:
+                    free_flow_kph = 110.0
+                elif 'trunk' in highway:
+                    free_flow_kph = 90.0
+                elif 'primary' in highway:
+                    free_flow_kph = 70.0
+                elif 'secondary' in highway:
+                    free_flow_kph = 60.0
+                elif 'tertiary' in highway:
+                    free_flow_kph = 50.0
+                elif 'residential' in highway:
+                    free_flow_kph = 40.0
+                else:
+                    free_flow_kph = 50.0  # Default for unknown
+            else:
+                free_flow_kph = 50.0  # Default if no edges
+        
+        # FIX: If current speed is 0 but we have jam_factor, estimate from free flow
+        if speed_kph == 0.0 and jam_factor > 0.0 and free_flow_kph > 0.0:
+            # Calculate speed from jam factor: 0 = free flow, 10 = stopped
+            speed_reduction_ratio = min(1.0, jam_factor / 10.0)
+            speed_kph = free_flow_kph * (1.0 - speed_reduction_ratio * 0.9)  # Max 90% reduction
+        elif speed_kph == 0.0:
+            # If still 0, use free flow (assume no congestion)
+            speed_kph = free_flow_kph
         
         # Populate traffic metrics for all matched edges
         result_edges = []

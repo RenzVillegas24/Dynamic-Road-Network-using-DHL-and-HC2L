@@ -705,15 +705,22 @@ bool load_disruptions_with_cache(
                     // CRITICAL FIX: Calculate new weight based on actual traffic speeds
                     // Formula: new_weight = distance * (freeflow_speed / current_speed)
                     // This makes congested edges "longer" in terms of travel time
-                    if (current_speed > 0 && free_flow_speed > 0) {
+                    if (current_speed > 0.1 && free_flow_speed > 0.1) {
                         // Speed-based weight adjustment (time = distance / speed)
-                        double speed_ratio = free_flow_speed / max(current_speed, 1.0);
+                        // Clamp speed ratio to reasonable range [1.0, 10.0]
+                        double speed_ratio = free_flow_speed / current_speed;
+                        speed_ratio = min(10.0, max(1.0, speed_ratio));
                         new_weight = static_cast<distance_t>(old_weight * speed_ratio);
                         
-                        cerr << "   📊 Edge " << source << "→" << target 
-                             << ": base=" << old_weight 
-                             << "m, speed_ratio=" << speed_ratio 
-                             << ", new=" << new_weight << "m" << endl;
+                        // Only log significant changes
+                        if (speed_ratio > 1.5) {
+                            cerr << "   📊 Edge " << source << "→" << target 
+                                 << ": base=" << old_weight 
+                                 << "m, speed=" << current_speed 
+                                 << "/" << free_flow_speed << "km/h"
+                                 << ", ratio=" << speed_ratio 
+                                 << ", new=" << new_weight << "m" << endl;
+                        }
                     } else {
                         // Fallback to jam factor if speeds not available
                         double flow_multiplier = 1.0 + (jam_factor / 10.0) * 4.0;

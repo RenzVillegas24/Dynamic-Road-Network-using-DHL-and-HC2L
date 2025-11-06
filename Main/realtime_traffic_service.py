@@ -286,13 +286,49 @@ class RealtimeTrafficService:
                 # Get highway type (from matched edges CSV)
                 highway_type = str(row.get('highway_type', 'unknown')).replace(' ', '_')
                 
+                # CRITICAL FIX: Ensure free_flow_kph is never 0 to avoid division errors
+                if free_flow_kph <= 0.0:
+                    # Estimate from highway type
+                    hw_lower = highway_type.lower()
+                    if 'motorway' in hw_lower:
+                        free_flow_kph = 110.0
+                    elif 'trunk' in hw_lower:
+                        free_flow_kph = 90.0
+                    elif 'primary' in hw_lower:
+                        free_flow_kph = 70.0
+                    elif 'secondary' in hw_lower:
+                        free_flow_kph = 60.0
+                    elif 'tertiary' in hw_lower:
+                        free_flow_kph = 50.0
+                    elif 'residential' in hw_lower:
+                        free_flow_kph = 40.0
+                    else:
+                        free_flow_kph = 50.0  # Default
+                
+                # CRITICAL FIX: Ensure speed_kph is valid
+                if speed_kph <= 0.0:
+                    if jam_factor > 0.0:
+                        # Estimate from jam factor
+                        speed_reduction = min(1.0, jam_factor / 10.0)
+                        speed_kph = free_flow_kph * (1.0 - speed_reduction * 0.9)
+                    else:
+                        # No congestion, use free flow
+                        speed_kph = free_flow_kph
+                
+                # Ensure speed doesn't exceed free flow
+                speed_kph = min(speed_kph, free_flow_kph)
+                
                 # Calculate weight from jam factor and speed
                 if is_closed:
                     weight = 999999  # Very high penalty for closed roads
                     incident_type = 'closure'
-                elif free_flow_kph > 0:
-                    # Weight proportional to travel time
-                    weight = int(1000 * (1.0 + jam_factor / 10.0))
+                elif free_flow_kph > 0 and speed_kph > 0:
+                    # Weight based on travel time: weight ∝ time = distance / speed
+                    # Higher jam factor = higher weight multiplier
+                    base_weight = 1000
+                    time_multiplier = free_flow_kph / speed_kph  # > 1.0 when congested
+                    weight = int(base_weight * time_multiplier)
+                    
                     # Determine incident type from jam factor
                     if jam_factor >= 8.0:
                         incident_type = 'accident'
@@ -301,16 +337,19 @@ class RealtimeTrafficService:
                     else:
                         incident_type = 'flow'
                 else:
+                    # Fallback: use jam factor only
                     weight = int(1000 * (1.0 + jam_factor / 10.0))
                     incident_type = 'flow'
                 
                 # Calculate impact score (0.0 to 1.0)
+                # Based on actual speed reduction
                 if is_closed:
                     impact_score = 1.0
                 else:
-                    # Based on speed reduction
-                    speed_ratio = speed_kph / free_flow_kph if free_flow_kph > 0 else 0.5
-                    impact_score = round(1.0 - speed_ratio, 3)
+                    # Speed ratio: how much slower than free flow
+                    speed_ratio = speed_kph / free_flow_kph if free_flow_kph > 0 else 1.0
+                    # Impact is inverse of speed ratio (0 = no impact, 1 = complete blockage)
+                    impact_score = round(max(0.0, min(1.0, 1.0 - speed_ratio)), 3)
                 
                 # Confidence (assume high for HERE API data)
                 confidence = 0.9
