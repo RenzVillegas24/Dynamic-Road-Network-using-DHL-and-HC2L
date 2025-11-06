@@ -4,6 +4,9 @@ import pandas as pd
 import time
 from pathlib import Path
 import atexit
+import logging
+from collections import deque
+from datetime import datetime
 
 # Import configuration
 from config import Config
@@ -28,6 +31,54 @@ app = Flask(__name__)
 # Configure Flask from config file
 app.config['DEBUG'] = Config.FLASK_DEBUG
 app.config['ENV'] = Config.FLASK_ENV
+
+# ============================================================
+# BACKEND LOGGING SYSTEM
+# ============================================================
+
+# In-memory log buffer (thread-safe circular buffer)
+backend_logs = deque(maxlen=1000)  # Keep last 1000 logs
+backend_log_counter = 0
+
+class BackendLogHandler(logging.Handler):
+    """Custom log handler that captures logs to in-memory buffer"""
+    
+    def emit(self, record):
+        global backend_log_counter
+        backend_log_counter += 1
+        
+        try:
+            log_entry = {
+                'id': backend_log_counter,
+                'timestamp': record.created,
+                'level': record.levelname,
+                'message': self.format(record),
+                'module': record.module,
+                'line': record.lineno,
+                'function': record.funcName
+            }
+            backend_logs.append(log_entry)
+        except Exception as e:
+            # Fail silently to avoid breaking the app
+            print(f"Error in BackendLogHandler: {e}")
+
+# Configure backend logging
+backend_handler = BackendLogHandler()
+backend_handler.setLevel(logging.DEBUG)
+backend_formatter = logging.Formatter('%(levelname)s - %(module)s:%(lineno)d - %(message)s')
+backend_handler.setFormatter(backend_formatter)
+
+# Add handler to Flask logger and root logger
+app.logger.addHandler(backend_handler)
+logging.getLogger().addHandler(backend_handler)
+logging.getLogger().setLevel(logging.DEBUG)
+
+# Add initial log
+app.logger.info("Backend logging system initialized")
+
+# ============================================================
+# END BACKEND LOGGING SYSTEM
+# ============================================================
 
 # Initialize components using config paths
 mapper = NodeMapper(str(Config.NODES_CSV))
@@ -331,6 +382,35 @@ def cleanup_old_traffic_files(mode: str, max_files: int = 10):
 def index():
     return render_template('index.html')
 
+@app.route('/get_backend_logs')
+def get_backend_logs():
+    """
+    Return backend logs for Developer View
+    Optional 'since' parameter to get only new logs
+    """
+    try:
+        since_timestamp = float(request.args.get('since', 0))
+        
+        # Filter logs newer than 'since' timestamp
+        filtered_logs = [
+            log for log in backend_logs 
+            if log['timestamp'] > since_timestamp
+        ]
+        
+        return jsonify({
+            'success': True,
+            'logs': filtered_logs,
+            'total': len(filtered_logs),
+            'buffer_size': len(backend_logs)
+        })
+    except Exception as e:
+        app.logger.error(f"Error retrieving backend logs: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'logs': []
+        })
+
 @app.route('/request_new_dataset')
 def request_new_dataset():
     """Fetch latest traffic data using hash-based matching"""
@@ -366,6 +446,7 @@ def report_disruption():
     - Road closure toggle (completely blocks road)
     - Automatic jam factor calculation
     - Saving to disruptions CSV for route calculation
+    - OSM snapping for accurate road matching
     """
     import csv
     from datetime import datetime
@@ -389,19 +470,42 @@ def report_disruption():
         jam_factor = float(data.get('jam_factor', 5.0))
         is_closed = bool(data.get('is_closed', False))
         
-        # Find nearest road segment to apply disruption
-        snap_result = mapper.snap_to_nearest_road(lat, lng, max_distance=100)
+        # Use OSM road snapping for better accuracy
+        print(f"🗺️  Attempting OSM road snapping for ({lat}, {lng})...")
+        snap_result = mapper.snap_to_osm_road(lat, lng, max_distance_m=100)
         
         if snap_result is None:
-            return jsonify({
-                'success': False,
-                'error': 'No road within 100m of this location'
-            })
-        
-        # Get edge information
-        source_id = snap_result['edge'][0]
-        target_id = snap_result['edge'][1]
-        road_name = snap_result['road_name']
+            print(f"⚠️  OSM snapping failed, falling back to basic snap")
+            # Fallback to basic nearest road snap
+            snap_result = mapper.snap_to_nearest_road(lat, lng, max_distance=100)
+            
+            if snap_result is None:
+                return jsonify({
+                    'success': False,
+                    'error': 'No road within 100m of this location'
+                })
+            
+            # Use basic snap result
+            source_id = snap_result['edge'][0]
+            target_id = snap_result['edge'][1]
+            road_name = snap_result['road_name']
+            snapped_lat = snap_result['projection_point']['lat']
+            snapped_lng = snap_result['projection_point']['lng']
+        else:
+            # Use OSM snap result (routing nodes are the actual graph nodes)
+            if snap_result.get('routing_nodes') and len(snap_result['routing_nodes']) >= 2:
+                source_id = snap_result['routing_nodes'][0]
+                target_id = snap_result['routing_nodes'][1]
+            else:
+                # Fallback to OSM nodes if routing nodes not available
+                source_id = snap_result['osm_nodes'][0]
+                target_id = snap_result['osm_nodes'][1]
+            
+            road_name = snap_result['road_name']
+            snapped_lat = snap_result['snapped_point']['lat']
+            snapped_lng = snap_result['snapped_point']['lng']
+            
+            print(f"✅ OSM snap successful: {road_name} (Edge: {source_id}→{target_id})")
         
         print(f"✅ Mapped to road: {road_name} (Edge: {source_id}→{target_id})")
         print(f"   Custom flow: {custom_speed} km/h, Jam Factor: {jam_factor}, Closed: {is_closed}")
@@ -415,6 +519,7 @@ def report_disruption():
         with open(user_disruptions_file, 'a', newline='') as csvfile:
             fieldnames = [
                 'timestamp', 'source', 'target', 'lat', 'lng',
+                'snapped_lat', 'snapped_lng', 
                 'road_name', 'incident_type', 'severity',
                 'speed_kph', 'freeFlow_kph', 'jamFactor', 'isClosed',
                 'description'
@@ -430,6 +535,8 @@ def report_disruption():
                 'target': target_id,
                 'lat': lat,
                 'lng': lng,
+                'snapped_lat': snapped_lat,
+                'snapped_lng': snapped_lng,
                 'road_name': road_name,
                 'incident_type': incident_type,
                 'severity': severity,
@@ -442,11 +549,15 @@ def report_disruption():
         
         print(f"💾 Saved user disruption to: {user_disruptions_file.name}")
         
+        # IMPORTANT: Merge user disruptions with existing traffic data
+        merge_user_disruptions_with_traffic()
+        
         return jsonify({
             'success': True,
             'message': f'Disruption reported on {road_name}',
             'road_name': road_name,
             'edge': {'source': source_id, 'target': target_id},
+            'snapped_location': {'lat': snapped_lat, 'lng': snapped_lng},
             'custom_flow': {
                 'speed_kph': custom_speed,
                 'jam_factor': jam_factor,
@@ -462,6 +573,100 @@ def report_disruption():
             'success': False,
             'error': str(e)
         })
+
+
+def merge_user_disruptions_with_traffic():
+    """
+    Merge user-reported disruptions with existing traffic data
+    This ensures user disruptions appear on top of real-time traffic
+    """
+    import glob
+    import pandas as pd
+    
+    try:
+        user_disruptions_file = Config.DISRUPTIONS_DIR / 'user_reported_disruptions.csv'
+        
+        if not user_disruptions_file.exists():
+            print("ℹ️  No user disruptions to merge")
+            return
+        
+        # Load user disruptions
+        user_df = pd.read_csv(user_disruptions_file)
+        print(f"📊 Found {len(user_df)} user-reported disruptions")
+        
+        # Find latest traffic file
+        traffic_pattern = "traffic_*_both.csv"
+        traffic_files = sorted(Config.DISRUPTIONS_DIR.glob(traffic_pattern), reverse=True)
+        
+        if traffic_files:
+            # Load existing traffic data
+            latest_traffic = traffic_files[0]
+            traffic_df = pd.read_csv(latest_traffic)
+            print(f"📊 Loaded {len(traffic_df)} traffic segments from {latest_traffic.name}")
+            
+            # Rename columns to match traffic format
+            user_df_renamed = user_df.rename(columns={
+                'snapped_lat': 'source_lat',
+                'snapped_lng': 'source_lon'
+            })
+            
+            # Add missing columns with defaults
+            if 'target_lat' not in user_df_renamed.columns:
+                user_df_renamed['target_lat'] = user_df_renamed['source_lat']
+            if 'target_lon' not in user_df_renamed.columns:
+                user_df_renamed['target_lon'] = user_df_renamed['source_lon']
+            
+            # Ensure all required columns exist
+            required_cols = ['source', 'target', 'source_lat', 'source_lon', 'target_lat', 'target_lon',
+                           'road_name', 'speed_kph', 'freeFlow_kph', 'jamFactor', 'isClosed']
+            
+            for col in required_cols:
+                if col not in user_df_renamed.columns:
+                    if col in ['speed_kph', 'freeFlow_kph', 'jamFactor']:
+                        user_df_renamed[col] = 30.0 if col == 'speed_kph' else 50.0 if col == 'freeFlow_kph' else 5.0
+                    elif col == 'isClosed':
+                        user_df_renamed[col] = 0
+                    else:
+                        user_df_renamed[col] = ''
+            
+            # Merge: user disruptions take priority (added first)
+            merged_df = pd.concat([user_df_renamed[required_cols], traffic_df[required_cols]], ignore_index=True)
+            
+            # Remove duplicates (keep user-reported ones)
+            merged_df = merged_df.drop_duplicates(subset=['source', 'target'], keep='first')
+            
+            # Save merged data
+            from datetime import datetime
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            merged_file = Config.DISRUPTIONS_DIR / f'traffic_{timestamp}_both.csv'
+            merged_df.to_csv(merged_file, index=False)
+            
+            print(f"✅ Merged traffic data saved: {merged_file.name} ({len(merged_df)} total segments)")
+            print(f"   📍 User disruptions: {len(user_df_renamed)}, Traffic: {len(traffic_df)}")
+            
+        else:
+            # No existing traffic data, just save user disruptions as traffic data
+            from datetime import datetime
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            new_file = Config.DISRUPTIONS_DIR / f'traffic_{timestamp}_both.csv'
+            
+            # Prepare user disruptions in traffic format
+            user_traffic = user_df.copy()
+            user_traffic = user_traffic.rename(columns={
+                'snapped_lat': 'source_lat',
+                'snapped_lng': 'source_lon'
+            })
+            
+            required_cols = ['source', 'target', 'source_lat', 'source_lon',
+                           'road_name', 'speed_kph', 'freeFlow_kph', 'jamFactor', 'isClosed']
+            
+            user_traffic.to_csv(new_file, index=False, columns=required_cols)
+            print(f"✅ Created traffic file from user disruptions: {new_file.name}")
+            
+    except Exception as e:
+        print(f"⚠️  Error merging user disruptions: {e}")
+        import traceback
+        traceback.print_exc()
 
 @app.route('/search_location', methods=['POST'])
 def search_location():

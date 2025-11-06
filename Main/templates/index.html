@@ -952,80 +952,21 @@
         <!-- Performance Metrics -->
         <div class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-5 border border-slate-300 shadow-sm">
           <h3 class="font-bold text-slate-800 mb-4 text-lg">Performance Metrics</h3>
-          <div class="space-y-2">
-            <!-- Core Algorithm Metrics -->
+          <div class="space-y-3">
             <div
-              class="flex justify-between bg-white p-3 rounded-xl border-2 border-slate-200 shadow-sm hover:shadow-md transition-all">
-              <span class="text-xs font-semibold text-slate-700">Labeling Time</span>
-              <span id="perf-labeling-time" class="font-bold text-emerald-600 text-sm">-</span>
-            </div>
-            <div
-              class="flex justify-between bg-white p-3 rounded-xl border-2 border-slate-200 shadow-sm hover:shadow-md transition-all">
-              <span class="text-xs font-semibold text-slate-700">Labeling Size</span>
-              <span id="perf-labeling-size" class="font-bold text-blue-600 text-sm">-</span>
+              class="flex justify-between bg-white p-4 rounded-xl border-2 border-slate-200 shadow-sm hover:shadow-md transition-all">
+              <span class="text-sm font-semibold text-slate-700">Labeling Time</span>
+              <span id="perf-labeling-time" class="font-bold text-emerald-600 text-lg">-</span>
             </div>
             <div
-              class="flex justify-between bg-white p-3 rounded-xl border-2 border-slate-200 shadow-sm hover:shadow-md transition-all">
-              <span class="text-xs font-semibold text-slate-700">Query Time</span>
-              <span id="perf-query-time" class="font-bold text-indigo-600 text-sm">-</span>
-            </div>
-            
-            <!-- Route Information -->
-            <div class="pt-2 border-t-2 border-slate-300"></div>
-            <div
-              class="flex justify-between bg-white p-3 rounded-xl border-2 border-slate-200 shadow-sm hover:shadow-md transition-all">
-              <span class="text-xs font-semibold text-slate-700">Path Length</span>
-              <span id="perf-path-length" class="font-bold text-purple-600 text-sm">-</span>
+              class="flex justify-between bg-white p-4 rounded-xl border-2 border-slate-200 shadow-sm hover:shadow-md transition-all">
+              <span class="text-sm font-semibold text-slate-700">Labeling Size</span>
+              <span id="perf-labeling-size" class="font-bold text-blue-600 text-lg">-</span>
             </div>
             <div
-              class="flex justify-between bg-white p-3 rounded-xl border-2 border-slate-200 shadow-sm hover:shadow-md transition-all">
-              <span class="text-xs font-semibold text-slate-700">Route Distance</span>
-              <span id="perf-route-distance" class="font-bold text-cyan-600 text-sm">-</span>
-            </div>
-            <div
-              class="flex justify-between bg-white p-3 rounded-xl border-2 border-slate-200 shadow-sm hover:shadow-md transition-all">
-              <span class="text-xs font-semibold text-slate-700">Estimated ETA</span>
-              <span id="perf-eta" class="font-bold text-orange-600 text-sm">-</span>
-            </div>
-            
-            <!-- Advanced Metrics (HC2L specific) -->
-            <div id="perf-advanced-section" class="hidden">
-              <div class="pt-2 border-t-2 border-slate-300"></div>
-              <div
-                class="flex justify-between bg-white p-3 rounded-xl border-2 border-slate-200 shadow-sm hover:shadow-md transition-all">
-                <span class="text-xs font-semibold text-slate-700">Total Labels</span>
-                <span id="perf-total-labels" class="font-bold text-rose-600 text-sm">-</span>
-              </div>
-              <div
-                class="flex justify-between bg-white p-3 rounded-xl border-2 border-slate-200 shadow-sm hover:shadow-md transition-all">
-                <span class="text-xs font-semibold text-slate-700">Hierarchy Height</span>
-                <span id="perf-hierarchy-height" class="font-bold text-teal-600 text-sm">-</span>
-              </div>
-              <div
-                class="flex justify-between bg-white p-3 rounded-xl border-2 border-slate-200 shadow-sm hover:shadow-md transition-all">
-                <span class="text-xs font-semibold text-slate-700">Avg Cut Size</span>
-                <span id="perf-avg-cut-size" class="font-bold text-amber-600 text-sm">-</span>
-              </div>
-            </div>
-            
-            <!-- LazyHC2L Metrics -->
-            <div id="perf-lazy-section" class="hidden">
-              <div class="pt-2 border-t-2 border-slate-300"></div>
-              <div
-                class="flex justify-between bg-white p-3 rounded-xl border-2 border-slate-200 shadow-sm hover:shadow-md transition-all">
-                <span class="text-xs font-semibold text-slate-700">Impact Score</span>
-                <span id="perf-impact-score" class="font-bold text-red-600 text-sm">-</span>
-              </div>
-              <div
-                class="flex justify-between bg-white p-3 rounded-xl border-2 border-slate-200 shadow-sm hover:shadow-md transition-all">
-                <span class="text-xs font-semibold text-slate-700">Dirty Nodes</span>
-                <span id="perf-dirty-nodes" class="font-bold text-yellow-600 text-sm">-</span>
-              </div>
-              <div
-                class="flex justify-between bg-white p-3 rounded-xl border-2 border-slate-200 shadow-sm hover:shadow-md transition-all">
-                <span class="text-xs font-semibold text-slate-700">Cache Status</span>
-                <span id="perf-cache-status" class="font-bold text-green-600 text-sm">-</span>
-              </div>
+              class="flex justify-between bg-white p-4 rounded-xl border-2 border-slate-200 shadow-sm hover:shadow-md transition-all">
+              <span class="text-sm font-semibold text-slate-700">Query Response Time</span>
+              <span id="perf-query-time" class="font-bold text-indigo-600 text-lg">-</span>
             </div>
           </div>
 
@@ -1118,8 +1059,304 @@
               </div>
               <span class="font-bold text-amber-700">Run Demo</span>
             </button>
+
+            <!-- Create Custom Demo Button -->
+            <button id="custom-demo-btn" onclick="openDemoCreator()"
+              class="w-full flex items-center space-x-3 px-3 py-3 glass-effect hover:shadow-md rounded-2xl transition-all duration-300 border-2 border-purple-400 bg-gradient-to-r from-purple-50 to-indigo-50">
+              <div class="bg-gradient-to-br from-purple-600 to-indigo-600 rounded-xl p-2 shadow-sm">
+                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                </svg>
+              </div>
+              <span class="font-bold text-purple-700">Create Custom Demo</span>
+            </button>
+
+            <!-- Open Developer View Button -->
+            <button id="developer-view-btn" onclick="openDeveloperView()"
+              class="w-full flex items-center space-x-3 px-3 py-3 glass-effect hover:shadow-md rounded-2xl transition-all duration-300 border-2 border-emerald-400 bg-gradient-to-r from-emerald-50 to-green-50">
+              <div class="bg-gradient-to-br from-emerald-600 to-green-600 rounded-xl p-2 shadow-sm">
+                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                    d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
+                </svg>
+              </div>
+              <span class="font-bold text-emerald-700">Developer View</span>
+            </button>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- Custom Demo Creator Panel -->
+    <div id="demo-creator-panel"
+      class="fixed top-0 right-0 w-[40rem] h-full glass-effect shadow-2xl transform translate-x-full transition-transform duration-300 overflow-y-auto z-50 border-l border-slate-200/50">
+      
+      <div class="p-6 bg-gradient-to-r from-purple-600 via-purple-700 to-indigo-700 text-white flex justify-between items-center sticky top-0 z-10">
+        <div>
+          <h2 class="font-bold text-2xl mb-1">Custom Demo Creator</h2>
+          <p class="text-purple-100 text-sm">Create highly customizable demo scenarios</p>
+        </div>
+        <button onclick="closeDemoCreator()" class="hover:bg-white/20 rounded-xl p-2 transition-all">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Step Indicators -->
+      <div class="p-6 bg-slate-50 border-b border-slate-200">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <div id="step-indicator-locations" class="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm">1</div>
+            <span class="text-sm font-semibold">Locations</span>
+          </div>
+          <div class="flex-1 h-0.5 bg-gray-300 mx-2"></div>
+          <div class="flex items-center gap-2">
+            <div id="step-indicator-traffic" class="w-10 h-10 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center font-bold text-sm">2</div>
+            <span class="text-sm font-semibold">Traffic</span>
+          </div>
+          <div class="flex-1 h-0.5 bg-gray-300 mx-2"></div>
+          <div class="flex items-center gap-2">
+            <div id="step-indicator-sequence" class="w-10 h-10 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center font-bold text-sm">3</div>
+            <span class="text-sm font-semibold">Sequence</span>
+          </div>
+          <div class="flex-1 h-0.5 bg-gray-300 mx-2"></div>
+          <div class="flex items-center gap-2">
+            <div id="step-indicator-review" class="w-10 h-10 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center font-bold text-sm">4</div>
+            <span class="text-sm font-semibold">Review</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-6">
+        <!-- Step 1: Locations -->
+        <div id="demo-step-locations" class="space-y-5">
+          <h3 class="font-bold text-lg text-slate-800">Configure Route Locations</h3>
+          
+          <button onclick="addWaypointFromMap()" 
+                  class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-xl shadow-md transition-all">
+            📍 Add Waypoint on Map
+          </button>
+          
+          <div id="waypoints-list" class="space-y-2 max-h-80 overflow-y-auto">
+            <!-- Waypoints will be inserted here -->
+          </div>
+          
+          <button onclick="markLastWaypointAsEnd()" 
+                  class="w-full bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg shadow transition-all text-sm">
+            🔴 Mark Last as Destination
+          </button>
+        </div>
+
+        <!-- Step 2: Traffic -->
+        <div id="demo-step-traffic" class="space-y-5 hidden">
+          <h3 class="font-bold text-lg text-slate-800">Traffic Configuration</h3>
+          
+          <label class="flex items-center justify-between p-4 bg-slate-100 rounded-xl cursor-pointer">
+            <span class="font-semibold">Enable Traffic Data</span>
+            <input type="checkbox" id="demo-traffic-enabled" class="toggle-checkbox">
+          </label>
+          
+          <div class="space-y-3">
+            <label class="block cursor-pointer p-3 border-2 border-slate-300 rounded-lg hover:bg-slate-50">
+              <input type="radio" name="demo-traffic-mode" value="both" checked class="mr-2">
+              <span class="font-medium">Real-time (HERE API)</span>
+            </label>
+            <label class="block cursor-pointer p-3 border-2 border-slate-300 rounded-lg hover:bg-slate-50">
+              <input type="radio" name="demo-traffic-mode" value="custom" class="mr-2">
+              <span class="font-medium">Custom Segments</span>
+            </label>
+          </div>
+          
+          <button onclick="addTrafficSegmentFromMap()" 
+                  class="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-4 rounded-xl shadow-md transition-all">
+            🚦 Add Traffic Segment
+          </button>
+          
+          <div id="traffic-segments-list" class="space-y-2 max-h-60 overflow-y-auto">
+            <!-- Traffic segments will be inserted here -->
+          </div>
+        </div>
+
+        <!-- Step 3: Sequence -->
+        <div id="demo-step-sequence" class="space-y-5 hidden">
+          <h3 class="font-bold text-lg text-slate-800">Demo Sequence Configuration</h3>
+          
+          <div>
+            <label class="block font-semibold mb-2">Algorithm</label>
+            <select id="demo-algorithm" class="w-full p-3 border-2 border-slate-300 rounded-xl">
+              <option value="hc2l">HC2L</option>
+              <option value="dhl">DHL</option>
+              <option value="both">Both (Comparison)</option>
+            </select>
+          </div>
+          
+          <div>
+            <label class="block font-semibold mb-2">τ (Tau) Values to Test</label>
+            <input type="text" id="demo-tau-values" placeholder="0.3, 0.5, 0.7" 
+                   class="w-full p-3 border-2 border-slate-300 rounded-xl">
+            <p class="text-xs text-slate-500 mt-1">Comma-separated values (e.g., 0.3, 0.5, 0.7)</p>
+          </div>
+          
+          <label class="flex items-center justify-between p-4 bg-slate-100 rounded-xl cursor-pointer">
+            <span class="font-semibold">Show Metrics</span>
+            <input type="checkbox" id="demo-show-metrics" checked class="toggle-checkbox">
+          </label>
+          
+          <div>
+            <label class="block font-semibold mb-2">Step Delay (ms)</label>
+            <input type="number" id="demo-step-delay" value="2000" min="500" max="10000" step="500"
+                   class="w-full p-3 border-2 border-slate-300 rounded-xl">
+          </div>
+        </div>
+
+        <!-- Step 4: Review -->
+        <div id="demo-step-review" class="space-y-5 hidden">
+          <h3 class="font-bold text-lg text-slate-800">Review & Run</h3>
+          
+          <div>
+            <label class="block font-semibold mb-2">Demo Name</label>
+            <input type="text" id="demo-name-input" placeholder="My Custom Demo" 
+                   class="w-full p-3 border-2 border-slate-300 rounded-xl">
+          </div>
+          
+          <div>
+            <label class="block font-semibold mb-2">Description (optional)</label>
+            <textarea id="demo-description-input" rows="3" placeholder="Describe your demo..." 
+                      class="w-full p-3 border-2 border-slate-300 rounded-xl"></textarea>
+          </div>
+          
+          <div id="demo-review-summary" class="bg-slate-100 rounded-xl p-4">
+            <!-- Summary will be inserted here -->
+          </div>
+          
+          <div class="flex gap-3">
+            <button onclick="saveDemoConfig()" 
+                    class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl shadow-md transition-all">
+              💾 Save Config
+            </button>
+            <button onclick="runCreatedDemo()" 
+                    class="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl shadow-md transition-all">
+              ▶️ Run Now
+            </button>
+          </div>
+        </div>
+
+        <!-- Navigation Buttons -->
+        <div class="flex gap-3 mt-6 pt-6 border-t border-slate-200">
+          <button onclick="demoCreatorPrevStep()" id="demo-prev-btn"
+                  class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-3 rounded-xl transition-all">
+            ← Previous
+          </button>
+          <button onclick="demoCreatorNextStep()" id="demo-next-btn"
+                  class="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl transition-all">
+            Next →
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Developer View Panel (Logging) -->
+    <div id="developer-view-panel"
+      class="fixed top-0 right-0 w-[45rem] h-full glass-effect shadow-2xl transform translate-x-full transition-transform duration-300 z-50 border-l border-slate-200/50 flex flex-col">
+      
+      <div class="p-6 bg-gradient-to-r from-emerald-600 via-green-600 to-teal-700 text-white flex justify-between items-center">
+        <div>
+          <h2 class="font-bold text-2xl mb-1">Developer View</h2>
+          <p class="text-green-100 text-sm">System logs and debugging</p>
+        </div>
+        <button onclick="closeDeveloperView()" class="hover:bg-white/20 rounded-xl p-2 transition-all">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Log Controls -->
+      <div class="p-4 bg-slate-100 border-b border-slate-200">
+        <div class="flex items-center gap-3 mb-3">
+          <button onclick="clearLogs()" 
+                  class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg shadow transition-all flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+            </svg>
+            Clear
+          </button>
+          <button onclick="exportLogs()" 
+                  class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg shadow transition-all flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                    d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            Export
+          </button>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <span class="text-sm font-semibold">Auto-scroll</span>
+            <input type="checkbox" id="log-autoscroll" checked class="toggle-checkbox" 
+                   onchange="LoggingSystem.autoScroll = this.checked">
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <span class="text-sm font-semibold text-blue-700">Console</span>
+            <input type="checkbox" id="console-log-toggle" class="toggle-checkbox" 
+                   onchange="toggleConsoleLogging(this.checked)">
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <span class="text-sm font-semibold text-green-700">Backend</span>
+            <input type="checkbox" id="backend-log-toggle" class="toggle-checkbox" 
+                   onchange="toggleBackendLogging(this.checked)">
+          </label>
+        </div>
+
+        <!-- Source Indicators -->
+        <div class="flex gap-2 mb-3">
+          <div class="flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 rounded-lg text-xs">
+            <span class="w-2 h-2 rounded-full bg-blue-600"></span>
+            <span class="font-semibold">Web Console</span>
+          </div>
+          <div class="flex items-center gap-1.5 px-3 py-1.5 bg-green-100 rounded-lg text-xs">
+            <span class="w-2 h-2 rounded-full bg-green-600"></span>
+            <span class="font-semibold">Python Backend</span>
+          </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="flex flex-wrap gap-2">
+          <label class="flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-lg cursor-pointer hover:bg-gray-50 border border-gray-200">
+            <input type="checkbox" id="filter-debug" checked onchange="toggleLogFilter('debug')">
+            <span class="text-xs font-semibold">🔧 Debug</span>
+          </label>
+          <label class="flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-lg cursor-pointer hover:bg-gray-50 border border-gray-200">
+            <input type="checkbox" id="filter-info" checked onchange="toggleLogFilter('info')">
+            <span class="text-xs font-semibold">ℹ️ Info</span>
+          </label>
+          <label class="flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-lg cursor-pointer hover:bg-gray-50 border border-gray-200">
+            <input type="checkbox" id="filter-success" checked onchange="toggleLogFilter('success')">
+            <span class="text-xs font-semibold">✅ Success</span>
+          </label>
+          <label class="flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-lg cursor-pointer hover:bg-gray-50 border border-gray-200">
+            <input type="checkbox" id="filter-warning" checked onchange="toggleLogFilter('warning')">
+            <span class="text-xs font-semibold">⚠️ Warning</span>
+          </label>
+          <label class="flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-lg cursor-pointer hover:bg-gray-50 border border-gray-200">
+            <input type="checkbox" id="filter-error" checked onchange="toggleLogFilter('error')">
+            <span class="text-xs font-semibold">❌ Error</span>
+          </label>
+          <label class="flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-lg cursor-pointer hover:bg-gray-50 border border-gray-200">
+            <input type="checkbox" id="filter-query" checked onchange="toggleLogFilter('query')">
+            <span class="text-xs font-semibold">🔍 Query</span>
+          </label>
+          <label class="flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-lg cursor-pointer hover:bg-gray-50 border border-gray-200">
+            <input type="checkbox" id="filter-update" checked onchange="toggleLogFilter('update')">
+            <span class="text-xs font-semibold">🔄 Update</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Log Entries -->
+      <div class="flex-1 overflow-y-auto p-4 bg-slate-50" id="log-entries-container">
+        <!-- Log entries will be inserted here dynamically -->
       </div>
     </div>
 
@@ -1296,8 +1533,54 @@
   <script src="{{ url_for('static', filename='js/map-legend.js') }}"></script>
   <script src="{{ url_for('static', filename='js/csv-export.js') }}"></script>
   <script src="{{ url_for('static', filename='js/demo-automation.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/logging-system.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/custom-demo-creator.js') }}"></script>
 
   <script>
+
+    // Helper functions for panels
+    function openDeveloperView() {
+      const panel = document.getElementById('developer-view-panel');
+      if (panel) {
+        panel.classList.remove('translate-x-full');
+        logInfo('Developer View opened');
+        
+        // Start backend log polling when panel opens (if enabled)
+        if (document.getElementById('backend-log-toggle')?.checked) {
+          startBackendLogPolling(5000);  // 5 second interval to reduce load
+        }
+      }
+    }
+
+    function closeDeveloperView() {
+      const panel = document.getElementById('developer-view-panel');
+      if (panel) {
+        panel.classList.add('translate-x-full');
+        
+        // Stop backend log polling when panel closes
+        stopBackendLogPolling();
+      }
+    }
+
+    function toggleConsoleLogging(enabled) {
+      if (enabled) {
+        interceptConsoleLogs();
+        logSuccess('Console logging enabled');
+      } else {
+        restoreConsoleLogs();
+        logInfo('Console logging disabled');
+      }
+    }
+
+    function toggleBackendLogging(enabled) {
+      if (enabled) {
+        startBackendLogPolling(5000);  // 5 second interval to reduce load
+        logSuccess('Backend logging enabled (polling every 5s)');
+      } else {
+        stopBackendLogPolling();
+        logInfo('Backend logging disabled');
+      }
+    }
 
     // Initialize Leaflet Map
     function initMap() {
@@ -1328,10 +1611,12 @@
 
         setupMapClickHandlers();
         showUpdateToast("OpenStreetMap loaded successfully", 'success');
+        logSuccess('OpenStreetMap initialized successfully');
       } catch (error) {
         console.error("Failed to initialize OpenStreetMap:", error);
         document.getElementById("map-placeholder").classList.remove("hidden");
         showUpdateToast("Failed to load OpenStreetMap", 'warning');
+        logError('Failed to initialize OpenStreetMap', { error: error.message });
       }
     }
 
