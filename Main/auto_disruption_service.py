@@ -151,28 +151,14 @@ class AutoDisruptionService:
             logger.error(f"Error triggering recalculation: {e}")
     
     def _run_loop(self):
-        """Main service loop - fetches traffic data and monitors changes"""
-        logger.info("🔄 Auto-disruption service loop started")
-        
-        # Import traffic service
-        try:
-            from realtime_traffic_service import RealtimeTrafficService
-            traffic_service = RealtimeTrafficService()
-            logger.info("✅ RealtimeTrafficService initialized in background thread")
-        except Exception as e:
-            logger.error(f"❌ Failed to initialize traffic service: {e}")
-            traffic_service = None
+        """Main service loop - monitors file changes only (NO AUTO-FETCH)"""
+        logger.info("🔄 Auto-disruption service loop started (MONITORING ONLY)")
+        logger.info("   NOTE: Auto-fetch disabled - use manual refresh in UI")
         
         while self.running:
             try:
-                # Fetch latest traffic data if service is available
-                if traffic_service:
-                    try:
-                        logger.info("🌐 Fetching latest traffic data...")
-                        metadata = traffic_service.fetch_and_save(mode='both')
-                        logger.info(f"✅ Traffic data updated: {metadata.get('total_edges', 0)} edges")
-                    except Exception as e:
-                        logger.error(f"❌ Error fetching traffic data: {e}")
+                # DISABLED: Auto-fetch traffic data
+                # Files are now manually refreshed via UI only
                 
                 # Check if there are active routes
                 if self.active_routes:

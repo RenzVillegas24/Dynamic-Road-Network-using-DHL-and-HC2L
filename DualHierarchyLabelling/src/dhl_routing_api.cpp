@@ -642,6 +642,23 @@ bool load_disruptions_with_cache(
                     is_closed = (closed_str == "True" || closed_str == "true" || closed_str == "1") ? 1 : 0;
                 }
                 
+                // FIX: If freeFlow_kph is 0 (missing from traffic data), estimate from highway_type
+                if (free_flow_speed == 0.0) {
+                    // Look ahead to read highway_type column (index 11)
+                    if (csv_column_indices.count("highway_type") && csv_column_indices["highway_type"] < fields.size()) {
+                        string hw_type = fields[csv_column_indices["highway_type"]];
+                        if (hw_type.find("motorway") != string::npos) free_flow_speed = 110.0;
+                        else if (hw_type.find("trunk") != string::npos) free_flow_speed = 90.0;
+                        else if (hw_type.find("primary") != string::npos) free_flow_speed = 70.0;
+                        else if (hw_type.find("secondary") != string::npos) free_flow_speed = 60.0;
+                        else if (hw_type.find("tertiary") != string::npos) free_flow_speed = 50.0;
+                        else if (hw_type.find("residential") != string::npos) free_flow_speed = 40.0;
+                        else free_flow_speed = 50.0;  // Default
+                    } else {
+                        free_flow_speed = 50.0;  // Default estimate
+                    }
+                }
+                
                 // Infer disruption type from jam factor and closure status
                 if (is_closed) {
                     disruption_type = "road_closure";
@@ -792,13 +809,15 @@ map<NodeID, GPSCoordinate> load_node_coordinates(const string& filename) {
     }
     
     string line;
-    getline(file, line); // Skip header
+    getline(file, line); // Skip header (node_id,osm_id,latitude,longitude)
     
     while (getline(file, line)) {
         stringstream ss(line);
-        string node_id_str, lat_str, lng_str;
+        string node_id_str, osm_id_str, lat_str, lng_str;
         
+        // FIX: Read 4 columns from nodes CSV: node_id,osm_id,latitude,longitude
         if (getline(ss, node_id_str, ',') &&
+            getline(ss, osm_id_str, ',') &&
             getline(ss, lat_str, ',') &&
             getline(ss, lng_str, ',')) {
             
@@ -892,32 +911,39 @@ map<NodeID, vector<Neighbor>> load_edges(const string& filename, map<pair<NodeID
     while (getline(file, line)) {
         vector<string> fields = parse_csv_line(line);
         
-        // CSV columns: source,target,source_lat,source_lon,target_lat,target_lon,road_name,highway_type,length,freeFlow_kph,oneway,geometry
-        // Need at least 12 fields (indices 0-11)
-        if (fields.size() < 12) {
+        // CSV columns: source,target,osm_source,osm_target,source_lat,source_lon,target_lat,target_lon,length,highway_type,road_name,oneway,geometry
+        // UPDATED: Added osm_source and osm_target columns (indices 2-3)
+        // Need at least 13 fields (indices 0-12)
+        if (fields.size() < 13) {
             continue;
         }
         
         try {
-            NodeID source = stoul(fields[0]);
-            NodeID target = stoul(fields[1]);
+            NodeID source = stoul(fields[0]);                               // source (sequential ID)
+            NodeID target = stoul(fields[1]);                               // target (sequential ID)
+            // fields[2] = osm_source (not used in routing)
+            // fields[3] = osm_target (not used in routing)
+            // fields[4] = source_lat (not used here)
+            // fields[5] = source_lon (not used here)
+            // fields[6] = target_lat (not used here)
+            // fields[7] = target_lon (not used here)
             distance_t length = static_cast<distance_t>(stod(fields[8]));  // length is at index 8
-            string oneway_str = fields[10];                                 // oneway is at index 10
-            string geometry_json = fields[11];                              // geometry is at index 11
+            string oneway_str = fields[11];                                 // oneway is at index 11 (UPDATED)
+            string geometry_json = fields[12];                              // geometry is at index 12 (UPDATED)
             
-            // Load road name from column 6
+            // Load road name from column 10 (UPDATED from 6)
             string road_name = "";
-            if (fields.size() > 6 && !fields[6].empty()) {
-                road_name = fields[6];
+            if (fields.size() > 10 && !fields[10].empty()) {
+                road_name = fields[10];
                 // Trim whitespace
                 road_name.erase(0, road_name.find_first_not_of(" \t\n\r"));
                 road_name.erase(road_name.find_last_not_of(" \t\n\r") + 1);
             }
             
-            // Load highway type from column 7
+            // Load highway type from column 9 (UPDATED from 7)
             string highway_type = "road";  // Default
-            if (fields.size() > 7 && !fields[7].empty()) {
-                highway_type = fields[7];
+            if (fields.size() > 9 && !fields[9].empty()) {
+                highway_type = fields[9];
                 // Trim whitespace
                 highway_type.erase(0, highway_type.find_first_not_of(" \t\n\r"));
                 highway_type.erase(highway_type.find_last_not_of(" \t\n\r") + 1);
@@ -946,8 +972,8 @@ map<NodeID, vector<Neighbor>> load_edges(const string& filename, map<pair<NodeID
             int success_count = 0;
             
             if (!geometry_json.empty() && geometry_json != "[]") {
-                // Format is: [[lon1, lat1], [lon2, lat2], ...]
-                // Find all inner coordinate pairs [lon, lat]
+                // Format is: [[lat1, lon1], [lat2, lon2], ...] (CSV stores lat first!)
+                // Find all inner coordinate pairs [lat, lon]
                 size_t start = 0;
                 while ((start = geometry_json.find('[', start)) != string::npos) {
                     // Skip if this is the outer bracket
@@ -961,21 +987,21 @@ map<NodeID, vector<Neighbor>> load_edges(const string& filename, map<pair<NodeID
                     
                     string pair_str = geometry_json.substr(start + 1, end - start - 1);
                     
-                    // Parse "lon, lat" or "lon,lat" 
+                    // Parse "lat, lon" or "lat,lon" (CSV format has lat first!)
                     size_t comma = pair_str.find(',');
                     if (comma != string::npos) {
                         try {
-                            string lon_str = pair_str.substr(0, comma);
-                            string lat_str = pair_str.substr(comma + 1);
+                            string lat_str = pair_str.substr(0, comma);
+                            string lon_str = pair_str.substr(comma + 1);
                             
                             // Trim whitespace
-                            lon_str.erase(0, lon_str.find_first_not_of(" \t"));
-                            lon_str.erase(lon_str.find_last_not_of(" \t") + 1);
                             lat_str.erase(0, lat_str.find_first_not_of(" \t"));
                             lat_str.erase(lat_str.find_last_not_of(" \t") + 1);
+                            lon_str.erase(0, lon_str.find_first_not_of(" \t"));
+                            lon_str.erase(lon_str.find_last_not_of(" \t") + 1);
                             
-                            double lon = stod(lon_str);
                             double lat = stod(lat_str);
+                            double lon = stod(lon_str);
                             
                             // Validate coordinate ranges (reasonable GPS bounds for Philippines)
                             if (lat >= 4.0 && lat <= 20.0 && lon >= 115.0 && lon <= 130.0) {
@@ -1950,22 +1976,14 @@ int main(int argc, char* argv[]) {
             dest_candidates_osm.push_back(dest_edge_target);
         }
         
-        // Convert OSM IDs to Sequential IDs for DHL index query
-        vector<NodeID> start_candidates, dest_candidates;
-        for (NodeID osm_id : start_candidates_osm) {
-            if (osm_to_seq.count(osm_id)) {
-                start_candidates.push_back(osm_to_seq[osm_id]);
-            }
-        }
-        for (NodeID osm_id : dest_candidates_osm) {
-            if (osm_to_seq.count(osm_id)) {
-                dest_candidates.push_back(osm_to_seq[osm_id]);
-            }
-        }
+        // Input IDs are already sequential IDs (not OSM IDs anymore)
+        // Just use them directly without conversion
+        vector<NodeID> start_candidates = start_candidates_osm;
+        vector<NodeID> dest_candidates = dest_candidates_osm;
         
         if (start_candidates.empty() || dest_candidates.empty()) {
-            cerr << "⚠️  No valid sequential IDs found for routing" << endl;
-            output_json_response(false, "Failed to map start/dest nodes to sequential IDs");
+            cerr << "⚠️  No valid routing endpoints provided" << endl;
+            output_json_response(false, "No valid start/dest nodes for routing");
             return 1;
         }
         
@@ -1994,9 +2012,9 @@ int main(int argc, char* argv[]) {
             return 1;
         }
         
-        // Convert back to OSM IDs for path reconstruction
-        NodeID best_start = seq_to_osm.count(best_start_seq) ? seq_to_osm[best_start_seq] : best_start_seq;
-        NodeID best_dest = seq_to_osm.count(best_dest_seq) ? seq_to_osm[best_dest_seq] : best_dest_seq;
+        // IDs are already sequential, no need to convert
+        NodeID best_start = best_start_seq;
+        NodeID best_dest = best_dest_seq;
         
         // Find actual path using Dijkstra with comprehensive cost calculation
         // *** USES ENHANCED VERSION WITH HIGHWAY, FLOW, AND INCIDENT DATA ***

@@ -62,34 +62,34 @@ except Exception as e:
     print(f"❌ Error initializing HERE Traffic Service: {e}")
     traffic_service = None
 
-# Initialize auto-disruption service (90 second updates)
-auto_service = init_auto_disruption_service(app, update_interval=90)
+# DISABLED: Auto-disruption service (manual refresh only)
+# auto_service = init_auto_disruption_service(app, update_interval=90)
+auto_service = None
 
-# Shutdown service on exit
-atexit.register(shutdown_auto_disruption_service)
+# Shutdown service on exit (if enabled)
+# atexit.register(shutdown_auto_disruption_service)
 
 
 def get_dynamic_disruption_file(algorithm: str = 'hc2l', dataset_mode: str = None) -> str:
     """
-    Get the path to the current traffic disruption file based on dataset selection.
+    Get the path to the current traffic disruption CSV file.
     
-    **NEW SYSTEM**: Uses hash-based traffic matching with real-time HERE API data
-    - Traffic data is matched to OSM edges using pre-matched fingerprints
-    - Files are in .gr format (compatible with C++ routing algorithms)
-    - Symlinks always point to latest: current_traffic_both.gr → traffic_TIMESTAMP_both.gr
-    
-    **KEY INSIGHT**: matched_edges.csv and quezon_city_edges.csv have the same structure!
-    - Both have: source, target, coordinates, road info
-    - Traffic .gr files use these matched edges directly
-    - C++ algorithms can consume .gr files without modification
+    **CSV-ONLY SYSTEM**: 
+    - Only uses CSV files (no .gr files)
+    - Returns latest CSV if less than 1 minute old
+    - Otherwise fetches new data from HERE API
+    - Maintains max 10 traffic files in disruptions directory
     
     Args:
         algorithm: 'hc2l' or 'dhl' (for backward compatibility, not used)
         dataset_mode: 'none' or 'both' (simplified from old 4-option system)
         
     Returns:
-        Path to disruption file as string, or empty string if no disruptions
+        Path to disruption CSV file as string, or empty string if no disruptions
     """
+    import time
+    from pathlib import Path
+    
     # Simplified: only 'none' or 'both' modes now
     if dataset_mode is None:
         dataset_mode = 'both'  # Default to using traffic data
@@ -101,27 +101,69 @@ def get_dynamic_disruption_file(algorithm: str = 'hc2l', dataset_mode: str = Non
         print(f"ℹ️  Dataset mode is NONE - no disruptions will be used")
         return ""
     
-    # Always use 'both' for traffic (includes flow + incidents)
-    # This is the new hash-based matched traffic file
-    traffic_file = Config.DISRUPTIONS_DIR / "current_traffic_both.gr"
+    # Find latest traffic CSV file
+    traffic_pattern = f"traffic_*_{dataset_mode}.csv"
+    traffic_files = sorted(Config.DISRUPTIONS_DIR.glob(traffic_pattern), reverse=True)
     
-    if traffic_file.exists():
-        print(f"✅ Using real-time traffic file: {traffic_file}")
-        print(f"   ⚡ Hash-matched edges from HERE API (90x faster than geospatial)")
-        return str(traffic_file)
+    # Check if latest file exists and is less than 1 minute old
+    if traffic_files:
+        latest_file = traffic_files[0]
+        file_age = time.time() - latest_file.stat().st_mtime
+        
+        if file_age < 60:  # Less than 1 minute old
+            print(f"✅ Using recent traffic file ({file_age:.0f}s old): {latest_file.name}")
+            return str(latest_file)
+        else:
+            print(f"⚠️  Latest file is {file_age:.0f}s old (>60s) - fetching new data...")
+    else:
+        print(f"⚠️  No traffic files found - fetching new data...")
     
-    print(f"⚠️  No traffic file found - generating new traffic data...")
-    # If file doesn't exist, trigger traffic generation
+    # Fetch new traffic data
     try:
         if traffic_service:
-            traffic_service.fetch_and_save(mode='both')
-            if traffic_file.exists():
-                print(f"✅ Generated new traffic file: {traffic_file}")
-                return str(traffic_file)
+            # Cleanup old files first (keep max 10)
+            cleanup_old_traffic_files(dataset_mode, max_files=10)
+            
+            # Fetch and save new data (CSV only)
+            traffic_service.fetch_and_save(mode=dataset_mode)
+            
+            # Get the newly created file
+            traffic_files = sorted(Config.DISRUPTIONS_DIR.glob(traffic_pattern), reverse=True)
+            if traffic_files:
+                latest_file = traffic_files[0]
+                print(f"✅ Generated new traffic file: {latest_file.name}")
+                return str(latest_file)
     except Exception as e:
         print(f"❌ Error generating traffic: {e}")
     
+    # Fallback to latest file even if old
+    if traffic_files:
+        print(f"⚠️  Using stale traffic file as fallback: {traffic_files[0].name}")
+        return str(traffic_files[0])
+    
     return ""
+
+
+def cleanup_old_traffic_files(mode: str, max_files: int = 10):
+    """
+    Remove old traffic files, keeping only the latest N files
+    
+    Args:
+        mode: Traffic mode (flow/incidents/both)
+        max_files: Maximum number of files to keep per mode
+    """
+    traffic_pattern = f"traffic_*_{mode}.csv"
+    traffic_files = sorted(Config.DISRUPTIONS_DIR.glob(traffic_pattern), reverse=True)
+    
+    # Keep only the latest max_files
+    if len(traffic_files) > max_files:
+        files_to_remove = traffic_files[max_files:]
+        for old_file in files_to_remove:
+            try:
+                old_file.unlink()
+                print(f"   🗑️  Removed old file: {old_file.name}")
+            except Exception as e:
+                print(f"   ⚠️  Failed to remove {old_file.name}: {e}")
 
 
 @app.route('/')

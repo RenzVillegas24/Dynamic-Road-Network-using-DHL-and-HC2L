@@ -81,7 +81,7 @@ class TrafficHashMatcher:
         Initialize matcher with pre-matched edges
         
         Args:
-            matched_edges_csv: Path to matched_edges.csv file
+            matched_edges_csv: Path to matched_edges.csv file (should use sequential IDs)
         """
         self.matched_edges_csv = matched_edges_csv
         self.hash_to_edges: Dict[str, List[TrafficEdge]] = {}
@@ -104,6 +104,7 @@ class TrafficHashMatcher:
         try:
             df = pd.read_csv(edges_csv)
             for _, row in df.iterrows():
+                # Use SEQUENTIAL IDs as key (for C++ routing)
                 key = (int(row['source']), int(row['target']))
                 highway = str(row.get('highway_type', 'unknown')).strip()
                 # Handle NaN values
@@ -113,7 +114,7 @@ class TrafficHashMatcher:
                     'highway_type': highway,
                     'road_name': str(row.get('road_name', '')).strip()
                 }
-            print(f"   Loaded attributes for {len(edge_attrs)} OSM edges")
+            print(f"   Loaded attributes for {len(edge_attrs)} OSM edges (sequential IDs)")
             # Debug: show a sample
             if edge_attrs:
                 sample_key = list(edge_attrs.keys())[0]
@@ -125,8 +126,50 @@ class TrafficHashMatcher:
         
         return edge_attrs
     
+    def _load_osm_to_seq_mapping(self, edges_csv: Path) -> Dict[int, int]:
+        """
+        Load OSM ID to Sequential ID mapping from edges CSV
+        
+        Returns:
+            Dict mapping OSM ID -> Sequential ID
+        """
+        print(f"📂 Loading OSM->Sequential ID mapping from {edges_csv}...")
+        
+        osm_to_seq = {}
+        try:
+            df = pd.read_csv(edges_csv)
+            
+            # Extract unique node mappings from edges
+            for _, row in df.iterrows():
+                if 'osm_source' in df.columns and 'source' in df.columns:
+                    osm_source = int(row['osm_source'])
+                    seq_source = int(row['source'])
+                    osm_to_seq[osm_source] = seq_source
+                
+                if 'osm_target' in df.columns and 'target' in df.columns:
+                    osm_target = int(row['osm_target'])
+                    seq_target = int(row['target'])
+                    osm_to_seq[osm_target] = seq_target
+            
+            print(f"   Loaded {len(osm_to_seq)} OSM->Sequential ID mappings")
+            # Debug: show a sample
+            if osm_to_seq:
+                sample_osm = list(osm_to_seq.keys())[0]
+                print(f"   Sample: OSM {sample_osm} -> Sequential {osm_to_seq[sample_osm]}")
+        except Exception as e:
+            print(f"   ⚠️  Could not load OSM->Sequential mapping: {e}")
+            print(f"   ⚠️  Will use OSM IDs directly (may cause issues in C++ routing)")
+            import traceback
+            traceback.print_exc()
+        
+        return osm_to_seq
+    
     def _load_matched_edges(self):
-        """Load matched edges CSV into hash lookup table with highway_type"""
+        """
+        Load matched edges CSV into hash lookup table with highway_type
+        
+        UPDATED: matched_edges.csv now uses Sequential IDs directly (after update_matched_edges.py)
+        """
         print(f"📂 Loading matched edges from {self.matched_edges_csv}...")
         
         df = pd.read_csv(self.matched_edges_csv)
@@ -138,11 +181,13 @@ class TrafficHashMatcher:
         # Group by traffic_hash
         for _, row in df.iterrows():
             traffic_hash = row['traffic_hash']
-            source = int(row['source'])
-            target = int(row['target'])
             
-            # Get highway_type from OSM edges
-            edge_key = (source, target)
+            # matched_edges.csv NOW uses Sequential IDs directly (after conversion)
+            seq_source = int(row['source'])
+            seq_target = int(row['target'])
+            
+            # Get highway_type from OSM edges using SEQUENTIAL IDs
+            edge_key = (seq_source, seq_target)
             attrs = self.edge_attributes.get(edge_key, {})
             highway_type = attrs.get('highway_type', 'unknown')
             road_name = attrs.get('road_name', '')
@@ -154,8 +199,8 @@ class TrafficHashMatcher:
             
             edge = TrafficEdge(
                 traffic_hash=traffic_hash,
-                source=source,
-                target=target,
+                source=seq_source,  # Use sequential IDs directly from matched_edges.csv
+                target=seq_target,  # Use sequential IDs directly from matched_edges.csv
                 source_lat=float(row['source_lat']),
                 source_lon=float(row['source_lon']),
                 target_lat=float(row['target_lat']),

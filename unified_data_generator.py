@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 """
-Unified Data Generator - Hash-Based Traffic Matching
-=====================================================
+Unified Data Generator - Hash-Based Traffic Matching (CSV Only)
+================================================================
 
 Simplified version using pre-matched edges from matched_edges.csv
 No runtime geospatial matching - just hash lookup!
+Only generates CSV files (no .gr files)
 
 Usage:
     python unified_data_generator.py --mode flow
-    python unified_data_generator.py --mode both --continuous --interval 60
+    python unified_data_generator.py --mode both
+    
+Note: --continuous mode removed (use manual refresh in UI)
 """
 
 import os
@@ -103,24 +106,13 @@ def check_and_generate_graph():
 def main():
     """Main entry point"""
     parser = argparse.ArgumentParser(
-        description='Unified traffic data generator with hash-based matching'
+        description='Unified traffic data generator with hash-based matching (CSV only)'
     )
     parser.add_argument(
         '--mode', 
         choices=['flow', 'incidents', 'both'], 
         default='flow',
         help='Traffic data mode'
-    )
-    parser.add_argument(
-        '--continuous', 
-        action='store_true',
-        help='Run continuously with periodic updates'
-    )
-    parser.add_argument(
-        '--interval', 
-        type=int, 
-        default=60,
-        help='Update interval in seconds (for continuous mode)'
     )
     
     args = parser.parse_args()
@@ -132,12 +124,10 @@ def main():
         return 1
     
     print("\n" + "="*70)
-    print("Unified Data Generator V2 - Hash-Based Traffic Matching")
+    print("Unified Data Generator V2 - Hash-Based Matching (CSV Only)")
     print("="*70)
     print(f"Mode: {args.mode}")
-    print(f"Continuous: {args.continuous}")
-    if args.continuous:
-        print(f"Interval: {args.interval}s")
+    print(f"Output: CSV files only (no .gr files)")
     print("="*70 + "\n")
     
     # Initialize service
@@ -148,15 +138,12 @@ def main():
         print("Make sure HERE_API_KEY is set in your .env file")
         return 1
     
-    # Run
-    if args.continuous:
-        service.run_continuous(mode=args.mode, interval=args.interval)
-    else:
-        metadata = service.fetch_and_save(mode=args.mode)
-        
-        print(f"\n✅ Done!")
-        print(f"   CSV: {metadata.get('csv_file', 'N/A')}")
-        print(f"   GR: {metadata.get('gr_file', 'N/A')}")
+    # Generate single dataset (no continuous mode)
+    metadata = service.fetch_and_save(mode=args.mode)
+    
+    print(f"\n✅ Done!")
+    print(f"   CSV: {metadata.get('csv_file', 'N/A')}")
+    print(f"   Note: Use UI refresh button for updates (no auto-refresh)")
     
     return 0
 

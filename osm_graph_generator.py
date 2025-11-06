@@ -100,15 +100,27 @@ def create_sequential_node_mapping(G):
 
 
 def generate_edges_csv(G, osm_to_seq, output_path: Path):
-    """Generate edges CSV with geometry"""
+    """
+    Generate edges CSV with geometry
+    
+    CRITICAL: This CSV is used for TWO purposes:
+    1. C++ routing algorithms (use sequential IDs: source, target)
+    2. Traffic matching (uses OSM IDs: osm_source, osm_target)
+    
+    The CSV contains BOTH ID types to support both use cases.
+    """
     print(f"\n📄 Generating edges CSV: {output_path}")
     
     edges_data = []
     
     for u, v, key, data in G.edges(keys=True, data=True):
-        # Get sequential IDs
-        source = osm_to_seq[u]
-        target = osm_to_seq[v]
+        # Get sequential IDs (for C++ routing - 1-based indexing)
+        seq_source = osm_to_seq[u]
+        seq_target = osm_to_seq[v]
+        
+        # Keep OSM IDs (for traffic matching)
+        osm_source = u
+        osm_target = v
         
         # Get edge attributes
         highway = data.get('highway', 'unknown')
@@ -137,15 +149,34 @@ def generate_edges_csv(G, osm_to_seq, output_path: Path):
         # Convert geometry to list of [lat, lon] pairs
         coords = [[coord[1], coord[0]] for coord in geom.coords]  # [lon, lat] -> [lat, lon]
         
+        # Extract source and target coordinates for hash matching
+        source_lat = coords[0][0]
+        source_lon = coords[0][1]
+        target_lat = coords[-1][0]
+        target_lon = coords[-1][1]
+        
         edges_data.append({
-            'source': source,
-            'target': target,
-            'osm_source': u,
-            'osm_target': v,
+            # Sequential IDs (for C++ routing algorithms - REQUIRED)
+            'source': seq_source,
+            'target': seq_target,
+            
+            # OSM IDs (for traffic matching - REQUIRED)
+            'osm_source': osm_source,
+            'osm_target': osm_target,
+            
+            # Coordinate endpoints (for traffic matching)
+            'source_lat': source_lat,
+            'source_lon': source_lon,
+            'target_lat': target_lat,
+            'target_lon': target_lon,
+            
+            # Edge attributes
             'length': round(length, 2),
             'highway_type': highway,
             'road_name': road_name,
             'oneway': oneway,
+            
+            # Full geometry
             'geometry': json.dumps(coords)  # Store as JSON string
         })
     
@@ -155,6 +186,8 @@ def generate_edges_csv(G, osm_to_seq, output_path: Path):
     
     print(f"   ✅ Wrote {len(df)} edges")
     print(f"   Columns: {', '.join(df.columns)}")
+    print(f"   ID Format: source/target = sequential (1-{len(osm_to_seq)})")
+    print(f"   ID Format: osm_source/osm_target = OSM IDs (for matching)")
     
     return df
 

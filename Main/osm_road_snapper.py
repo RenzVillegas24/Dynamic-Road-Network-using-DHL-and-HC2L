@@ -84,8 +84,10 @@ class OSMRoadSnapper:
                 
                 # Create LineString from coordinates
                 if coords and len(coords) >= 2:
-                    # Coords are [[lon, lat], [lon, lat], ...]
-                    line_coords = [(coord[0], coord[1]) for coord in coords if len(coord) >= 2]
+                    # CRITICAL: Our CSV stores coords as [[lat, lon], [lat, lon], ...]
+                    # But Shapely expects [[lon, lat], [lon, lat], ...]
+                    # So we need to SWAP the coordinates
+                    line_coords = [(coord[1], coord[0]) for coord in coords if len(coord) >= 2]  # Swap: (lon, lat)
                     if len(line_coords) >= 2:
                         geometry = LineString(line_coords)
                     else:

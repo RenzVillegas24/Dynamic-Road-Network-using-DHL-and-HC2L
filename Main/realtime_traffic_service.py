@@ -168,6 +168,7 @@ class RealtimeTrafficService:
     def save_traffic_csv(self, df: pd.DataFrame, mode: str) -> Path:
         """
         Save traffic data to timestamped CSV file
+        Auto-cleanup old files to maintain max 10 files per mode
         
         Args:
             df: DataFrame with traffic edges
@@ -180,6 +181,9 @@ class RealtimeTrafficService:
             print(f"⚠️  No data to save")
             return None
         
+        # Cleanup old files first (keep max 10)
+        self._cleanup_old_files(mode, max_files=10)
+        
         # Generate timestamp filename
         timestamp = datetime.now().strftime("%Y%m%dT%H%M%S")
         filename = f"traffic_{timestamp}_{mode}.csv"
@@ -189,14 +193,30 @@ class RealtimeTrafficService:
         df.to_csv(filepath, index=False)
         print(f"   💾 Saved CSV: {filepath}")
         
-        # Create/update symlink to latest
-        symlink = self.output_dir / f"current_traffic_{mode}.csv"
-        if symlink.exists():
-            symlink.unlink()
-        symlink.symlink_to(filepath.name)
-        print(f"   🔗 Symlink: {symlink} -> {filepath.name}")
+        # NOTE: No symlink creation - system now uses latest timestamped file
         
         return filepath
+    
+    def _cleanup_old_files(self, mode: str, max_files: int = 10):
+        """
+        Remove old traffic files, keeping only the latest N files
+        
+        Args:
+            mode: Traffic mode (flow/incidents/both)
+            max_files: Maximum number of files to keep per mode
+        """
+        traffic_pattern = f"traffic_*_{mode}.csv"
+        traffic_files = sorted(self.output_dir.glob(traffic_pattern), reverse=True)
+        
+        # Keep only the latest max_files
+        if len(traffic_files) >= max_files:
+            files_to_remove = traffic_files[max_files-1:]  # Keep max_files-1 to make room for new file
+            for old_file in files_to_remove:
+                try:
+                    old_file.unlink()
+                    print(f"   🗑️  Removed old file: {old_file.name}")
+                except Exception as e:
+                    print(f"   ⚠️  Failed to remove {old_file.name}: {e}")
     
     def save_traffic_gr(self, df: pd.DataFrame, mode: str) -> Path:
         """
@@ -314,7 +334,7 @@ class RealtimeTrafficService:
     
     def fetch_and_save(self, mode: str = 'flow') -> Dict:
         """
-        Fetch traffic data and save to files
+        Fetch traffic data and save to CSV file only
         
         Args:
             mode: 'flow', 'incidents', or 'both'
@@ -326,18 +346,15 @@ class RealtimeTrafficService:
         df, metadata = self.generate_traffic_data(mode)
         
         if not df.empty:
-            # Save CSV
+            # Save CSV only (no .gr files)
             csv_path = self.save_traffic_csv(df, mode)
             metadata['csv_file'] = str(csv_path) if csv_path else None
-            
-            # Save .gr
-            gr_path = self.save_traffic_gr(df, mode)
-            metadata['gr_file'] = str(gr_path) if gr_path else None
             
             print(f"\n📊 Summary:")
             print(f"   Flow segments: {metadata['flow_count']}")
             print(f"   Incidents: {metadata['incident_count']}")
             print(f"   Total edges: {metadata['total_edges']}")
+            print(f"   📄 CSV only (no .gr files generated)")
         
         return metadata
     
