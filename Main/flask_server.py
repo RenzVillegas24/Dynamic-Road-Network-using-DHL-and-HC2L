@@ -1358,19 +1358,30 @@ def get_traffic_with_geometry():
             geometry_str = edge['geometry']
             if isinstance(geometry_str, str):
                 try:
-                    # Use eval to parse the string into a list
-                    geometry = eval(geometry_str)
-                except:
-                    # Fallback: create simple line from source to target
-                    geometry = [[edge['source_lat'], edge['source_lon']], 
-                               [edge['target_lat'], edge['target_lon']]]
+                    # Try JSON parsing first (safer than eval)
+                    import json
+                    geometry = json.loads(geometry_str)
+                except (json.JSONDecodeError, ValueError):
+                    try:
+                        # Fallback to ast.literal_eval (safer than eval)
+                        import ast
+                        geometry = ast.literal_eval(geometry_str)
+                    except (ValueError, SyntaxError):
+                        # Last resort: create simple line from source to target
+                        geometry = [[float(edge['source_lat']), float(edge['source_lon'])], 
+                                   [float(edge['target_lat']), float(edge['target_lon'])]]
             else:
                 geometry = geometry_str
+            
+            # Validate geometry is a list of coordinates
+            if not isinstance(geometry, list) or len(geometry) < 2:
+                geometry = [[float(edge['source_lat']), float(edge['source_lon'])], 
+                           [float(edge['target_lat']), float(edge['target_lon'])]]
                 
             edge_lookup[key] = {
                 'geometry': geometry,
-                'road_name': edge.get('road_name', 'Unknown Road'),
-                'highway_type': edge.get('highway_type', 'unknown'),
+                'road_name': str(edge.get('road_name', 'Unknown Road')),
+                'highway_type': str(edge.get('highway_type', 'unknown')),
                 'length': float(edge.get('length', 0)),
                 'freeFlow_kph': float(edge.get('freeFlow_kph', 50.0)) if pd.notna(edge.get('freeFlow_kph')) else 50.0
             }
@@ -1422,19 +1433,32 @@ def get_traffic_with_geometry():
                     severity = 'Light'
                 
                 # Determine incident type (default to Congestion for flow data)
-                incident_type = row.get('incident_type', 'Congestion')
+                incident_type = str(row.get('incident_type', 'Congestion'))
+                
+                # Sanitize geometry to ensure JSON serialization
+                geometry = edge_data['geometry']
+                if isinstance(geometry, list):
+                    # Ensure all coordinates are valid floats (not NaN or Inf)
+                    geometry = [[float(coord[0]), float(coord[1])] for coord in geometry 
+                               if len(coord) >= 2 and 
+                               not (pd.isna(coord[0]) or pd.isna(coord[1]) or 
+                                    coord[0] == float('inf') or coord[1] == float('inf'))]
+                
+                # Skip if geometry is invalid
+                if not geometry or len(geometry) < 2:
+                    continue
                 
                 traffic_segments.append({
                     'type': 'flow',  # Most disruption data is flow-based
                     'incident_type': incident_type,
                     'severity': severity,
-                    'geometry': edge_data['geometry'],
-                    'road_name': row.get('road_name', edge_data['road_name']),
-                    'highway_type': row.get('highway_type', edge_data['highway_type']),
-                    'length': edge_data['length'],
+                    'geometry': geometry,
+                    'road_name': str(row.get('road_name', edge_data['road_name'])),
+                    'highway_type': str(row.get('highway_type', edge_data['highway_type'])),
+                    'length': float(edge_data['length']),
                     'speed_kph': float(row['speed_kph']),
                     'free_flow_kph': float(row['freeFlow_kph']),
-                    'jam_factor': jam_factor,
+                    'jam_factor': float(jam_factor),
                     'is_closed': bool(row.get('isClosed', False)),
                     'source': int(row['source']),
                     'target': int(row['target'])
@@ -1460,17 +1484,30 @@ def get_traffic_with_geometry():
                     else:
                         severity = 'Light'
                     
+                    # Sanitize geometry to ensure JSON serialization
+                    geometry = edge_data['geometry']
+                    if isinstance(geometry, list):
+                        # Ensure all coordinates are valid floats (not NaN or Inf)
+                        geometry = [[float(coord[0]), float(coord[1])] for coord in geometry 
+                                   if len(coord) >= 2 and 
+                                   not (pd.isna(coord[0]) or pd.isna(coord[1]) or 
+                                        coord[0] == float('inf') or coord[1] == float('inf'))]
+                    
+                    # Skip if geometry is invalid
+                    if not geometry or len(geometry) < 2:
+                        continue
+                    
                     traffic_segments.append({
                         'type': 'flow',
                         'incident_type': 'Congestion',
                         'severity': severity,
-                        'geometry': edge_data['geometry'],
-                        'road_name': row.get('road_name', edge_data['road_name']),
-                        'highway_type': row.get('highway_type', edge_data['highway_type']),
-                        'length': edge_data['length'],
+                        'geometry': geometry,
+                        'road_name': str(row.get('road_name', edge_data['road_name'])),
+                        'highway_type': str(row.get('highway_type', edge_data['highway_type'])),
+                        'length': float(edge_data['length']),
                         'speed_kph': float(row['speed_kph']),
                         'free_flow_kph': float(row['freeFlow_kph']),
-                        'jam_factor': jam_factor,
+                        'jam_factor': float(jam_factor),
                         'is_closed': bool(row.get('isClosed', False)),
                         'source': int(row['source']),
                         'target': int(row['target'])
@@ -1495,19 +1532,32 @@ def get_traffic_with_geometry():
                     else:
                         severity = 'Light'
                     
+                    # Sanitize geometry to ensure JSON serialization
+                    geometry = edge_data['geometry']
+                    if isinstance(geometry, list):
+                        # Ensure all coordinates are valid floats (not NaN or Inf)
+                        geometry = [[float(coord[0]), float(coord[1])] for coord in geometry 
+                                   if len(coord) >= 2 and 
+                                   not (pd.isna(coord[0]) or pd.isna(coord[1]) or 
+                                        coord[0] == float('inf') or coord[1] == float('inf'))]
+                    
+                    # Skip if geometry is invalid
+                    if not geometry or len(geometry) < 2:
+                        continue
+                    
                     traffic_segments.append({
                         'type': 'incident',
-                        'incident_type': row.get('incident_type', 'Other'),
+                        'incident_type': str(row.get('incident_type', 'Other')),
                         'severity': severity,
-                        'geometry': edge_data['geometry'],
-                        'road_name': row.get('road_name', edge_data['road_name']),
-                        'highway_type': row.get('highway_type', edge_data['highway_type']),
-                        'length': edge_data['length'],
+                        'geometry': geometry,
+                        'road_name': str(row.get('road_name', edge_data['road_name'])),
+                        'highway_type': str(row.get('highway_type', edge_data['highway_type'])),
+                        'length': float(edge_data['length']),
                         'speed_kph': float(row['speed_kph']),
                         'free_flow_kph': float(row['freeFlow_kph']),
-                        'jam_factor': jam_factor,
+                        'jam_factor': float(jam_factor),
                         'is_closed': bool(row.get('isClosed', False)),
-                        'description': row.get('description', 'Incident'),
+                        'description': str(row.get('description', 'Incident')),
                         'source': int(row['source']),
                         'target': int(row['target'])
                     })
@@ -1516,6 +1566,24 @@ def get_traffic_with_geometry():
             print("   ⚠️  No disruption files found or no traffic data available")
         
         print(f"   ✅ Generated {len(traffic_segments)} traffic segments with geometry")
+        
+        # Final validation: ensure all segments are JSON-serializable
+        try:
+            import json
+            json.dumps(traffic_segments)  # Test serialization
+        except (TypeError, ValueError) as e:
+            print(f"   ❌ JSON serialization error detected: {e}")
+            print(f"   🔍 Cleaning non-serializable data...")
+            # Remove problematic segments
+            clean_segments = []
+            for segment in traffic_segments:
+                try:
+                    json.dumps(segment)
+                    clean_segments.append(segment)
+                except:
+                    continue
+            traffic_segments = clean_segments
+            print(f"   ✅ Cleaned segments: {len(traffic_segments)} valid segments")
         
         return jsonify({
             'success': True,
