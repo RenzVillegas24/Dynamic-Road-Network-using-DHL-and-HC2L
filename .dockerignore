@@ -1,0 +1,66 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Documentation (optional, comment out if you want to include)
+# Documentation/
+
+# Cache
+Main/cache/*
+!Main/cache/.gitkeep
+
+# Local data files (comment out if needed in container)
+Main/data/disruptions/*
+Main/data/processed/*
+Main/data/raw/*
+!Main/data/disruptions/.gitkeep
+!Main/data/processed/.gitkeep
+!Main/data/raw/.gitkeep
+
+# Conda
+environment.yml
+
+# Setup scripts
+setup.bat
+setup.ps1
+setup.sh
+SETUP.md
+
+# Markdown files (optional)
+*.md
+!README.md
+
+# Logs
+*.log
+
+# Environment variables
+.env.local
+.env.*.local

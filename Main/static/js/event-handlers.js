@@ -440,14 +440,36 @@ function initializeEventHandlers() {
       return;
     }
     
-    const description = document.getElementById('incident-description').value.trim();
-    if (!description) {
-      showUpdateToast("Please provide a brief description of the incident", 'warning');
+    // Get incident type
+    const incidentType = document.getElementById('disruption-type')?.value;
+    if (!incidentType) {
+      showUpdateToast("Please select an incident type", 'warning');
       return;
     }
     
+    // Get traffic severity
+    const severityRadio = document.querySelector('input[name="traffic"]:checked');
+    if (!severityRadio) {
+      showUpdateToast("Please select traffic severity", 'warning');
+      return;
+    }
+    const severity = severityRadio.value;
+    
+    // Get custom flow parameters
+    const isClosed = document.getElementById('road-closure-toggle')?.checked || false;
+    const customSpeed = parseFloat(document.getElementById('custom-speed-input')?.value || 30);
+    const freeFlowSpeed = 50; // Normal city speed
+    
+    // Calculate jam factor
+    let jamFactor;
+    if (isClosed) {
+      jamFactor = 10.0;
+    } else {
+      jamFactor = Math.max(0, Math.min(10, 10 * (1 - customSpeed / freeFlowSpeed)));
+    }
+    
     // Disable submit button to prevent multiple submissions
-    const submitButton = document.getElementById('report-submit-btn');
+    const submitButton = reportForm.querySelector('button[type="submit"]');
     const originalText = submitButton.innerHTML;
     submitButton.innerHTML = 'Submitting...';
     submitButton.disabled = true;
@@ -461,7 +483,13 @@ function initializeEventHandlers() {
         body: JSON.stringify({
           lat: reportLocation.lat,
           lng: reportLocation.lng,
-          description: description
+          incident_type: incidentType,
+          severity: severity,
+          custom_speed: customSpeed,
+          free_flow_speed: freeFlowSpeed,
+          jam_factor: jamFactor,
+          is_closed: isClosed,
+          description: `User reported ${incidentType} (${severity} severity)`
         })
       });
         if (!response.ok) { 
@@ -469,14 +497,31 @@ function initializeEventHandlers() {
         }
         const data = await response.json();
         if (data.success) {
-            showUpdateToast(data.message || 'Disruption reported successfully', 'success');
+            showUpdateToast(data.message || 'Disruption reported successfully!', 'success');
+            
             // Reset form and remove marker
             document.getElementById('report-form').reset();
             if (reportMarker) {
-                reportMarker.setMap(null);
+                map.removeLayer(reportMarker);
                 reportMarker = null;
                 reportLocation = null;
             }
+            
+            // Close report panel
+            const reportPanel = document.getElementById('report-panel');
+            if (reportPanel) {
+              reportPanel.classList.add('translate-x-full');
+            }
+            
+            // Reset custom flow controls
+            if (document.getElementById('road-closure-toggle')) {
+              document.getElementById('road-closure-toggle').checked = false;
+            }
+            if (document.getElementById('custom-speed-input')) {
+              document.getElementById('custom-speed-input').value = 30;
+              document.getElementById('custom-speed-slider').value = 30;
+            }
+            
         } else {
             throw new Error(data.error || 'Failed to report disruption');
         }

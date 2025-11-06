@@ -597,6 +597,48 @@
             </div>
           </div>
 
+          <!-- Custom Flow Control Section -->
+          <div class="border-t-2 border-purple-200 pt-5">
+            <label class="block text-sm font-bold text-slate-700 mb-3">Custom Traffic Flow</label>
+            
+            <!-- Road Closure Toggle -->
+            <label class="flex items-center justify-between p-4 bg-red-50 border-2 border-red-300 rounded-2xl cursor-pointer hover:bg-red-100 transition-all mb-4">
+              <div class="flex items-center">
+                <svg class="w-6 h-6 text-red-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L5.636 5.636"/>
+                </svg>
+                <div>
+                  <span class="font-bold text-slate-900">Block Road Completely</span>
+                  <p class="text-xs text-slate-600">Mark as impassable</p>
+                </div>
+              </div>
+              <input type="checkbox" id="road-closure-toggle" class="toggle-checkbox">
+            </label>
+
+            <!-- Custom Speed Control (disabled if road blocked) -->
+            <div id="custom-speed-section" class="transition-all">
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Custom Speed (km/h)</label>
+              <div class="flex items-center gap-3 mb-2">
+                <input type="range" id="custom-speed-slider" 
+                  min="0" max="100" value="30" step="5"
+                  class="flex-1 h-3 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-purple-600">
+                <input type="number" id="custom-speed-input" 
+                  min="0" max="100" value="30" step="5"
+                  class="w-20 px-3 py-2 bg-slate-50 border-2 border-slate-300 rounded-xl text-center font-bold text-slate-700 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none">
+              </div>
+              <p class="text-xs text-slate-500 italic">Normal city speed: ~50 km/h</p>
+            </div>
+
+            <!-- Jam Factor Display -->
+            <div class="mt-4 p-3 bg-gradient-to-r from-purple-50 to-violet-50 border border-purple-200 rounded-xl">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-semibold text-slate-700">Jam Factor:</span>
+                <span id="jam-factor-display" class="text-lg font-bold text-purple-600">4.0</span>
+              </div>
+              <p class="text-xs text-slate-600 mt-1">Based on speed reduction from 50 km/h</p>
+            </div>
+          </div>
+
           <button type="submit"
             class="w-full bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white font-bold py-5 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 text-lg">
             Submit Report
@@ -2433,6 +2475,73 @@
           }
         });
       }
+
+      // Wire up Custom Flow Controls in Report Panel
+      const roadClosureToggle = document.getElementById('road-closure-toggle');
+      const customSpeedSection = document.getElementById('custom-speed-section');
+      const customSpeedSlider = document.getElementById('custom-speed-slider');
+      const customSpeedInput = document.getElementById('custom-speed-input');
+      const jamFactorDisplay = document.getElementById('jam-factor-display');
+
+      // Calculate jam factor based on speed reduction
+      function updateJamFactor() {
+        const isClosed = roadClosureToggle?.checked || false;
+        const customSpeed = parseFloat(customSpeedInput?.value || 50);
+        const freeFlowSpeed = 50; // Normal city speed
+
+        let jamFactor;
+        if (isClosed) {
+          jamFactor = 10.0; // Maximum jam factor for blocked road
+          if (customSpeedSection) {
+            customSpeedSection.style.opacity = '0.4';
+            customSpeedSection.style.pointerEvents = 'none';
+          }
+        } else {
+          // Jam factor formula: 10 * (1 - current_speed / free_flow_speed)
+          jamFactor = Math.max(0, Math.min(10, 10 * (1 - customSpeed / freeFlowSpeed)));
+          if (customSpeedSection) {
+            customSpeedSection.style.opacity = '1';
+            customSpeedSection.style.pointerEvents = 'auto';
+          }
+        }
+
+        if (jamFactorDisplay) {
+          jamFactorDisplay.textContent = jamFactor.toFixed(1);
+          // Color code the jam factor
+          if (jamFactor >= 8) {
+            jamFactorDisplay.className = 'text-lg font-bold text-red-600';
+          } else if (jamFactor >= 4) {
+            jamFactorDisplay.className = 'text-lg font-bold text-orange-600';
+          } else {
+            jamFactorDisplay.className = 'text-lg font-bold text-green-600';
+          }
+        }
+
+        return jamFactor;
+      }
+
+      // Sync slider and input
+      if (customSpeedSlider && customSpeedInput) {
+        customSpeedSlider.addEventListener('input', (e) => {
+          customSpeedInput.value = e.target.value;
+          updateJamFactor();
+        });
+
+        customSpeedInput.addEventListener('input', (e) => {
+          let value = parseInt(e.target.value) || 0;
+          value = Math.max(0, Math.min(100, value));
+          e.target.value = value;
+          customSpeedSlider.value = value;
+          updateJamFactor();
+        });
+      }
+
+      if (roadClosureToggle) {
+        roadClosureToggle.addEventListener('change', updateJamFactor);
+      }
+
+      // Initialize jam factor
+      updateJamFactor();
 
       // Wire up Algorithm & Dataset Selection
       const algorithmRadios = document.querySelectorAll('input[name="algorithm"]');

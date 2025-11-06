@@ -132,7 +132,19 @@ def generate_edges_csv(G, osm_to_seq, output_path: Path):
             road_name = ', '.join(road_name)
         
         length = data.get('length', 0.0)
-        oneway = data.get('oneway', False)
+        
+        # Convert oneway to integer format: 1 (forward), 0 (bidirectional), -1 (reverse)
+        # OSMnx returns True for one-way, False for bidirectional
+        # For reverse one-way roads, OSMnx already reverses the edge direction
+        oneway_raw = data.get('oneway', False)
+        if oneway_raw is True or oneway_raw == 'True' or oneway_raw == 1:
+            oneway = 1  # One-way forward
+        elif oneway_raw is False or oneway_raw == 'False' or oneway_raw == 0:
+            oneway = 0  # Bidirectional
+        elif oneway_raw == -1 or oneway_raw == '-1':
+            oneway = -1  # One-way reverse (rare, as OSMnx usually reverses the edge)
+        else:
+            oneway = 0  # Default to bidirectional for unknown values
         
         # Get geometry
         if 'geometry' in data:

@@ -1,49 +1,51 @@
 /**
  * Demo Automation Module
  * Automated demo sequence for thesis defense presentation:
- * 1. Load preset locations
- * 2. Calculate base routes
- * 3. Add disruptions
+ * 1. Load random locations
+ * 2. Calculate routes with different TAU values
+ * 3. Simulate traffic flow changes
  * 4. Show auto-recalculation
- * 5. Compare algorithms
+ * 5. Compare algorithms with metrics
  */
 
 // Demo configuration
 const DEMO_CONFIG = {
-    // Preset locations in Quezon City
-    locations: {
-        start: {
-            name: 'Quezon Memorial Circle',
-            lat: 14.6540,
-            lng: 121.0490,
-            description: 'Popular landmark and park'
-        },
-        destination: {
-            name: 'SM North EDSA',
-            lat: 14.6563,
-            lng: 121.0315,
-            description: 'Major shopping mall'
-        }
-    },
-    
-    // Demo disruptions
-    disruptions: [
+    // Multiple preset location pairs in Quezon City for variety
+    locationPairs: [
         {
-            delay: 3000,
-            location: { lat: 14.6555, lng: 121.0400 },
-            severity: 'heavy',
-            type: 'accident',
-            description: 'Simulated accident on main route'
+            start: { name: 'Quezon Memorial Circle', lat: 14.6540, lng: 121.0490 },
+            destination: { name: 'SM North EDSA', lat: 14.6563, lng: 121.0315 }
+        },
+        {
+            start: { name: 'UP Diliman', lat: 14.6537, lng: 121.0685 },
+            destination: { name: 'Trinoma Mall', lat: 14.6560, lng: 121.0324 }
+        },
+        {
+            start: { name: 'Araneta Coliseum', lat: 14.6225, lng: 121.0501 },
+            destination: { name: 'Eastwood City', lat: 14.6093, lng: 121.0776 }
+        },
+        {
+            start: { name: 'Tomas Morato', lat: 14.6320, lng: 121.0324 },
+            destination: { name: 'Ateneo de Manila', lat: 14.6386, lng: 121.0779 }
         }
+    ],
+    
+    // TAU threshold values to compare
+    tauValues: [0.1, 0.3, 0.5, 0.7, 0.9],
+    
+    // Traffic scenarios to simulate
+    trafficScenarios: [
+        { mode: 'none', description: 'No disruptions (baseline)' },
+        { mode: 'both', description: 'Active traffic flow' }
     ],
     
     // Timing configuration (in milliseconds)
     timing: {
         locationSet: 1500,
-        routeCalculation: 2000,
-        disruptionAdd: 3000,
-        algorithmSwitch: 2500,
-        comparison: 2000,
+        routeCalculation: 2500,
+        tauComparison: 3000,
+        trafficUpdate: 2000,
+        metricDisplay: 2500,
         narrationDelay: 1000
     }
 };
@@ -57,7 +59,7 @@ let demoState = {
 };
 
 /**
- * Main demo execution function
+ * Main demo execution function - Enhanced with traffic flow simulation
  */
 async function runDemo() {
     if (demoState.isRunning) {
@@ -68,38 +70,38 @@ async function runDemo() {
     demoState.isRunning = true;
     demoState.currentStep = 0;
     
-    console.log('🎬 Starting automated demo...');
-    showUpdateToast('🎬 Starting Demo Sequence...', 'info');
+    console.log('🎬 Starting automated demo with traffic flow simulation...');
+    showUpdateToast('🎬 Starting Enhanced Demo Sequence...', 'info');
     
     try {
         // Step 1: Reset and prepare
         await demoStep1_Reset();
         
-        // Step 2: Load preset locations
-        await demoStep2_LoadLocations();
+        // Step 2: Load random locations
+        await demoStep2_LoadRandomLocations();
         
-        // Step 3: Calculate base route with Lazy HC2L
-        await demoStep3_CalculateLazyRoute();
+        // Step 3: Baseline - No traffic
+        await demoStep3_BaselineRoute();
         
-        // Step 4: Calculate DHL route for comparison
-        await demoStep4_CalculateDHLRoute();
+        // Step 4: Compare TAU threshold values (HC2L only)
+        await demoStep4_CompareTauValues();
         
-        // Step 5: Show algorithm comparison
-        await demoStep5_CompareAlgorithms();
+        // Step 5: Activate traffic flow
+        await demoStep5_ActivateTraffic();
         
-        // Step 6: Add disruption
-        await demoStep6_AddDisruption();
+        // Step 6: Show route adaptation with traffic
+        await demoStep6_RouteAdaptation();
         
-        // Step 7: Show auto-recalculation
-        await demoStep7_ShowRecalculation();
+        // Step 7: Algorithm comparison (HC2L vs DHL)
+        await demoStep7_AlgorithmComparison();
         
-        // Step 8: Compare with Google Maps
-        await demoStep8_GoogleComparison();
+        // Step 8: Performance metrics summary
+        await demoStep8_MetricsSummary();
         
         // Step 9: Final summary
-        await demoStep9_Summary();
+        await demoStep9_FinalSummary();
         
-        showUpdateToast('✅ Demo Complete!', 'success');
+        showUpdateToast('✅ Demo Complete - All scenarios tested!', 'success');
         console.log('✅ Demo sequence completed successfully');
         
     } catch (error) {
@@ -141,30 +143,39 @@ async function demoStep1_Reset() {
 }
 
 /**
- * Step 2: Load preset start and destination
+ * Step 2: Load random locations from preset pairs
  */
-async function demoStep2_LoadLocations() {
-    narrate('Step 2: Loading preset locations...');
+async function demoStep2_LoadRandomLocations() {
+    narrate('Step 2: Loading random route scenario...');
     demoState.currentStep = 2;
     
-    const start = DEMO_CONFIG.locations.start;
-    const destination = DEMO_CONFIG.locations.destination;
+    // Select random location pair
+    const randomIndex = Math.floor(Math.random() * DEMO_CONFIG.locationPairs.length);
+    const locationPair = DEMO_CONFIG.locationPairs[randomIndex];
+    demoState.currentLocations = locationPair;
     
-    showUpdateToast(`📍 Start: ${start.name}`, 'info');
+    const start = locationPair.start;
+    const destination = locationPair.destination;
+    
+    showUpdateToast(`📍 Random Route: ${start.name} → ${destination.name}`, 'info');
     await delay(DEMO_CONFIG.timing.narrationDelay);
     
-    // Set start location
-    if (typeof handleStartLocationPin === 'function') {
+    // Set start location with OSM snapping
+    if (typeof handleOSMStartLocationPin === 'function') {
+        await handleOSMStartLocationPin(start.lat, start.lng);
+    } else if (typeof handleStartLocationPin === 'function') {
         await handleStartLocationPin(start.lat, start.lng);
     }
     
     await delay(DEMO_CONFIG.timing.locationSet);
     
-    showUpdateToast(`📍 Destination: ${destination.name}`, 'info');
+    showUpdateToast(`🎯 Destination: ${destination.name}`, 'info');
     await delay(DEMO_CONFIG.timing.narrationDelay);
     
-    // Set destination location
-    if (typeof handleDestLocationPin === 'function') {
+    // Set destination location with OSM snapping
+    if (typeof handleOSMDestLocationPin === 'function') {
+        await handleOSMDestLocationPin(destination.lat, destination.lng);
+    } else if (typeof handleDestLocationPin === 'function') {
         await handleDestLocationPin(destination.lat, destination.lng);
     }
     
@@ -172,198 +183,235 @@ async function demoStep2_LoadLocations() {
 }
 
 /**
- * Step 3: Calculate route with Lazy HC2L
+ * Step 3: Calculate baseline route (no traffic)
  */
-async function demoStep3_CalculateLazyRoute() {
-    narrate('Step 3: Calculating route with Lazy HC2L...');
+async function demoStep3_BaselineRoute() {
+    narrate('Step 3: Calculating baseline route (no traffic)...');
     demoState.currentStep = 3;
     
-    showUpdateToast('🔵 Calculating Lazy HC2L route...', 'info');
+    showUpdateToast('� Baseline: No traffic disruptions', 'info');
     
-    // Select Lazy HC2L algorithm
-    const lazyRadio = document.querySelector('input[value="hc2l_base"]');
-    if (lazyRadio) {
-        lazyRadio.checked = true;
+    // Select HC2L algorithm
+    const hc2lRadio = document.querySelector('input[value="hc2l"]');
+    if (hc2lRadio) {
+        hc2lRadio.checked = true;
+        hc2lRadio.dispatchEvent(new Event('change'));
+    }
+    
+    // Set dataset to none
+    const noneRadio = document.querySelector('input[value="none"]');
+    if (noneRadio) {
+        noneRadio.checked = true;
+        noneRadio.dispatchEvent(new Event('change'));
+    }
+    
+    // Set initial TAU value
+    const thresholdInput = document.getElementById('threshold-input');
+    if (thresholdInput) {
+        thresholdInput.value = 0.5;
+        thresholdInput.dispatchEvent(new Event('input'));
     }
     
     await delay(DEMO_CONFIG.timing.narrationDelay);
     
-    // Trigger route calculation
-    const goButton = document.getElementById('go-button');
-    if (goButton) {
-        goButton.click();
+    // Calculate route
+    if (typeof computeRouteBasedOnSelection === 'function') {
+        const result = await computeRouteBasedOnSelection();
+        demoState.baselineResult = result;
     }
     
     await delay(DEMO_CONFIG.timing.routeCalculation);
 }
 
 /**
- * Step 4: Calculate route with DHL
+ * Step 4: Compare different TAU threshold values
  */
-async function demoStep4_CalculateDHLRoute() {
-    narrate('Step 4: Calculating route with DHL...');
+async function demoStep4_CompareTauValues() {
+    narrate('Step 4: Comparing TAU threshold values...');
     demoState.currentStep = 4;
     
-    showUpdateToast('🟣 Calculating DHL route...', 'info');
+    showUpdateToast('🔬 Testing different τ thresholds...', 'info');
+    demoState.tauResults = {};
     
-    // Select DHL algorithm
-    const dhlRadio = document.querySelector('input[value="dhl_base"]');
-    if (dhlRadio) {
-        dhlRadio.checked = true;
+    // Test multiple TAU values
+    for (const tau of DEMO_CONFIG.tauValues) {
+        const thresholdInput = document.getElementById('threshold-input');
+        if (thresholdInput) {
+            thresholdInput.value = tau;
+            thresholdInput.dispatchEvent(new Event('input'));
+        }
+        
+        showUpdateToast(`Testing τ = ${tau}`, 'info');
+        await delay(DEMO_CONFIG.timing.narrationDelay);
+        
+        // Calculate route with this TAU value
+        if (typeof computeRouteBasedOnSelection === 'function') {
+            const result = await computeRouteBasedOnSelection();
+            if (result && result.success) {
+                demoState.tauResults[tau] = {
+                    distance: result.metrics?.total_distance_m || 0,
+                    query_time: result.metrics?.query_time_ms || 0,
+                    updated_labels: result.metrics?.updated_labels || 0
+                };
+                console.log(`τ=${tau}: ${result.metrics?.total_distance_m}m, ${result.metrics?.query_time_ms}ms`);
+            }
+        }
+        
+        await delay(DEMO_CONFIG.timing.tauComparison);
     }
     
+    // Show TAU comparison summary
+    showUpdateToast(`✅ Tested ${DEMO_CONFIG.tauValues.length} TAU values`, 'success');
     await delay(DEMO_CONFIG.timing.narrationDelay);
-    
-    // Trigger route calculation
-    const goButton = document.getElementById('go-button');
-    if (goButton) {
-        goButton.click();
-    }
-    
-    await delay(DEMO_CONFIG.timing.routeCalculation);
 }
 
 /**
- * Step 5: Show algorithm comparison
+ * Step 5: Activate traffic flow
  */
-async function demoStep5_CompareAlgorithms() {
-    narrate('Step 5: Comparing algorithms...');
+async function demoStep5_ActivateTraffic() {
+    narrate('Step 5: Activating traffic flow data...');
     demoState.currentStep = 5;
     
-    showUpdateToast('📊 Showing algorithm comparison...', 'info');
+    showUpdateToast('� Loading real-time traffic conditions...', 'info');
     
-    // Select comparison mode
-    const comparisonRadio = document.querySelector('input[value="comparison"]');
-    if (comparisonRadio) {
-        comparisonRadio.checked = true;
+    // Select traffic dataset mode
+    const bothRadio = document.querySelector('input[value="both"]');
+    if (bothRadio) {
+        bothRadio.checked = true;
+        bothRadio.dispatchEvent(new Event('change'));
     }
     
     await delay(DEMO_CONFIG.timing.narrationDelay);
     
-    // Trigger comparison calculation
-    const goButton = document.getElementById('go-button');
-    if (goButton) {
-        goButton.click();
+    // Fetch traffic data
+    if (typeof loadActiveDisruptionsForAlgorithm === 'function') {
+        await loadActiveDisruptionsForAlgorithm('HC2L');
     }
     
-    await delay(DEMO_CONFIG.timing.algorithmSwitch);
-    
-    // Open comparison modal
-    const comparisonButton = document.getElementById('show-comparison-summary');
-    if (comparisonButton) {
-        comparisonButton.click();
-        await delay(3000); // Show modal for 3 seconds
-        
-        // Close modal
-        const closeButton = document.getElementById('comparison-modal-close');
-        if (closeButton) {
-            closeButton.click();
-        }
-    }
-    
-    await delay(DEMO_CONFIG.timing.comparison);
+    showUpdateToast('✅ Traffic data loaded', 'success');
+    await delay(DEMO_CONFIG.timing.trafficUpdate);
 }
 
 /**
- * Step 6: Add disruption to trigger update
+ * Step 6: Show route adaptation with traffic
  */
-async function demoStep6_AddDisruption() {
-    narrate('Step 6: Adding road disruption...');
+async function demoStep6_RouteAdaptation() {
+    narrate('Step 6: Demonstrating route adaptation to traffic...');
     demoState.currentStep = 6;
     
-    showUpdateToast('⚠️ Simulating road accident...', 'warning');
+    showUpdateToast('🔄 Recalculating route with traffic...', 'info');
     
-    // Select Lazy HC2L with disruptions
-    const lazyDisruptedRadio = document.querySelector('input[value="hc2l_disrupted"]');
-    if (lazyDisruptedRadio) {
-        lazyDisruptedRadio.checked = true;
+    // Set optimal TAU value
+    const thresholdInput = document.getElementById('threshold-input');
+    if (thresholdInput) {
+        thresholdInput.value = 0.5;
+        thresholdInput.dispatchEvent(new Event('input'));
     }
     
     await delay(DEMO_CONFIG.timing.narrationDelay);
     
-    // Add disruption via UI
-    const addDisruptionBtn = document.getElementById('add-disruption-btn');
-    if (addDisruptionBtn) {
-        addDisruptionBtn.click();
-        
-        await delay(1000);
-        
-        // Set severity to heavy
-        const heavyBtn = document.querySelector('[data-severity="heavy"]');
-        if (heavyBtn) {
-            heavyBtn.click();
-        }
-        
-        await delay(500);
-        
-        // Confirm disruption
-        const confirmBtn = document.getElementById('confirm-disruption');
-        if (confirmBtn) {
-            confirmBtn.click();
-        }
-    }
-    
-    await delay(DEMO_CONFIG.timing.disruptionAdd);
-}
-
-/**
- * Step 7: Show automatic route recalculation
- */
-async function demoStep7_ShowRecalculation() {
-    narrate('Step 7: Demonstrating auto-recalculation...');
-    demoState.currentStep = 7;
-    
-    showUpdateToast('🔄 Auto-recalculating route with disruption...', 'info');
-    
-    // Trigger route calculation with disruptions
-    const goButton = document.getElementById('go-button');
-    if (goButton) {
-        goButton.click();
+    // Calculate route with traffic
+    if (typeof computeRouteBasedOnSelection === 'function') {
+        const result = await computeRouteBasedOnSelection();
+        demoState.trafficResult = result;
     }
     
     await delay(DEMO_CONFIG.timing.routeCalculation);
     
-    // Show update region overlay
-    showUpdateToast('🟢 Lazy update region displayed', 'success');
-    
-    await delay(2000);
+    // Show update regions if available
+    showUpdateToast('🟢 Showing lazy update regions', 'info');
+    await delay(DEMO_CONFIG.timing.metricDisplay);
 }
 
 /**
- * Step 8: Compare with Google Maps
+ * Step 7: Algorithm comparison (HC2L vs DHL)
  */
-async function demoStep8_GoogleComparison() {
-    narrate('Step 8: Comparing with Google Maps...');
-    demoState.currentStep = 8;
+async function demoStep7_AlgorithmComparison() {
+    narrate('Step 7: Comparing HC2L and DHL algorithms...');
+    demoState.currentStep = 7;
     
-    showUpdateToast('🗺️ Fetching Google Maps route...', 'info');
+    showUpdateToast('📊 Algorithm Comparison Mode', 'info');
     
-    // Trigger Google Maps comparison
-    if (typeof compareWithGoogleMaps === 'function') {
-        await compareWithGoogleMaps();
+    // Enable both algorithms
+    const bothAlgoRadio = document.querySelector('input[value="both"]');
+    if (bothAlgoRadio) {
+        bothAlgoRadio.checked = true;
+        bothAlgoRadio.dispatchEvent(new Event('change'));
     }
     
-    await delay(DEMO_CONFIG.timing.comparison);
+    await delay(DEMO_CONFIG.timing.narrationDelay);
+    
+    // Calculate routes with both algorithms
+    if (typeof computeRouteBasedOnSelection === 'function') {
+        const result = await computeRouteBasedOnSelection();
+        demoState.comparisonResult = result;
+    }
+    
+    await delay(DEMO_CONFIG.timing.routeCalculation);
 }
 
 /**
- * Step 9: Show final summary
+ * Step 8: Display performance metrics summary
  */
-async function demoStep9_Summary() {
-    narrate('Step 9: Demo complete - Summary displayed');
-    demoState.currentStep = 9;
+async function demoStep8_MetricsSummary() {
+    narrate('Step 8: Displaying performance metrics...');
+    demoState.currentStep = 8;
     
-    showUpdateToast('📋 Demo Summary:', 'info');
-    await delay(1000);
-    
-    showUpdateToast('✅ All thesis features demonstrated', 'success');
-    await delay(1000);
+    showUpdateToast('� Performance Metrics Summary', 'info');
     
     // Open admin panel to show metrics
     const adminToggle = document.getElementById('admin-toggle');
     if (adminToggle) {
         adminToggle.click();
     }
+    
+    await delay(DEMO_CONFIG.timing.metricDisplay);
+    
+    // Log comprehensive metrics
+    console.log('🎯 DEMO RESULTS SUMMARY:');
+    console.log('=======================');
+    
+    if (demoState.tauResults) {
+        console.log('\n📊 TAU Threshold Comparison:');
+        for (const [tau, metrics] of Object.entries(demoState.tauResults)) {
+            console.log(`  τ=${tau}: ${metrics.distance}m, ${metrics.query_time}ms, ${metrics.updated_labels} labels updated`);
+        }
+    }
+    
+    if (demoState.baselineResult && demoState.trafficResult) {
+        console.log('\n🚦 Traffic Impact:');
+        const baseDistance = demoState.baselineResult.metrics?.total_distance_m || 0;
+        const trafficDistance = demoState.trafficResult.metrics?.total_distance_m || 0;
+        const detourPct = ((trafficDistance - baseDistance) / baseDistance * 100).toFixed(1);
+        console.log(`  Baseline: ${baseDistance}m`);
+        console.log(`  With Traffic: ${trafficDistance}m (${detourPct}% detour)`);
+    }
+    
+    showUpdateToast('✅ Metrics displayed in console', 'success');
+    await delay(DEMO_CONFIG.timing.metricDisplay);
+}
+
+/**
+ * Step 9: Final summary and cleanup
+ */
+async function demoStep9_FinalSummary() {
+    narrate('Step 9: Demo complete - Final summary');
+    demoState.currentStep = 9;
+    
+    const locations = demoState.currentLocations;
+    const summary = `
+🎬 Demo Completed Successfully!
+
+📍 Route: ${locations?.start?.name} → ${locations?.destination?.name}
+🔬 TAU Values Tested: ${DEMO_CONFIG.tauValues.join(', ')}
+🚦 Traffic Scenarios: Baseline + Real-time
+📊 Algorithms Compared: HC2L vs DHL
+    `.trim();
+    
+    console.log(summary);
+    showUpdateToast('✅ Demo sequence complete!', 'success');
+    
+    await delay(2000);
 }
 
 /**

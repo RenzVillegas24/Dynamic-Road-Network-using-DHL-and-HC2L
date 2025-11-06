@@ -359,13 +359,110 @@ def request_new_dataset():
 
 @app.route('/report_disruption', methods=['POST'])
 def report_disruption():
+    """
+    Save user-reported disruption with custom traffic flow parameters
+    
+    Enhanced to support:
+    - Custom speed settings (km/h)
+    - Road closure toggle (completely blocks road)
+    - Automatic jam factor calculation
+    - Saving to disruptions CSV for route calculation
+    """
+    import csv
+    from datetime import datetime
+    
     data = request.json
-    print(f"Received disruption report: {data}")
-    # Process disruption report
-    return jsonify({
-        'success': True,
-        'message': 'Disruption reported successfully'
-    })
+    print(f"📝 Received disruption report: {data}")
+    
+    try:
+        # Extract location
+        lat = float(data.get('lat', 0))
+        lng = float(data.get('lng', 0))
+        
+        # Extract incident details
+        incident_type = data.get('incident_type', 'other')
+        severity = data.get('severity', 'medium')
+        description = data.get('description', 'User-reported disruption')
+        
+        # Extract custom flow parameters
+        custom_speed = float(data.get('custom_speed', 30.0))
+        free_flow_speed = float(data.get('free_flow_speed', 50.0))
+        jam_factor = float(data.get('jam_factor', 5.0))
+        is_closed = bool(data.get('is_closed', False))
+        
+        # Find nearest road segment to apply disruption
+        snap_result = mapper.snap_to_nearest_road(lat, lng, max_distance=100)
+        
+        if snap_result is None:
+            return jsonify({
+                'success': False,
+                'error': 'No road within 100m of this location'
+            })
+        
+        # Get edge information
+        source_id = snap_result['edge'][0]
+        target_id = snap_result['edge'][1]
+        road_name = snap_result['road_name']
+        
+        print(f"✅ Mapped to road: {road_name} (Edge: {source_id}→{target_id})")
+        print(f"   Custom flow: {custom_speed} km/h, Jam Factor: {jam_factor}, Closed: {is_closed}")
+        
+        # Save to user disruptions CSV file
+        user_disruptions_file = Config.DISRUPTIONS_DIR / 'user_reported_disruptions.csv'
+        
+        # Check if file exists to write header
+        file_exists = user_disruptions_file.exists()
+        
+        with open(user_disruptions_file, 'a', newline='') as csvfile:
+            fieldnames = [
+                'timestamp', 'source', 'target', 'lat', 'lng',
+                'road_name', 'incident_type', 'severity',
+                'speed_kph', 'freeFlow_kph', 'jamFactor', 'isClosed',
+                'description'
+            ]
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            
+            if not file_exists:
+                writer.writeheader()
+            
+            writer.writerow({
+                'timestamp': datetime.now().isoformat(),
+                'source': source_id,
+                'target': target_id,
+                'lat': lat,
+                'lng': lng,
+                'road_name': road_name,
+                'incident_type': incident_type,
+                'severity': severity,
+                'speed_kph': custom_speed,
+                'freeFlow_kph': free_flow_speed,
+                'jamFactor': jam_factor,
+                'isClosed': 1 if is_closed else 0,
+                'description': description
+            })
+        
+        print(f"💾 Saved user disruption to: {user_disruptions_file.name}")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Disruption reported on {road_name}',
+            'road_name': road_name,
+            'edge': {'source': source_id, 'target': target_id},
+            'custom_flow': {
+                'speed_kph': custom_speed,
+                'jam_factor': jam_factor,
+                'is_closed': is_closed
+            }
+        })
+        
+    except Exception as e:
+        print(f"❌ Error saving disruption: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
 
 @app.route('/search_location', methods=['POST'])
 def search_location():

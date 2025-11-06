@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  road-network:
+    build:
+      context: .
+      dockerfile: dockerfile
+    container_name: dynamic-road-network
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=production
+      - FLASK_DEBUG=0
+      - PYTHONUNBUFFERED=1
+      # Add your API keys here or use a .env file
+      # - GOOGLE_MAPS_API_KEY=your_key_here
+      # - HERE_API_KEY=your_key_here
+    volumes:
+      # Mount data directories for persistence
+      - ./Main/data:/app/Main/data
+      - ./Main/here_osm:/app/Main/here_osm
+      - ./Main/cache:/app/Main/cache
+    restart: unless-stopped
+    networks:
+      - road-network-net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5000/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  road-network-net:
+    driver: bridge
