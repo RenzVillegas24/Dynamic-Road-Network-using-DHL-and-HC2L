@@ -2873,20 +2873,20 @@
       const timeImpact = disruptionAnalysis.time_impact || {};
       const severityBreakdown = routeDisruptions.severity_breakdown || {};
       
-      const totalCount = routeDisruptions.total_count || 0;
+      const onRouteCount = routeDisruptions.on_route_count || 0;
       const closures = routeDisruptions.closures || 0;
       const addedDelayMin = Math.round((timeImpact.added_delay_seconds || 0) / 60);
       const percentIncrease = timeImpact.percentage_increase || 0;
       
-      if (totalCount > 0) {
+      if (onRouteCount > 0) {
         // Show alert with actual data
         alertContainer.classList.remove('hidden');
         
         // Update title with breakdown
         if (closures > 0) {
-          titleElement.textContent = `${totalCount} Disruption${totalCount > 1 ? 's' : ''} (${closures} Road Closure${closures > 1 ? 's' : ''})`;
+          titleElement.textContent = `${onRouteCount} Disruption${onRouteCount > 1 ? 's' : ''} (${closures} Road Closure${closures > 1 ? 's' : ''})`;
         } else {
-          titleElement.textContent = `${totalCount} Disruption${totalCount > 1 ? 's' : ''} Detected`;
+          titleElement.textContent = `${onRouteCount} Disruption${onRouteCount > 1 ? 's' : ''} Detected`;
         }
         
         // Build summary with severity breakdown
@@ -2914,7 +2914,7 @@
         alertContainer.onclick = openDisruptionsPanel;
         alertContainer.style.cursor = 'pointer';
         
-        console.log(`✅ Disruption alert updated: ${totalCount} disruptions, +${addedDelayMin}min`);
+        console.log(`✅ Disruption alert updated: ${onRouteCount} disruptions, +${addedDelayMin}min`);
       } else {
         // Hide alert if no disruptions
         alertContainer.classList.add('hidden');
