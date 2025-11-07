@@ -216,6 +216,16 @@ class GPSRoutingService:
                     print(f"   ⏱️  ETA: {metrics.get('eta_formatted', 'N/A')}")
                     print(f"   🏷️  Labeling size: {metrics.get('labeling_size_mb', 'N/A')} MB")
                     print(f"   ⏱️  Labeling time: {metrics.get('labeling_time_ms', 'N/A')} s")
+                    
+                    # Log disruption analysis if present
+                    disruption_analysis = route_data.get('disruption_analysis', {})
+                    if disruption_analysis:
+                        route_disruptions = disruption_analysis.get('route_disruptions', {})
+                        time_impact = disruption_analysis.get('time_impact', {})
+                        print(f"🚧 Disruption Analysis:")
+                        print(f"   ⚠️  Total disruptions on route: {route_disruptions.get('total_count', 0)}")
+                        print(f"   🚫 Road closures: {route_disruptions.get('closures', 0)}")
+                        print(f"   ⏱️  Added delay: {time_impact.get('added_delay_seconds', 0):.1f}s ({time_impact.get('percentage_increase', 0):.1f}%)")
                 
                 # Enhance with coordinate data if available
                 if route_data.get('success', False):

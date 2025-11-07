@@ -94,7 +94,9 @@ class DHLRouter:
             dest_edge_target: Target node of edge where dest snap occurred
             dest_edge_oneway: One-way property of dest edge (1=forward, -1=reverse, 0=bidirectional)
             disruption_file: Path to .gr disruption file (empty string or "null" = no disruptions)
-            tau_threshold: DHL threshold parameter (default: 0.5, for comparison with LazyHC2L)
+            tau_threshold: NOTE: DHL does not use tau threshold (it's only for HC2L/LazyHC2L).
+                          This parameter is accepted but ignored by DHL for API compatibility.
+                          DHL always performs immediate updates, unlike LazyHC2L.
         """
         try:
             print(f"Executing DHL JSON API route computation...")
@@ -166,6 +168,16 @@ class DHLRouter:
                         'success': False,
                         'error': dhl_data.get('error', 'Unknown DHL error')
                     }
+                
+                # Log disruption analysis if present
+                disruption_analysis = dhl_data.get('disruption_analysis', {})
+                if disruption_analysis:
+                    route_disruptions = disruption_analysis.get('route_disruptions', {})
+                    time_impact = disruption_analysis.get('time_impact', {})
+                    print(f"🚧 DHL Disruption Analysis:")
+                    print(f"   ⚠️  Total disruptions on route: {route_disruptions.get('total_count', 0)}")
+                    print(f"   🚫 Road closures: {route_disruptions.get('closures', 0)}")
+                    print(f"   ⏱️  Added delay: {time_impact.get('added_delay_seconds', 0):.1f}s ({time_impact.get('percentage_increase', 0):.1f}%)")
                 
                 # Convert DHL JSON output to our route format
                 parsed_data = self._convert_dhl_to_route_format(dhl_data)

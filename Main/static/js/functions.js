@@ -1263,6 +1263,15 @@ function displayDHLRoute(routeData) {
     if (routeData.metrics) {
       updateRouteMetrics(routeData);
     }
+
+    // Update disruptions panel if data available
+    if (routeData.disruptions_summary) {
+      if (typeof updateDisruptionsPanel === 'function') {
+        updateDisruptionsPanel(routeData.disruptions_summary);
+      } else {
+        console.warn('updateDisruptionsPanel function not found');
+      }
+    }
 }
 
 // HC2L Route Display Function (same features as DHL)
@@ -1524,6 +1533,15 @@ function displayDHC2LRoute(routeData) {
     if (routeData.metrics) {
       updateRouteMetrics(routeData);
     }
+
+    // Update disruptions panel if data available
+    if (routeData.disruptions_summary) {
+      if (typeof updateDisruptionsPanel === 'function') {
+        updateDisruptionsPanel(routeData.disruptions_summary);
+      } else {
+        console.warn('updateDisruptionsPanel function not found');
+      }
+    }
 }
  
 
@@ -1552,9 +1570,9 @@ function resetCurrentPathPanel() {
     if (stepsElement) stepsElement.textContent = '0';
     
     // Hide route disruption alert when resetting
-    const alertElement = document.getElementById('route-disruption-alert');
-    if (alertElement) {
-      alertElement.classList.add('hidden');
+    const alertContainer = document.getElementById('disruption-alert-container');
+    if (alertContainer) {
+      alertContainer.classList.add('hidden');
     }
     
     console.log('Current Path Panel reset to placeholder state');
@@ -1604,17 +1622,17 @@ function highlightDisruptedSegments(disruptedSegments) {
 
   
 function displayRouteDisruptionAlert(disruptedSegments) {
-    const alertElement = document.getElementById('route-disruption-alert');
-    if (!alertElement || !disruptedSegments || disruptedSegments.length === 0) {
+    const alertContainer = document.getElementById('disruption-alert-container');
+    if (!alertContainer || !disruptedSegments || disruptedSegments.length === 0) {
       // Hide alert if no disruptions
-      if (alertElement) {
-        alertElement.classList.add('hidden');
+      if (alertContainer) {
+        alertContainer.classList.add('hidden');
       }
       return;
     }
     
     // Show alert and update content
-    alertElement.classList.remove('hidden');
+    alertContainer.classList.remove('hidden');
     
     // Get the most severe disruption for the main display
     const severityOrder = { 'Heavy': 3, 'Medium': 2, 'Light': 1 };
@@ -1642,8 +1660,8 @@ function displayRouteDisruptionAlert(disruptedSegments) {
     }
     
     // Update alert content
-    const titleElement = alertElement.querySelector('.text-sm.font-bold.text-red-900');
-    const descElement = alertElement.querySelector('.text-xs.text-red-700');
+    const titleElement = alertContainer.querySelector('.text-sm.font-bold.text-red-900');
+    const descElement = alertContainer.querySelector('.text-xs.text-red-700');
     
     if (titleElement) {
       titleElement.textContent = `${totalDisruptions} Disruption${totalDisruptions > 1 ? 's' : ''} on Route`;
@@ -2410,9 +2428,9 @@ function updateCurrentPathPanelWithGoogleRoute(routeMetadata) {
         }
         
         // Hide route disruption alert (Google Maps routes don't show disruptions)
-        const alertElement = document.getElementById('route-disruption-alert');
-        if (alertElement) {
-            alertElement.classList.add('hidden');
+        const alertContainer = document.getElementById('disruption-alert-container');
+        if (alertContainer) {
+            alertContainer.classList.add('hidden');
         }
         
         console.log('Current Path Panel updated with Google Maps route data');

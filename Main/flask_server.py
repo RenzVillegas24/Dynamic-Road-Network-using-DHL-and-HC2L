@@ -1219,7 +1219,7 @@ def compute_dhc2l_route():
         start_pin_lng = float(data['start_lng'])
         dest_pin_lat = float(data['dest_lat'])
         dest_pin_lng = float(data['dest_lng'])
-        threshold = float(data.get('threshold', 0.0))
+        tau_threshold = float(data['tau_threshold']) if 'tau_threshold' in data else 0.5
         
         # Check if OSM edge-based routing should be used (snap point data)
         start_osm_edge = data.get('start_osm_edge')
@@ -1291,9 +1291,7 @@ def compute_dhc2l_route():
         # If no disruption file specified, use dynamic disruptions based on dataset mode
         if not disruption_file:
             disruption_file = get_dynamic_disruption_file('hc2l', dataset_mode)
-        
-        tau_threshold = float(data.get('tau_threshold', 0.5))
-        
+                
         print(f"Computing GPS HC2L route with snap points:")
         print(f"  Start: Pin({start_pin_lat}, {start_pin_lng}) → Snap({start_snap_lat}, {start_snap_lng})")
         print(f"  Dest:  Pin({dest_pin_lat}, {dest_pin_lng}) → Snap({dest_snap_lat}, {dest_snap_lng})")
@@ -1345,6 +1343,11 @@ def compute_dhc2l_route():
         if hc2l_geometry:
             print(f"🔍 HC2L First segment keys: {list(hc2l_geometry[0].keys()) if hc2l_geometry else 'No segments'}")
         
+        # Extract disruption_analysis from C++ output
+        disruption_analysis = route_result.get('disruption_analysis', {})
+        if disruption_analysis:
+            print(f"🔍 Disruption analysis detected: {disruption_analysis.get('route_disruptions', {}).get('total_count', 0)} disruptions")
+        
         return jsonify({
             'success': True,
             'route': {
@@ -1362,6 +1365,8 @@ def compute_dhc2l_route():
                 'geometry': route_result.get('route', {}).get('geometry', [])  # Edge details with distance, highway type, speeds, traffic status
             },
             'metrics': summary,
+            'disruption_analysis': disruption_analysis,  # Pass disruption analysis from C++ to frontend
+            'disruptions_summary': route_result.get('disruptions_summary', {}),  # Also pass disruptions_summary for additional details
             'algorithm': summary.get('algorithm', 'D-HC2L Dynamic'),  # Use algorithm from summary
             'algorithm_base': summary.get('algorithm_base', 'D-HC2L'),
             'routing_mode': summary.get('routing_mode', 'BASE'),
@@ -1998,6 +2003,12 @@ def compute_dhl_route():
         turn_by_turn_directions = dhl_router.get_turn_by_turn_directions(route_result)
         route_summary_text = dhl_router.get_route_summary_text(route_result)
         detailed_route_info = dhl_router.get_detailed_route_info(route_result)
+        
+        # Extract disruption_analysis from C++ output
+        disruption_analysis = route_result.get('disruption_analysis', {})
+        if disruption_analysis:
+            print(f"🔍 DHL Disruption analysis detected: {disruption_analysis.get('route_disruptions', {}).get('total_count', 0)} disruptions")
+        
         return jsonify({
             'success': True,
             'route': {
@@ -2017,6 +2028,8 @@ def compute_dhl_route():
                 'detailed_info': detailed_route_info
             },
             'metrics': summary,
+            'disruption_analysis': disruption_analysis,  # Pass disruption analysis from C++ to frontend
+            'disruptions_summary': route_result.get('disruptions_summary', {}),  # Also pass disruptions_summary for additional details
             'algorithm': 'DHL (Dual-Hierarchy Labelling)',
             'gps_mapping': route_result.get('gps_mapping', {}),
             'snap_edges': route_result.get('snap_edges', {}),
@@ -2122,119 +2135,20 @@ def compare_dhl_routes():
 
 @app.route('/compare_algorithms', methods=['POST'])
 def compare_algorithms():
-    """Compare HC2L (Hierarchical Cut Labelling) and DHL algorithms side by side"""
-    data = request.json
+    """
+    DEPRECATED: Compare HC2L and DHL algorithms side by side
     
-    try:
-        start_lat = float(data['start_lat'])
-        start_lng = float(data['start_lng'])
-        dest_lat = float(data['dest_lat'])
-        dest_lng = float(data['dest_lng'])
-        use_disruptions = data.get('use_disruptions', False),
-        threshold = float(data.get('threshold', 0.5))
-        
-        results = {'success': True, 'routes': {}, 'comparison_metrics': {}}
-        
-        # Compute D-HC2L route if available
-        if gps_router is not None:
-            print("Computing D-HC2L route...")
-            dhc2l_start = time.time()
-            dhc2l_result = gps_router.compute_route(start_lat, start_lng, dest_lat, dest_lng, use_disruptions, threshold)
-            dhc2l_time = time.time() - dhc2l_start
-            
-            if dhc2l_result['success']:
-                dhc2l_summary = gps_router.get_route_summary(dhc2l_result)
-                results['routes']['dhc2l'] = {
-                    'polylines': gps_router.get_route_polylines_for_gmaps(dhc2l_result),
-                    'summary': dhc2l_summary,
-                    'name': dhc2l_summary.get('algorithm', 'D-HC2L Dynamic'),
-                    'routing_mode': dhc2l_summary.get('routing_mode', 'BASE'),
-                    'update_strategy': dhc2l_summary.get('update_strategy', 'none'),
-                    'mode_explanation': dhc2l_summary.get('mode_explanation', ''),
-                    'labels_status': dhc2l_summary.get('labels_status', 'original'),
-                    'color': '#FF0000',
-                    'computation_time': dhc2l_time
-                }
-        
-        # Compute DHL route if available
-        if dhl_router is not None:
-            print("Computing DHL route...")
-            dhl_start = time.time()
-            dhl_result = dhl_router.compute_route(start_lat, start_lng, dest_lat, dest_lng, use_disruptions)
-            dhl_time = time.time() - dhl_start
-            
-            if dhl_result['success']:
-                # Get enhanced route information for DHL
-                dhl_summary = dhl_router.get_route_summary(dhl_result)
-                dhl_route_summary = dhl_router.get_route_summary_text(dhl_result)
-                dhl_directions = dhl_router.get_turn_by_turn_directions(dhl_result)
-                dhl_details = dhl_router.get_detailed_route_info(dhl_result)
-                
-                results['routes']['dhl'] = {
-                    'polylines': dhl_router.get_route_polylines_for_gmaps(dhl_result),
-                    'summary': dhl_summary,
-                    'route_summary_text': dhl_route_summary,  # Enhanced with road names
-                    'turn_by_turn_directions': dhl_directions,
-                    'detailed_info': dhl_details,
-                    'name': 'DHL (Dual-Hierarchy Labelling)',
-                    'color': '#0066FF',
-                    'computation_time': dhl_time
-                }
-                
-                print(f"🛣️  DHL route summary: {dhl_route_summary}")
-                print(f"📍 DHL directions: {len(dhl_directions)} steps")
-        
-        # Add straight line reference
-        results['routes']['straight_line'] = {
-            'polylines': [{
-                'path': [
-                    {'lat': start_lat, 'lng': start_lng},
-                    {'lat': dest_lat, 'lng': dest_lng}
-                ],
-                'strokeColor': '#00FF00',
-                'strokeOpacity': 0.5,
-                'strokeWeight': 2,
-                'geodesic': True
-            }],
-            'name': 'Straight Line',
-            'color': '#00FF00'
-        }
-        
-        # Add comparison metrics
-        if 'dhc2l' in results['routes'] and 'dhl' in results['routes']:
-            dhc2l_summary = results['routes']['dhc2l']['summary']
-            dhl_summary = results['routes']['dhl']['summary']
-            
-            results['comparison_metrics'] = {
-                'query_time_difference_ms': (
-                    dhl_summary.get('query_time_ms', 0) - 
-                    dhc2l_summary.get('query_time_ms', 0)
-                ),
-                'total_computation_difference_sec': (
-                    results['routes']['dhl']['computation_time'] - 
-                    results['routes']['dhc2l']['computation_time']
-                ),
-                'distance_comparison': {
-                    'dhc2l_distance': dhc2l_summary.get('total_distance_m', 0),
-                    'dhl_distance': dhl_summary.get('total_distance_units', 0)
-                },
-                'path_length_comparison': {
-                    'dhc2l_nodes': dhc2l_summary.get('number_of_nodes', 0),
-                    'dhl_nodes': dhl_summary.get('path_length', 0)
-                }
-            }
-        
-        results['start_point'] = {'lat': start_lat, 'lng': start_lng}
-        results['end_point'] = {'lat': dest_lat, 'lng': dest_lng}
-        results['parameters'] = {'use_disruptions': use_disruptions}
-
-        return jsonify(results)
-        
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': f"Algorithm comparison error: {str(e)}"
-        })
+    This endpoint is deprecated. The new routing flow uses individual algorithm
+    endpoints (/compute_gps_hc2l_route and /compute_dhl_route) with proper OSM
+    snapping and doesn't require this comparison endpoint.
+    
+    Kept for backward compatibility but may return errors due to API changes.
+    """
+    return jsonify({
+        'success': False,
+        'error': 'This endpoint is deprecated. Please use the individual algorithm endpoints with OSM snapping.',
+        'alternative': 'Use /compute_gps_hc2l_route and /compute_dhl_route separately with proper snap point data'
+    }), 410  # 410 Gone status code
 
 
 @app.route('/compare_with_google_maps', methods=['POST'])

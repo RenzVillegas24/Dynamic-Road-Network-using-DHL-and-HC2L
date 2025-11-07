@@ -43,17 +43,17 @@ function highlightDisruptedSegments(disruptedSegments) {
 }
   
 function displayRouteDisruptionAlert(disruptedSegments) {
-    const alertElement = document.getElementById('route-disruption-alert');
-    if (!alertElement || !disruptedSegments || disruptedSegments.length === 0) {
+    const alertContainer = document.getElementById('disruption-alert-container');
+    if (!alertContainer || !disruptedSegments || disruptedSegments.length === 0) {
       // Hide alert if no disruptions
-      if (alertElement) {
-        alertElement.classList.add('hidden');
+      if (alertContainer) {
+        alertContainer.classList.add('hidden');
       }
       return;
     }
     
     // Show alert and update content
-    alertElement.classList.remove('hidden');
+    alertContainer.classList.remove('hidden');
     
     // Get the most severe disruption for the main display
     const severityOrder = { 'Heavy': 3, 'Medium': 2, 'Light': 1 };
@@ -81,8 +81,8 @@ function displayRouteDisruptionAlert(disruptedSegments) {
     }
     
     // Update alert content
-    const titleElement = alertElement.querySelector('.text-sm.font-bold.text-red-900');
-    const descElement = alertElement.querySelector('.text-xs.text-red-700');
+    const titleElement = alertContainer.querySelector('.text-sm.font-bold.text-red-900');
+    const descElement = alertContainer.querySelector('.text-xs.text-red-700');
     
     if (titleElement) {
       titleElement.textContent = `${totalDisruptions} Disruption${totalDisruptions > 1 ? 's' : ''} on Route`;
@@ -93,17 +93,19 @@ function displayRouteDisruptionAlert(disruptedSegments) {
     }
     
     // Update severity styling based on most severe disruption
-    alertElement.className = alertElement.className.replace(/from-\w+-50 to-\w+-50 border-\w+-500/, '');
+    alertContainer.className = alertContainer.className.replace(/from-\w+-50 to-\w+-50 border-\w+-500/, '');
     const severityColors = {
       'Heavy': 'from-red-50 to-rose-50 border-red-500',
       'Medium': 'from-orange-50 to-amber-50 border-orange-500', 
       'Light': 'from-yellow-50 to-orange-50 border-yellow-500'
     };
-    alertElement.className += ' ' + (severityColors[mostSevere.severity] || severityColors['Heavy']);
+    alertContainer.className += ' ' + (severityColors[mostSevere.severity] || severityColors['Heavy']);
     
-    // Add click handler to show disruptions
-    alertElement.style.cursor = 'pointer';
-    alertElement.onclick = () => {
+    // Add click handler to navigate to disruption analysis panel
+    alertContainer.style.cursor = 'pointer';
+    alertContainer.onclick = () => {
+      // Navigate to disruption analysis panel
+      openDisruptionsPanel();
       showRouteDisruptionsDetail(disruptedSegments);
     };
     
