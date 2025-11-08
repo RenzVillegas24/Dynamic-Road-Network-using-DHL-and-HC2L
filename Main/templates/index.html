@@ -409,6 +409,21 @@
               </div>
             </div>
 
+            <!-- Detailed Route Metrics Section (Collapsible) -->
+            <div class="bg-gradient-to-br from-blue-100 to-blue-50 rounded-2xl border border-blue-300 shadow-sm overflow-hidden">
+              <button onclick="openRouteMetricsPanel()" class="w-full px-4 py-3 flex items-center justify-between hover:bg-blue-200 transition-colors">
+                <span class="text-sm font-bold text-blue-700 flex items-center gap-2">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                  </svg>
+                  All Metrics
+                </span>
+                <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                </svg>
+              </button>
+            </div>
+
             <!-- Enhanced Disruption Alert with C++ Data Integration -->
             <div id="disruption-alert-container" class="hidden">
               <div onclick="openDisruptionsPanel()"
@@ -652,10 +667,10 @@
 
     <!-- Admin Panel -->
     <div id="admin-panel"
-      class="fixed top-0 right-0 w-[28rem] h-full glass-effect shadow-2xl transform translate-x-full transition-transform duration-300 overflow-y-auto z-50 border-l border-slate-200/50">
+      class="fixed top-0 right-0 w-[28rem] h-full glass-effect shadow-2xl transform translate-x-full transition-transform duration-300 z-50 border-l border-slate-200/50 flex flex-col">
 
       <div
-        class="p-6 bg-gradient-to-r from-slate-700 via-slate-800 to-slate-900 text-white flex justify-between items-center">
+        class="p-6 bg-gradient-to-r from-slate-700 via-slate-800 to-slate-900 text-white flex justify-between items-center flex-shrink-0">
         <div>
           <h2 class="font-bold text-2xl mb-1">Admin Panel</h2>
           <p class="text-slate-300 text-sm">System configuration & metrics</p>
@@ -667,7 +682,7 @@
         </button>
       </div>
 
-      <div class="p-6 space-y-5">
+      <div class="p-6 space-y-5 overflow-y-auto flex-1">
         <!-- System Controls -->
         <div class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-5 border border-slate-300 shadow-sm">
           <h3 class="font-bold text-slate-800 mb-4 flex items-center text-lg">
@@ -850,6 +865,15 @@
             </div>
             <input type="checkbox" id="show-traffic-overlay" class="toggle-checkbox" />
           </label>
+
+          <!-- Show Alternative Routes Toggle -->
+          <label class="flex items-center justify-between py-2 px-3 hover:bg-purple-100 rounded-lg cursor-pointer">
+            <div>
+              <span class="text-sm font-medium text-purple-900">Show Alternative Routes</span>
+              <p class="text-xs text-purple-600 mt-0.5">Display alternative routes on map (transparent overlay)</p>
+            </div>
+            <input type="checkbox" id="show-alternative-routes" class="toggle-checkbox" checked />
+          </label>
           
           <!-- For Current Route Only (conditional) -->
           <div id="route-only-container" class="hidden ml-4 mt-2">
@@ -1017,18 +1041,6 @@
               </div>
               <span class="font-bold text-emerald-700">Developer View</span>
             </button>
-
-            <!-- View Route Analysis Button -->
-            <button id="disruptions-analysis-btn" onclick="openDisruptionsPanel()"
-              class="w-full flex items-center space-x-3 px-3 py-3 glass-effect hover:shadow-md rounded-2xl transition-all duration-300 border-2 border-red-400 bg-gradient-to-r from-red-50 to-orange-50">
-              <div class="bg-gradient-to-br from-red-600 to-orange-600 rounded-xl p-2 shadow-sm">
-                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
-                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                </svg>
-              </div>
-              <span class="font-bold text-red-700">Route Analysis</span>
-            </button>
           </div>
         </div>
       </div>
@@ -1036,9 +1048,9 @@
 
     <!-- Route Analysis Panel (z-index 60 to appear above admin panel) -->
     <div id="disruptions-panel"
-      class="fixed top-0 right-0 w-[35rem] h-full glass-effect shadow-2xl transform translate-x-full transition-transform duration-300 overflow-y-auto z-[60] border-l border-slate-200/50">
-      
-      <div class="p-6 bg-gradient-to-r from-red-600 via-orange-600 to-amber-600 text-white flex justify-between items-center sticky top-0 z-10">
+      class="fixed top-0 right-0 w-[35rem] h-full glass-effect shadow-2xl transform translate-x-full transition-transform duration-300 z-[60] border-l border-slate-200/50 flex flex-col">
+    
+      <div class="p-6 bg-gradient-to-r from-red-600 via-orange-600 to-amber-600 text-white flex justify-between items-center sticky top-0 z-10 flex-shrink-0">
         <div>
           <h2 class="font-bold text-2xl mb-1">Route Analysis</h2>
           <p class="text-orange-100 text-sm">Comprehensive route and traffic insights</p>
@@ -1050,7 +1062,7 @@
         </button>
       </div>
 
-      <div class="p-6 space-y-5">
+      <div class="p-6 space-y-5 flex-grow overflow-y-auto">
         <!-- Summary Cards -->
         <div class="grid grid-cols-2 gap-3">
           <div class="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-4 border-2 border-red-300 shadow-sm">
@@ -1119,6 +1131,45 @@
           </div>
         </div>
 
+        <!-- Algorithm Performance Details -->
+        <div class="bg-white rounded-2xl p-5 border-2 border-slate-200 shadow-sm">
+          <h3 class="font-bold text-slate-800 mb-4 flex items-center text-lg">
+            <div class="bg-gradient-to-br from-blue-600 to-cyan-600 rounded-xl p-2 mr-3">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" 
+                  d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"></path>
+              </svg>
+            </div>
+            Algorithm Performance
+          </h3>
+          <div class="space-y-2 text-sm">
+            <div class="flex justify-between items-center py-2 px-3 bg-slate-50 rounded-lg">
+              <span class="text-slate-600 font-medium">Algorithm:</span>
+              <span id="analysis-algorithm" class="font-bold text-slate-800">--</span>
+            </div>
+            <div class="flex justify-between items-center py-2 px-3 bg-blue-50 rounded-lg border border-blue-200">
+              <span class="text-blue-700 font-medium">Query Time:</span>
+              <span id="analysis-query-time" class="font-bold text-blue-800 font-mono">--</span>
+            </div>
+            <div class="flex justify-between items-center py-2 px-3 bg-slate-50 rounded-lg">
+              <span class="text-slate-600 font-medium">Baseline ETA:</span>
+              <span id="analysis-baseline-eta" class="font-bold text-slate-800">--</span>
+            </div>
+            <div class="flex justify-between items-center py-2 px-3 bg-slate-50 rounded-lg">
+              <span class="text-slate-600 font-medium">Actual ETA:</span>
+              <span id="analysis-actual-eta" class="font-bold text-slate-800">--</span>
+            </div>
+            <div class="flex justify-between items-center py-2 px-3 bg-orange-50 rounded-lg border border-orange-200">
+              <span class="text-orange-700 font-medium">Time Impact:</span>
+              <span id="analysis-time-impact" class="font-bold text-orange-800">--</span>
+            </div>
+            <div class="flex justify-between items-center py-2 px-3 bg-red-50 rounded-lg border border-red-200">
+              <span class="text-red-700 font-medium">Disrupted Edges:</span>
+              <span id="analysis-disrupted-edges" class="font-bold text-red-800">--</span>
+            </div>
+          </div>
+        </div>
+
         <!-- Top Disruptions List -->
         <div class="bg-white rounded-2xl p-5 border-2 border-slate-200 shadow-sm">
           <h3 class="font-bold text-slate-800 mb-4 flex items-center text-lg">
@@ -1138,6 +1189,101 @@
               </svg>
               <p class="font-medium">No disruption data available</p>
               <p class="text-sm mt-1">Calculate a route to see disruptions</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Route Metrics Panel -->
+    <div id="route-metrics-panel"
+      class="fixed top-0 right-0 w-[40rem] h-full glass-effect shadow-2xl transform translate-x-full transition-transform duration-300 z-[65] border-l border-slate-200/50 flex flex-col overflow-hidden">
+    
+      <div class="p-6 bg-gradient-to-r from-blue-600 via-cyan-600 to-teal-600 text-white flex justify-between items-center sticky top-0 z-10 flex-shrink-0">
+        <div>
+          <h2 class="font-bold text-2xl mb-1">Algorithm Metrics</h2>
+          <p class="text-cyan-100 text-sm">Complete performance and route analysis</p>
+        </div>
+        <button onclick="closeRouteMetricsPanel()" class="hover:bg-white/20 rounded-xl p-2 transition-all">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div class="p-6 space-y-4 flex-grow overflow-y-auto">
+        <!-- Metrics Grid -->
+        <div class="grid grid-cols-2 gap-4">
+          <!-- Algorithm -->
+          <div class="bg-gradient-to-br from-blue-50 to-cyan-50 p-4 rounded-xl border border-blue-200">
+            <div class="text-xs text-blue-600 font-semibold uppercase tracking-wide">Algorithm</div>
+            <div id="metrics-algorithm" class="text-lg font-bold text-blue-900 mt-1">--</div>
+          </div>
+          
+          <!-- Query Time -->
+          <div class="bg-gradient-to-br from-purple-50 to-pink-50 p-4 rounded-xl border border-purple-200">
+            <div class="text-xs text-purple-600 font-semibold uppercase tracking-wide">Query Time</div>
+            <div id="metrics-query-time" class="text-lg font-bold text-purple-900 mt-1">-- ms</div>
+          </div>
+          
+          <!-- Baseline ETA -->
+          <div class="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-xl border border-green-200">
+            <div class="text-xs text-green-600 font-semibold uppercase tracking-wide">Baseline ETA</div>
+            <div id="metrics-baseline-eta" class="text-lg font-bold text-green-900 mt-1">-- sec</div>
+          </div>
+          
+          <!-- Actual ETA -->
+          <div class="bg-gradient-to-br from-orange-50 to-amber-50 p-4 rounded-xl border border-orange-200">
+            <div class="text-xs text-orange-600 font-semibold uppercase tracking-wide">Actual ETA</div>
+            <div id="metrics-actual-eta" class="text-lg font-bold text-orange-900 mt-1">-- sec</div>
+          </div>
+          
+          <!-- Time Impact -->
+          <div class="bg-gradient-to-br from-red-50 to-rose-50 p-4 rounded-xl border border-red-200">
+            <div class="text-xs text-red-600 font-semibold uppercase tracking-wide">Time Impact</div>
+            <div id="metrics-time-impact" class="text-lg font-bold text-red-900 mt-1">-- sec</div>
+          </div>
+          
+          <!-- Disrupted Edges -->
+          <div class="bg-gradient-to-br from-indigo-50 to-blue-50 p-4 rounded-xl border border-indigo-200">
+            <div class="text-xs text-indigo-600 font-semibold uppercase tracking-wide">Disrupted Edges</div>
+            <div id="metrics-disrupted-edges" class="text-lg font-bold text-indigo-900 mt-1">-- edges</div>
+          </div>
+        </div>
+
+        <!-- Detailed Metrics Section -->
+        <div class="border-t border-slate-200 pt-4 mt-4">
+          <h3 class="font-bold text-slate-800 mb-3 flex items-center gap-2">
+            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+            </svg>
+            Detailed Performance
+          </h3>
+          
+          <div class="space-y-2 text-sm">
+            <div class="flex justify-between py-2 px-3 bg-slate-50 rounded-lg">
+              <span class="text-slate-600 font-medium">Total Distance (units):</span>
+              <span id="metrics-distance" class="font-bold text-slate-800">--</span>
+            </div>
+            <div class="flex justify-between py-2 px-3 bg-slate-50 rounded-lg">
+              <span class="text-slate-600 font-medium">Path Length (nodes):</span>
+              <span id="metrics-path-length" class="font-bold text-slate-800">--</span>
+            </div>
+            <div class="flex justify-between py-2 px-3 bg-slate-50 rounded-lg">
+              <span class="text-slate-600 font-medium">Edge Count:</span>
+              <span id="metrics-edge-count" class="font-bold text-slate-800">--</span>
+            </div>
+            <div class="flex justify-between py-2 px-3 bg-slate-50 rounded-lg">
+              <span class="text-slate-600 font-medium">Uses Disruptions:</span>
+              <span id="metrics-uses-disruptions" class="font-bold text-slate-800">--</span>
+            </div>
+            <div class="flex justify-between py-2 px-3 bg-slate-50 rounded-lg">
+              <span class="text-slate-600 font-medium">Labeling Time (ms):</span>
+              <span id="metrics-labeling-time" class="font-bold text-slate-800">--</span>
+            </div>
+            <div class="flex justify-between py-2 px-3 bg-slate-50 rounded-lg">
+              <span class="text-slate-600 font-medium">Labeling Size (MB):</span>
+              <span id="metrics-labeling-size" class="font-bold text-slate-800">--</span>
             </div>
           </div>
         </div>
@@ -1635,6 +1781,54 @@
       }
     }
 
+    // Route Metrics Panel functions
+    function openRouteMetricsPanel() {
+      const panel = document.getElementById('route-metrics-panel');
+      if (panel) {
+        panel.classList.remove('translate-x-full');
+        console.log('Route Metrics panel opened');
+      }
+    }
+
+    function closeRouteMetricsPanel() {
+      const panel = document.getElementById('route-metrics-panel');
+      if (panel) {
+        panel.classList.add('translate-x-full');
+        console.log('Route Metrics panel closed');
+      }
+    }
+
+    function populateRouteMetricsPanel(routeData) {
+      if (!routeData) return;
+
+      const metrics = routeData.metrics || {};
+      const disruptions = routeData.disruptions_summary || {};
+
+      // Populate top metrics
+      document.getElementById('metrics-algorithm').textContent = routeData.algorithm || metrics.algorithm || '--';
+      document.getElementById('metrics-query-time').textContent = (metrics.query_time_ms || metrics.query_time_microseconds / 1000 || 0).toFixed(3) + ' ms';
+      
+      const baselineEta = disruptions.route?.baseline_eta_seconds || metrics.baseline_eta_seconds || 0;
+      document.getElementById('metrics-baseline-eta').textContent = baselineEta ? (baselineEta / 60).toFixed(1) + ' min' : '--';
+      
+      const actualEta = disruptions.route?.actual_eta_seconds || metrics.eta_seconds || 0;
+      document.getElementById('metrics-actual-eta').textContent = actualEta ? (actualEta / 60).toFixed(1) + ' min' : '--';
+      
+      const timeImpact = disruptions.route?.total_time_impact_seconds || 0;
+      document.getElementById('metrics-time-impact').textContent = timeImpact ? timeImpact.toFixed(1) + ' sec' : '--';
+      
+      const disruptedEdges = disruptions.route?.total_disrupted_edges || 0;
+      document.getElementById('metrics-disrupted-edges').textContent = disruptedEdges + ' edges';
+
+      // Populate detailed metrics
+      document.getElementById('metrics-distance').textContent = (metrics.total_distance_units || '--');
+      document.getElementById('metrics-path-length').textContent = (metrics.path_length || '--');
+      document.getElementById('metrics-edge-count').textContent = (metrics.edge_count || '--');
+      document.getElementById('metrics-uses-disruptions').textContent = metrics.uses_disruptions ? 'Yes' : 'No';
+      document.getElementById('metrics-labeling-time').textContent = (metrics.labeling_time_ms || '--').toFixed(2);
+      document.getElementById('metrics-labeling-size').textContent = (metrics.labeling_size_mb || '--').toFixed(2);
+    }
+
     // Focus on a specific edge on the map
     function focusOnEdge(fromNode, toNode) {
       console.log(`🎯 Focusing on edge: ${fromNode} → ${toNode}`);
@@ -1655,9 +1849,66 @@
               duration: 0.5
             });
             
-            // Optionally highlight the edge
+            // ENHANCED: Create a prominent highlight for the disrupted edge
+            if (!window.highlightedEdgeLayer) {
+              window.highlightedEdgeLayer = L.polyline([], {
+                color: '#ff0000',
+                weight: 10,
+                opacity: 0.9,
+                dashArray: '5, 5',
+                lineCap: 'round',
+                lineJoin: 'round',
+                zIndex: 1000
+              }).addTo(window.map);
+            }
+            
+            // Update the highlighted layer with this edge's coordinates
+            const latlngs = edge.coordinates.map(coord => [coord[1], coord[0]]);
+            window.highlightedEdgeLayer.setLatLngs(latlngs);
+            
+            // Add a popup with detailed disruption information
+            if (window.highlightedEdgePopup) {
+              window.map.removeLayer(window.highlightedEdgePopup);
+            }
+            
+            const popupContent = `
+              <div class="bg-white rounded-lg p-3 shadow-lg min-w-48">
+                <div class="font-bold text-red-600 mb-2">⚠️ Disrupted Edge</div>
+                <div class="text-sm space-y-2 text-slate-700">
+                  <div><strong>Edge:</strong> ${fromNode} → ${toNode}</div>
+                  <div><strong>Road:</strong> ${edge.road_name || 'Unknown'}</div>
+                  <div><strong>Type:</strong> ${edge.highway_type || 'unknown'}</div>
+                  ${edge.disruption ? `
+                    <div class="border-t pt-2 mt-2">
+                      <div><strong>Disruption Type:</strong> ${edge.disruption.type || 'unknown'}</div>
+                      <div><strong>Severity:</strong> <span class="font-bold text-red-600">${edge.disruption.severity_level || 'unknown'}</span></div>
+                      ${edge.disruption.is_closed ? '<div class="text-red-600 font-bold">🚫 ROAD CLOSED</div>' : ''}
+                      <div><strong>Confidence:</strong> ${(edge.disruption.confidence * 100).toFixed(0)}%</div>
+                      ${edge.disruption.description ? `<div class="italic text-slate-600">"${edge.disruption.description}"</div>` : ''}
+                    </div>
+                  ` : ''}
+                  ${edge.speed_kmh !== undefined ? `
+                    <div class="border-t pt-2 mt-2">
+                      <div><strong>Current Speed:</strong> ${edge.speed_kmh.toFixed(0)} km/h</div>
+                      <div><strong>Free Flow:</strong> ${edge.free_flow_speed_kmh.toFixed(0)} km/h</div>
+                      <div><strong>Duration:</strong> ${edge.duration_seconds.toFixed(0)}s</div>
+                    </div>
+                  ` : ''}
+                </div>
+              </div>
+            `;
+            
+            window.highlightedEdgePopup = L.popup({
+              closeButton: true,
+              autoClose: false,
+              maxWidth: 350
+            })
+              .setLatLng([midCoord[1], midCoord[0]])
+              .setContent(popupContent)
+              .openOn(window.map);
+            
+            // Flash effect on the route
             if (window.activeRoutePolyline) {
-              // Flash effect
               let flashCount = 0;
               const flashInterval = setInterval(() => {
                 window.activeRoutePolyline.setStyle({
@@ -1675,8 +1926,11 @@
               }, 200);
             }
             
-            showUpdateToast(`Focused on ${edge.road_name || 'road segment'}`, 'info');
+            showUpdateToast(`Focused on ${edge.road_name || 'road segment'} - ${edge.disruption?.type || 'disruption'}`, 'info');
           }
+        } else {
+          console.warn(`Edge ${fromNode}→${toNode} not found in geometry`);
+          showUpdateToast('Edge not found on current route', 'error');
         }
       }
     }
@@ -1694,257 +1948,49 @@
       window.currentDisruptionsData = disruptionsData;
       window.currentRouteGeometry = routeData ? routeData.geometry : null;
 
-      // Check if this is the new C++ disruption_analysis format
-      if (disruptionsData.route_disruptions && disruptionsData.time_impact) {
-        // NEW FORMAT: Direct from C++ disruption_analysis
-        console.log('📊 Using new C++ disruption_analysis format');
-        
-        const routeDisruptions = disruptionsData.route_disruptions || {};
-        const timeImpact = disruptionsData.time_impact || {};
-        const networkStats = disruptionsData.network_statistics || {};
-        const severityBreakdown = routeDisruptions.severity_breakdown || {};
-        
-        // Update route statistics
-        document.getElementById('route-disruption-count').textContent = routeDisruptions.total_count || 0;
-        
-        // Format time impact (convert seconds to minutes)
-        const addedDelaySec = timeImpact.added_delay_seconds || 0;
-        const addedDelayMin = Math.round(addedDelaySec / 60);
-        const percentIncrease = timeImpact.percentage_increase || 0;
-        document.getElementById('route-time-impact').textContent = 
-          addedDelayMin > 0 ? `+${addedDelayMin}m (${percentIncrease.toFixed(0)}%)` : '< 1 min';
-
-        // Update severity breakdown
-        document.getElementById('severity-critical').textContent = 
-          (routeDisruptions.closures || 0) + (severityBreakdown.high || 0);
-        document.getElementById('severity-high').textContent = severityBreakdown.high || 0;
-        document.getElementById('severity-medium').textContent = severityBreakdown.medium || 0;
-        document.getElementById('severity-low').textContent = severityBreakdown.low || 0;
-
-        // Update network statistics
-        document.getElementById('network-total-disruptions').textContent = networkStats.total_disruptions || 0;
-        
-        // Calculate active disruptions percentage
-        const totalDisruptions = networkStats.total_disruptions || 0;
-        const activeDisruptions = networkStats.active_disruptions || 0;
-        const activePercentage = totalDisruptions > 0 ? Math.round((activeDisruptions / totalDisruptions) * 100) : 0;
-        document.getElementById('network-coverage').textContent = `${activePercentage}% active`;
-
-        // Update top disruptions list
-        const topDisruptionsList = document.getElementById('top-disruptions-list');
-        
-        if (routeDisruptions.total_count === 0) {
-          topDisruptionsList.innerHTML = `
-            <div class="text-center text-slate-400 py-8">
-              <svg class="w-16 h-16 mx-auto mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-              </svg>
-              <p class="font-medium">No disruptions on route</p>
-              <p class="text-sm mt-1">Clear road ahead!</p>
-            </div>
-          `;
-        } else {
-          // Show summary card with severity breakdown
-          topDisruptionsList.innerHTML = `
-            <div class="bg-gradient-to-br from-red-50 to-orange-50 rounded-xl p-5 border-2 border-red-300 shadow-md">
-              <div class="flex items-center justify-between mb-4">
-                <h4 class="font-bold text-red-800 text-lg">Route Impact Summary</h4>
-                <div class="bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full">
-                  ${routeDisruptions.total_count} total
-                </div>
-              </div>
-              
-              <div class="space-y-3">
-                <div class="flex items-center justify-between p-3 bg-white rounded-lg border border-red-200">
-                  <div class="flex items-center gap-2">
-                    <div class="w-3 h-3 bg-red-600 rounded-full"></div>
-                    <span class="font-medium text-slate-700">Road Closures</span>
-                  </div>
-                  <span class="font-bold text-red-600">${routeDisruptions.closures || 0}</span>
-                </div>
-                
-                ${severityBreakdown.high > 0 ? `
-                <div class="flex items-center justify-between p-3 bg-white rounded-lg border border-orange-200">
-                  <div class="flex items-center gap-2">
-                    <div class="w-3 h-3 bg-orange-500 rounded-full"></div>
-                    <span class="font-medium text-slate-700">High Severity</span>
-                  </div>
-                  <span class="font-bold text-orange-600">${severityBreakdown.high}</span>
-                </div>
-                ` : ''}
-                
-                ${severityBreakdown.medium > 0 ? `
-                <div class="flex items-center justify-between p-3 bg-white rounded-lg border border-yellow-200">
-                  <div class="flex items-center gap-2">
-                    <div class="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                    <span class="font-medium text-slate-700">Medium Severity</span>
-                  </div>
-                  <span class="font-bold text-yellow-600">${severityBreakdown.medium}</span>
-                </div>
-                ` : ''}
-                
-                ${severityBreakdown.low > 0 ? `
-                <div class="flex items-center justify-between p-3 bg-white rounded-lg border border-blue-200">
-                  <div class="flex items-center gap-2">
-                    <div class="w-3 h-3 bg-blue-500 rounded-full"></div>
-                    <span class="font-medium text-slate-700">Low Severity</span>
-                  </div>
-                  <span class="font-bold text-blue-600">${severityBreakdown.low}</span>
-                </div>
-                ` : ''}
-              </div>
-              
-              <div class="mt-4 pt-4 border-t border-red-200">
-                <div class="flex items-center justify-between text-sm">
-                  <span class="text-slate-600">Baseline ETA:</span>
-                  <span class="font-semibold text-slate-700">${Math.round(timeImpact.baseline_eta_seconds / 60)}m</span>
-                </div>
-                <div class="flex items-center justify-between text-sm mt-1">
-                  <span class="text-slate-600">Actual ETA:</span>
-                  <span class="font-bold text-red-600">${Math.round(timeImpact.actual_eta_seconds / 60)}m</span>
-                </div>
-                <div class="flex items-center justify-between text-sm mt-2 pt-2 border-t border-red-200">
-                  <span class="text-red-700 font-semibold">Added Delay:</span>
-                  <span class="font-bold text-red-600 text-lg">+${addedDelayMin}m (${percentIncrease.toFixed(0)}%)</span>
-                </div>
-              </div>
-            </div>
-          `;
-          
-          // Add detailed disruptions list from geometry if available
-          if (window.currentRouteGeometry && window.currentRouteGeometry.length > 0) {
-            topDisruptionsList.innerHTML += `
-              <div class="mt-4">
-                <h4 class="font-bold text-slate-800 text-sm mb-3 flex items-center">
-                  <svg class="w-4 h-4 mr-2 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
-                  </svg>
-                  Disrupted Road Segments
-                </h4>
-                <div class="space-y-2 max-h-64 overflow-y-auto">
-            `;
-            
-            // Extract disrupted edges from geometry
-            let disruptionCount = 0;
-            window.currentRouteGeometry.forEach((edge, index) => {
-              const isDisrupted = edge.is_closed || edge.jam_factor > 5.0 || 
-                                  edge.incident_type !== 'none';
-              
-              if (isDisrupted && disruptionCount < 10) { // Limit to 10 items
-                disruptionCount++;
-                
-                const severityClass = edge.is_closed ? 'bg-red-50 border-red-300' :
-                                    edge.jam_factor >= 8 ? 'bg-orange-50 border-orange-300' :
-                                    edge.jam_factor >= 5 ? 'bg-yellow-50 border-yellow-300' :
-                                    'bg-blue-50 border-blue-300';
-                
-                const severityDot = edge.is_closed ? 'bg-red-600' :
-                                   edge.jam_factor >= 8 ? 'bg-orange-500' :
-                                   edge.jam_factor >= 5 ? 'bg-yellow-500' :
-                                   'bg-blue-500';
-                
-                const severityText = edge.is_closed ? 'CLOSED' :
-                                    edge.jam_factor >= 8 ? 'Heavy' :
-                                    edge.jam_factor >= 5 ? 'Moderate' :
-                                    'Light';
-                
-                const roadName = edge.road_name || 'Unknown Road';
-                const incidentType = edge.incident_type || 'congestion';
-                const jamFactor = edge.jam_factor ? edge.jam_factor.toFixed(1) : '0.0';
-                const speedKmh = edge.speed_kmh ? edge.speed_kmh.toFixed(0) : '0';
-                const durationSec = edge.duration_seconds ? edge.duration_seconds.toFixed(0) : '0';
-                
-                topDisruptionsList.innerHTML += `
-                  <div class="p-3 ${severityClass} border rounded-lg hover:shadow-sm transition-shadow cursor-pointer" 
-                       onclick="focusOnEdge(${edge.from}, ${edge.to})">
-                    <div class="flex items-start justify-between mb-2">
-                      <div class="flex items-center gap-2 flex-1">
-                        <div class="w-2 h-2 ${severityDot} rounded-full flex-shrink-0"></div>
-                        <span class="font-semibold text-slate-800 text-sm">${roadName}</span>
-                      </div>
-                      <span class="text-xs font-bold px-2 py-0.5 rounded-full ${severityDot} text-white ml-2">
-                        ${severityText}
-                      </span>
-                    </div>
-                    <div class="grid grid-cols-2 gap-2 text-xs text-slate-600 ml-4">
-                      <div>
-                        <span class="text-slate-500">Type:</span>
-                        <span class="font-medium ml-1">${incidentType}</span>
-                      </div>
-                      <div>
-                        <span class="text-slate-500">Jam:</span>
-                        <span class="font-medium ml-1">${jamFactor}/10</span>
-                      </div>
-                      <div>
-                        <span class="text-slate-500">Speed:</span>
-                        <span class="font-medium ml-1">${speedKmh} km/h</span>
-                      </div>
-                      <div>
-                        <span class="text-slate-500">Time:</span>
-                        <span class="font-medium ml-1">${durationSec}s</span>
-                      </div>
-                    </div>
-                    <div class="mt-2 text-xs text-slate-500 ml-4">
-                      <svg class="w-3 h-3 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                          d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                          d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                      </svg>
-                      Click to view on map
-                    </div>
-                  </div>
-                `;
-              }
-            });
-            
-            if (disruptionCount === 0) {
-              topDisruptionsList.innerHTML += `
-                <div class="text-center text-slate-400 py-4">
-                  <p class="text-xs">No detailed disruption data in geometry</p>
-                </div>
-              `;
-            }
-            
-            topDisruptionsList.innerHTML += `
-                </div>
-              </div>
-            `;
-          }
-        }
-        
+      // Use the new unified disruptions_summary format from C++
+      const summary = disruptionsData.disruptions_summary || disruptionsData;
+      
+      if (!summary || !summary.route) {
+        console.warn('Invalid disruptions summary format');
         return;
       }
 
-      // OLD FORMAT: Fallback for legacy disruption data structure
-      console.log('📊 Using legacy disruption data format');
-      const routeStats = disruptionsData.route || {};
-      document.getElementById('route-disruption-count').textContent = routeStats.total_disruptions || 0;
+      console.log('📊 Using unified disruptions_summary format', summary);
+      
+      const routeStats = summary.route || {};
+      const networkStats = summary.network || {};
+      const allDisruptions = summary.all_disruptions || [];
+      
+      // Update route statistics
+      document.getElementById('route-disruption-count').textContent = routeStats.total_disrupted_edges || 0;
       
       // Format time impact
       const timeImpactSec = routeStats.total_time_impact_seconds || 0;
       const timeImpactMin = Math.round(timeImpactSec / 60);
-      document.getElementById('route-time-impact').textContent = timeImpactMin > 0 ? `${timeImpactMin} min` : '< 1 min';
+      const percentIncrease = routeStats.percentage_increase || 0;
+      document.getElementById('route-time-impact').textContent = 
+        timeImpactMin > 0 ? `+${timeImpactMin}m (${percentIncrease.toFixed(0)}%)` : '< 1 min';
 
       // Update severity breakdown
-      const severityCounts = routeStats.severity_counts || {};
-      document.getElementById('severity-critical').textContent = severityCounts.critical || 0;
-      document.getElementById('severity-high').textContent = severityCounts.high || 0;
-      document.getElementById('severity-medium').textContent = severityCounts.medium || 0;
-      document.getElementById('severity-low').textContent = severityCounts.low || 0;
+      document.getElementById('severity-critical').textContent = routeStats.critical || 0;
+      document.getElementById('severity-high').textContent = routeStats.high || 0;
+      document.getElementById('severity-medium').textContent = routeStats.medium || 0;
+      document.getElementById('severity-low').textContent = routeStats.low || 0;
 
       // Update network statistics
-      const networkStats = disruptionsData.network || {};
-      document.getElementById('network-total-disruptions').textContent = networkStats.total_disruptions || 0;
-      document.getElementById('network-coverage').textContent = networkStats.coverage_area || 'N/A';
+      document.getElementById('network-total-disruptions').textContent = networkStats.total_incidents || 0;
+      
+      // Calculate active disruptions percentage
+      const totalDisruptions = networkStats.total_incidents || 0;
+      const activeDisruptions = networkStats.active_disruptions || 0;
+      const activePercentage = totalDisruptions > 0 ? Math.round((activeDisruptions / totalDisruptions) * 100) : 0;
+      document.getElementById('network-coverage').textContent = `${activePercentage}% active`;
 
-      // Update top disruptions list
+      // Update disruptions list with ALL disruptions
       const topDisruptionsList = document.getElementById('top-disruptions-list');
-      const topDisruptions = disruptionsData.top_disruptions || [];
-
-      if (topDisruptions.length === 0) {
+      
+      if (routeStats.total_disrupted_edges === 0) {
         topDisruptionsList.innerHTML = `
           <div class="text-center text-slate-400 py-8">
             <svg class="w-16 h-16 mx-auto mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1956,42 +2002,175 @@
           </div>
         `;
       } else {
-        topDisruptionsList.innerHTML = topDisruptions.map((disruption, index) => {
-          const severityColors = {
-            'critical': 'from-red-500 to-red-600 border-red-600',
-            'high': 'from-orange-500 to-orange-600 border-orange-600',
-            'medium': 'from-yellow-500 to-yellow-600 border-yellow-600',
-            'low': 'from-blue-500 to-blue-600 border-blue-600',
-            'none': 'from-gray-400 to-gray-500 border-gray-500'
-          };
-
-          const severityColor = severityColors[disruption.severity_level] || severityColors['none'];
-          const timeImpact = Math.round((disruption.time_impact_seconds || 0) / 60);
-
-          return `
-            <div class="bg-white rounded-xl p-4 border-2 border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-              <div class="flex items-start justify-between mb-2">
-                <div class="flex items-center gap-2">
-                  <div class="w-8 h-8 bg-gradient-to-br ${severityColor} text-white rounded-lg flex items-center justify-center font-bold text-sm">
-                    ${index + 1}
-                  </div>
-                  <span class="font-bold text-slate-800">${disruption.type || 'Unknown'}</span>
-                </div>
-                <span class="text-xs font-bold px-2 py-1 rounded-full bg-gradient-to-r ${severityColor} text-white uppercase">
-                  ${disruption.severity_level || 'unknown'}
-                </span>
-              </div>
-              <p class="text-sm text-slate-600 mb-2">${disruption.description || 'No description available'}</p>
-              <div class="flex items-center justify-between text-xs">
-                <span class="text-slate-500">⏱️ Impact: <strong>${timeImpact > 0 ? timeImpact + ' min' : '< 1 min'}</strong></span>
-                <span class="text-slate-500">📍 Edge ${disruption.edge_id || 'N/A'}</span>
+        // Show summary card with severity breakdown
+        topDisruptionsList.innerHTML = `
+          <div class="bg-gradient-to-br from-red-50 to-orange-50 rounded-xl p-5 border-2 border-red-300 shadow-md">
+            <div class="flex items-center justify-between mb-4">
+              <h4 class="font-bold text-red-800 text-lg">Route Impact Summary</h4>
+              <div class="bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full">
+                ${routeStats.total_disrupted_edges} disruptions
               </div>
             </div>
-          `;
-        }).join('');
+            
+            <div class="space-y-3">
+              ${routeStats.closures > 0 ? `
+              <div class="flex items-center justify-between p-3 bg-white rounded-lg border border-red-200">
+                <div class="flex items-center gap-2">
+                  <div class="w-3 h-3 bg-red-600 rounded-full"></div>
+                  <span class="font-medium text-slate-700">Road Closures</span>
+                </div>
+                <span class="font-bold text-red-600">${routeStats.closures}</span>
+              </div>
+              ` : ''}
+              
+              ${routeStats.critical > 0 ? `
+              <div class="flex items-center justify-between p-3 bg-white rounded-lg border border-red-200">
+                <div class="flex items-center gap-2">
+                  <div class="w-3 h-3 bg-red-600 rounded-full"></div>
+                  <span class="font-medium text-slate-700">Critical</span>
+                </div>
+                <span class="font-bold text-red-600">${routeStats.critical}</span>
+              </div>
+              ` : ''}
+              
+              ${routeStats.high > 0 ? `
+              <div class="flex items-center justify-between p-3 bg-white rounded-lg border border-orange-200">
+                <div class="flex items-center gap-2">
+                  <div class="w-3 h-3 bg-orange-500 rounded-full"></div>
+                  <span class="font-medium text-slate-700">High Severity</span>
+                </div>
+                <span class="font-bold text-orange-600">${routeStats.high}</span>
+              </div>
+              ` : ''}
+              
+              ${routeStats.medium > 0 ? `
+              <div class="flex items-center justify-between p-3 bg-white rounded-lg border border-yellow-200">
+                <div class="flex items-center gap-2">
+                  <div class="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                  <span class="font-medium text-slate-700">Medium Severity</span>
+                </div>
+                <span class="font-bold text-yellow-600">${routeStats.medium}</span>
+              </div>
+              ` : ''}
+              
+              ${routeStats.low > 0 ? `
+              <div class="flex items-center justify-between p-3 bg-white rounded-lg border border-blue-200">
+                <div class="flex items-center gap-2">
+                  <div class="w-3 h-3 bg-blue-500 rounded-full"></div>
+                  <span class="font-medium text-slate-700">Low Severity</span>
+                </div>
+                <span class="font-bold text-blue-600">${routeStats.low}</span>
+              </div>
+              ` : ''}
+            </div>
+            
+            <div class="mt-4 pt-4 border-t border-red-200">
+              <div class="flex items-center justify-between text-sm">
+                <span class="text-slate-600">Baseline ETA:</span>
+                <span class="font-semibold text-slate-700">${Math.round(routeStats.baseline_eta_seconds / 60)}m</span>
+              </div>
+              <div class="flex items-center justify-between text-sm mt-1">
+                <span class="text-slate-600">Actual ETA:</span>
+                <span class="font-bold text-red-600">${Math.round(routeStats.actual_eta_seconds / 60)}m</span>
+              </div>
+              <div class="flex items-center justify-between text-sm mt-2 pt-2 border-t border-red-200">
+                <span class="text-red-700 font-semibold">Added Delay:</span>
+                <span class="font-bold text-red-600 text-lg">+${timeImpactMin}m (${percentIncrease.toFixed(0)}%)</span>
+              </div>
+            </div>
+          </div>
+        `;
+        
+        // Add all disrupted edges list
+        if (allDisruptions && allDisruptions.length > 0) {
+          topDisruptionsList.innerHTML += `
+            <div class="mt-4">
+              <h4 class="font-bold text-slate-800 text-sm mb-3 flex items-center">
+                <svg class="w-4 h-4 mr-2 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                </svg>
+                All Disrupted Edges (${allDisruptions.length})
+              </h4>
+              <div class="space-y-2 max-h-96 overflow-y-auto">
+            `;
+            
+            // Display all disruptions from C++ API
+            allDisruptions.forEach((disruption, index) => {
+              const edge = disruption.edge || [];
+              const from = edge[0] || '?';
+              const to = edge[1] || '?';
+              
+              const severityClass = disruption.is_closed ? 'bg-red-50 border-red-300' :
+                                    disruption.severity_level === 'critical' ? 'bg-red-50 border-red-300' :
+                                    disruption.severity_level === 'high' ? 'bg-orange-50 border-orange-300' :
+                                    disruption.severity_level === 'medium' ? 'bg-yellow-50 border-yellow-300' :
+                                    'bg-blue-50 border-blue-300';
+              
+              const severityDot = disruption.is_closed ? 'bg-red-600' :
+                                 disruption.severity_level === 'critical' ? 'bg-red-600' :
+                                 disruption.severity_level === 'high' ? 'bg-orange-500' :
+                                 disruption.severity_level === 'medium' ? 'bg-yellow-500' :
+                                 'bg-blue-500';
+              
+              const severityText = disruption.is_closed ? 'CLOSED' : disruption.severity_level.toUpperCase();
+              
+              const incidentType = disruption.type || 'unknown';
+              const severity = (disruption.severity_score || 0).toFixed(2);
+              const timeImpact = (disruption.time_impact_seconds || 0).toFixed(0);
+              const highwayType = disruption.highway_type || 'unknown';
+              
+              topDisruptionsList.innerHTML += `
+                <div class="p-3 ${severityClass} border rounded-lg hover:shadow-md transition-all cursor-pointer" 
+                     onclick="focusOnEdge(${from}, ${to})" 
+                     title="Click to highlight on map">
+                  <div class="flex items-start justify-between mb-2">
+                    <div class="flex items-center gap-2 flex-1">
+                      <div class="w-2 h-2 ${severityDot} rounded-full flex-shrink-0"></div>
+                      <span class="font-semibold text-slate-800 text-sm">Edge ${from}→${to}</span>
+                    </div>
+                    <span class="text-xs font-bold px-2 py-0.5 rounded-full text-white ml-2" 
+                          style="background: ${severityDot === 'bg-red-600' ? '#dc2626' : 
+                                             severityDot === 'bg-orange-500' ? '#f97316' :
+                                             severityDot === 'bg-yellow-500' ? '#eab308' : '#3b82f6'}">
+                      ${severityText}
+                    </span>
+                  </div>
+                  <div class="grid grid-cols-2 gap-2 text-xs text-slate-600 ml-4">
+                    <div>
+                      <span class="text-slate-500">Type:</span>
+                      <span class="font-medium ml-1">${incidentType}</span>
+                    </div>
+                    <div>
+                      <span class="text-slate-500">Severity:</span>
+                      <span class="font-medium ml-1">${severity}</span>
+                    </div>
+                    <div>
+                      <span class="text-slate-500">Highway:</span>
+                      <span class="font-medium ml-1">${highwayType}</span>
+                    </div>
+                    <div>
+                      <span class="text-slate-500">Impact:</span>
+                      <span class="font-medium ml-1">${timeImpact}s</span>
+                    </div>
+                  </div>
+                  ${disruption.description ? `
+                  <div class="mt-2 pt-2 border-t border-slate-200 text-xs text-slate-700">
+                    <p class="italic">"${disruption.description}"</p>
+                  </div>
+                  ` : ''}
+                </div>
+              `;
+            });
+            
+            topDisruptionsList.innerHTML += `
+              </div>
+            </div>
+            `;
+        }
       }
 
-      console.log('Disruptions panel updated with data:', disruptionsData);
+      console.log('Disruptions panel updated with data:', summary);
     }
 
     function toggleConsoleLogging(enabled) {
@@ -2841,16 +3020,21 @@
       // Update comparison metrics
       updateComparisonMetrics(routeData);
 
-      // NEW: Update disruptions panel with C++ analysis data
-      if (routeData.disruption_analysis) {
-        console.log('📊 Found disruption_analysis in route data, updating panel');
-        // Pass both disruption analysis and route geometry for detailed items
-        updateDisruptionsPanel(routeData.disruption_analysis, routeData.route);
+      // NEW: Update disruptions panel with unified disruptions_summary format
+      if (routeData.disruptions_summary) {
+        console.log('📊 Found disruptions_summary in route data, updating panel');
+        // Pass both disruptions summary and route geometry for detailed items
+        updateDisruptionsPanel(routeData.disruptions_summary, routeData.route);
         
         // Update the disruption alert in current path panel
+        updateDisruptionAlert(routeData.disruptions_summary);
+      } else if (routeData.disruption_analysis) {
+        // FALLBACK: Legacy disruption_analysis format (for compatibility)
+        console.warn('⚠️  Using legacy disruption_analysis format - please update API');
+        updateDisruptionsPanel(routeData.disruption_analysis, routeData.route);
         updateDisruptionAlert(routeData.disruption_analysis);
       } else {
-        // Hide alert if no disruption analysis
+        // Hide alert if no disruption data
         const alertElement = document.getElementById('route-disruption-alert');
         if (alertElement) {
           alertElement.classList.add('hidden');
@@ -2861,22 +3045,27 @@
     }
 
     // Update disruption alert with C++ data - ENHANCED VERSION
-    function updateDisruptionAlert(disruptionAnalysis) {
+    function updateDisruptionAlert(disruptionData) {
       const alertContainer = document.getElementById('disruption-alert-container');
       const titleElement = document.getElementById('disruption-alert-title');
       const summaryElement = document.getElementById('disruption-alert-summary');
       const impactElement = document.getElementById('disruption-alert-impact');
       
-      if (!alertContainer || !disruptionAnalysis) return;
+      if (!alertContainer || !disruptionData) return;
       
-      const routeDisruptions = disruptionAnalysis.route_disruptions || {};
-      const timeImpact = disruptionAnalysis.time_impact || {};
+      // Handle unified format (disruptions_summary)
+      const route = disruptionData.route || {};
+      const routeDisruptions = disruptionData.route_disruptions || {};
+      
+      // Support both old and new formats
+      const timeImpact = disruptionData.time_impact || {};
       const severityBreakdown = routeDisruptions.severity_breakdown || {};
       
-      const onRouteCount = routeDisruptions.on_route_count || 0;
-      const closures = routeDisruptions.closures || 0;
-      const addedDelayMin = Math.round((timeImpact.added_delay_seconds || 0) / 60);
-      const percentIncrease = timeImpact.percentage_increase || 0;
+      // Get counts from appropriate location
+      const onRouteCount = route.total_disrupted_edges || routeDisruptions.on_route_count || 0;
+      const closures = route.closures || routeDisruptions.closures || 0;
+      const addedDelayMin = Math.round((route.total_time_impact_seconds || timeImpact.added_delay_seconds || 0) / 60);
+      const percentIncrease = route.percentage_increase || timeImpact.percentage_increase || 0;
       
       if (onRouteCount > 0) {
         // Show alert with actual data
@@ -2891,9 +3080,15 @@
         
         // Build summary with severity breakdown
         let summaryParts = [];
-        if (severityBreakdown.high > 0) summaryParts.push(`${severityBreakdown.high} High`);
-        if (severityBreakdown.medium > 0) summaryParts.push(`${severityBreakdown.medium} Medium`);
-        if (severityBreakdown.low > 0) summaryParts.push(`${severityBreakdown.low} Low`);
+        const critical = route.critical || severityBreakdown.critical || 0;
+        const high = route.high || severityBreakdown.high || 0;
+        const medium = route.medium || severityBreakdown.medium || 0;
+        const low = route.low || severityBreakdown.low || 0;
+        
+        if (critical > 0) summaryParts.push(`${critical} Critical`);
+        if (high > 0) summaryParts.push(`${high} High`);
+        if (medium > 0) summaryParts.push(`${medium} Medium`);
+        if (low > 0) summaryParts.push(`${low} Low`);
         
         if (summaryParts.length > 0) {
           summaryElement.textContent = `Severity: ${summaryParts.join(', ')} • Click for details`;
@@ -3441,6 +3636,36 @@
               toggleAllNodes();
             }
             showUpdateToast('Nodes hidden', 'info');
+          }
+        });
+      }
+
+      // Wire up Show Alternative Routes Toggle
+      const showAlternativeRoutes = document.getElementById('show-alternative-routes');
+      if (showAlternativeRoutes) {
+        showAlternativeRoutes.addEventListener('change', (e) => {
+          if (e.target.checked) {
+            // Show alternative routes
+            if (window.alternativeRoutePolylines && window.alternativeRoutePolylines.length > 0) {
+              window.alternativeRoutePolylines.forEach(polyline => {
+                if (polyline && map) {
+                  polyline.addTo(map);
+                }
+              });
+              showUpdateToast('Alternative routes displayed', 'info');
+            } else {
+              showUpdateToast('No alternative routes available', 'warning');
+            }
+          } else {
+            // Hide alternative routes
+            if (window.alternativeRoutePolylines && window.alternativeRoutePolylines.length > 0) {
+              window.alternativeRoutePolylines.forEach(polyline => {
+                if (polyline && map) {
+                  map.removeLayer(polyline);
+                }
+              });
+              showUpdateToast('Alternative routes hidden', 'info');
+            }
           }
         });
       }

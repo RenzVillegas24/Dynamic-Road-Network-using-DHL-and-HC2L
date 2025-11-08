@@ -2296,8 +2296,29 @@ void output_json_response(bool success, const string& error_message = "",
         
         cout << "  }," << endl;
         
-        // ENHANCED: Disruption Summary Section
+        // ENHANCED: Disruption Summary Section (consolidated)
         cout << "  \"disruptions_summary\": {" << endl;
+        
+        // Calculate disruption analysis for time impact metrics
+        DisruptionAnalysisResult analysis;
+        if (use_disruptions && path.size() > 0) {
+            analysis = analyze_route_disruptions(
+                path, incident_data, flow_data, coordinates, edge_geometries
+            );
+        } else {
+            // Default empty analysis
+            analysis.total_count = 0;
+            analysis.on_route_count = 0;
+            analysis.closures = 0;
+            analysis.baseline_eta_seconds = 0.0;
+            analysis.actual_eta_seconds = 0.0;
+            analysis.added_delay_seconds = 0.0;
+            analysis.percentage_increase = 0.0;
+            analysis.severity_counts["critical"] = 0;
+            analysis.severity_counts["high"] = 0;
+            analysis.severity_counts["medium"] = 0;
+            analysis.severity_counts["low"] = 0;
+        }
         
         // Calculate disruption statistics on the selected route
         int route_disruptions_critical = 0;
@@ -2354,8 +2375,11 @@ void output_json_response(bool success, const string& error_message = "",
         cout << "      \"medium\": " << route_disruptions_medium << "," << endl;
         cout << "      \"low\": " << route_disruptions_low << "," << endl;
         cout << "      \"closures\": " << route_closures << "," << endl;
-        cout << "      \"total_time_impact_seconds\": " << fixed << setprecision(1) << total_time_impact << "," << endl;
-        cout << "      \"total_time_impact_minutes\": " << fixed << setprecision(1) << (total_time_impact / 60.0) << endl;
+        cout << "      \"total_time_impact_seconds\": " << fixed << setprecision(1) << max(total_time_impact, analysis.added_delay_seconds) << "," << endl;
+        cout << "      \"total_time_impact_minutes\": " << fixed << setprecision(1) << (max(total_time_impact, analysis.added_delay_seconds) / 60.0) << "," << endl;
+        cout << "      \"baseline_eta_seconds\": " << fixed << setprecision(1) << analysis.baseline_eta_seconds << "," << endl;
+        cout << "      \"actual_eta_seconds\": " << fixed << setprecision(1) << analysis.actual_eta_seconds << "," << endl;
+        cout << "      \"percentage_increase\": " << fixed << setprecision(1) << analysis.percentage_increase << endl;
         cout << "    }," << endl;
         
         cout << "    \"network\": {" << endl;
@@ -2368,33 +2392,40 @@ void output_json_response(bool success, const string& error_message = "",
         cout << "      \"active_disruptions\": " << network_active << endl;
         cout << "    }," << endl;
         
-        // List most critical disruptions on route (top 5)
-        vector<pair<pair<NodeID, NodeID>, const IncidentData*>> critical_disruptions;
+        // List ALL disruptions on route (sorted by severity)
+        vector<pair<pair<NodeID, NodeID>, const IncidentData*>> all_route_disruptions;
         for (const auto& edge : affected_edges) {
             if (g_disruption_cache.incidents.count(edge)) {
-                critical_disruptions.push_back({edge, &g_disruption_cache.incidents.at(edge)});
+                all_route_disruptions.push_back({edge, &g_disruption_cache.incidents.at(edge)});
             }
         }
         
-        // Sort by severity score (descending)
-        sort(critical_disruptions.begin(), critical_disruptions.end(),
+        // Sort by severithttp://192.168.18.13:3948/0y score (descending), then by edge ID (ascending) for stability
+        sort(all_route_disruptions.begin(), all_route_disruptions.end(),
              [](const auto& a, const auto& b) {
-                 return a.second->severity > b.second->severity;
+                 if (a.second->severity != b.second->severity) {
+                     return a.second->severity > b.second->severity;
+                 }
+                 return a.first < b.first;
              });
         
-        cout << "    \"top_disruptions\": [" << endl;
-        size_t top_count = min(size_t(5), critical_disruptions.size());
-        for (size_t i = 0; i < top_count; i++) {
-            const auto& [edge, incident] = critical_disruptions[i];
+        cout << "    \"all_disruptions\": [" << endl;
+        for (size_t i = 0; i < all_route_disruptions.size(); i++) {
+            const auto& [edge, incident] = all_route_disruptions[i];
             cout << "      {" << endl;
             cout << "        \"edge\": [" << edge.first << ", " << edge.second << "]," << endl;
             cout << "        \"type\": \"" << incident->type << "\"," << endl;
             cout << "        \"severity_level\": \"" << incident->severity_level << "\"," << endl;
             cout << "        \"severity_score\": " << fixed << setprecision(2) << incident->severity << "," << endl;
+            cout << "        \"is_closed\": " << (incident->is_closed ? "true" : "false") << "," << endl;
+            cout << "        \"confidence\": " << fixed << setprecision(2) << incident->confidence << "," << endl;
+            cout << "        \"highway_type\": \"" << incident->highway_type << "\"," << endl;
             cout << "        \"description\": \"" << escape_json_string(incident->description) << "\"," << endl;
-            cout << "        \"time_impact_seconds\": " << fixed << setprecision(1) << incident->time_impact << endl;
+            cout << "        \"time_impact_seconds\": " << fixed << setprecision(1) << incident->time_impact << "," << endl;
+            cout << "        \"old_weight\": " << incident->old_weight << "," << endl;
+            cout << "        \"new_weight\": " << incident->new_weight << endl;
             cout << "      }";
-            if (i < top_count - 1) cout << ",";
+            if (i < all_route_disruptions.size() - 1) cout << ",";
             cout << endl;
         }
         cout << "    ]" << endl;
@@ -2414,9 +2445,18 @@ void output_json_response(bool success, const string& error_message = "",
             cout << "      \"eta_formatted\": \"" << format_eta_time(alt.eta_seconds) << "\"," << endl;
             cout << "      \"avg_jam_factor\": " << fixed << setprecision(2) << alt.avg_jam_factor << "," << endl;
             cout << "      \"path_length\": " << alt.path.size() << "," << endl;
+            
+            // Output path nodes as [lat, lng] coordinate pairs
             cout << "      \"path_nodes\": [";
             for (size_t j = 0; j < alt.path.size(); j++) {
-                cout << alt.path[j];
+                NodeID node_id = alt.path[j];
+                if (coordinates.count(node_id)) {
+                    const auto& coord = coordinates.at(node_id);
+                    cout << "[" << fixed << setprecision(6) 
+                         << coord.latitude << ", " << coord.longitude << "]";
+                } else {
+                    cout << "[0, 0]";  // Fallback for missing coordinates
+                }
                 if (j < alt.path.size() - 1) cout << ", ";
             }
             cout << "]" << endl;
@@ -2424,42 +2464,7 @@ void output_json_response(bool success, const string& error_message = "",
             if (alt_idx < alternatives.size() - 1) cout << ",";
             cout << endl;
         }
-        cout << "  ]," << endl;
-        
-        // Disruption Analysis Section
-        if (use_disruptions && path.size() > 0) {
-            DisruptionAnalysisResult analysis = analyze_route_disruptions(
-                path, incident_data, flow_data, coordinates, edge_geometries
-            );
-            
-            cout << "  \"disruption_analysis\": {" << endl;
-            cout << "    \"route_disruptions\": {" << endl;
-            cout << "      \"total_count\": " << analysis.total_count << "," << endl;
-            cout << "      \"on_route_count\": " << analysis.on_route_count << "," << endl;
-            cout << "      \"closures\": " << analysis.closures << "," << endl;
-            cout << "      \"severity_breakdown\": {" << endl;
-            cout << "        \"critical\": " << analysis.severity_counts.at("critical") << "," << endl;
-            cout << "        \"high\": " << analysis.severity_counts.at("high") << "," << endl;
-            cout << "        \"medium\": " << analysis.severity_counts.at("medium") << "," << endl;
-            cout << "        \"low\": " << analysis.severity_counts.at("low") << endl;
-            cout << "      }," << endl;
-            cout << "      \"time_impact\": {" << endl;
-            cout << "        \"baseline_eta_seconds\": " << fixed << setprecision(1) << analysis.baseline_eta_seconds << "," << endl;
-            cout << "        \"actual_eta_seconds\": " << fixed << setprecision(1) << analysis.actual_eta_seconds << "," << endl;
-            cout << "        \"added_delay_seconds\": " << fixed << setprecision(1) << analysis.added_delay_seconds << "," << endl;
-            cout << "        \"added_delay_formatted\": \"" << format_eta_time(analysis.added_delay_seconds) << "\"," << endl;
-            cout << "        \"percentage_increase\": " << fixed << setprecision(1) << analysis.percentage_increase << endl;
-            cout << "      }" << endl;
-            cout << "    }," << endl;
-            cout << "    \"network_statistics\": {" << endl;
-            cout << "      \"total_disruptions\": " << g_disruption_cache.total_incidents << "," << endl;
-            cout << "      \"total_closures\": " << g_disruption_cache.closures << "," << endl;
-            cout << "      \"active_disruptions\": " << g_disruption_cache.active_disruptions << endl;
-            cout << "    }" << endl;
-            cout << "  }" << endl;
-        } else {
-            cout << "  \"disruption_analysis\": null" << endl;
-        }
+        cout << "  ]" << endl;
     }
     
     cout << "}" << endl;

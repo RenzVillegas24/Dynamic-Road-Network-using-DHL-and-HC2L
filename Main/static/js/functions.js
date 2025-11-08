@@ -22,7 +22,20 @@ function showUpdateToast(message, type = 'info') {
     }, 4000);
 }
 
-// Function to trigger Immediate Update (simulated)
+
+// Toggle Route Details Panel
+function toggleRouteDetailsPanel() {
+    const panel = document.getElementById('route-details-panel');
+    const arrow = document.getElementById('route-details-arrow');
+    if (panel) {
+        panel.classList.toggle('hidden');
+        if (arrow) {
+            arrow.style.transform = panel.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(180deg)';
+        }
+    }
+}
+
+
 // function simulateRouteComputation() {
 //     const disruptionDetected = true;
 //     const impactScore = 0.65;
@@ -728,6 +741,23 @@ function lightenColor(hex, percent) {
     
     return `#${rr}${gg}${bb}`;
 }
+
+
+function formatDuration(seconds) {
+    if (!seconds || seconds < 0) return '0 min';
+    
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    
+    if (hours > 0) {
+        return `${hours}h ${minutes}m`;
+    } else if (minutes > 0) {
+        return `${minutes} min`;
+    } else {
+        return '< 1 min';
+    }
+}
+
   
 function updateRouteSteps(route) {
     try {
@@ -1271,6 +1301,21 @@ function displayDHLRoute(routeData) {
       } else {
         console.warn('updateDisruptionsPanel function not found');
       }
+      
+      // Update disruption alert banner
+      displayRouteDisruptionAlert(routeData.disruptions_summary);
+    }
+
+    // Display alternative routes with transparent overlay
+    if (routeData.alternative_routes && routeData.alternative_routes.length > 0) {
+      displayAlternativeRoutes(routeData.alternative_routes);
+    }
+
+
+
+    // Populate route metrics panel
+    if (typeof populateRouteMetricsPanel === 'function') {
+      populateRouteMetricsPanel(routeData);
     }
 }
 
@@ -1541,9 +1586,252 @@ function displayDHC2LRoute(routeData) {
       } else {
         console.warn('updateDisruptionsPanel function not found');
       }
+      
+      // Update disruption alert banner
+      displayRouteDisruptionAlert(routeData.disruptions_summary);
+    }
+
+    // Display alternative routes with transparent overlay
+    if (routeData.alternative_routes && routeData.alternative_routes.length > 0) {
+      displayAlternativeRoutes(routeData.alternative_routes);
+    }
+
+    // Populate extended route details panel
+    if (typeof populateRouteDetails === 'function') {
+      populateRouteDetails(routeData);
+    }
+
+    // Populate route metrics panel
+    if (typeof populateRouteMetricsPanel === 'function') {
+      populateRouteMetricsPanel(routeData);
     }
 }
  
+
+function displayAlternativeRoutes(alternativeRoutes) {
+    console.log('🔀 Displaying alternative routes:', alternativeRoutes);
+
+    // Clear previous alternative route layers
+    if (window.alternativeRoutePolylines && window.alternativeRoutePolylines.length > 0) {
+        window.alternativeRoutePolylines.forEach(polyline => {
+            if (polyline && map) {
+                map.removeLayer(polyline);
+            }
+        });
+        window.alternativeRoutePolylines = [];
+    }
+
+    if (!alternativeRoutes || alternativeRoutes.length === 0) {
+        console.warn('No alternative routes to display');
+        return;
+    }
+
+    // Color palette for alternative routes (semi-transparent)
+    const routeColors = [
+        { color: '#60a5fa', label: 'Route 1' },      // light blue
+        { color: '#34d399', label: 'Route 2' },      // light green
+        { color: '#fbbf24', label: 'Route 3' },      // light orange
+        { color: '#f87171', label: 'Route 4' },      // light red
+        { color: '#c084fc', label: 'Route 5' }       // light purple
+    ];
+
+    alternativeRoutes.forEach((route, routeIndex) => {
+        if (!route.path_nodes || route.path_nodes.length < 2) {
+            console.warn(`Alternative route ${routeIndex + 1} has insufficient path nodes`);
+            return;
+        }
+
+        // Get route color
+        const colorConfig = routeColors[routeIndex % routeColors.length];
+        const routeColor = colorConfig.color;
+
+        // Convert path nodes to Leaflet coordinates [lat, lng]
+        // path_nodes should now contain [lat, lng] coordinate pairs from C++ output
+        const pathCoords = route.path_nodes.map((node, idx) => {
+            if (Array.isArray(node) && node.length === 2) {
+                // Already a coordinate pair [lat, lng]
+                return node;
+            } else {
+                // Fallback in case it's still a node ID
+                console.warn(`Alternative route ${routeIndex + 1} node ${idx} is not a coordinate pair:`, node);
+                return null;
+            }
+        }).filter(coord => coord !== null);
+
+        if (pathCoords.length < 2) {
+            console.warn(`Alternative route ${routeIndex + 1} has insufficient valid coordinates after conversion`);
+            return;
+        }
+
+        // Create polyline for alternative route with semi-transparent styling
+        const polyline = L.polyline(pathCoords, {
+            color: routeColor,
+            opacity: 0.35,  // 35% opacity for alternative routes
+            weight: 4,
+            dashArray: '8, 4',  // Dashed line to differentiate from primary route
+            lineCap: 'round',
+            lineJoin: 'round',
+            className: 'alternative-route-polyline'
+        }).addTo(map);
+
+        // Build popup with alternative route details
+        const distance_m = route.distance_meters || 0;
+        const distance_km = (distance_m / 1000).toFixed(2);
+        const eta_seconds = route.eta_seconds || 0;
+        const eta_formatted = route.eta_formatted || formatDuration(eta_seconds);
+        const avg_jam_factor = route.avg_jam_factor || 0;
+        const path_length = route.path_length || route.path_nodes.length;
+        const rank = route.rank || (routeIndex + 1);
+        const description = route.description || `Alternative Route ${rank}`;
+
+        // Determine jam factor color
+        let jamColor = '#10b981'; // green
+        if (avg_jam_factor > 7) jamColor = '#ef4444'; // red
+        else if (avg_jam_factor > 5) jamColor = '#dc2626'; // dark red
+        else if (avg_jam_factor > 3) jamColor = '#f59e0b'; // orange
+        else if (avg_jam_factor > 1) jamColor = '#fbbf24'; // yellow
+
+        const popupContent = `
+            <div class="p-3" style="min-width: 300px;">
+                <div class="font-bold text-base mb-2 border-b pb-2">
+                    🛣️ ${description}
+                </div>
+                
+                <div class="space-y-2 text-sm">
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600">Route Rank:</span>
+                        <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded font-bold">#${rank}</span>
+                    </div>
+                    
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600">Distance:</span>
+                        <span class="font-bold text-blue-600">${distance_km} km (${distance_m.toFixed(0)}m)</span>
+                    </div>
+                    
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600">Estimated Time:</span>
+                        <span class="font-semibold">${eta_formatted}</span>
+                    </div>
+                    
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600">Average Jam Factor:</span>
+                        <span class="font-bold" style="color: ${jamColor}">${avg_jam_factor.toFixed(2)}</span>
+                    </div>
+                    
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600">Path Segments:</span>
+                        <span class="font-semibold">${path_length}</span>
+                    </div>
+                </div>
+                
+                <div class="mt-3 pt-3 border-t">
+                    <button onclick="switchToAlternativeRoute(${routeIndex})" 
+                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-3 rounded transition-colors text-sm">
+                        Switch to This Route
+                    </button>
+                </div>
+            </div>
+        `;
+
+        polyline.bindPopup(popupContent, {
+            maxWidth: 340,
+            className: 'alternative-route-popup'
+        });
+
+        // Store metadata for this alternative route
+        polyline._alternativeRouteIndex = routeIndex;
+        polyline._alternativeRouteData = route;
+        polyline._isAlternativeRoute = true;
+
+        // Add click event to show details
+        polyline.on('click', function(e) {
+            console.log(`🖱️ Clicked alternative route ${routeIndex + 1}:`, route);
+            
+            // Highlight this route and dim others
+            if (window.alternativeRoutePolylines) {
+                window.alternativeRoutePolylines.forEach((p, i) => {
+                    if (i === routeIndex) {
+                        p.setStyle({ 
+                            weight: 6,
+                            opacity: 0.7  // Make more visible when clicked
+                        });
+                        p._isHighlighted = true;
+                    } else {
+                        p.setStyle({ 
+                            weight: 4,
+                            opacity: 0.25  // Dim other routes
+                        });
+                        p._isHighlighted = false;
+                    }
+                });
+            }
+            
+            L.DomEvent.stop(e);
+            polyline.openPopup();
+        });
+
+        // Reset highlight when popup closes
+        polyline.on('popupclose', function(e) {
+            if (window.alternativeRoutePolylines) {
+                window.alternativeRoutePolylines.forEach((p, i) => {
+                    p.setStyle({ 
+                        weight: 4,
+                        opacity: 0.35  // Reset to 35%
+                    });
+                    p._isHighlighted = false;
+                });
+            }
+        });
+
+        // Add hover effect
+        polyline.on('mouseover', function(e) {
+            if (!this._isHighlighted) {
+                this.setStyle({ 
+                    weight: 5,
+                    opacity: 0.6
+                });
+            }
+        });
+
+        polyline.on('mouseout', function(e) {
+            if (!this._isHighlighted) {
+                this.setStyle({ 
+                    weight: 4,
+                    opacity: 0.35  // Reset to 35%
+                });
+            }
+        });
+
+        window.alternativeRoutePolylines.push(polyline);
+    });
+
+    console.log(`✅ Displayed ${alternativeRoutes.length} alternative routes on map`);
+}
+
+
+function switchToAlternativeRoute(routeIndex) {
+    console.log(`🔄 Switching to alternative route ${routeIndex + 1}`);
+    
+    if (!window.alternativeRoutePolylines || !window.alternativeRoutePolylines[routeIndex]) {
+        console.error('Alternative route polyline not found');
+        return;
+    }
+
+    const altRouteData = window.alternativeRoutePolylines[routeIndex]._alternativeRouteData;
+    if (!altRouteData) {
+        console.error('Alternative route data not found');
+        return;
+    }
+
+    showUpdateToast(`✅ Switched to Route ${routeIndex + 1}`, 'success');
+    console.log('Alternative route data:', altRouteData);
+    
+    // You could implement additional logic here to:
+    // 1. Make this route the primary route
+    // 2. Recalculate metrics based on this route
+    // 3. Update the Route Analysis panel
+}
+
 
 function resetCurrentPathPanel() {
     // Show placeholder in route steps
@@ -1621,10 +1909,34 @@ function highlightDisruptedSegments(disruptedSegments) {
 }
 
   
-function displayRouteDisruptionAlert(disruptedSegments) {
+function displayRouteDisruptionAlert(disruptionsSummary) {
     const alertContainer = document.getElementById('disruption-alert-container');
-    if (!alertContainer || !disruptedSegments || disruptedSegments.length === 0) {
-      // Hide alert if no disruptions
+    
+    // Handle both old format (array) and new format (object with route/network data)
+    let totalDisruptions = 0;
+    let timeImpact = 0;
+    let highCount = 0;
+    let mediumCount = 0;
+    let lowCount = 0;
+    
+    if (!disruptionsSummary) {
+      if (alertContainer) {
+        alertContainer.classList.add('hidden');
+      }
+      return;
+    }
+    
+    // Parse the new disruptions_summary format from C++ API
+    if (disruptionsSummary.route) {
+      totalDisruptions = disruptionsSummary.route.total_disrupted_edges || 0;
+      timeImpact = disruptionsSummary.route.total_time_impact_seconds || 0;
+      highCount = disruptionsSummary.route.high || 0;
+      mediumCount = disruptionsSummary.route.medium || 0;
+      lowCount = disruptionsSummary.route.low || 0;
+    }
+    
+    // Hide alert if no disruptions
+    if (totalDisruptions === 0) {
       if (alertContainer) {
         alertContainer.classList.add('hidden');
       }
@@ -1634,59 +1946,43 @@ function displayRouteDisruptionAlert(disruptedSegments) {
     // Show alert and update content
     alertContainer.classList.remove('hidden');
     
-    // Get the most severe disruption for the main display
-    const severityOrder = { 'Heavy': 3, 'Medium': 2, 'Light': 1 };
-    const mostSevere = disruptedSegments.reduce((prev, current) => {
-      return severityOrder[current.severity] > severityOrder[prev.severity] ? current : prev;
-    });
-    
-    // Count disruptions by type
-    const disruptionCounts = {};
-    disruptedSegments.forEach(segment => {
-      disruptionCounts[segment.incidentType] = (disruptionCounts[segment.incidentType] || 0) + 1;
-    });
+    // Determine severity level
+    let severityLevel = 'low';
+    if (highCount > 0) {
+      severityLevel = 'high';
+    } else if (mediumCount > 0) {
+      severityLevel = 'medium';
+    }
     
     // Create description text
-    const totalDisruptions = disruptedSegments.length;
-    const uniqueRoads = [...new Set(disruptedSegments.map(s => s.roadName))];
-    
     let description = '';
     if (totalDisruptions === 1) {
-      description = `${mostSevere.roadName} affected by ${mostSevere.incidentType.toLowerCase()}`;
+      description = `1 disrupted segment on route`;
     } else {
-      const roadList = uniqueRoads.slice(0, 2).join(', ');
-      const remainingRoads = uniqueRoads.length - 2;
-      description = `${roadList}${remainingRoads > 0 ? ` and ${remainingRoads} other road${remainingRoads > 1 ? 's' : ''}` : ''} affected by ${totalDisruptions} disruption${totalDisruptions > 1 ? 's' : ''}`;
+      description = `${totalDisruptions} disrupted segments: ${highCount} high, ${mediumCount} medium, ${lowCount} low severity`;
     }
     
     // Update alert content
-    const titleElement = alertContainer.querySelector('.text-sm.font-bold.text-red-900');
-    const descElement = alertContainer.querySelector('.text-xs.text-red-700');
+    const titleElement = document.getElementById('disruption-alert-title');
+    const summaryElement = document.getElementById('disruption-alert-summary');
+    const impactElement = document.getElementById('disruption-alert-impact');
     
     if (titleElement) {
-      titleElement.textContent = `${totalDisruptions} Disruption${totalDisruptions > 1 ? 's' : ''} on Route`;
+      titleElement.textContent = `${totalDisruptions} Disruption${totalDisruptions > 1 ? 's' : ''} Detected`;
     }
     
-    if (descElement) {
-      descElement.textContent = description;
+    if (summaryElement) {
+      summaryElement.textContent = description;
     }
     
-    // Update severity styling based on most severe disruption
-    alertElement.className = alertElement.className.replace(/from-\w+-50 to-\w+-50 border-\w+-500/, '');
-    const severityColors = {
-      'Heavy': 'from-red-50 to-rose-50 border-red-500',
-      'Medium': 'from-orange-50 to-amber-50 border-orange-500', 
-      'Light': 'from-yellow-50 to-orange-50 border-yellow-500'
-    };
-    alertElement.className += ' ' + (severityColors[mostSevere.severity] || severityColors['Heavy']);
+    if (impactElement && timeImpact > 0) {
+      const timeMin = Math.round(timeImpact / 60);
+      impactElement.textContent = `Time Impact: +${timeMin} min`;
+    } else if (impactElement) {
+      impactElement.textContent = 'Time Impact: Minimal';
+    }
     
-    // Add click handler to show disruptions
-    alertElement.style.cursor = 'pointer';
-    alertElement.onclick = () => {
-      showRouteDisruptionsDetail(disruptedSegments);
-    };
-    
-    console.log(`Route passes through ${totalDisruptions} disrupted segment(s):`, disruptedSegments);
+    console.log(`Route passes through ${totalDisruptions} disrupted segment(s), impact: ${timeImpact}s`);
 }
   
 function showRouteDisruptionsDetail(disruptedSegments) {

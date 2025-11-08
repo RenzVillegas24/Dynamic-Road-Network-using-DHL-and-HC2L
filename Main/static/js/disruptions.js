@@ -42,15 +42,43 @@ function highlightDisruptedSegments(disruptedSegments) {
     });
 }
   
-function displayRouteDisruptionAlert(disruptedSegments) {
+function displayRouteDisruptionAlert(disruptedSegmentsOrSummary) {
     const alertContainer = document.getElementById('disruption-alert-container');
-    if (!alertContainer || !disruptedSegments || disruptedSegments.length === 0) {
+    
+    // Handle both array format (legacy) and object format (new disruptions_summary)
+    let disruptedSegments = [];
+    
+    if (!disruptedSegmentsOrSummary) {
+      if (alertContainer) {
+        alertContainer.classList.add('hidden');
+      }
+      return;
+    }
+    
+    // Check if it's the new disruptions_summary object format
+    if (disruptedSegmentsOrSummary.route && typeof disruptedSegmentsOrSummary.route === 'object') {
+      // This is the new C++ API format, use the functions.js version instead
+      // Call the correct function
+      if (typeof displayRouteDisruptionAlert_NewFormat === 'function') {
+        return displayRouteDisruptionAlert_NewFormat(disruptedSegmentsOrSummary);
+      }
+      // Fallback: just hide the alert
+      if (alertContainer) {
+        alertContainer.classList.add('hidden');
+      }
+      return;
+    }
+    
+    // Otherwise treat as array (legacy format)
+    if (!Array.isArray(disruptedSegmentsOrSummary) || disruptedSegmentsOrSummary.length === 0) {
       // Hide alert if no disruptions
       if (alertContainer) {
         alertContainer.classList.add('hidden');
       }
       return;
     }
+    
+    disruptedSegments = disruptedSegmentsOrSummary;
     
     // Show alert and update content
     alertContainer.classList.remove('hidden');
@@ -488,6 +516,76 @@ function clearDisruptionMarkers() {
         map.removeLayer(marker);
     });
     disruptionMarkers = [];
+}
+
+// Handle new disruptions_summary format from C++ API
+function displayRouteDisruptionAlert_NewFormat(disruptionsSummary) {
+    const alertContainer = document.getElementById('disruption-alert-container');
+    
+    if (!alertContainer || !disruptionsSummary) return;
+    
+    // Parse the new disruptions_summary format from C++ API
+    let totalDisruptions = 0;
+    let timeImpact = 0;
+    let highCount = 0;
+    let mediumCount = 0;
+    let lowCount = 0;
+    
+    if (disruptionsSummary.route) {
+      totalDisruptions = disruptionsSummary.route.total_disrupted_edges || 0;
+      timeImpact = disruptionsSummary.route.total_time_impact_seconds || 0;
+      highCount = disruptionsSummary.route.high || 0;
+      mediumCount = disruptionsSummary.route.medium || 0;
+      lowCount = disruptionsSummary.route.low || 0;
+    }
+    
+    // Hide alert if no disruptions
+    if (totalDisruptions === 0) {
+      alertContainer.classList.add('hidden');
+      return;
+    }
+    
+    // Show alert and update content
+    alertContainer.classList.remove('hidden');
+    
+    // Determine severity level
+    let severityLevel = 'low';
+    if (highCount > 0) {
+      severityLevel = 'high';
+    } else if (mediumCount > 0) {
+      severityLevel = 'medium';
+    }
+    
+    // Create description text
+    let description = '';
+    if (totalDisruptions === 1) {
+      description = '1 disrupted segment';
+    } else {
+      description = `${totalDisruptions} disrupted segments`;
+    }
+    
+    // Update alert content
+    const titleElement = document.getElementById('disruption-alert-title');
+    const summaryElement = document.getElementById('disruption-alert-summary');
+    const impactElement = document.getElementById('disruption-alert-impact');
+    
+    if (titleElement) {
+      titleElement.textContent = '⚠️ Route Disruptions Detected';
+    }
+    
+    if (summaryElement) {
+      const severityBreakdown = highCount > 0 ? ` (${highCount} high priority)` : mediumCount > 0 ? ` (${mediumCount} medium priority)` : '';
+      summaryElement.textContent = `${description}${severityBreakdown}`;
+    }
+    
+    if (impactElement && timeImpact > 0) {
+      const minutes = Math.round(timeImpact / 60);
+      impactElement.textContent = `+${minutes} min delay`;
+    } else if (impactElement) {
+      impactElement.textContent = '';
+    }
+    
+    console.log(`Route passes through ${totalDisruptions} disrupted segment(s), impact: ${timeImpact}s`);
 }
 
 

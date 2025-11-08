@@ -114,6 +114,7 @@ struct TrafficFlowData {
 // Incident/Disruption Data: stores disruption details per edge
 struct IncidentData {
     string type;                // "accident", "construction", "closure", "congestion", "weather"
+    string severity_level;      // "critical", "high", "medium", "low", "none"
     double severity;            // 0.0 to 1.0 (higher = more severe)
     double weight_multiplier;   // Cost multiplier for routing (1.0 = normal, >1.0 = avoid)
     int is_closed;              // 1 = road closed, 0 = passable
@@ -122,10 +123,12 @@ struct IncidentData {
     double impact_score;        // Combined impact metric
     distance_t old_weight;      // Original edge weight
     distance_t new_weight;      // Updated weight with disruption
+    double time_impact;         // Extra time added in seconds
+    string description;         // Human-readable description
     
-    IncidentData() : type("unknown"), severity(0.0), weight_multiplier(1.0), 
+    IncidentData() : type("unknown"), severity_level("none"), severity(0.0), weight_multiplier(1.0), 
                      is_closed(0), confidence(1.0), highway_type("unknown"),
-                     impact_score(0.0), old_weight(0), new_weight(0) {}
+                     impact_score(0.0), old_weight(0), new_weight(0), time_impact(0.0), description("") {}
 };
 
 // Disruption Cache: stores parsed disruption data to avoid re-parsing
@@ -839,6 +842,46 @@ bool load_disruptions_with_cache(
         incident.severity = (new_weight > old_weight && old_weight > 0) ? 
                            (double)(new_weight - old_weight) / old_weight : 0.0;
         incident.weight_multiplier = get_incident_severity(disruption_type);
+        
+        // Determine severity level from jam factor (matching HC2L logic)
+        if (is_closed) {
+            incident.severity_level = "critical";
+        } else if (jam_factor >= 8.0) {
+            incident.severity_level = "high";
+        } else if (jam_factor >= 5.0) {
+            incident.severity_level = "medium";
+        } else if (jam_factor >= 3.0) {
+            incident.severity_level = "low";
+        } else {
+            incident.severity_level = "none";
+        }
+        
+        // Generate human-readable description (matching HC2L format)
+        if (is_closed) {
+            incident.description = "Road Closed - Impassable";
+        } else if (jam_factor >= 8.0) {
+            incident.description = "Severe Incident - Near Standstill Traffic";
+        } else if (jam_factor >= 6.5) {
+            incident.description = "Heavy Congestion - Very Slow Movement";
+        } else if (jam_factor >= 5.0) {
+            incident.description = "Heavy Traffic - Significant Delays";
+        } else if (jam_factor >= 3.5) {
+            incident.description = "Moderate Traffic - Some Delays";
+        } else if (jam_factor >= 2.0) {
+            incident.description = "Light Traffic - Minor Delays";
+        } else {
+            incident.description = "Free Flow - No Delays";
+        }
+        
+        // Calculate time impact based on weight difference (in seconds)
+        if (old_weight > 0 && new_weight > old_weight) {
+            // Weight is in meters, convert difference to estimated time impact
+            // Assuming avg speed of 50 km/h = 13.89 m/s
+            double weight_diff = new_weight - old_weight;
+            incident.time_impact = (weight_diff / 13.89);  // seconds
+        } else {
+            incident.time_impact = 0.0;
+        }
         
         incidents_out[edge_key] = incident;
         
@@ -1991,41 +2034,123 @@ void output_json_response(bool success, const string& error_message = "",
         cout << "  }," << endl;
         
         // ============================================================
-        // DISRUPTION ANALYSIS - Comprehensive route disruption metrics
+        // DISRUPTIONS SUMMARY - Consolidated disruption metrics
         // ============================================================
-        cout << "  \"disruption_analysis\": {" << endl;
+        cout << "  \"disruptions_summary\": {" << endl;
         
         // Perform disruption analysis on the route
         DisruptionAnalysisResult analysis = analyze_route_disruptions(
             path, disruption_map, flow_data, coordinates, edge_geometries
         );
         
-        cout << "    \"route_disruptions\": {" << endl;
-        cout << "      \"total_count\": " << analysis.total_disruptions_on_route << "," << endl;
-        cout << "      \"on_route_count\": " << analysis.total_disruptions_on_route << "," << endl;
-        cout << "      \"closures\": " << analysis.road_closures_count << "," << endl;
-        cout << "      \"severity_breakdown\": {" << endl;
-        cout << "        \"high\": " << analysis.high_severity_count << "," << endl;
-        cout << "        \"medium\": " << analysis.medium_severity_count << "," << endl;
-        cout << "        \"low\": " << analysis.low_severity_count << endl;
-        cout << "      }" << endl;
-        cout << "    }," << endl;
+        // Calculate disruption statistics on the selected route
+        int route_disruptions_critical = 0;
+        int route_disruptions_high = 0;
+        int route_disruptions_medium = 0;
+        int route_disruptions_low = 0;
+        int route_closures = 0;
+        double total_time_impact = 0.0;
+        vector<pair<NodeID, NodeID>> affected_edges;
         
-        cout << "    \"time_impact\": {" << endl;
+        for (size_t i = 0; i < path.size() - 1; i++) {
+            auto edge_key = make_pair(path[i], path[i + 1]);
+            if (disruption_map.count(edge_key)) {
+                const auto& incident = disruption_map.at(edge_key);
+                
+                // DHL uses high/medium/low, map to the same severity levels
+                if (incident.severity >= 0.7) {
+                    route_disruptions_high++;
+                    if (incident.is_closed) route_closures++;
+                } else if (incident.severity >= 0.4) {
+                    route_disruptions_medium++;
+                } else {
+                    route_disruptions_low++;
+                }
+                
+                affected_edges.push_back(edge_key);
+            }
+        }
+        
+        // Network-wide statistics
+        int network_total = analysis.total_network_disruptions;
+        int network_closures = analysis.total_network_closures;
+        int network_active = analysis.active_disruptions;
+        
+        cout << "    \"route\": {" << endl;
+        cout << "      \"total_disrupted_edges\": " << affected_edges.size() << "," << endl;
+        cout << "      \"critical\": " << route_disruptions_critical << "," << endl;
+        cout << "      \"high\": " << route_disruptions_high << "," << endl;
+        cout << "      \"medium\": " << route_disruptions_medium << "," << endl;
+        cout << "      \"low\": " << route_disruptions_low << "," << endl;
+        cout << "      \"closures\": " << route_closures << "," << endl;
+        cout << "      \"total_time_impact_seconds\": " << fixed << setprecision(1) << analysis.added_delay_seconds << "," << endl;
+        cout << "      \"total_time_impact_minutes\": " << fixed << setprecision(1) << (analysis.added_delay_seconds / 60.0) << "," << endl;
         cout << "      \"baseline_eta_seconds\": " << fixed << setprecision(1) << analysis.baseline_eta_seconds << "," << endl;
         cout << "      \"actual_eta_seconds\": " << fixed << setprecision(1) << analysis.actual_eta_seconds << "," << endl;
-        cout << "      \"added_delay_seconds\": " << fixed << setprecision(1) << analysis.added_delay_seconds << "," << endl;
-        cout << "      \"percentage_increase\": " << fixed << setprecision(2) << analysis.delay_percentage << endl;
+        cout << "      \"percentage_increase\": " << fixed << setprecision(1) << analysis.delay_percentage << endl;
         cout << "    }," << endl;
         
-        cout << "    \"network_statistics\": {" << endl;
-        cout << "      \"total_disruptions\": " << analysis.total_network_disruptions << "," << endl;
-        cout << "      \"total_closures\": " << analysis.total_network_closures << "," << endl;
-        cout << "      \"active_disruptions\": " << analysis.active_disruptions << endl;
-        cout << "    }" << endl;
+        cout << "    \"network\": {" << endl;
+        cout << "      \"total_incidents\": " << network_total << "," << endl;
+        cout << "      \"high\": " << analysis.high_severity_count << "," << endl;
+        cout << "      \"medium\": " << analysis.medium_severity_count << "," << endl;
+        cout << "      \"low\": " << analysis.low_severity_count << "," << endl;
+        cout << "      \"closures\": " << network_closures << "," << endl;
+        cout << "      \"active_disruptions\": " << network_active << endl;
+        cout << "    }," << endl;
+        
+        // List ALL disruptions on route (sorted by severity)
+        vector<pair<pair<NodeID, NodeID>, const IncidentData*>> all_route_disruptions;
+        for (const auto& edge : affected_edges) {
+            if (disruption_map.count(edge)) {
+                all_route_disruptions.push_back({edge, &disruption_map.at(edge)});
+            }
+        }
+        
+        // Sort by severity score (descending), then by edge ID (ascending) for stability
+        sort(all_route_disruptions.begin(), all_route_disruptions.end(),
+             [](const auto& a, const auto& b) {
+                 if (a.second->severity != b.second->severity) {
+                     return a.second->severity > b.second->severity;
+                 }
+                 return a.first < b.first;
+             });
+        
+        cout << "    \"all_disruptions\": [" << endl;
+        for (size_t i = 0; i < all_route_disruptions.size(); i++) {
+            const auto& [edge, incident] = all_route_disruptions[i];
+            
+            // Determine severity level from severity score (same as HC2L)
+            string severity_level = "low";
+            if (incident->severity >= 0.7) {
+                severity_level = "high";
+            } else if (incident->severity >= 0.4) {
+                severity_level = "medium";
+            }
+            
+            cout << "      {" << endl;
+            cout << "        \"edge\": [" << edge.first << ", " << edge.second << "]," << endl;
+            cout << "        \"type\": \"" << incident->type << "\"," << endl;
+            cout << "        \"severity_level\": \"" << incident->severity_level << "\"," << endl;
+            cout << "        \"severity_score\": " << fixed << setprecision(2) << incident->severity << "," << endl;
+            cout << "        \"is_closed\": " << (incident->is_closed ? "true" : "false") << "," << endl;
+            cout << "        \"confidence\": " << fixed << setprecision(2) << incident->confidence << "," << endl;
+            cout << "        \"highway_type\": \"" << incident->highway_type << "\"," << endl;
+            cout << "        \"description\": \"" << escape_json_string(incident->description) << "\"," << endl;
+            cout << "        \"time_impact_seconds\": " << fixed << setprecision(0) << incident->time_impact << "," << endl;
+            cout << "        \"old_weight\": " << incident->old_weight << "," << endl;
+            cout << "        \"new_weight\": " << incident->new_weight << endl;
+            cout << "      }";
+            if (i < all_route_disruptions.size() - 1) cout << ",";
+            cout << endl;
+        }
+        cout << "    ]" << endl;
         
         cout << "  }" << endl;
     }
+    
+    // Add empty alternative_routes array (DHL does not generate alternatives in this version)
+    cout << "  ,\"alternative_routes\": []" << endl;
     
     cout << "}" << endl;
 }
