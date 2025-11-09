@@ -1655,7 +1655,8 @@ void output_json_response(bool success, const string& error_message = "",
                          const string& update_reason = "",
                          int nodes_updated = 0,
                          const map<pair<NodeID, NodeID>, TrafficFlowData>& flow_data = map<pair<NodeID, NodeID>, TrafficFlowData>(),
-                         const map<pair<NodeID, NodeID>, IncidentData>& disruption_map = map<pair<NodeID, NodeID>, IncidentData>()) {
+                         const map<pair<NodeID, NodeID>, IncidentData>& disruption_map = map<pair<NodeID, NodeID>, IncidentData>(),
+                         const ContractionIndex* ci = nullptr) {
     
     cout << "{" << endl;
     cout << "  \"success\": " << (success ? "true" : "false") << "," << endl;
@@ -1711,9 +1712,6 @@ void output_json_response(bool success, const string& error_message = "",
         cout << "  \"metrics\": {" << endl;
         cout << "    \"total_distance_units\": " << distance << "," << endl;
         cout << "    \"query_time_ms\": " << fixed << setprecision(3) << query_time_ms << "," << endl;
-        cout << "    \"labeling_time_ms\": " << fixed << setprecision(3) << index_load_time_ms << "," << endl;
-        cout << "    \"labeling_size_mb\": " << fixed << setprecision(2) << index_size_mb << "," << endl;
-        cout << "    \"labeling_size_bytes\": " << fixed << setprecision(0) << index_size_bytes << "," << endl;
         cout << "    \"path_length\": " << path.size() << "," << endl;
         cout << "    \"uses_disruptions\": " << (use_disruptions ? "true" : "false") << "," << endl;
         cout << "    \"tau_threshold\": " << fixed << setprecision(2) << tau_threshold << "," << endl;
@@ -1729,7 +1727,49 @@ void output_json_response(bool success, const string& error_message = "",
         cout << "    \"calculated_distance_meters\": " << fixed << setprecision(1) << calculated_distance << "," << endl;
         cout << "    \"calculated_distance_km\": " << fixed << setprecision(2) << (calculated_distance / 1000.0) << "," << endl;
         cout << "    \"eta_seconds\": " << fixed << setprecision(0) << eta_seconds << "," << endl;
-        cout << "    \"eta_formatted\": \"" << eta_formatted << "\"" << endl;
+        cout << "    \"eta_formatted\": \"" << eta_formatted << "\"," << endl;
+        
+        // DHL Labeling Information (nested object matching HC2L structure)
+        if (ci != nullptr) {
+            size_t label_count = ci->label_count();
+            size_t index_size = ci->size();
+            size_t height = ci->height();
+            size_t max_label_count = ci->max_label_count();
+            size_t max_cut_size = ci->max_cut_size();
+            size_t non_empty_cuts = ci->non_empty_cuts();
+            double avg_cut_size = ci->avg_cut_size();
+            
+            cout << "    \"labeling_info\": {" << endl;
+            cout << "      \"total_labels\": " << label_count << "," << endl;
+            cout << "      \"infinite_labels\": 0," << endl;  // DHL doesn't track infinite labels separately
+            cout << "      \"index_size_bytes\": " << index_size << "," << endl;
+            cout << "      \"index_size_mb\": " << fixed << setprecision(2) << (index_size / (1024.0 * 1024.0)) << "," << endl;
+            cout << "      \"hierarchy_height\": " << height << "," << endl;
+            cout << "      \"max_label_count_per_node\": " << max_label_count << "," << endl;
+            cout << "      \"max_cut_size\": " << max_cut_size << "," << endl;
+            cout << "      \"average_cut_size\": " << fixed << setprecision(2) << avg_cut_size << "," << endl;
+            cout << "      \"non_empty_cuts\": " << non_empty_cuts << "," << endl;
+            cout << "      \"index_load_time_ms\": " << fixed << setprecision(3) << index_load_time_ms << endl;
+            cout << "    }," << endl;
+        } else {
+            cout << "    \"labeling_info\": {" << endl;
+            cout << "      \"total_labels\": 0," << endl;
+            cout << "      \"infinite_labels\": 0," << endl;
+            cout << "      \"index_size_bytes\": " << fixed << setprecision(0) << index_size_bytes << "," << endl;
+            cout << "      \"index_size_mb\": " << fixed << setprecision(2) << index_size_mb << "," << endl;
+            cout << "      \"hierarchy_height\": 0," << endl;
+            cout << "      \"max_label_count_per_node\": 0," << endl;
+            cout << "      \"max_cut_size\": 0," << endl;
+            cout << "      \"average_cut_size\": 0.0," << endl;
+            cout << "      \"non_empty_cuts\": 0," << endl;
+            cout << "      \"index_load_time_ms\": " << fixed << setprecision(3) << index_load_time_ms << endl;
+            cout << "    }," << endl;
+        }
+        
+        // Keep backward compatibility fields at top level
+        cout << "    \"labeling_time_ms\": " << fixed << setprecision(3) << index_load_time_ms << "," << endl;
+        cout << "    \"labeling_size_mb\": " << fixed << setprecision(2) << index_size_mb << "," << endl;
+        cout << "    \"labeling_size_bytes\": " << fixed << setprecision(0) << index_size_bytes << endl;
         cout << "  }," << endl;
         
         // Disruption configuration section
@@ -2128,8 +2168,17 @@ void output_json_response(bool success, const string& error_message = "",
                 severity_level = "medium";
             }
             
+            // Get road name from edge geometries
+            string road_name = "";
+            if (edge_geometries.count(edge)) {
+                road_name = edge_geometries.at(edge).road_name;
+            }
+            
             cout << "      {" << endl;
             cout << "        \"edge\": [" << edge.first << ", " << edge.second << "]," << endl;
+            cout << "        \"source\": " << edge.first << "," << endl;
+            cout << "        \"target\": " << edge.second << "," << endl;
+            cout << "        \"road_name\": \"" << escape_json_string(road_name) << "\"," << endl;
             cout << "        \"type\": \"" << incident->type << "\"," << endl;
             cout << "        \"severity_level\": \"" << incident->severity_level << "\"," << endl;
             cout << "        \"severity_score\": " << fixed << setprecision(2) << incident->severity << "," << endl;
@@ -2146,11 +2195,11 @@ void output_json_response(bool success, const string& error_message = "",
         }
         cout << "    ]" << endl;
         
-        cout << "  }" << endl;
+        cout << "  }," << endl;
+        
+        // Add empty alternative_routes array (DHL does not generate alternatives in this version)
+        cout << "  \"alternative_routes\": []" << endl;
     }
-    
-    // Add empty alternative_routes array (DHL does not generate alternatives in this version)
-    cout << "  ,\"alternative_routes\": []" << endl;
     
     cout << "}" << endl;
 }
@@ -2574,7 +2623,7 @@ int main(int argc, char* argv[]) {
                            path, coordinates,
                            edge_geometries, use_disruptions, tau_threshold,
                            disruption_file, disruption_impact_score,
-                           update_strategy, update_reason, nodes_updated, flow_data, incident_data);
+                           update_strategy, update_reason, nodes_updated, flow_data, incident_data, &ci);
         
         return 0;
         

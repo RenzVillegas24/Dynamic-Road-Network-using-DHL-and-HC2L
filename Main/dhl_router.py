@@ -261,25 +261,9 @@ class DHLRouter:
             print(f"📊 DHL path summary: {path_summary['total_distance_m']:.1f}m over {path_summary['num_segments']} segments")
         
         # Create route data structure with enhanced metrics from API
+        # CRITICAL FIX: Pass through ALL C++ fields to preserve labeling_info, dhl_update_info, disruptions_summary, etc.
         route_data = {
-            'metrics': {
-                'algorithm': dhl_data.get('algorithm', 'DHL'),
-                'query_time_microseconds': dhl_data.get('metrics', {}).get('query_time_microseconds', 0),
-                'query_time_ms': dhl_data.get('metrics', {}).get('query_time_ms', 0),
-                'labeling_time_ms': dhl_data.get('metrics', {}).get('labeling_time_ms', 0),
-                'labeling_size_bytes': dhl_data.get('metrics', {}).get('labeling_size_bytes', 0),
-                'total_distance_units': dhl_data.get('metrics', {}).get('total_distance_units', 0),
-                'path_length': dhl_data.get('metrics', {}).get('path_length', 0),
-                'hoplinks_examined': dhl_data.get('metrics', {}).get('hoplinks_examined', 0),
-                'uses_disruptions': dhl_data.get('metrics', {}).get('uses_disruptions', False),
-                'routing_mode': dhl_data.get('metrics', {}).get('routing_mode', 'DHL'),
-                # Enhanced index statistics from API
-                'index_height': dhl_data.get('index_stats', {}).get('index_height', 0),
-                'avg_cut_size': dhl_data.get('index_stats', {}).get('avg_cut_size', 0),
-                'total_labels': dhl_data.get('index_stats', {}).get('total_labels', 0),
-                'graph_nodes': dhl_data.get('index_stats', {}).get('graph_nodes', 0),
-                'graph_edges': dhl_data.get('index_stats', {}).get('graph_edges', 0)
-            },
+            'metrics': dhl_data.get('metrics', {}),  # Pass through entire metrics object from C++
             'route': {
                 'path_nodes': path_nodes,
                 'coordinates': coordinates,
@@ -292,8 +276,14 @@ class DHLRouter:
             },
             'gps_mapping': dhl_data.get('gps_mapping', {}),
             'disruptions': dhl_data.get('disruptions', {}),
+            'disruptions_summary': dhl_data.get('disruptions_summary', {}),  # Pass through disruptions_summary
+            'dhl_update_info': dhl_data.get('dhl_update_info', {}),  # Pass through DHL update info
+            'disruption_config': dhl_data.get('disruption_config', {}),  # Pass through disruption config
+            'alternative_routes': dhl_data.get('alternative_routes', []),  # Pass through alternative routes
             'data_sources': dhl_data.get('data_sources', {}),
-            'input': dhl_data.get('input', {})
+            'input': dhl_data.get('input', {}),
+            'snap_edges': dhl_data.get('snap_edges', {}),  # Pass through snap edge info
+            'algorithm': dhl_data.get('algorithm', 'DHL')  # Pass through algorithm name
         }
         
         # Create polylines from coordinates

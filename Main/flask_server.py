@@ -1326,6 +1326,12 @@ def compute_dhc2l_route():
         summary = gps_router.get_route_summary(route_result)
         summary['total_computation_time_sec'] = round(computation_time, 3)
         
+        # Get the full metrics from C++ output
+        cpp_metrics = route_result.get('metrics', {})
+        
+        # Merge summary into cpp_metrics (keeping all C++ fields, adding Python-calculated fields)
+        full_metrics = {**cpp_metrics, **summary}
+        
         # # Debug: Print labeling metrics
         # print(f"Route Summary Metrics:")
         # print(f"Labeling size: {summary.get('labeling_size_mb', 'N/A')} MB")
@@ -1364,9 +1370,12 @@ def compute_dhc2l_route():
                 'display_format': route_result.get('route', {}).get('display_format', {}),
                 'geometry': route_result.get('route', {}).get('geometry', [])  # Edge details with distance, highway type, speeds, traffic status
             },
-            'metrics': summary,
+            'metrics': full_metrics,  # Use full_metrics with all C++ fields
             'disruption_analysis': disruption_analysis,  # Pass disruption analysis from C++ to frontend
             'disruptions_summary': route_result.get('disruptions_summary', {}),  # Also pass disruptions_summary for additional details
+            'alternative_routes': route_result.get('alternative_routes', []),  # Pass alternative routes from C++
+            'lazy_hc2l': route_result.get('lazy_hc2l', {}),  # Pass LazyHC2L update strategy info
+            'disruption_config': route_result.get('disruption_config', {}),  # Pass disruption configuration
             'algorithm': summary.get('algorithm', 'D-HC2L Dynamic'),  # Use algorithm from summary
             'algorithm_base': summary.get('algorithm_base', 'D-HC2L'),
             'routing_mode': summary.get('routing_mode', 'BASE'),
@@ -1999,6 +2008,12 @@ def compute_dhl_route():
         summary = dhl_router.get_route_summary(route_result)
         summary['total_computation_time_sec'] = round(computation_time, 3)
         
+        # Get the full metrics from C++ output
+        cpp_metrics = route_result.get('metrics', {})
+        
+        # Merge summary into cpp_metrics (keeping all C++ fields, adding Python-calculated fields)
+        full_metrics = {**cpp_metrics, **summary}
+        
         # Get enhanced road name information using the new methods
         turn_by_turn_directions = dhl_router.get_turn_by_turn_directions(route_result)
         route_summary_text = dhl_router.get_route_summary_text(route_result)
@@ -2027,9 +2042,12 @@ def compute_dhl_route():
                 'display_format': route_result.get('route', {}).get('display_format', {}),
                 'detailed_info': detailed_route_info
             },
-            'metrics': summary,
+            'metrics': full_metrics,  # Use full_metrics with all C++ fields
             'disruption_analysis': disruption_analysis,  # Pass disruption analysis from C++ to frontend
             'disruptions_summary': route_result.get('disruptions_summary', {}),  # Also pass disruptions_summary for additional details
+            'alternative_routes': route_result.get('alternative_routes', []),  # Pass alternative routes from C++
+            'dhl_update_info': route_result.get('dhl_update_info', {}),  # Pass DHL update strategy info
+            'disruption_config': route_result.get('disruption_config', {}),  # Pass disruption configuration
             'algorithm': 'DHL (Dual-Hierarchy Labelling)',
             'gps_mapping': route_result.get('gps_mapping', {}),
             'snap_edges': route_result.get('snap_edges', {}),

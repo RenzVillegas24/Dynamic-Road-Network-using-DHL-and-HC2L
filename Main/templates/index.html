@@ -409,19 +409,25 @@
               </div>
             </div>
 
-            <!-- Detailed Route Metrics Section (Collapsible) -->
-            <div class="bg-gradient-to-br from-blue-100 to-blue-50 rounded-2xl border border-blue-300 shadow-sm overflow-hidden">
-              <button onclick="openRouteMetricsPanel()" class="w-full px-4 py-3 flex items-center justify-between hover:bg-blue-200 transition-colors">
-                <span class="text-sm font-bold text-blue-700 flex items-center gap-2">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <!-- Algorithm Metrics Section (Collapsible) -->
+            <div onclick="openRouteMetricsPanel()"
+              class="bg-gradient-to-br from-blue-50 to-cyan-50 border-l-4 border-blue-500 rounded-2xl p-3 shadow cursor-pointer hover:shadow-lg transition-all duration-200">
+              <div class="flex items-start gap-3">
+                <div class="bg-blue-500 rounded-xl p-2 flex-shrink-0">
+                  <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
                   </svg>
-                  All Metrics
-                </span>
-                <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                </svg>
-              </button>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="text-sm font-bold text-blue-900">Algorithm Metrics</div>
+                  <div class="text-xs text-blue-700 mt-1">Performance & routing details</div>
+                </div>
+                <div class="self-center flex-shrink-0">
+                  <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                  </svg>
+                </div>
+              </div>
             </div>
 
             <!-- Enhanced Disruption Alert with C++ Data Integration -->
@@ -1046,14 +1052,14 @@
       </div>
     </div>
 
-    <!-- Route Analysis Panel (z-index 60 to appear above admin panel) -->
+    <!-- Disruption Analysis Panel (z-index 60 to appear above admin panel) -->
     <div id="disruptions-panel"
       class="fixed top-0 right-0 w-[35rem] h-full glass-effect shadow-2xl transform translate-x-full transition-transform duration-300 z-[60] border-l border-slate-200/50 flex flex-col">
     
       <div class="p-6 bg-gradient-to-r from-red-600 via-orange-600 to-amber-600 text-white flex justify-between items-center sticky top-0 z-10 flex-shrink-0">
         <div>
-          <h2 class="font-bold text-2xl mb-1">Route Analysis</h2>
-          <p class="text-orange-100 text-sm">Comprehensive route and traffic insights</p>
+          <h2 class="font-bold text-2xl mb-1">Disruption Analysis</h2>
+          <p class="text-orange-100 text-sm">Route disruptions and traffic incident analysis</p>
         </div>
         <button onclick="closeDisruptionsPanel()" class="hover:bg-white/20 rounded-xl p-2 transition-all">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1075,6 +1081,16 @@
             <div id="route-time-impact" class="text-3xl font-bold text-orange-600">--</div>
             <div class="text-xs text-orange-600 mt-1">added delay</div>
           </div>
+          <div class="bg-gradient-to-br from-amber-50 to-yellow-100 rounded-xl p-4 border-2 border-amber-300 shadow-sm">
+            <div class="text-xs text-amber-700 font-bold uppercase mb-1">Base Route Time</div>
+            <div id="route-base-time" class="text-3xl font-bold text-amber-600">--</div>
+            <div class="text-xs text-amber-600 mt-1">without disruptions</div>
+          </div>
+          <div class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl p-4 border-2 border-slate-300 shadow-sm">
+            <div class="text-xs text-slate-700 font-bold uppercase mb-1">Total Route Time</div>
+            <div id="route-total-time" class="text-3xl font-bold text-slate-600">--</div>
+            <div class="text-xs text-slate-600 mt-1">including disruptions</div>
+          </div>  
         </div>
 
         <!-- Severity Breakdown -->
@@ -1088,22 +1104,111 @@
             </div>
             Severity Breakdown
           </h3>
-          <div class="space-y-3">
-            <div class="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-200">
-              <span class="font-semibold text-red-800">Critical</span>
-              <span id="severity-critical" class="text-xl font-bold text-red-600">0</span>
+          <div class="grid grid-cols-2 gap-4">
+            <!-- Critical -->
+            <div class="flex flex-col justify-between p-4 bg-gradient-to-br from-red-50 to-red-100 rounded-2xl border border-red-200 shadow-md hover:shadow-lg transition-shadow">
+              <div class="flex items-start gap-3">
+                <div class="w-12 h-12 flex items-center justify-center rounded-xl bg-red-600/10 text-red-700">
+                  <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M12 9v4" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M12 17h.01" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M10.29 3.86L3 10.59a2.5 2.5 0 000 3.53l8 8a2.5 2.5 0 003.53 0l7.29-7.29a2.5 2.5 0 000-3.53L13.71 3.86a2.5 2.5 0 00-3.42 0z"/>
+                  </svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <div class="text-xs uppercase font-semibold text-red-800">Critical</div>
+                      <div id="severity-critical" class="text-2xl sm:text-3xl font-extrabold text-red-600 mt-1">0</div>
+                    </div>
+                    <div class="text-xs text-slate-400" id="severity-critical-percent" aria-hidden="true">0%</div>
+                  </div>
+                  <div class="mt-3">
+                    <div class="w-full bg-red-100 rounded-full h-2 overflow-hidden">
+                      <div id="severity-critical-bar" class="h-2 bg-red-600 transition-all" style="width:0%"></div>
+                    </div>
+                    <div class="text-xs text-red-500 mt-2">Most severe disruptions impacting route</div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div class="flex items-center justify-between p-3 bg-orange-50 rounded-lg border border-orange-200">
-              <span class="font-semibold text-orange-800">High</span>
-              <span id="severity-high" class="text-xl font-bold text-orange-600">0</span>
+
+            <!-- High -->
+            <div class="flex flex-col justify-between p-4 bg-gradient-to-br from-orange-50 to-orange-100 rounded-2xl border border-orange-200 shadow-md hover:shadow-lg transition-shadow">
+              <div class="flex items-start gap-3">
+                <div class="w-12 h-12 flex items-center justify-center rounded-xl bg-orange-600/10 text-orange-700">
+                  <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14l-5-4.87 6.91-1.01L12 2z"/>
+                  </svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <div class="text-xs uppercase font-semibold text-orange-800">High</div>
+                      <div id="severity-high" class="text-2xl sm:text-3xl font-extrabold text-orange-600 mt-1">0</div>
+                    </div>
+                    <div class="text-xs text-slate-400" id="severity-high-percent" aria-hidden="true">0%</div>
+                  </div>
+                  <div class="mt-3">
+                    <div class="w-full bg-orange-100 rounded-full h-2 overflow-hidden">
+                      <div id="severity-high-bar" class="h-2 bg-orange-600 transition-all" style="width:0%"></div>
+                    </div>
+                    <div class="text-xs text-orange-600 mt-2">Severe delays and major slowdowns</div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div class="flex items-center justify-between p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-              <span class="font-semibold text-yellow-800">Medium</span>
-              <span id="severity-medium" class="text-xl font-bold text-yellow-600">0</span>
+
+            <!-- Medium -->
+            <div class="flex flex-col justify-between p-4 bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-2xl border border-yellow-200 shadow-md hover:shadow-lg transition-shadow">
+              <div class="flex items-start gap-3">
+                <div class="w-12 h-12 flex items-center justify-center rounded-xl bg-yellow-600/10 text-yellow-800">
+                  <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M3 12h18M12 3v18" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <div class="text-xs uppercase font-semibold text-yellow-800">Medium</div>
+                      <div id="severity-medium" class="text-2xl sm:text-3xl font-extrabold text-yellow-600 mt-1">0</div>
+                    </div>
+                    <div class="text-xs text-slate-400" id="severity-medium-percent" aria-hidden="true">0%</div>
+                  </div>
+                  <div class="mt-3">
+                    <div class="w-full bg-yellow-100 rounded-full h-2 overflow-hidden">
+                      <div id="severity-medium-bar" class="h-2 bg-yellow-500 transition-all" style="width:0%"></div>
+                    </div>
+                    <div class="text-xs text-yellow-700 mt-2">Moderate slowdowns along the route</div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div class="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200">
-              <span class="font-semibold text-blue-800">Low</span>
-              <span id="severity-low" class="text-xl font-bold text-blue-600">0</span>
+
+            <!-- Low -->
+            <div class="flex flex-col justify-between p-4 bg-gradient-to-br from-sky-50 to-blue-50 rounded-2xl border border-blue-200 shadow-md hover:shadow-lg transition-shadow">
+              <div class="flex items-start gap-3">
+                <div class="w-12 h-12 flex items-center justify-center rounded-xl bg-blue-600/10 text-blue-700">
+                  <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M12 20c4.418 0 8-3.582 8-8s-3.582-8-8-8-8 3.582-8 8 3.582 8 8 8z"/>
+                  </svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <div class="text-xs uppercase font-semibold text-blue-800">Low</div>
+                      <div id="severity-low" class="text-2xl sm:text-3xl font-extrabold text-blue-600 mt-1">0</div>
+                    </div>
+                    <div class="text-xs text-slate-400" id="severity-low-percent" aria-hidden="true">0%</div>
+                  </div>
+                  <div class="mt-3">
+                    <div class="w-full bg-blue-100 rounded-full h-2 overflow-hidden">
+                      <div id="severity-low-bar" class="h-2 bg-blue-600 transition-all" style="width:0%"></div>
+                    </div>
+                    <div class="text-xs text-blue-600 mt-2">Minor slowdowns, keep an eye out</div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1151,18 +1256,6 @@
               <span class="text-blue-700 font-medium">Query Time:</span>
               <span id="analysis-query-time" class="font-bold text-blue-800 font-mono">--</span>
             </div>
-            <div class="flex justify-between items-center py-2 px-3 bg-slate-50 rounded-lg">
-              <span class="text-slate-600 font-medium">Baseline ETA:</span>
-              <span id="analysis-baseline-eta" class="font-bold text-slate-800">--</span>
-            </div>
-            <div class="flex justify-between items-center py-2 px-3 bg-slate-50 rounded-lg">
-              <span class="text-slate-600 font-medium">Actual ETA:</span>
-              <span id="analysis-actual-eta" class="font-bold text-slate-800">--</span>
-            </div>
-            <div class="flex justify-between items-center py-2 px-3 bg-orange-50 rounded-lg border border-orange-200">
-              <span class="text-orange-700 font-medium">Time Impact:</span>
-              <span id="analysis-time-impact" class="font-bold text-orange-800">--</span>
-            </div>
             <div class="flex justify-between items-center py-2 px-3 bg-red-50 rounded-lg border border-red-200">
               <span class="text-red-700 font-medium">Disrupted Edges:</span>
               <span id="analysis-disrupted-edges" class="font-bold text-red-800">--</span>
@@ -1179,9 +1272,13 @@
                   d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
               </svg>
             </div>
-            Top Disruptions on Route
+            <!-- show the total number of disruptions on right -->
+             <div class="flex-1 flex justify-between items-center">
+              <span>Disruptions on Route</span>
+              <span id="top-disruptions-count" class="text-sm text-slate-500 font-medium">--</span>
+            </div>
           </h3>
-          <div id="top-disruptions-list" class="space-y-3 max-h-96 overflow-y-auto">
+          <div id="top-disruptions-list" class="space-y-3">
             <div class="text-center text-slate-400 py-8">
               <svg class="w-16 h-16 mx-auto mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
@@ -1285,6 +1382,169 @@
               <span class="text-slate-600 font-medium">Labeling Size (MB):</span>
               <span id="metrics-labeling-size" class="font-bold text-slate-800">--</span>
             </div>
+            <div class="flex justify-between py-2 px-3 bg-slate-50 rounded-lg">
+              <span class="text-slate-600 font-medium">Calculated Distance:</span>
+              <span id="metrics-calculated-distance" class="font-bold text-slate-800">--</span>
+            </div>
+            <div class="flex justify-between py-2 px-3 bg-slate-50 rounded-lg">
+              <span class="text-slate-600 font-medium">Interpolation Used:</span>
+              <span id="metrics-interpolation" class="font-bold text-slate-800">--</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- HC2L Labeling Info Section (HC2L only) -->
+        <div id="hc2l-labeling-info-section" class="border-t border-slate-200 pt-4 mt-4">
+          <h3 class="font-bold text-slate-800 mb-3 flex items-center gap-2">
+            <svg class="w-5 h-5 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path>
+            </svg>
+            Labeling Information
+          </h3>
+          
+          <div class="space-y-2 text-sm">
+            <div class="flex justify-between py-2 px-3 bg-cyan-50 rounded-lg">
+              <span class="text-slate-600 font-medium">Total Labels:</span>
+              <span id="metrics-total-labels" class="font-bold text-cyan-800">--</span>
+            </div>
+            <div class="flex justify-between py-2 px-3 bg-cyan-50 rounded-lg">
+              <span class="text-slate-600 font-medium">Infinite Labels:</span>
+              <span id="metrics-infinite-labels" class="font-bold text-cyan-800">--</span>
+            </div>
+            <div class="flex justify-between py-2 px-3 bg-cyan-50 rounded-lg">
+              <span class="text-slate-600 font-medium">Index Size (bytes):</span>
+              <span id="metrics-index-size-bytes" class="font-bold text-cyan-800">--</span>
+            </div>
+            <div class="flex justify-between py-2 px-3 bg-cyan-50 rounded-lg">
+              <span class="text-slate-600 font-medium">Hierarchy Height:</span>
+              <span id="metrics-hierarchy-height" class="font-bold text-cyan-800">--</span>
+            </div>
+            <div class="flex justify-between py-2 px-3 bg-cyan-50 rounded-lg">
+              <span class="text-slate-600 font-medium">Max Label Count/Node:</span>
+              <span id="metrics-max-label-count" class="font-bold text-cyan-800">--</span>
+            </div>
+            <div class="flex justify-between py-2 px-3 bg-cyan-50 rounded-lg">
+              <span class="text-slate-600 font-medium">Max Cut Size:</span>
+              <span id="metrics-max-cut-size" class="font-bold text-cyan-800">--</span>
+            </div>
+            <div class="flex justify-between py-2 px-3 bg-cyan-50 rounded-lg">
+              <span class="text-slate-600 font-medium">Average Cut Size:</span>
+              <span id="metrics-avg-cut-size" class="font-bold text-cyan-800">--</span>
+            </div>
+            <div class="flex justify-between py-2 px-3 bg-cyan-50 rounded-lg">
+              <span class="text-slate-600 font-medium">Non-Empty Cuts:</span>
+              <span id="metrics-non-empty-cuts" class="font-bold text-cyan-800">--</span>
+            </div>
+            <div class="flex justify-between py-2 px-3 bg-cyan-50 rounded-lg">
+              <span class="text-slate-600 font-medium">Index Load Time:</span>
+              <span id="metrics-index-load-time" class="font-bold text-cyan-800">--</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- LazyHC2L Update Strategy Section (HC2L only) -->
+        <div id="hc2l-lazy-section" class="border-t border-slate-200 pt-4 mt-4">
+          <h3 class="font-bold text-slate-800 mb-3 flex items-center gap-2">
+            <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+            </svg>
+            LazyHC2L Update Strategy
+          </h3>
+          
+          <div class="space-y-2 text-sm">
+            <div class="flex justify-between py-2 px-3 bg-purple-50 rounded-lg">
+              <span class="text-slate-600 font-medium">Update Strategy:</span>
+              <span id="metrics-update-strategy" class="font-bold text-purple-800">--</span>
+            </div>
+            <div class="flex justify-between py-2 px-3 bg-purple-50 rounded-lg">
+              <span class="text-slate-600 font-medium">Dirty Nodes Marked:</span>
+              <span id="metrics-dirty-nodes" class="font-bold text-purple-800">--</span>
+            </div>
+            <div class="flex justify-between py-2 px-3 bg-purple-50 rounded-lg">
+              <span class="text-slate-600 font-medium">Lazy Repair Time:</span>
+              <span id="metrics-repair-time" class="font-bold text-purple-800">--</span>
+            </div>
+            <div class="flex justify-between py-2 px-3 bg-purple-50 rounded-lg">
+              <span class="text-slate-600 font-medium">Nodes Repaired:</span>
+              <span id="metrics-nodes-repaired" class="font-bold text-purple-800">--</span>
+            </div>
+            <div class="flex justify-between py-2 px-3 bg-purple-50 rounded-lg">
+              <span class="text-slate-600 font-medium">Cache Hit:</span>
+              <span id="metrics-cache-hit" class="font-bold text-purple-800">--</span>
+            </div>
+            <div class="flex justify-between py-2 px-3 bg-purple-50 rounded-lg">
+              <span class="text-slate-600 font-medium">Impact Score:</span>
+              <span id="metrics-impact-score" class="font-bold text-purple-800">--</span>
+            </div>
+            <div class="flex justify-between py-2 px-3 bg-purple-50 rounded-lg">
+              <span class="text-slate-600 font-medium">Tau Threshold:</span>
+              <span id="metrics-tau-threshold" class="font-bold text-purple-800">--</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- DHL Update Info Section (DHL only) -->
+        <div id="dhl-update-info-section" class="border-t border-slate-200 pt-4 mt-4">
+          <h3 class="font-bold text-slate-800 mb-3 flex items-center gap-2">
+            <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+            DHL Update Information
+          </h3>
+          
+          <div class="space-y-2 text-sm">
+            <div class="flex justify-between py-2 px-3 bg-indigo-50 rounded-lg">
+              <span class="text-slate-600 font-medium">Algorithm Type:</span>
+              <span id="metrics-algorithm-type" class="font-bold text-indigo-800">--</span>
+            </div>
+            <div class="flex justify-between py-2 px-3 bg-indigo-50 rounded-lg">
+              <span class="text-slate-600 font-medium">Update Strategy:</span>
+              <span id="metrics-dhl-strategy" class="font-bold text-indigo-800">--</span>
+            </div>
+            <div class="flex justify-between py-2 px-3 bg-indigo-50 rounded-lg">
+              <span class="text-slate-600 font-medium">Nodes Updated:</span>
+              <span id="metrics-nodes-updated" class="font-bold text-indigo-800">--</span>
+            </div>
+            <div class="flex justify-between py-2 px-3 bg-indigo-50 rounded-lg">
+              <span class="text-slate-600 font-medium">Impact Score:</span>
+              <span id="metrics-dhl-impact" class="font-bold text-indigo-800">--</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Disruption Configuration Section (HC2L only) -->
+        <div id="disruption-config-section" class="border-t border-slate-200 pt-4 mt-4">
+          <h3 class="font-bold text-slate-800 mb-3 flex items-center gap-2">
+            <svg class="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+            </svg>
+            Disruption Configuration
+          </h3>
+          
+          <div class="space-y-2 text-sm">
+            <div class="flex justify-between py-2 px-3 bg-orange-50 rounded-lg">
+              <span class="text-slate-600 font-medium">Tau Threshold:</span>
+              <span id="metrics-config-tau" class="font-bold text-orange-800">--</span>
+            </div>
+            <div class="flex justify-between py-2 px-3 bg-orange-50 rounded-lg">
+              <span class="text-slate-600 font-medium">Disruption File:</span>
+              <span id="metrics-disruption-file" class="font-bold text-orange-800 truncate" title="--">--</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Alternative Routes Section -->
+        <div id="metrics-alternative-routes-section" class="border-t border-slate-200 pt-4 mt-4 hidden">
+          <h3 class="font-bold text-slate-800 mb-3 flex items-center gap-2">
+            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path>
+            </svg>
+            Alternative Routes
+          </h3>
+          
+          <div id="metrics-alternative-routes-list" class="space-y-2">
+            <!-- Alternative routes will be inserted here by JavaScript -->
           </div>
         </div>
       </div>
@@ -1725,6 +1985,7 @@
   <script src="{{ url_for('static', filename='js/functions.js') }}"></script>
   <script src="{{ url_for('static', filename='js/disruptions.js') }}"></script>
   <script src="{{ url_for('static', filename='js/metrics.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/panel-population.js') }}"></script>
   <script src="{{ url_for('static', filename='js/osm-snapping.js') }}"></script>
   <script src="{{ url_for('static', filename='js/event-handlers.js') }}"></script>
   <script src="{{ url_for('static', filename='js/search-and-drag.js') }}"></script>
@@ -1764,12 +2025,12 @@
       }
     }
 
-    // Route Analysis panel functions
+    // Disruption Analysis panel functions
     function openDisruptionsPanel() {
       const panel = document.getElementById('disruptions-panel');
       if (panel) {
         panel.classList.remove('translate-x-full');
-        console.log('Route Analysis panel opened');
+        console.log('Disruption Analysis panel opened');
       }
     }
 
@@ -1777,7 +2038,7 @@
       const panel = document.getElementById('disruptions-panel');
       if (panel) {
         panel.classList.add('translate-x-full');
-        console.log('Route Analysis panel closed');
+        console.log('Disruption Analysis panel closed');
       }
     }
 
@@ -1798,35 +2059,25 @@
       }
     }
 
-    function populateRouteMetricsPanel(routeData) {
+    // Wrapper function to populate both metrics and disruption panels
+    function populateAllPanels(routeData) {
       if (!routeData) return;
 
-      const metrics = routeData.metrics || {};
-      const disruptions = routeData.disruptions_summary || {};
-
-      // Populate top metrics
-      document.getElementById('metrics-algorithm').textContent = routeData.algorithm || metrics.algorithm || '--';
-      document.getElementById('metrics-query-time').textContent = (metrics.query_time_ms || metrics.query_time_microseconds / 1000 || 0).toFixed(3) + ' ms';
+      console.log('📊 populateAllPanels called - routing to panel-population.js functions');
       
-      const baselineEta = disruptions.route?.baseline_eta_seconds || metrics.baseline_eta_seconds || 0;
-      document.getElementById('metrics-baseline-eta').textContent = baselineEta ? (baselineEta / 60).toFixed(1) + ' min' : '--';
+      // Populate Algorithm Metrics panel (non-disruption data)
+      if (typeof window.populateRouteMetricsPanel === 'function') {
+        window.populateRouteMetricsPanel(routeData);
+      } else {
+        console.warn('⚠️ populateRouteMetricsPanel not loaded from panel-population.js');
+      }
       
-      const actualEta = disruptions.route?.actual_eta_seconds || metrics.eta_seconds || 0;
-      document.getElementById('metrics-actual-eta').textContent = actualEta ? (actualEta / 60).toFixed(1) + ' min' : '--';
-      
-      const timeImpact = disruptions.route?.total_time_impact_seconds || 0;
-      document.getElementById('metrics-time-impact').textContent = timeImpact ? timeImpact.toFixed(1) + ' sec' : '--';
-      
-      const disruptedEdges = disruptions.route?.total_disrupted_edges || 0;
-      document.getElementById('metrics-disrupted-edges').textContent = disruptedEdges + ' edges';
-
-      // Populate detailed metrics
-      document.getElementById('metrics-distance').textContent = (metrics.total_distance_units || '--');
-      document.getElementById('metrics-path-length').textContent = (metrics.path_length || '--');
-      document.getElementById('metrics-edge-count').textContent = (metrics.edge_count || '--');
-      document.getElementById('metrics-uses-disruptions').textContent = metrics.uses_disruptions ? 'Yes' : 'No';
-      document.getElementById('metrics-labeling-time').textContent = (metrics.labeling_time_ms || '--').toFixed(2);
-      document.getElementById('metrics-labeling-size').textContent = (metrics.labeling_size_mb || '--').toFixed(2);
+      // Populate Disruption Analysis panel (disruption-specific data)
+      if (typeof window.populateDisruptionsPanel === 'function') {
+        window.populateDisruptionsPanel(routeData);
+      } else {
+        console.warn('⚠️ populateDisruptionsPanel not loaded from panel-population.js');
+      }
     }
 
     // Focus on a specific edge on the map
@@ -1978,6 +2229,33 @@
       document.getElementById('severity-medium').textContent = routeStats.medium || 0;
       document.getElementById('severity-low').textContent = routeStats.low || 0;
 
+      // Calculate and update severity bar widths and percentages based on time impact
+      const criticalTimeImpact = routeStats.critical_time_impact_seconds || 0;
+      const highTimeImpact = routeStats.high_time_impact_seconds || 0;
+      const mediumTimeImpact = routeStats.medium_time_impact_seconds || 0;
+      const lowTimeImpact = routeStats.low_time_impact_seconds || 0;
+      
+      const totalSeverityTimeImpact = criticalTimeImpact + highTimeImpact + mediumTimeImpact + lowTimeImpact;
+      
+      // Calculate percentages for each severity level
+      const criticalPercent = totalSeverityTimeImpact > 0 ? Math.round((criticalTimeImpact / totalSeverityTimeImpact) * 100) : 0;
+      const highPercent = totalSeverityTimeImpact > 0 ? Math.round((highTimeImpact / totalSeverityTimeImpact) * 100) : 0;
+      const mediumPercent = totalSeverityTimeImpact > 0 ? Math.round((mediumTimeImpact / totalSeverityTimeImpact) * 100) : 0;
+      const lowPercent = totalSeverityTimeImpact > 0 ? Math.round((lowTimeImpact / totalSeverityTimeImpact) * 100) : 0;
+      
+      // Update severity bar widths and percentages
+      document.getElementById('severity-critical-bar').style.width = `${criticalPercent}%`;
+      document.getElementById('severity-critical-percent').textContent = `${criticalPercent}%`;
+      
+      document.getElementById('severity-high-bar').style.width = `${highPercent}%`;
+      document.getElementById('severity-high-percent').textContent = `${highPercent}%`;
+      
+      document.getElementById('severity-medium-bar').style.width = `${mediumPercent}%`;
+      document.getElementById('severity-medium-percent').textContent = `${mediumPercent}%`;
+      
+      document.getElementById('severity-low-bar').style.width = `${lowPercent}%`;
+      document.getElementById('severity-low-percent').textContent = `${lowPercent}%`;
+
       // Update network statistics
       document.getElementById('network-total-disruptions').textContent = networkStats.total_incidents || 0;
       
@@ -1989,6 +2267,9 @@
 
       // Update disruptions list with ALL disruptions
       const topDisruptionsList = document.getElementById('top-disruptions-list');
+
+      // top-disruptions-count
+      const topDisruptionsCount = document.getElementById('top-disruptions-count');
       
       if (routeStats.total_disrupted_edges === 0) {
         topDisruptionsList.innerHTML = `
@@ -2001,99 +2282,12 @@
             <p class="text-sm mt-1">Clear road ahead!</p>
           </div>
         `;
+        topDisruptionsCount.textContent = '0 disruptions';
       } else {
-        // Show summary card with severity breakdown
-        topDisruptionsList.innerHTML = `
-          <div class="bg-gradient-to-br from-red-50 to-orange-50 rounded-xl p-5 border-2 border-red-300 shadow-md">
-            <div class="flex items-center justify-between mb-4">
-              <h4 class="font-bold text-red-800 text-lg">Route Impact Summary</h4>
-              <div class="bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full">
-                ${routeStats.total_disrupted_edges} disruptions
-              </div>
-            </div>
-            
-            <div class="space-y-3">
-              ${routeStats.closures > 0 ? `
-              <div class="flex items-center justify-between p-3 bg-white rounded-lg border border-red-200">
-                <div class="flex items-center gap-2">
-                  <div class="w-3 h-3 bg-red-600 rounded-full"></div>
-                  <span class="font-medium text-slate-700">Road Closures</span>
-                </div>
-                <span class="font-bold text-red-600">${routeStats.closures}</span>
-              </div>
-              ` : ''}
-              
-              ${routeStats.critical > 0 ? `
-              <div class="flex items-center justify-between p-3 bg-white rounded-lg border border-red-200">
-                <div class="flex items-center gap-2">
-                  <div class="w-3 h-3 bg-red-600 rounded-full"></div>
-                  <span class="font-medium text-slate-700">Critical</span>
-                </div>
-                <span class="font-bold text-red-600">${routeStats.critical}</span>
-              </div>
-              ` : ''}
-              
-              ${routeStats.high > 0 ? `
-              <div class="flex items-center justify-between p-3 bg-white rounded-lg border border-orange-200">
-                <div class="flex items-center gap-2">
-                  <div class="w-3 h-3 bg-orange-500 rounded-full"></div>
-                  <span class="font-medium text-slate-700">High Severity</span>
-                </div>
-                <span class="font-bold text-orange-600">${routeStats.high}</span>
-              </div>
-              ` : ''}
-              
-              ${routeStats.medium > 0 ? `
-              <div class="flex items-center justify-between p-3 bg-white rounded-lg border border-yellow-200">
-                <div class="flex items-center gap-2">
-                  <div class="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                  <span class="font-medium text-slate-700">Medium Severity</span>
-                </div>
-                <span class="font-bold text-yellow-600">${routeStats.medium}</span>
-              </div>
-              ` : ''}
-              
-              ${routeStats.low > 0 ? `
-              <div class="flex items-center justify-between p-3 bg-white rounded-lg border border-blue-200">
-                <div class="flex items-center gap-2">
-                  <div class="w-3 h-3 bg-blue-500 rounded-full"></div>
-                  <span class="font-medium text-slate-700">Low Severity</span>
-                </div>
-                <span class="font-bold text-blue-600">${routeStats.low}</span>
-              </div>
-              ` : ''}
-            </div>
-            
-            <div class="mt-4 pt-4 border-t border-red-200">
-              <div class="flex items-center justify-between text-sm">
-                <span class="text-slate-600">Baseline ETA:</span>
-                <span class="font-semibold text-slate-700">${Math.round(routeStats.baseline_eta_seconds / 60)}m</span>
-              </div>
-              <div class="flex items-center justify-between text-sm mt-1">
-                <span class="text-slate-600">Actual ETA:</span>
-                <span class="font-bold text-red-600">${Math.round(routeStats.actual_eta_seconds / 60)}m</span>
-              </div>
-              <div class="flex items-center justify-between text-sm mt-2 pt-2 border-t border-red-200">
-                <span class="text-red-700 font-semibold">Added Delay:</span>
-                <span class="font-bold text-red-600 text-lg">+${timeImpactMin}m (${percentIncrease.toFixed(0)}%)</span>
-              </div>
-            </div>
-          </div>
-        `;
-        
         // Add all disrupted edges list
         if (allDisruptions && allDisruptions.length > 0) {
-          topDisruptionsList.innerHTML += `
-            <div class="mt-4">
-              <h4 class="font-bold text-slate-800 text-sm mb-3 flex items-center">
-                <svg class="w-4 h-4 mr-2 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
-                </svg>
-                All Disrupted Edges (${allDisruptions.length})
-              </h4>
-              <div class="space-y-2 max-h-96 overflow-y-auto">
-            `;
+          topDisruptionsList.innerHTML = "";
+          topDisruptionsCount.textContent = allDisruptions.length.toString() + ' disruptions';
             
             // Display all disruptions from C++ API
             allDisruptions.forEach((disruption, index) => {
@@ -3093,7 +3287,7 @@
         if (summaryParts.length > 0) {
           summaryElement.textContent = `Severity: ${summaryParts.join(', ')} • Click for details`;
         } else {
-          summaryElement.textContent = 'Click to view Route Analysis';
+          summaryElement.textContent = 'Click to view Disruption Analysis';
         }
         
         // Update time impact
@@ -3105,7 +3299,7 @@
           impactElement.classList.remove('hidden');
         }
         
-        // Add click handler to navigate to Route Analysis panel
+        // Add click handler to navigate to Disruption Analysis panel
         alertContainer.onclick = openDisruptionsPanel;
         alertContainer.style.cursor = 'pointer';
         

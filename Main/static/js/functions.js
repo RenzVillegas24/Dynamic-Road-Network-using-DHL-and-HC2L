@@ -63,6 +63,9 @@ function clearRoutes() {
         console.log('Cleared', routePolylines.length, 'route polylines');
         routePolylines = [];
     }
+    
+    // Make routePolylines globally accessible
+    window.routePolylines = routePolylines || [];
 
     // Clear start and destination markers (Leaflet)
     if (startMarker && map) {
@@ -1050,6 +1053,7 @@ function displayDHLRoute(routeData) {
             }
         });
         routePolylines = [];
+        window.routePolylines = routePolylines;
     }
     
     if (!routeData.success || !routeData.route) {
@@ -1187,9 +1191,10 @@ function displayDHLRoute(routeData) {
           className: 'route-segment-popup'
         });
         
-        // Store original color for each polyline
+        // Store original color and segment data for each polyline
         polyline._originalColor = segmentColor;
         polyline._segmentIndex = index;
+        polyline._segmentData = segment; // Store complete segment data for lookup
         
         // Add click event to highlight and show details
         polyline.on('click', function(e) {
@@ -1313,9 +1318,15 @@ function displayDHLRoute(routeData) {
 
 
 
-    // Populate route metrics panel
-    if (typeof populateRouteMetricsPanel === 'function') {
-      populateRouteMetricsPanel(routeData);
+    // Populate both metrics and disruption panels
+    if (typeof populateAllPanels === 'function') {
+      populateAllPanels(routeData);
+    } else if (typeof window.populateRouteMetricsPanel === 'function') {
+      // Fallback: call the panel-population.js functions directly
+      window.populateRouteMetricsPanel(routeData);
+      if (typeof window.populateDisruptionsPanel === 'function') {
+        window.populateDisruptionsPanel(routeData);
+      }
     }
 }
 
@@ -1331,6 +1342,7 @@ function displayDHC2LRoute(routeData) {
             }
         });
         routePolylines = [];
+        window.routePolylines = routePolylines;
     }
     
     if (!routeData.success || !routeData.route) {
@@ -1476,9 +1488,10 @@ function displayDHC2LRoute(routeData) {
           className: 'route-segment-popup'
         });
         
-        // Store original color for each polyline
+        // Store original color and segment data for each polyline
         polyline._originalColor = segmentColor;
         polyline._segmentIndex = index;
+        polyline._segmentData = segment; // Store complete segment data for lookup
         
         // Add click event to highlight and show details
         polyline.on('click', function(e) {
@@ -1601,9 +1614,15 @@ function displayDHC2LRoute(routeData) {
       populateRouteDetails(routeData);
     }
 
-    // Populate route metrics panel
-    if (typeof populateRouteMetricsPanel === 'function') {
-      populateRouteMetricsPanel(routeData);
+    // Populate both metrics and disruption panels
+    if (typeof populateAllPanels === 'function') {
+      populateAllPanels(routeData);
+    } else if (typeof window.populateRouteMetricsPanel === 'function') {
+      // Fallback: call the panel-population.js functions directly
+      window.populateRouteMetricsPanel(routeData);
+      if (typeof window.populateDisruptionsPanel === 'function') {
+        window.populateDisruptionsPanel(routeData);
+      }
     }
 }
  
@@ -1672,7 +1691,16 @@ function displayAlternativeRoutes(alternativeRoutes) {
             lineCap: 'round',
             lineJoin: 'round',
             className: 'alternative-route-polyline'
-        }).addTo(map);
+        });
+        
+        // Always add to map (toggle will control visibility later if needed)
+        polyline.addTo(map);
+        
+        // Check if toggle is unchecked and hide immediately if so
+        const showAlternativeRoutesToggle = document.getElementById('show-alternative-routes');
+        if (showAlternativeRoutesToggle && !showAlternativeRoutesToggle.checked) {
+            map.removeLayer(polyline);
+        }
 
         // Build popup with alternative route details
         const distance_m = route.distance_meters || 0;

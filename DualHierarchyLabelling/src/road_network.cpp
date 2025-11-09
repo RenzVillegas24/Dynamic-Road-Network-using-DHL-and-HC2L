@@ -680,6 +680,15 @@ size_t ContractionIndex::label_count() const
     return total;
 }
 
+size_t ContractionIndex::max_label_count() const
+{
+    size_t max_label_count = 0;
+    for (NodeID node = 1; node < labels.size(); node++)
+        if (!labels[node].cut_index.empty())
+            max_label_count = max(max_label_count, labels[node].cut_index.label_count());
+    return max_label_count;
+}
+
 size_t ContractionIndex::non_empty_cuts() const
 {
     size_t total = 0;

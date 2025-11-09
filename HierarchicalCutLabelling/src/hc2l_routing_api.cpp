@@ -2400,7 +2400,7 @@ void output_json_response(bool success, const string& error_message = "",
             }
         }
         
-        // Sort by severithttp://192.168.18.13:3948/0y score (descending), then by edge ID (ascending) for stability
+        // Sort by severity score (descending), then by edge ID (ascending) for stability
         sort(all_route_disruptions.begin(), all_route_disruptions.end(),
              [](const auto& a, const auto& b) {
                  if (a.second->severity != b.second->severity) {
@@ -2412,8 +2412,18 @@ void output_json_response(bool success, const string& error_message = "",
         cout << "    \"all_disruptions\": [" << endl;
         for (size_t i = 0; i < all_route_disruptions.size(); i++) {
             const auto& [edge, incident] = all_route_disruptions[i];
+            
+            // Get road name from edge geometries
+            string road_name = "";
+            if (edge_geometries.count(edge)) {
+                road_name = edge_geometries.at(edge).road_name;
+            }
+            
             cout << "      {" << endl;
             cout << "        \"edge\": [" << edge.first << ", " << edge.second << "]," << endl;
+            cout << "        \"source\": " << edge.first << "," << endl;
+            cout << "        \"target\": " << edge.second << "," << endl;
+            cout << "        \"road_name\": \"" << escape_json_string(road_name) << "\"," << endl;
             cout << "        \"type\": \"" << incident->type << "\"," << endl;
             cout << "        \"severity_level\": \"" << incident->severity_level << "\"," << endl;
             cout << "        \"severity_score\": " << fixed << setprecision(2) << incident->severity << "," << endl;
