@@ -528,46 +528,60 @@ window.populateDisruptionsPanel = function(routeData) {
     }
   }
   
-  // Severity Breakdown
+  // Traffic Flow Status Breakdown (instead of Severity Breakdown)
+  const flowStatuses = {
+    'free_flow': 0,
+    'light': 0,
+    'moderate': 0,
+    'heavy': 0,
+    'blocked': 0,
+    'default': 0
+  };
+  
   const totalDisruptions = routeDisruptions.total_disrupted_edges || 0;
-  const critical = routeDisruptions.critical || 0;
-  const high = routeDisruptions.high || 0;
-  const medium = routeDisruptions.medium || 0;
-  const low = routeDisruptions.low || 0;
   
-  // Update counts
-  document.getElementById('severity-critical').textContent = critical;
-  document.getElementById('severity-high').textContent = high;
-  document.getElementById('severity-medium').textContent = medium;
-  document.getElementById('severity-low').textContent = low;
+  // Count disruptions by flow status from all_disruptions
+  if (disruptions.all_disruptions && disruptions.all_disruptions.length > 0) {
+    disruptions.all_disruptions.forEach(disruption => {
+      const status = disruption.flow_status || 'default';
+      if (flowStatuses.hasOwnProperty(status)) {
+        flowStatuses[status]++;
+      }
+    });
+  }
   
-  // Update percentages
+  // Update counts and percentages
+  const flowStatusElements = {
+    'free_flow': { count: 'flow-free-count', percent: 'flow-free-percent', bar: 'flow-free-bar' },
+    'light': { count: 'flow-light-count', percent: 'flow-light-percent', bar: 'flow-light-bar' },
+    'moderate': { count: 'flow-moderate-count', percent: 'flow-moderate-percent', bar: 'flow-moderate-bar' },
+    'heavy': { count: 'flow-heavy-count', percent: 'flow-heavy-percent', bar: 'flow-heavy-bar' },
+    'blocked': { count: 'flow-blocked-count', percent: 'flow-blocked-percent', bar: 'flow-blocked-bar' }
+  };
+  
   if (totalDisruptions > 0) {
-    const criticalPercent = ((critical / totalDisruptions) * 100).toFixed(0);
-    const highPercent = ((high / totalDisruptions) * 100).toFixed(0);
-    const mediumPercent = ((medium / totalDisruptions) * 100).toFixed(0);
-    const lowPercent = ((low / totalDisruptions) * 100).toFixed(0);
-    
-    document.getElementById('severity-critical-percent').textContent = `${criticalPercent}%`;
-    document.getElementById('severity-high-percent').textContent = `${highPercent}%`;
-    document.getElementById('severity-medium-percent').textContent = `${mediumPercent}%`;
-    document.getElementById('severity-low-percent').textContent = `${lowPercent}%`;
-    
-    // Update progress bars
-    document.getElementById('severity-critical-bar').style.width = `${criticalPercent}%`;
-    document.getElementById('severity-high-bar').style.width = `${highPercent}%`;
-    document.getElementById('severity-medium-bar').style.width = `${mediumPercent}%`;
-    document.getElementById('severity-low-bar').style.width = `${lowPercent}%`;
+    Object.keys(flowStatusElements).forEach(status => {
+      const count = flowStatuses[status] || 0;
+      const percent = ((count / totalDisruptions) * 100).toFixed(0);
+      
+      const countEl = document.getElementById(flowStatusElements[status].count);
+      const percentEl = document.getElementById(flowStatusElements[status].percent);
+      const barEl = document.getElementById(flowStatusElements[status].bar);
+      
+      if (countEl) countEl.textContent = count;
+      if (percentEl) percentEl.textContent = `${percent}%`;
+      if (barEl) barEl.style.width = `${percent}%`;
+    });
   } else {
-    document.getElementById('severity-critical-percent').textContent = '0%';
-    document.getElementById('severity-high-percent').textContent = '0%';
-    document.getElementById('severity-medium-percent').textContent = '0%';
-    document.getElementById('severity-low-percent').textContent = '0%';
-    
-    document.getElementById('severity-critical-bar').style.width = '0%';
-    document.getElementById('severity-high-bar').style.width = '0%';
-    document.getElementById('severity-medium-bar').style.width = '0%';
-    document.getElementById('severity-low-bar').style.width = '0%';
+    Object.keys(flowStatusElements).forEach(status => {
+      const countEl = document.getElementById(flowStatusElements[status].count);
+      const percentEl = document.getElementById(flowStatusElements[status].percent);
+      const barEl = document.getElementById(flowStatusElements[status].bar);
+      
+      if (countEl) countEl.textContent = '0';
+      if (percentEl) percentEl.textContent = '0%';
+      if (barEl) barEl.style.width = '0%';
+    });
   }
   
   // Network Statistics
@@ -620,68 +634,102 @@ window.populateDisruptionsPanel = function(routeData) {
     for (let i = 0; i < displayCount; i++) {
       const disruption = allDisruptions[i];
       
-      // Determine severity color
-      let severityColor = 'slate';
-      let severityBg = 'bg-slate-50';
-      let severityBorder = 'border-slate-200';
-      const severity = disruption.severity_level || '';
+      // Determine flow status color with both Tailwind classes and inline styles
+      let flowColor = 'slate';
+      let flowBgClass = 'bg-slate-50';
+      let flowBorderClass = 'border-slate-200';
+      let flowIconColor = '#64748b'; // slate-500
+      let flowTextColor = '#1e293b'; // slate-900
+      let flowIcon = '◑';
+      const flowStatus = disruption.flow_status || 'default';
       
-      if (severity === 'critical') {
-        severityColor = 'red';
-        severityBg = 'bg-red-50';
-        severityBorder = 'border-red-300';
-      } else if (severity === 'high') {
-        severityColor = 'orange';
-        severityBg = 'bg-orange-50';
-        severityBorder = 'border-orange-300';
-      } else if (severity === 'medium') {
-        severityColor = 'yellow';
-        severityBg = 'bg-yellow-50';
-        severityBorder = 'border-yellow-300';
-      } else if (severity === 'low') {
-        severityColor = 'blue';
-        severityBg = 'bg-blue-50';
-        severityBorder = 'border-blue-300';
+      if (flowStatus === 'blocked') {
+        flowColor = 'red';
+        flowBgClass = 'bg-red-50';
+        flowBorderClass = 'border-red-500';
+        flowIconColor = '#dc2626'; // red-600
+        flowTextColor = '#7f1d1d'; // red-900
+        flowIcon = '🚫';
+      } else if (flowStatus === 'heavy') {
+        flowColor = 'orange';
+        flowBgClass = 'bg-orange-50';
+        flowBorderClass = 'border-orange-500';
+        flowIconColor = '#ea580c'; // orange-600
+        flowTextColor = '#7c2d12'; // orange-900
+        flowIcon = '🔴';
+      } else if (flowStatus === 'moderate') {
+        flowColor = 'yellow';
+        flowBgClass = 'bg-yellow-50';
+        flowBorderClass = 'border-yellow-500';
+        flowIconColor = '#ca8a04'; // yellow-600
+        flowTextColor = '#713f12'; // yellow-900
+        flowIcon = '🟡';
+      } else if (flowStatus === 'light') {
+        flowColor = 'green';
+        flowBgClass = 'bg-green-50';
+        flowBorderClass = 'border-green-500';
+        flowIconColor = '#16a34a'; // green-600
+        flowTextColor = '#15803d'; // green-900
+        flowIcon = '🟢';
+      } else if (flowStatus === 'free_flow') {
+        flowColor = 'blue';
+        flowBgClass = 'bg-blue-50';
+        flowBorderClass = 'border-blue-500';
+        flowIconColor = '#2563eb'; // blue-600
+        flowTextColor = '#1e40af'; // blue-900
+        flowIcon = '✓';
       }
       
       const disruptionCard = document.createElement('div');
-      disruptionCard.className = `${severityBg} border ${severityBorder} rounded-xl p-3 cursor-pointer hover:shadow-md transition-all`;
+      disruptionCard.className = `${flowBgClass} border-2 ${flowBorderClass} rounded-xl p-3 cursor-pointer hover:shadow-md transition-all`;
       disruptionCard.onclick = () => showEdgeDetails(disruption);
       
       // Get road name or use fallback
       const roadName = disruption.road_name || 'Unknown Road';
+      const flowStatusDisplay = flowStatus.replace(/_/g, ' ').toUpperCase();
+      const disruptionType = disruption.type || 'Unknown';
       
       disruptionCard.innerHTML = `
         <div class="flex items-start gap-3">
-          <div class="flex-shrink-0 w-10 h-10 bg-${severityColor}-500 rounded-lg flex items-center justify-center text-white font-bold">
-            ${i + 1}
+          <div class="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-lg" style="background-color: ${flowIconColor};">
+            ${flowIcon}
           </div>
           <div class="flex-1 min-w-0">
-            <div class="flex items-center justify-between mb-1">
-              <div class="font-bold text-${severityColor}-900 text-sm">${roadName}</div>
-              <div class="text-xs px-2 py-1 bg-${severityColor}-200 text-${severityColor}-800 rounded-lg font-semibold uppercase">
-                ${severity}
+            <div class="flex items-center justify-between mb-1 flex-wrap gap-1">
+              <div class="font-bold text-sm" style="color: ${flowTextColor};">${roadName}</div>
+              <div class="text-xs px-2 py-1 rounded-lg font-semibold uppercase" style="background-color: ${flowIconColor}20; color: ${flowIconColor};">
+                ${flowStatusDisplay}
               </div>
             </div>
             <div class="text-xs text-slate-600 space-y-1">
+              <div><strong>Type:</strong> ${disruptionType}</div>
               <div><strong>Edge:</strong> ${disruption.source} → ${disruption.target}</div>
-              <div><strong>Type:</strong> ${disruption.type || 'Unknown'}</div>
-              ${disruption.description ? `<div class="italic">"${disruption.description}"</div>` : ''}
-              <div class="flex items-center gap-3 mt-2">
+              ${disruption.description ? `<div class="italic text-slate-500">"${disruption.description}"</div>` : ''}
+              <div class="flex items-center gap-3 mt-2 flex-wrap">
                 <div>
-                  <strong>Impact:</strong> 
-                  <span class="text-${severityColor}-700 font-bold">+${(disruption.time_impact_seconds || 0).toFixed(0)}s</span>
+                  <strong>Speed:</strong> 
+                  <span class="font-semibold" style="color: ${flowIconColor};">${(disruption.current_speed || 0).toFixed(1)} km/h</span>
                 </div>
-                ${disruption.confidence !== undefined ? `
+                <div>
+                  <strong>Jam Factor:</strong> 
+                  <span class="font-semibold" style="color: ${flowIconColor};">${(disruption.jam_factor || 0).toFixed(2)}</span>
+                </div>
+                ${disruption.time_impact_seconds !== undefined ? `
                   <div>
-                    <strong>Confidence:</strong> 
-                    <span class="font-semibold">${(disruption.confidence * 100).toFixed(0)}%</span>
+                    <strong>Impact:</strong> 
+                    <span class="font-bold" style="color: ${flowIconColor};">+${(disruption.time_impact_seconds || 0).toFixed(0)}s</span>
                   </div>
                 ` : ''}
-                ${disruption.is_closed ? `
-                  <div class="text-red-600 font-bold">🚫 CLOSED</div>
-                ` : ''}
               </div>
+              ${disruption.confidence !== undefined ? `
+                <div class="mt-1">
+                  <strong>Confidence:</strong> 
+                  <span class="font-semibold">${(disruption.confidence * 100).toFixed(0)}%</span>
+                </div>
+              ` : ''}
+              ${disruption.is_closed ? `
+                <div class="text-red-600 font-bold mt-1">🚫 ROAD CLOSED</div>
+              ` : ''}
             </div>
           </div>
         </div>
@@ -957,6 +1005,9 @@ window.highlightAlternativeRoute = function(routeIndex, altRoute) {
     }
   }
 };
+
+// Alias for backward compatibility - functions.js calls updateDisruptionsPanel
+window.updateDisruptionsPanel = window.populateDisruptionsPanel;
 
 console.log('✅ Panel Population module loaded');
 

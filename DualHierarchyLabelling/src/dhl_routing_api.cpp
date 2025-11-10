@@ -154,6 +154,18 @@ struct DisruptionCache {
     }
 };
 
+// Alternative Route Structure: represents k-shortest paths
+struct AlternativeRoute {
+    vector<NodeID> path;        // Node IDs in the path
+    distance_t distance;        // Total distance in meters
+    double eta_seconds;         // Estimated time in seconds
+    double avg_jam_factor;      // Average jam factor along route
+    int rank;                   // Rank (1 = best, 2 = second best, etc.)
+    string description;         // Human-readable description
+    
+    AlternativeRoute() : distance(0), eta_seconds(0.0), avg_jam_factor(5.0), rank(1), description("") {}
+};
+
 // Global disruption cache (persists across requests)
 static DisruptionCache g_disruption_cache;
 
@@ -412,6 +424,120 @@ string format_eta_time(double seconds) {
     }
     
     return ss.str();
+}
+
+// Generate K alternative routes using penalty-based k-shortest paths
+vector<AlternativeRoute> generate_alternative_routes(
+    NodeID start, NodeID dest,
+    const map<NodeID, vector<Neighbor>>& adj_list,
+    const map<pair<NodeID, NodeID>, TrafficFlowData>& flow_data,
+    const map<NodeID, GPSCoordinate>& coordinates,
+    int K = 3) {
+    
+    vector<AlternativeRoute> alternatives;
+    set<pair<NodeID, NodeID>> used_edges;
+    
+    for (int k = 0; k < K; k++) {
+        // Find shortest path avoiding used edges (with penalty)
+        map<NodeID, distance_t> dist;
+        map<NodeID, NodeID> pred;
+        set<NodeID> visited;
+        
+        priority_queue<pair<distance_t, NodeID>,
+                       vector<pair<distance_t, NodeID>>,
+                       greater<pair<distance_t, NodeID>>> pq;
+        
+        dist[start] = 0;
+        pq.push({0, start});
+        
+        while (!pq.empty()) {
+            auto [d, u] = pq.top();
+            pq.pop();
+            
+            if (visited.count(u)) continue;
+            visited.insert(u);
+            
+            if (u == dest) break;
+            
+            if (adj_list.count(u)) {
+                for (const auto& neighbor : adj_list.at(u)) {
+                    NodeID v = neighbor.node;
+                    distance_t edge_cost = neighbor.distance;
+                    
+                    // Apply penalty to used edges
+                    auto edge_key = make_pair(u, v);
+                    if (used_edges.count(edge_key)) {
+                        edge_cost *= 2; // 2x penalty for used edges
+                    }
+                    
+                    distance_t new_dist = dist[u] + edge_cost;
+                    
+                    if (!dist.count(v) || new_dist < dist[v]) {
+                        dist[v] = new_dist;
+                        pred[v] = u;
+                        pq.push({new_dist, v});
+                    }
+                }
+            }
+        }
+        
+        // Reconstruct path
+        vector<NodeID> path;
+        if (pred.count(dest) || dest == start) {
+            NodeID curr = dest;
+            while (curr != start) {
+                path.push_back(curr);
+                if (!pred.count(curr)) break;
+                curr = pred[curr];
+            }
+            path.push_back(start);
+            reverse(path.begin(), path.end());
+        }
+        
+        if (path.empty() || path.size() < 2) break;
+        
+        // Calculate metrics
+        AlternativeRoute route;
+        route.path = path;
+        route.distance = dist.count(dest) ? dist[dest] : 0;
+        route.eta_seconds = calculate_eta_with_traffic(path, flow_data, coordinates);
+        
+        // Calculate average jam factor
+        double total_jam = 0.0;
+        int edge_count = 0;
+        for (size_t i = 0; i < path.size() - 1; i++) {
+            auto edge_key = make_pair(path[i], path[i+1]);
+            if (flow_data.count(edge_key)) {
+                total_jam += flow_data.at(edge_key).jam_factor;
+                edge_count++;
+            }
+        }
+        route.avg_jam_factor = edge_count > 0 ? total_jam / edge_count : 5.0;
+        route.rank = k + 1;
+        route.description = k == 0 ? "Fastest route" : 
+                           k == 1 ? "Alternative via different path" :
+                           "Secondary alternative";
+        
+        alternatives.push_back(route);
+        
+        // Mark edges as used for next iteration
+        for (size_t i = 0; i < path.size() - 1; i++) {
+            used_edges.insert({path[i], path[i+1]});
+        }
+    }
+    
+    // Sort by ETA (best first)
+    sort(alternatives.begin(), alternatives.end(),
+         [](const AlternativeRoute& a, const AlternativeRoute& b) {
+             return a.eta_seconds < b.eta_seconds;
+         });
+    
+    // Update ranks
+    for (size_t i = 0; i < alternatives.size(); i++) {
+        alternatives[i].rank = i + 1;
+    }
+    
+    return alternatives;
 }
 
 // ============================================================
@@ -1656,7 +1782,8 @@ void output_json_response(bool success, const string& error_message = "",
                          int nodes_updated = 0,
                          const map<pair<NodeID, NodeID>, TrafficFlowData>& flow_data = map<pair<NodeID, NodeID>, TrafficFlowData>(),
                          const map<pair<NodeID, NodeID>, IncidentData>& disruption_map = map<pair<NodeID, NodeID>, IncidentData>(),
-                         const ContractionIndex* ci = nullptr) {
+                         const ContractionIndex* ci = nullptr,
+                         const map<NodeID, vector<Neighbor>>& adj_list = map<NodeID, vector<Neighbor>>()) {
     
     cout << "{" << endl;
     cout << "  \"success\": " << (success ? "true" : "false") << "," << endl;
@@ -2174,6 +2301,17 @@ void output_json_response(bool success, const string& error_message = "",
                 road_name = edge_geometries.at(edge).road_name;
             }
             
+            // Get traffic flow data for this edge
+            string flow_status = "default";
+            double current_speed = 0.0;
+            double jam_factor = 0.0;
+            if (flow_data.count(edge)) {
+                const auto& flow = flow_data.at(edge);
+                flow_status = flow.flow_status;
+                current_speed = flow.current_speed;
+                jam_factor = flow.jam_factor;
+            }
+            
             cout << "      {" << endl;
             cout << "        \"edge\": [" << edge.first << ", " << edge.second << "]," << endl;
             cout << "        \"source\": " << edge.first << "," << endl;
@@ -2182,6 +2320,9 @@ void output_json_response(bool success, const string& error_message = "",
             cout << "        \"type\": \"" << incident->type << "\"," << endl;
             cout << "        \"severity_level\": \"" << incident->severity_level << "\"," << endl;
             cout << "        \"severity_score\": " << fixed << setprecision(2) << incident->severity << "," << endl;
+            cout << "        \"flow_status\": \"" << flow_status << "\"," << endl;
+            cout << "        \"current_speed\": " << fixed << setprecision(1) << current_speed << "," << endl;
+            cout << "        \"jam_factor\": " << fixed << setprecision(2) << jam_factor << "," << endl;
             cout << "        \"is_closed\": " << (incident->is_closed ? "true" : "false") << "," << endl;
             cout << "        \"confidence\": " << fixed << setprecision(2) << incident->confidence << "," << endl;
             cout << "        \"highway_type\": \"" << incident->highway_type << "\"," << endl;
@@ -2197,8 +2338,52 @@ void output_json_response(bool success, const string& error_message = "",
         
         cout << "  }," << endl;
         
-        // Add empty alternative_routes array (DHL does not generate alternatives in this version)
-        cout << "  \"alternative_routes\": []" << endl;
+        // Generate alternative routes (k-shortest paths)
+        vector<AlternativeRoute> alternatives;
+        if (!path.empty() && path.size() >= 2 && !adj_list.empty()) {
+            NodeID route_start = path.front();
+            NodeID route_dest = path.back();
+            alternatives = generate_alternative_routes(route_start, route_dest, adj_list, flow_data, coordinates, 3);
+        }
+        
+        // Output alternative routes
+        cout << "  \"alternative_routes\": [" << endl;
+        for (size_t i = 0; i < alternatives.size(); i++) {
+            const auto& alt = alternatives[i];
+            
+            // Convert path nodes to coordinates
+            vector<pair<double, double>> path_coords;
+            for (NodeID node_id : alt.path) {
+                if (coordinates.count(node_id)) {
+                    const auto& coord = coordinates.at(node_id);
+                    path_coords.push_back({coord.latitude, coord.longitude});
+                }
+            }
+            
+            cout << "    {" << endl;
+            cout << "      \"rank\": " << alt.rank << "," << endl;
+            cout << "      \"description\": \"" << escape_json_string(alt.description) << "\"," << endl;
+            cout << "      \"distance_meters\": " << alt.distance << "," << endl;
+            cout << "      \"eta_seconds\": " << fixed << setprecision(1) << alt.eta_seconds << "," << endl;
+            cout << "      \"eta_formatted\": \"" << format_eta_time(alt.eta_seconds) << "\"," << endl;
+            cout << "      \"avg_jam_factor\": " << fixed << setprecision(2) << alt.avg_jam_factor << "," << endl;
+            cout << "      \"path_length\": " << alt.path.size() << "," << endl;
+            
+            // Output path nodes as coordinate pairs [lat, lng]
+            cout << "      \"path_nodes\": [" << endl;
+            for (size_t j = 0; j < path_coords.size(); j++) {
+                cout << "        [" << fixed << setprecision(6) << path_coords[j].first 
+                     << ", " << path_coords[j].second << "]";
+                if (j < path_coords.size() - 1) cout << ",";
+                cout << endl;
+            }
+            cout << "      ]" << endl;
+            
+            cout << "    }";
+            if (i < alternatives.size() - 1) cout << ",";
+            cout << endl;
+        }
+        cout << "  ]" << endl;
     }
     
     cout << "}" << endl;
@@ -2623,7 +2808,7 @@ int main(int argc, char* argv[]) {
                            path, coordinates,
                            edge_geometries, use_disruptions, tau_threshold,
                            disruption_file, disruption_impact_score,
-                           update_strategy, update_reason, nodes_updated, flow_data, incident_data, &ci);
+                           update_strategy, update_reason, nodes_updated, flow_data, incident_data, &ci, adj_list);
         
         return 0;
         

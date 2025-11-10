@@ -2419,6 +2419,17 @@ void output_json_response(bool success, const string& error_message = "",
                 road_name = edge_geometries.at(edge).road_name;
             }
             
+            // Get traffic flow data for this edge
+            string flow_status = "default";
+            double current_speed = 0.0;
+            double jam_factor = 0.0;
+            if (flow_data.count(edge)) {
+                const auto& flow = flow_data.at(edge);
+                flow_status = flow.flow_status;
+                current_speed = flow.current_speed;
+                jam_factor = flow.jam_factor;
+            }
+            
             cout << "      {" << endl;
             cout << "        \"edge\": [" << edge.first << ", " << edge.second << "]," << endl;
             cout << "        \"source\": " << edge.first << "," << endl;
@@ -2427,6 +2438,9 @@ void output_json_response(bool success, const string& error_message = "",
             cout << "        \"type\": \"" << incident->type << "\"," << endl;
             cout << "        \"severity_level\": \"" << incident->severity_level << "\"," << endl;
             cout << "        \"severity_score\": " << fixed << setprecision(2) << incident->severity << "," << endl;
+            cout << "        \"flow_status\": \"" << flow_status << "\"," << endl;
+            cout << "        \"current_speed\": " << fixed << setprecision(1) << current_speed << "," << endl;
+            cout << "        \"jam_factor\": " << fixed << setprecision(2) << jam_factor << "," << endl;
             cout << "        \"is_closed\": " << (incident->is_closed ? "true" : "false") << "," << endl;
             cout << "        \"confidence\": " << fixed << setprecision(2) << incident->confidence << "," << endl;
             cout << "        \"highway_type\": \"" << incident->highway_type << "\"," << endl;

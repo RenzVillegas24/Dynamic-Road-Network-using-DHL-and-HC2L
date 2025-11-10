@@ -1093,119 +1093,143 @@
           </div>  
         </div>
 
-        <!-- Severity Breakdown -->
+        <!-- Traffic Flow Status Breakdown -->
         <div class="bg-white rounded-2xl p-5 border-2 border-slate-200 shadow-sm">
           <h3 class="font-bold text-slate-800 mb-4 flex items-center text-lg">
-            <div class="bg-gradient-to-br from-red-600 to-orange-600 rounded-xl p-2 mr-3">
+            <div class="bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl p-2 mr-3">
               <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" 
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                  d="M13 10V3L4 14h7v7l9-11h-7z"></path>
               </svg>
             </div>
-            Severity Breakdown
+            Traffic Flow Status
           </h3>
           <div class="grid grid-cols-2 gap-4">
-            <!-- Critical -->
+            <!-- Blocked -->
             <div class="flex flex-col justify-between p-4 bg-gradient-to-br from-red-50 to-red-100 rounded-2xl border border-red-200 shadow-md hover:shadow-lg transition-shadow">
               <div class="flex items-start gap-3">
                 <div class="w-12 h-12 flex items-center justify-center rounded-xl bg-red-600/10 text-red-700">
                   <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <path d="M12 9v4" stroke-linecap="round" stroke-linejoin="round"/>
-                    <path d="M12 17h.01" stroke-linecap="round" stroke-linejoin="round"/>
-                    <path d="M10.29 3.86L3 10.59a2.5 2.5 0 000 3.53l8 8a2.5 2.5 0 003.53 0l7.29-7.29a2.5 2.5 0 000-3.53L13.71 3.86a2.5 2.5 0 00-3.42 0z"/>
+                    <path d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" stroke-linecap="round" stroke-linejoin="round"/>
                   </svg>
                 </div>
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center justify-between">
                     <div>
-                      <div class="text-xs uppercase font-semibold text-red-800">Critical</div>
-                      <div id="severity-critical" class="text-2xl sm:text-3xl font-extrabold text-red-600 mt-1">0</div>
+                      <div class="text-xs uppercase font-semibold text-red-800">Blocked</div>
+                      <div id="flow-blocked-count" class="text-2xl sm:text-3xl font-extrabold text-red-600 mt-1">0</div>
                     </div>
-                    <div class="text-xs text-slate-400" id="severity-critical-percent" aria-hidden="true">0%</div>
+                    <div class="text-xs text-slate-400" id="flow-blocked-percent" aria-hidden="true">0%</div>
                   </div>
                   <div class="mt-3">
                     <div class="w-full bg-red-100 rounded-full h-2 overflow-hidden">
-                      <div id="severity-critical-bar" class="h-2 bg-red-600 transition-all" style="width:0%"></div>
+                      <div id="flow-blocked-bar" class="h-2 bg-red-600 transition-all" style="width:0%"></div>
                     </div>
-                    <div class="text-xs text-red-500 mt-2">Most severe disruptions impacting route</div>
+                    <div class="text-xs text-red-500 mt-2">Traffic is completely blocked</div>
                   </div>
                 </div>
               </div>
             </div>
 
-            <!-- High -->
+            <!-- Heavy -->
             <div class="flex flex-col justify-between p-4 bg-gradient-to-br from-orange-50 to-orange-100 rounded-2xl border border-orange-200 shadow-md hover:shadow-lg transition-shadow">
               <div class="flex items-start gap-3">
                 <div class="w-12 h-12 flex items-center justify-center rounded-xl bg-orange-600/10 text-orange-700">
                   <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14l-5-4.87 6.91-1.01L12 2z"/>
+                    <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"/>
                   </svg>
                 </div>
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center justify-between">
                     <div>
-                      <div class="text-xs uppercase font-semibold text-orange-800">High</div>
-                      <div id="severity-high" class="text-2xl sm:text-3xl font-extrabold text-orange-600 mt-1">0</div>
+                      <div class="text-xs uppercase font-semibold text-orange-800">Heavy</div>
+                      <div id="flow-heavy-count" class="text-2xl sm:text-3xl font-extrabold text-orange-600 mt-1">0</div>
                     </div>
-                    <div class="text-xs text-slate-400" id="severity-high-percent" aria-hidden="true">0%</div>
+                    <div class="text-xs text-slate-400" id="flow-heavy-percent" aria-hidden="true">0%</div>
                   </div>
                   <div class="mt-3">
                     <div class="w-full bg-orange-100 rounded-full h-2 overflow-hidden">
-                      <div id="severity-high-bar" class="h-2 bg-orange-600 transition-all" style="width:0%"></div>
+                      <div id="flow-heavy-bar" class="h-2 bg-orange-600 transition-all" style="width:0%"></div>
                     </div>
-                    <div class="text-xs text-orange-600 mt-2">Severe delays and major slowdowns</div>
+                    <div class="text-xs text-orange-600 mt-2">Heavy congestion, major delays</div>
                   </div>
                 </div>
               </div>
             </div>
 
-            <!-- Medium -->
+            <!-- Moderate -->
             <div class="flex flex-col justify-between p-4 bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-2xl border border-yellow-200 shadow-md hover:shadow-lg transition-shadow">
               <div class="flex items-start gap-3">
                 <div class="w-12 h-12 flex items-center justify-center rounded-xl bg-yellow-600/10 text-yellow-800">
                   <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <path d="M3 12h18M12 3v18" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"/>
                   </svg>
                 </div>
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center justify-between">
                     <div>
-                      <div class="text-xs uppercase font-semibold text-yellow-800">Medium</div>
-                      <div id="severity-medium" class="text-2xl sm:text-3xl font-extrabold text-yellow-600 mt-1">0</div>
+                      <div class="text-xs uppercase font-semibold text-yellow-800">Moderate</div>
+                      <div id="flow-moderate-count" class="text-2xl sm:text-3xl font-extrabold text-yellow-600 mt-1">0</div>
                     </div>
-                    <div class="text-xs text-slate-400" id="severity-medium-percent" aria-hidden="true">0%</div>
+                    <div class="text-xs text-slate-400" id="flow-moderate-percent" aria-hidden="true">0%</div>
                   </div>
                   <div class="mt-3">
                     <div class="w-full bg-yellow-100 rounded-full h-2 overflow-hidden">
-                      <div id="severity-medium-bar" class="h-2 bg-yellow-500 transition-all" style="width:0%"></div>
+                      <div id="flow-moderate-bar" class="h-2 bg-yellow-500 transition-all" style="width:0%"></div>
                     </div>
-                    <div class="text-xs text-yellow-700 mt-2">Moderate slowdowns along the route</div>
+                    <div class="text-xs text-yellow-700 mt-2">Moderate traffic, some delays</div>
                   </div>
                 </div>
               </div>
             </div>
 
-            <!-- Low -->
-            <div class="flex flex-col justify-between p-4 bg-gradient-to-br from-sky-50 to-blue-50 rounded-2xl border border-blue-200 shadow-md hover:shadow-lg transition-shadow">
+            <!-- Light -->
+            <div class="flex flex-col justify-between p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-2xl border border-green-200 shadow-md hover:shadow-lg transition-shadow">
               <div class="flex items-start gap-3">
-                <div class="w-12 h-12 flex items-center justify-center rounded-xl bg-blue-600/10 text-blue-700">
+                <div class="w-12 h-12 flex items-center justify-center rounded-xl bg-green-600/10 text-green-700">
                   <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <path d="M12 20c4.418 0 8-3.582 8-8s-3.582-8-8-8-8 3.582-8 8 3.582 8 8 8z"/>
+                    <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"/>
                   </svg>
                 </div>
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center justify-between">
                     <div>
-                      <div class="text-xs uppercase font-semibold text-blue-800">Low</div>
-                      <div id="severity-low" class="text-2xl sm:text-3xl font-extrabold text-blue-600 mt-1">0</div>
+                      <div class="text-xs uppercase font-semibold text-green-800">Light</div>
+                      <div id="flow-light-count" class="text-2xl sm:text-3xl font-extrabold text-green-600 mt-1">0</div>
                     </div>
-                    <div class="text-xs text-slate-400" id="severity-low-percent" aria-hidden="true">0%</div>
+                    <div class="text-xs text-slate-400" id="flow-light-percent" aria-hidden="true">0%</div>
+                  </div>
+                  <div class="mt-3">
+                    <div class="w-full bg-green-100 rounded-full h-2 overflow-hidden">
+                      <div id="flow-light-bar" class="h-2 bg-green-600 transition-all" style="width:0%"></div>
+                    </div>
+                    <div class="text-xs text-green-600 mt-2">Light traffic, minimal delays</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Free Flow (spans 2 columns for emphasis) -->
+            <div class="col-span-2 flex flex-col justify-between p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl border border-blue-200 shadow-md hover:shadow-lg transition-shadow">
+              <div class="flex items-start gap-3">
+                <div class="w-12 h-12 flex items-center justify-center rounded-xl bg-blue-600/10 text-blue-700">
+                  <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M13 10V3L4 14h7v7l9-11h-7z" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <div class="text-xs uppercase font-semibold text-blue-800">Free Flow</div>
+                      <div id="flow-free-count" class="text-2xl sm:text-3xl font-extrabold text-blue-600 mt-1">0</div>
+                    </div>
+                    <div class="text-xs text-slate-400" id="flow-free-percent" aria-hidden="true">0%</div>
                   </div>
                   <div class="mt-3">
                     <div class="w-full bg-blue-100 rounded-full h-2 overflow-hidden">
-                      <div id="severity-low-bar" class="h-2 bg-blue-600 transition-all" style="width:0%"></div>
+                      <div id="flow-free-bar" class="h-2 bg-blue-600 transition-all" style="width:0%"></div>
                     </div>
-                    <div class="text-xs text-blue-600 mt-2">Minor slowdowns, keep an eye out</div>
+                    <div class="text-xs text-blue-600 mt-2">Traffic flowing smoothly at normal speed</div>
                   </div>
                 </div>
               </div>
@@ -2190,182 +2214,8 @@
     window.currentDisruptionsData = null;
     window.currentRouteGeometry = null;
 
-    function updateDisruptionsPanel(disruptionsData, routeData) {
-      if (!disruptionsData) {
-        console.warn('No disruptions data provided');
-        return;
-      }
-
-      window.currentDisruptionsData = disruptionsData;
-      window.currentRouteGeometry = routeData ? routeData.geometry : null;
-
-      // Use the new unified disruptions_summary format from C++
-      const summary = disruptionsData.disruptions_summary || disruptionsData;
-      
-      if (!summary || !summary.route) {
-        console.warn('Invalid disruptions summary format');
-        return;
-      }
-
-      console.log('📊 Using unified disruptions_summary format', summary);
-      
-      const routeStats = summary.route || {};
-      const networkStats = summary.network || {};
-      const allDisruptions = summary.all_disruptions || [];
-      
-      // Update route statistics
-      document.getElementById('route-disruption-count').textContent = routeStats.total_disrupted_edges || 0;
-      
-      // Format time impact
-      const timeImpactSec = routeStats.total_time_impact_seconds || 0;
-      const timeImpactMin = Math.round(timeImpactSec / 60);
-      const percentIncrease = routeStats.percentage_increase || 0;
-      document.getElementById('route-time-impact').textContent = 
-        timeImpactMin > 0 ? `+${timeImpactMin}m (${percentIncrease.toFixed(0)}%)` : '< 1 min';
-
-      // Update severity breakdown
-      document.getElementById('severity-critical').textContent = routeStats.critical || 0;
-      document.getElementById('severity-high').textContent = routeStats.high || 0;
-      document.getElementById('severity-medium').textContent = routeStats.medium || 0;
-      document.getElementById('severity-low').textContent = routeStats.low || 0;
-
-      // Calculate and update severity bar widths and percentages based on time impact
-      const criticalTimeImpact = routeStats.critical_time_impact_seconds || 0;
-      const highTimeImpact = routeStats.high_time_impact_seconds || 0;
-      const mediumTimeImpact = routeStats.medium_time_impact_seconds || 0;
-      const lowTimeImpact = routeStats.low_time_impact_seconds || 0;
-      
-      const totalSeverityTimeImpact = criticalTimeImpact + highTimeImpact + mediumTimeImpact + lowTimeImpact;
-      
-      // Calculate percentages for each severity level
-      const criticalPercent = totalSeverityTimeImpact > 0 ? Math.round((criticalTimeImpact / totalSeverityTimeImpact) * 100) : 0;
-      const highPercent = totalSeverityTimeImpact > 0 ? Math.round((highTimeImpact / totalSeverityTimeImpact) * 100) : 0;
-      const mediumPercent = totalSeverityTimeImpact > 0 ? Math.round((mediumTimeImpact / totalSeverityTimeImpact) * 100) : 0;
-      const lowPercent = totalSeverityTimeImpact > 0 ? Math.round((lowTimeImpact / totalSeverityTimeImpact) * 100) : 0;
-      
-      // Update severity bar widths and percentages
-      document.getElementById('severity-critical-bar').style.width = `${criticalPercent}%`;
-      document.getElementById('severity-critical-percent').textContent = `${criticalPercent}%`;
-      
-      document.getElementById('severity-high-bar').style.width = `${highPercent}%`;
-      document.getElementById('severity-high-percent').textContent = `${highPercent}%`;
-      
-      document.getElementById('severity-medium-bar').style.width = `${mediumPercent}%`;
-      document.getElementById('severity-medium-percent').textContent = `${mediumPercent}%`;
-      
-      document.getElementById('severity-low-bar').style.width = `${lowPercent}%`;
-      document.getElementById('severity-low-percent').textContent = `${lowPercent}%`;
-
-      // Update network statistics
-      document.getElementById('network-total-disruptions').textContent = networkStats.total_incidents || 0;
-      
-      // Calculate active disruptions percentage
-      const totalDisruptions = networkStats.total_incidents || 0;
-      const activeDisruptions = networkStats.active_disruptions || 0;
-      const activePercentage = totalDisruptions > 0 ? Math.round((activeDisruptions / totalDisruptions) * 100) : 0;
-      document.getElementById('network-coverage').textContent = `${activePercentage}% active`;
-
-      // Update disruptions list with ALL disruptions
-      const topDisruptionsList = document.getElementById('top-disruptions-list');
-
-      // top-disruptions-count
-      const topDisruptionsCount = document.getElementById('top-disruptions-count');
-      
-      if (routeStats.total_disrupted_edges === 0) {
-        topDisruptionsList.innerHTML = `
-          <div class="text-center text-slate-400 py-8">
-            <svg class="w-16 h-16 mx-auto mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-            <p class="font-medium">No disruptions on route</p>
-            <p class="text-sm mt-1">Clear road ahead!</p>
-          </div>
-        `;
-        topDisruptionsCount.textContent = '0 disruptions';
-      } else {
-        // Add all disrupted edges list
-        if (allDisruptions && allDisruptions.length > 0) {
-          topDisruptionsList.innerHTML = "";
-          topDisruptionsCount.textContent = allDisruptions.length.toString() + ' disruptions';
-            
-            // Display all disruptions from C++ API
-            allDisruptions.forEach((disruption, index) => {
-              const edge = disruption.edge || [];
-              const from = edge[0] || '?';
-              const to = edge[1] || '?';
-              
-              const severityClass = disruption.is_closed ? 'bg-red-50 border-red-300' :
-                                    disruption.severity_level === 'critical' ? 'bg-red-50 border-red-300' :
-                                    disruption.severity_level === 'high' ? 'bg-orange-50 border-orange-300' :
-                                    disruption.severity_level === 'medium' ? 'bg-yellow-50 border-yellow-300' :
-                                    'bg-blue-50 border-blue-300';
-              
-              const severityDot = disruption.is_closed ? 'bg-red-600' :
-                                 disruption.severity_level === 'critical' ? 'bg-red-600' :
-                                 disruption.severity_level === 'high' ? 'bg-orange-500' :
-                                 disruption.severity_level === 'medium' ? 'bg-yellow-500' :
-                                 'bg-blue-500';
-              
-              const severityText = disruption.is_closed ? 'CLOSED' : disruption.severity_level.toUpperCase();
-              
-              const incidentType = disruption.type || 'unknown';
-              const severity = (disruption.severity_score || 0).toFixed(2);
-              const timeImpact = (disruption.time_impact_seconds || 0).toFixed(0);
-              const highwayType = disruption.highway_type || 'unknown';
-              
-              topDisruptionsList.innerHTML += `
-                <div class="p-3 ${severityClass} border rounded-lg hover:shadow-md transition-all cursor-pointer" 
-                     onclick="focusOnEdge(${from}, ${to})" 
-                     title="Click to highlight on map">
-                  <div class="flex items-start justify-between mb-2">
-                    <div class="flex items-center gap-2 flex-1">
-                      <div class="w-2 h-2 ${severityDot} rounded-full flex-shrink-0"></div>
-                      <span class="font-semibold text-slate-800 text-sm">Edge ${from}→${to}</span>
-                    </div>
-                    <span class="text-xs font-bold px-2 py-0.5 rounded-full text-white ml-2" 
-                          style="background: ${severityDot === 'bg-red-600' ? '#dc2626' : 
-                                             severityDot === 'bg-orange-500' ? '#f97316' :
-                                             severityDot === 'bg-yellow-500' ? '#eab308' : '#3b82f6'}">
-                      ${severityText}
-                    </span>
-                  </div>
-                  <div class="grid grid-cols-2 gap-2 text-xs text-slate-600 ml-4">
-                    <div>
-                      <span class="text-slate-500">Type:</span>
-                      <span class="font-medium ml-1">${incidentType}</span>
-                    </div>
-                    <div>
-                      <span class="text-slate-500">Severity:</span>
-                      <span class="font-medium ml-1">${severity}</span>
-                    </div>
-                    <div>
-                      <span class="text-slate-500">Highway:</span>
-                      <span class="font-medium ml-1">${highwayType}</span>
-                    </div>
-                    <div>
-                      <span class="text-slate-500">Impact:</span>
-                      <span class="font-medium ml-1">${timeImpact}s</span>
-                    </div>
-                  </div>
-                  ${disruption.description ? `
-                  <div class="mt-2 pt-2 border-t border-slate-200 text-xs text-slate-700">
-                    <p class="italic">"${disruption.description}"</p>
-                  </div>
-                  ` : ''}
-                </div>
-              `;
-            });
-            
-            topDisruptionsList.innerHTML += `
-              </div>
-            </div>
-            `;
-        }
-      }
-
-      console.log('Disruptions panel updated with data:', summary);
-    }
+    // NOTE: updateDisruptionsPanel is now defined in panel-population.js
+    // It handles the new flow-status system and is called from functions.js
 
     function toggleConsoleLogging(enabled) {
       if (enabled) {
