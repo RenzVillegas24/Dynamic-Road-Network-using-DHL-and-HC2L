@@ -27,3 +27,4 @@ let routePolylines = []; // Store D-HC2L route polylines
 let disruptionMarkers = []; // Store disruption markers
 let allNodesLayer = null; // Leaflet layer for displaying all nodes (toggleable)
 window.alternativeRoutePolylines = []; // Store alternative route polylines
+window.currentSelectedAlternativeRouteIndex = null; // Track which alternative route is currently selected (null = none)

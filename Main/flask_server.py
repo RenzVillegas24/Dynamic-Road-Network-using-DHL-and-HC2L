@@ -356,6 +356,44 @@ def get_dynamic_disruption_file(algorithm: str = 'hc2l', dataset_mode: str = Non
     return ""
 
 
+def enhance_alternative_routes_with_geometry(alternative_routes):
+    """
+    Alternative routes geometry is now provided by C++ APIs directly.
+    Geometry structure (NEW):
+        - Each geometry segment includes: edge (source-target), source, target, coordinates, color, highway_type
+        - Removed: path_nodes, path_node_ids, distance_meters per segment (distance_meters is at route level only)
+        - highway_type now follows the actual road type (not "alternative")
+    
+    Args:
+        alternative_routes: List of alternative route objects from C++ API
+        
+    Returns:
+        list: Alternative routes (unchanged, geometry already from C++)
+    """
+    if not alternative_routes:
+        return []
+    
+    try:
+        enhanced_routes = []
+        
+        for route in alternative_routes:
+            # Check if route already has geometry from C++ API
+            if route.get('geometry') and len(route.get('geometry', [])) > 0:
+                print(f"✅ Alternative route rank {route.get('rank')} has {len(route['geometry'])} geometry segments from C++")
+                enhanced_routes.append(route)
+            else:
+                # Fallback: just pass through the route as-is
+                print(f"⚠️  Alternative route rank {route.get('rank')} has no geometry from C++, will use geometry as-is")
+                enhanced_routes.append(route)
+        
+        print(f"✅ Processed {len(enhanced_routes)} alternative routes with geometry")
+        return enhanced_routes
+        
+    except Exception as e:
+        print(f"⚠️  Error processing alternative routes: {e}")
+        return alternative_routes
+
+
 def cleanup_old_traffic_files(mode: str, max_files: int = 10):
     """
     Remove old traffic files, keeping only the latest N files
@@ -1287,6 +1325,7 @@ def compute_dhc2l_route():
         # tau_threshold: threshold for lazy vs immediate update (default 0.5)
         disruption_file = data.get('disruption_file', '')
         dataset_mode = data.get('dataset_mode', None)  # Get dataset mode from request
+        generate_alternatives = data.get('generate_alternatives', True)  # NEW: Control alternative route generation
         
         # If no disruption file specified, use dynamic disruptions based on dataset mode
         if not disruption_file:
@@ -1298,6 +1337,7 @@ def compute_dhc2l_route():
         print(f"  Dataset mode: {dataset_mode if dataset_mode else 'auto'}")
         print(f"  Disruption file: {disruption_file if disruption_file else '(none)'}")
         print(f"  Tau threshold: {tau_threshold}")
+        print(f"  Generate alternatives: {generate_alternatives}")
         
         # Compute route using GPS HC2L with LazyHC2L parameters
         start_time = time.time()
@@ -1308,7 +1348,7 @@ def compute_dhc2l_route():
             dest_snap_lat, dest_snap_lng,
             start_edge_source, start_edge_target, start_edge_oneway,
             dest_edge_source, dest_edge_target, dest_edge_oneway,
-            disruption_file, tau_threshold  # Pass disruption_file and tau_threshold
+            disruption_file, tau_threshold, generate_alternatives  # Pass disruption_file, tau_threshold, and generate_alternatives
         )
         computation_time = time.time() - start_time
         
@@ -1354,6 +1394,13 @@ def compute_dhc2l_route():
         if disruption_analysis:
             print(f"🔍 Disruption analysis detected: {disruption_analysis.get('route_disruptions', {}).get('total_count', 0)} disruptions")
         
+        # Enhance alternative routes with geometry (only if requested)
+        if generate_alternatives:
+            enhanced_alt_routes = enhance_alternative_routes_with_geometry(route_result.get('alternative_routes', []))
+        else:
+            enhanced_alt_routes = []
+            print(f"⏭️  Alternative routes generation skipped (generate_alternatives=False)")
+        
         return jsonify({
             'success': True,
             'route': {
@@ -1373,7 +1420,7 @@ def compute_dhc2l_route():
             'metrics': full_metrics,  # Use full_metrics with all C++ fields
             'disruption_analysis': disruption_analysis,  # Pass disruption analysis from C++ to frontend
             'disruptions_summary': route_result.get('disruptions_summary', {}),  # Also pass disruptions_summary for additional details
-            'alternative_routes': route_result.get('alternative_routes', []),  # Pass alternative routes from C++
+            'alternative_routes': enhanced_alt_routes,  # Pass enhanced alternative routes (or empty if not requested)
             'lazy_hc2l': route_result.get('lazy_hc2l', {}),  # Pass LazyHC2L update strategy info
             'disruption_config': route_result.get('disruption_config', {}),  # Pass disruption configuration
             'algorithm': summary.get('algorithm', 'D-HC2L Dynamic'),  # Use algorithm from summary
@@ -1973,6 +2020,7 @@ def compute_dhl_route():
                     disruption_file = ''
         
         tau_threshold = float(data.get('tau_threshold', 0.5))
+        generate_alternatives = data.get('generate_alternatives', True)  # Default: True (generate alternatives)
         
         print(f"Computing DHL route with snap points:")
         print(f"  Start: Pin({start_pin_lat}, {start_pin_lng}) → Snap({start_snap_lat}, {start_snap_lng})")
@@ -1980,6 +2028,7 @@ def compute_dhl_route():
         print(f"  Dataset mode: {dataset_mode if dataset_mode else 'auto'}")
         print(f"  Disruption file: {disruption_file if disruption_file else '(none)'}")
         print(f"  Tau threshold: {tau_threshold}")
+        print(f"  Generate alternatives: {generate_alternatives}")
         
         # Compute route using DHL with disruption parameters
         start_time = time.time()
@@ -1990,7 +2039,7 @@ def compute_dhl_route():
             dest_snap_lat, dest_snap_lng,
             start_edge_source, start_edge_target, start_edge_oneway,
             dest_edge_source, dest_edge_target, dest_edge_oneway,
-            disruption_file, tau_threshold  # Pass disruption_file and tau_threshold
+            disruption_file, tau_threshold, generate_alternatives  # Pass disruption_file, tau_threshold, and generate_alternatives
         )
         computation_time = time.time() - start_time
         
@@ -2024,6 +2073,13 @@ def compute_dhl_route():
         if disruption_analysis:
             print(f"🔍 DHL Disruption analysis detected: {disruption_analysis.get('route_disruptions', {}).get('total_count', 0)} disruptions")
         
+        # Enhance alternative routes with geometry (only if requested)
+        if generate_alternatives:
+            enhanced_alt_routes = enhance_alternative_routes_with_geometry(route_result.get('alternative_routes', []))
+        else:
+            enhanced_alt_routes = []
+            print(f"⏭️  Alternative routes generation skipped (generate_alternatives=False)")
+        
         return jsonify({
             'success': True,
             'route': {
@@ -2045,7 +2101,7 @@ def compute_dhl_route():
             'metrics': full_metrics,  # Use full_metrics with all C++ fields
             'disruption_analysis': disruption_analysis,  # Pass disruption analysis from C++ to frontend
             'disruptions_summary': route_result.get('disruptions_summary', {}),  # Also pass disruptions_summary for additional details
-            'alternative_routes': route_result.get('alternative_routes', []),  # Pass alternative routes from C++
+            'alternative_routes': enhanced_alt_routes,  # Pass enhanced alternative routes (or empty if not requested)
             'dhl_update_info': route_result.get('dhl_update_info', {}),  # Pass DHL update strategy info
             'disruption_config': route_result.get('disruption_config', {}),  # Pass disruption configuration
             'algorithm': 'DHL (Dual-Hierarchy Labelling)',

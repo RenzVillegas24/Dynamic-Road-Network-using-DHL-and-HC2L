@@ -3318,7 +3318,8 @@
     }
 
     // Unified routing function based on algorithm selection
-    async function computeRouteBasedOnSelection() {
+    // isPreview: true during pinning/preview, false on route confirmation
+    async function computeRouteBasedOnSelection(isPreview = true) {
       if (!window.startLocation || !window.destLocation) {
         showUpdateToast("Please pin both starting location and destination", 'warning');
         return null;
@@ -3327,7 +3328,7 @@
       const selections = getCurrentSelections();
       const useDisruptions = selections.dataset_mode !== 'none';
       
-      console.log('🚀 Computing route with selections:', selections);
+      console.log(`🚀 Computing route with selections: ${isPreview ? '(PREVIEW - no alternatives)' : '(CONFIRMED - with alternatives)'}`, selections);
       
       // Clear previous routes
       clearRoutes();
@@ -3335,7 +3336,7 @@
       try {
         if (selections.algorithm === 'hc2l') {
           // HC2L only
-          const hc2lResult = await computeDHC2LRoute(useDisruptions, selections.threshold);
+          const hc2lResult = await computeDHC2LRoute(useDisruptions, selections.threshold, isPreview);
           if (hc2lResult && hc2lResult.success) {
             displayDHC2LRoute(hc2lResult);
             updateMetricsDisplay(hc2lResult.metrics);
@@ -3344,7 +3345,7 @@
           
         } else if (selections.algorithm === 'dhl') {
           // DHL only
-          const dhlResult = await computeDHLRoute(useDisruptions);
+          const dhlResult = await computeDHLRoute(useDisruptions, isPreview);
           if (dhlResult && dhlResult.success) {
             displayDHLRoute(dhlResult);
             updateMetricsDisplay(dhlResult.metrics);
@@ -3357,8 +3358,8 @@
           
           // Compute both routes in parallel
           const [hc2lResult, dhlResult] = await Promise.all([
-            computeDHC2LRoute(useDisruptions, selections.threshold),
-            computeDHLRoute(useDisruptions)
+            computeDHC2LRoute(useDisruptions, selections.threshold, isPreview),
+            computeDHLRoute(useDisruptions, isPreview)
           ]);
           
           // Display both routes
@@ -3412,14 +3413,16 @@
     }
 
     // Function to compute DHL route
-    async function computeDHLRoute(useDisruptions = false) {
+    // isPreview: true during pinning (don't generate alternatives), false on confirmation (generate alternatives)
+    async function computeDHLRoute(useDisruptions = false, isPreview = true) {
       if (!window.startLocation || !window.destLocation) {
         showUpdateToast("Please pin both starting location and destination", 'warning');
         return null;
       }
 
       const selections = getCurrentSelections();
-      showUpdateToast(`Computing DHL route (dataset: ${selections.dataset_mode})...`, 'info');
+      const previewLabel = isPreview ? ' (preview)' : ' (confirmed)';
+      showUpdateToast(`Computing DHL route${previewLabel} (dataset: ${selections.dataset_mode})...`, 'info');
 
       try {
         // Prepare routing request with OSM edge data if available
@@ -3430,8 +3433,9 @@
           dest_lng: window.destLocation.lng,
           // Pass dataset mode to backend
           dataset_mode: selections.dataset_mode,
-          disruption_file: useDisruptions ? 'active_disruptions' : ''
-          // Note: DHL doesn't use tau_threshold (no lazy updates)
+          disruption_file: useDisruptions ? 'active_disruptions' : '',
+          // Control alternative route generation: false during preview, true on confirmation
+          generate_alternatives: !isPreview
         };
 
         // Add OSM edge-based routing if snapping was used
@@ -3488,15 +3492,17 @@
       }
     }
 
-    // Function to compute D-HC2L route  
-    async function computeDHC2LRoute(useDisruptions = false, threshold = undefined) {
+    // Function to compute D-HC2L route
+    // isPreview: true during pinning (don't generate alternatives), false on confirmation (generate alternatives)
+    async function computeDHC2LRoute(useDisruptions = false, threshold = undefined, isPreview = true) {
       if (!window.startLocation || !window.destLocation) {
         showUpdateToast("Please pin both starting location and destination", 'warning');
         return null;
       }
 
       const selections = getCurrentSelections();
-      showUpdateToast(`Computing D-HC2L route (dataset: ${selections.dataset_mode}, τ=${selections.threshold})...`, 'info');
+      const previewLabel = isPreview ? ' (preview)' : ' (confirmed)';
+      showUpdateToast(`Computing D-HC2L route${previewLabel} (dataset: ${selections.dataset_mode}, τ=${selections.threshold})...`, 'info');
 
       try {
         // Prepare routing request with OSM edge data if available
@@ -3507,7 +3513,9 @@
           dest_lng: window.destLocation.lng,
           tau_threshold: selections.threshold,  // FIXED: Use tau_threshold for HC2L
           use_disruptions: useDisruptions,
-          dataset_mode: selections.dataset_mode  // Pass dataset mode to backend
+          dataset_mode: selections.dataset_mode,  // Pass dataset mode to backend
+          // Control alternative route generation: false during preview, true on confirmation
+          generate_alternatives: !isPreview
         };
 
         // Add OSM edge-based routing if snapping was used

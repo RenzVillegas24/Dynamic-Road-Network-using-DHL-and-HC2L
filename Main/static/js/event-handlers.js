@@ -111,6 +111,7 @@ function initializeEventHandlers() {
       let routeData = null;
       
       // Route computation based on selected algorithm
+      // isPreview=false because user clicked "Go" button - this is route CONFIRMATION with alternatives
       switch (selectedAlgorithm) {
         case 'dhl':
           // DHL only
@@ -119,7 +120,7 @@ function initializeEventHandlers() {
           } else {
             clearDisruptionMarkers();
           }
-          routeData = await computeDHLRoute(useDisruptions);
+          routeData = await computeDHLRoute(useDisruptions, false);
           if (routeData) displayDHLRoute(routeData);
           break;
           
@@ -130,7 +131,7 @@ function initializeEventHandlers() {
           } else {
             clearDisruptionMarkers();
           }
-          routeData = await computeDHC2LRoute(useDisruptions, currentThreshold);
+          routeData = await computeDHC2LRoute(useDisruptions, currentThreshold, false);
           if (routeData) displayDHC2LRoute(routeData);
           break;
           
@@ -143,10 +144,10 @@ function initializeEventHandlers() {
           }
           showUpdateToast('Computing comparison routes...', 'info');
           
-          // Compute both routes in parallel
+          // Compute both routes in parallel with isPreview=false (confirmations with alternatives)
           const [hc2lResult, dhlResult] = await Promise.all([
-            computeDHC2LRoute(useDisruptions, currentThreshold),
-            computeDHLRoute(useDisruptions)
+            computeDHC2LRoute(useDisruptions, currentThreshold, false),
+            computeDHLRoute(useDisruptions, false)
           ]);
           
           // Display both routes
@@ -169,7 +170,8 @@ function initializeEventHandlers() {
           
         default:
           console.warn('Unknown algorithm selected:', selectedAlgorithm);
-          routeData = await computeDHC2LRoute(useDisruptions, currentThreshold);
+          // Fallback to HC2L with isPreview=false (confirmation with alternatives)
+          routeData = await computeDHC2LRoute(useDisruptions, currentThreshold, false);
           if (routeData) displayDHC2LRoute(routeData);
       }
       

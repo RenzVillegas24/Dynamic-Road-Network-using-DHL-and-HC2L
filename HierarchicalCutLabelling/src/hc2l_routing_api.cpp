@@ -949,10 +949,12 @@ vector<AlternativeRoute> generate_alternative_routes(
     const map<NodeID, GPSCoordinate>& coordinates,
     int K = 3) {
     
-    vector<AlternativeRoute> alternatives;
+    vector<AlternativeRoute> all_alternatives;
+    vector<AlternativeRoute> alternatives; // Will only contain ranks 1+ (after removing rank 1 from original)
     set<pair<NodeID, NodeID>> used_edges;
     
-    for (int k = 0; k < K; k++) {
+    // Generate K+1 routes to ensure we have at least 2 alternatives after removing rank 1
+    for (int k = 0; k < K + 1; k++) {
         // Find shortest path avoiding used edges (with penalty)
         map<NodeID, distance_t> dist;
         map<NodeID, NodeID> pred;
@@ -1033,7 +1035,7 @@ vector<AlternativeRoute> generate_alternative_routes(
                            k == 1 ? "Alternative via different path" :
                            "Secondary alternative";
         
-        alternatives.push_back(route);
+        all_alternatives.push_back(route);
         
         // Mark edges as used for next iteration
         for (size_t i = 0; i < path.size() - 1; i++) {
@@ -1041,15 +1043,19 @@ vector<AlternativeRoute> generate_alternative_routes(
         }
     }
     
-    // Sort by ETA (best first)
-    sort(alternatives.begin(), alternatives.end(),
+    // Sort all alternatives by ETA (best first)
+    sort(all_alternatives.begin(), all_alternatives.end(),
          [](const AlternativeRoute& a, const AlternativeRoute& b) {
              return a.eta_seconds < b.eta_seconds;
          });
     
-    // Update ranks
-    for (size_t i = 0; i < alternatives.size(); i++) {
-        alternatives[i].rank = i + 1;
+    // Filter: skip rank 1 (fastest), only return ranks 2 and beyond
+    // This way the fastest route (already returned as main route) is not duplicated
+    for (size_t i = 1; i < all_alternatives.size(); i++) {  // Start from index 1 (rank 2)
+        AlternativeRoute& route = all_alternatives[i];
+        route.rank = i;  // Re-rank starting from 1 for the alternatives
+        route.description = i == 1 ? "Alternative via different path" : "Secondary alternative";
+        alternatives.push_back(route);
     }
     
     return alternatives;
@@ -2431,7 +2437,6 @@ void output_json_response(bool success, const string& error_message = "",
             }
             
             cout << "      {" << endl;
-            cout << "        \"edge\": [" << edge.first << ", " << edge.second << "]," << endl;
             cout << "        \"source\": " << edge.first << "," << endl;
             cout << "        \"target\": " << edge.second << "," << endl;
             cout << "        \"road_name\": \"" << escape_json_string(road_name) << "\"," << endl;
@@ -2461,6 +2466,45 @@ void output_json_response(bool success, const string& error_message = "",
         for (size_t alt_idx = 0; alt_idx < alternatives.size(); alt_idx++) {
             const AlternativeRoute& alt = alternatives[alt_idx];
             
+            // Build detailed geometry segments from edges
+            vector<map<string, string>> geometry_segments;
+            for (size_t k = 0; k < alt.path.size() - 1; k++) {
+                NodeID u = alt.path[k];
+                NodeID v = alt.path[k + 1];
+                auto edge_key = make_pair(u, v);
+                
+                // Look up edge geometry
+                vector<pair<double, double>> edge_coords;
+                string highway_type = "unknown";
+                if (edge_geometries.count(edge_key)) {
+                    const auto& geom = edge_geometries.at(edge_key);
+                    edge_coords = geom.coords;  // Use coords from EdgeGeometry
+                }
+                
+                // Get actual highway type from road data
+                if (g_highway_types.count(edge_key)) {
+                    highway_type = g_highway_types.at(edge_key);
+                }
+                
+                // Create geometry segment with edge metadata
+                map<string, string> segment;
+                segment["source"] = to_string(u);
+                segment["target"] = to_string(v);
+                segment["color"] = "#9333ea";  // Purple for alternatives
+                segment["highway_type"] = highway_type;
+                
+                // Store coordinates as GeoJSON format [lng, lat]
+                string coords_str = "[";
+                for (size_t j = 0; j < edge_coords.size(); j++) {
+                    if (j > 0) coords_str += ", ";
+                    coords_str += "[" + to_string(edge_coords[j].first) + ", " + to_string(edge_coords[j].second) + "]";
+                }
+                coords_str += "]";
+                segment["coordinates"] = coords_str;
+                
+                geometry_segments.push_back(segment);
+            }
+            
             cout << "    {" << endl;
             cout << "      \"rank\": " << alt.rank << "," << endl;
             cout << "      \"description\": \"" << alt.description << "\"," << endl;
@@ -2470,20 +2514,21 @@ void output_json_response(bool success, const string& error_message = "",
             cout << "      \"avg_jam_factor\": " << fixed << setprecision(2) << alt.avg_jam_factor << "," << endl;
             cout << "      \"path_length\": " << alt.path.size() << "," << endl;
             
-            // Output path nodes as [lat, lng] coordinate pairs
-            cout << "      \"path_nodes\": [";
-            for (size_t j = 0; j < alt.path.size(); j++) {
-                NodeID node_id = alt.path[j];
-                if (coordinates.count(node_id)) {
-                    const auto& coord = coordinates.at(node_id);
-                    cout << "[" << fixed << setprecision(6) 
-                         << coord.latitude << ", " << coord.longitude << "]";
-                } else {
-                    cout << "[0, 0]";  // Fallback for missing coordinates
-                }
-                if (j < alt.path.size() - 1) cout << ", ";
+            // Output detailed geometry segments with edge metadata (no path_nodes, no path_node_ids, no redundant edge field)
+            cout << "      \"geometry\": [" << endl;
+            for (size_t k = 0; k < geometry_segments.size(); k++) {
+                cout << "        {" << endl;
+                cout << "          \"source\": " << geometry_segments[k]["source"] << "," << endl;
+                cout << "          \"target\": " << geometry_segments[k]["target"] << "," << endl;
+                cout << "          \"coordinates\": " << geometry_segments[k]["coordinates"] << "," << endl;
+                cout << "          \"color\": \"" << geometry_segments[k]["color"] << "\"," << endl;
+                cout << "          \"highway_type\": \"" << geometry_segments[k]["highway_type"] << "\"" << endl;
+                cout << "        }";
+                if (k < geometry_segments.size() - 1) cout << ",";
+                cout << endl;
             }
-            cout << "]" << endl;
+            cout << "      ]" << endl;
+            
             cout << "    }";
             if (alt_idx < alternatives.size() - 1) cout << ",";
             cout << endl;
@@ -2498,10 +2543,10 @@ int main(int argc, char* argv[]) {
     // Optimize I/O for large JSON output
     setup_fast_io();
     
-    // Accept 18 args (no disruption) or 19 args (with disruption file) or 20 args (with disruption + tau)
-    // Args: 14 routing params + 3 data files + optional disruption_file + optional tau_threshold
-    if (argc != 18 && argc != 19 && argc != 20) {
-        output_json_response(false, "Invalid arguments. Usage: hc2l_routing_api <start_pin_lat> <start_pin_lng> <start_snap_lat> <start_snap_lng> <start_edge_source> <start_edge_target> <start_edge_oneway> <dest_pin_lat> <dest_pin_lng> <dest_snap_lat> <dest_snap_lng> <dest_edge_source> <dest_edge_target> <dest_edge_oneway> <nodes_csv> <edges_csv> <index_file> [disruption_file] [tau_threshold]");
+    // Accept 18 args (no disruption) or 19 args (with disruption file) or 20 args (with disruption + tau) or 21 args (with generate_alternatives)
+    // Args: 14 routing params + 3 data files + optional disruption_file + optional tau_threshold + optional generate_alternatives
+    if (argc != 18 && argc != 19 && argc != 20 && argc != 21) {
+        output_json_response(false, "Invalid arguments. Usage: hc2l_routing_api <start_pin_lat> <start_pin_lng> <start_snap_lat> <start_snap_lng> <start_edge_source> <start_edge_target> <start_edge_oneway> <dest_pin_lat> <dest_pin_lng> <dest_snap_lat> <dest_snap_lng> <dest_edge_source> <dest_edge_target> <dest_edge_oneway> <nodes_csv> <edges_csv> <index_file> [disruption_file] [tau_threshold] [generate_alternatives]");
         return 1;
     }
     
@@ -2548,6 +2593,12 @@ int main(int argc, char* argv[]) {
         double tau_threshold = 0.5; // Default
         if (argc >= 20) {
             tau_threshold = stod(argv[19]);
+        }
+        
+        // Parse optional generate_alternatives flag (arg 20)
+        bool generate_alternatives = true; // Default to true for backward compatibility
+        if (argc >= 21) {
+            generate_alternatives = (stoi(argv[20]) == 1);
         }
         
         // Initialize LazyHC2L state
@@ -3012,7 +3063,7 @@ int main(int argc, char* argv[]) {
         // ============================================================
         vector<AlternativeRoute> alternatives;
         
-        if (use_disruptions && !flow_data.empty()) {
+        if (generate_alternatives && use_disruptions && !flow_data.empty()) {
             cerr << "\n🔀 Generating alternative routes with ETA comparison..." << endl;
             
             // Generate up to 3 alternative routes

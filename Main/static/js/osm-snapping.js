@@ -292,10 +292,11 @@ async function handleOSMStartLocationPin(lat, lng) {
             
             // Auto-trigger routing if both start and dest are set
             if (window.startLocation && window.destLocation) {
-                console.log('🚀 Both locations set - auto-triggering route computation');
+                console.log('🚀 Both locations set - auto-triggering route computation (PREVIEW mode - no alternatives)');
                 setTimeout(() => {
                     if (typeof computeRouteBasedOnSelection === 'function') {
-                        computeRouteBasedOnSelection();
+                        // Pass isPreview=true to avoid generating alternatives during pinning
+                        computeRouteBasedOnSelection(true);
                     } else {
                         console.warn('computeRouteBasedOnSelection function not found');
                     }
@@ -356,10 +357,11 @@ async function handleOSMDestLocationPin(lat, lng) {
             
             // Auto-trigger routing if both start and dest are set
             if (window.startLocation && window.destLocation) {
-                console.log('🚀 Both locations set - auto-triggering route computation');
+                console.log('🚀 Both locations set - auto-triggering route computation (PREVIEW mode - no alternatives)');
                 setTimeout(() => {
                     if (typeof computeRouteBasedOnSelection === 'function') {
-                        computeRouteBasedOnSelection();
+                        // Pass isPreview=true to avoid generating alternatives during pinning
+                        computeRouteBasedOnSelection(true);
                     } else {
                         console.warn('computeRouteBasedOnSelection function not found');
                     }

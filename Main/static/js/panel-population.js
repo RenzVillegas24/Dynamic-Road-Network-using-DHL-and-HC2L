@@ -365,56 +365,100 @@ window.populateRouteMetricsPanel = function(routeData) {
   const alternativeRoutesList = document.getElementById('metrics-alternative-routes-list');
   
   if (routeData.alternative_routes && routeData.alternative_routes.length > 0) {
-    // Show the section
-    if (alternativeRoutesSection) {
-      alternativeRoutesSection.classList.remove('hidden');
+    // Get primary route color from the main route polyline if available
+    let primaryRouteColor = '#3b82f6'; // Default blue
+    if (window.routePolylines && window.routePolylines.length > 0) {
+      const mainPolyline = window.routePolylines[0];
+      if (mainPolyline && mainPolyline.options && mainPolyline.options.color) {
+        primaryRouteColor = mainPolyline.options.color;
+      }
     }
     
-    // Clear existing routes
-    if (alternativeRoutesList) {
-      alternativeRoutesList.innerHTML = '';
+    // Convert hex color to RGB for transparency
+    const hexToRgb = (hex) => {
+      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      return result ? `rgb(${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)})` : hex;
+    };
+    
+    // Filter out rank 1 (fastest route - already the main route)
+    const alternativeRoutesFiltered = routeData.alternative_routes.filter(r => r.rank > 1);
+    
+    if (alternativeRoutesFiltered.length > 0) {
+      // Show the section
+      if (alternativeRoutesSection) {
+        alternativeRoutesSection.classList.remove('hidden');
+      }
       
-      routeData.alternative_routes.forEach((altRoute, index) => {
-        // Determine color based on rank
-        const colors = [
-          { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-800', badge: 'bg-blue-500' },
-          { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-800', badge: 'bg-green-500' },
-          { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-800', badge: 'bg-purple-500' }
-        ];
-        const color = colors[index % colors.length];
+      // Clear existing routes
+      if (alternativeRoutesList) {
+        alternativeRoutesList.innerHTML = '';
         
-        const routeCard = document.createElement('div');
-        routeCard.className = `${color.bg} border ${color.border} rounded-xl p-3 cursor-pointer hover:shadow-md transition-all`;
-        routeCard.onclick = () => highlightAlternativeRoute(index, altRoute);
-        
-        const etaMinutes = (altRoute.eta_seconds / 60).toFixed(1);
-        const distanceKm = (altRoute.distance / 1000).toFixed(2);
-        
-        routeCard.innerHTML = `
-          <div class="flex items-start gap-3">
-            <div class="flex-shrink-0 w-10 h-10 ${color.badge} rounded-lg flex items-center justify-center text-white font-bold">
-              ${altRoute.rank || (index + 1)}
-            </div>
-            <div class="flex-1 min-w-0">
-              <div class="font-bold ${color.text} text-sm mb-1">
-                ${altRoute.description || `Route ${index + 1}`}
+        alternativeRoutesFiltered.forEach((altRoute, index) => {
+          // Use primary route color with varying opacity
+          const rgbColor = hexToRgb(primaryRouteColor);
+          const bgColor = primaryRouteColor + '15'; // Add transparency (15 = 8% opacity)
+          const borderColor = primaryRouteColor;
+          
+          // Check if this route is currently selected
+          const isSelected = window.currentSelectedAlternativeRouteIndex === index;
+          
+          const routeCard = document.createElement('div');
+          routeCard.className = 'border-2 rounded-xl p-3 cursor-pointer hover:shadow-md transition-all';
+          routeCard.id = `alt-route-card-${index}`; // Add ID for state tracking
+          
+          // Apply selected or unselected styles
+          if (isSelected) {
+            routeCard.style.backgroundColor = primaryRouteColor + '25'; // More visible when selected
+            routeCard.style.borderColor = primaryRouteColor;
+            routeCard.style.borderWidth = '3px'; // Thicker border when selected
+            routeCard.style.boxShadow = `0 0 12px ${primaryRouteColor}40`; // Glow effect
+          } else {
+            routeCard.style.backgroundColor = bgColor;
+            routeCard.style.borderColor = borderColor;
+            routeCard.style.borderWidth = '2px';
+            routeCard.style.boxShadow = 'none';
+          }
+          
+          routeCard.onclick = () => highlightAlternativeRoute(index, altRoute);
+          
+          const etaMinutes = (altRoute.eta_seconds / 60).toFixed(1);
+          const distanceKm = (altRoute.distance / 1000).toFixed(2);
+          
+          // Get text color to match primary route color (for badge)
+          let badgeTextColor = '#ffffff'; // Default white text
+          let badgeBgColor = primaryRouteColor;
+          
+          routeCard.innerHTML = `
+            <div class="flex items-start gap-3">
+              <div class="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold" style="background-color: ${badgeBgColor}; color: ${badgeTextColor};">
+                ${altRoute.rank}
               </div>
-              <div class="text-xs text-slate-600 space-y-1">
-                <div class="flex items-center justify-between">
-                  <span><strong>Distance:</strong> ${distanceKm} km</span>
-                  <span><strong>ETA:</strong> ${etaMinutes} min</span>
+              <div class="flex-1 min-w-0">
+                <div class="font-bold text-sm mb-1" style="color: ${primaryRouteColor};">
+                  ${altRoute.description || `Alternative Route ${index + 1}`}
                 </div>
-                <div>
-                  <strong>Avg Jam Factor:</strong> 
-                  <span class="${altRoute.avg_jam_factor > 5 ? 'text-red-600 font-bold' : 'text-green-600'}">${altRoute.avg_jam_factor.toFixed(1)}</span>
+                <div class="text-xs text-slate-600 space-y-1">
+                  <div class="flex items-center justify-between">
+                    <span><strong>Distance:</strong> ${distanceKm} km</span>
+                    <span><strong>ETA:</strong> ${etaMinutes} min</span>
+                  </div>
+                  <div>
+                    <strong>Avg Jam Factor:</strong> 
+                    <span class="${altRoute.avg_jam_factor > 5 ? 'font-bold' : ''}" style="color: ${primaryRouteColor};">${altRoute.avg_jam_factor.toFixed(1)}</span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        `;
-        
-        alternativeRoutesList.appendChild(routeCard);
-      });
+          `;
+          
+          alternativeRoutesList.appendChild(routeCard);
+        });
+      }
+    } else {
+      // Hide the section if no alternative routes (after filtering rank 1)
+      if (alternativeRoutesSection) {
+        alternativeRoutesSection.classList.add('hidden');
+      }
     }
   } else {
     // Hide the section if no alternative routes
@@ -923,88 +967,261 @@ window.showEdgeDetails = function(disruption) {
  * @param {Object} altRoute - The alternative route object
  */
 window.highlightAlternativeRoute = function(routeIndex, altRoute) {
-  console.log(`🗺️ Highlighting alternative route ${routeIndex}:`, altRoute);
+  console.log(`🗺️ CLICK: Highlighting alternative route ${routeIndex}`, altRoute);
+  console.log(`📊 Current state: selectedIndex=${window.currentSelectedAlternativeRouteIndex}, clickedIndex=${routeIndex}`);
   
   if (!window.alternativeRoutePolylines || window.alternativeRoutePolylines.length === 0) {
     console.warn('⚠️ No alternative route polylines found on map');
     return;
   }
-  
-  // Find the corresponding polyline
-  const polyline = window.alternativeRoutePolylines[routeIndex];
-  
-  if (!polyline) {
-    console.warn(`⚠️ Alternative route polyline ${routeIndex} not found`);
+
+  // Check if user is clicking the same route that's already selected (toggle off)
+  if (window.currentSelectedAlternativeRouteIndex === routeIndex) {
+    console.log(`✋ DESELECT: Clicking same route again - deselecting route ${routeIndex}`);
+    window.currentSelectedAlternativeRouteIndex = null;
+    resetAlternativeRoutesDisplay();
     return;
   }
+
+  console.log(`✨ NEW SELECTION: Selecting route ${routeIndex}`);
   
-  // Reset all alternative routes to transparent
-  window.alternativeRoutePolylines.forEach((p, idx) => {
-    if (p && p.setStyle) {
-      p.setStyle({
-        opacity: idx === routeIndex ? 0.8 : 0.3,
-        weight: idx === routeIndex ? 8 : 5
+  // If there was a previously selected route, first reset the entire display
+  // This ensures all polylines return to baseline state
+  if (window.currentSelectedAlternativeRouteIndex !== null) {
+    console.log(`🔄 SWITCHING: From route ${window.currentSelectedAlternativeRouteIndex} to route ${routeIndex}`);
+    
+    // Reset all alternative polylines to baseline
+    if (window.alternativeRoutePolylines && window.alternativeRoutePolylines.length > 0) {
+      window.alternativeRoutePolylines.forEach((p) => {
+        p.setStyle({
+          opacity: 0.35,
+          weight: 4,
+          dashArray: '8, 4'
+        });
+        p._isHighlighted = false;
       });
     }
-  });
+  }
+
+  // Now set the new selection
+  window.currentSelectedAlternativeRouteIndex = routeIndex;
+  console.log(`✅ State updated: currentSelectedAlternativeRouteIndex = ${routeIndex}`);
+
+  // Hide the primary/best route (make it completely transparent)
+  if (window.routePolylines && window.routePolylines.length > 0) {
+    window.routePolylines.forEach(polyline => {
+      if (polyline && polyline.setStyle) {
+        polyline.setStyle({ opacity: 0.15 });
+      }
+    });
+    console.log('🙈 PRIMARY ROUTE: Hidden (opacity: 0)');
+  }
+
+  // Highlight ONLY the selected route's polylines
+  if (window.alternativeRoutePolylines && window.alternativeRoutePolylines.length > 0) {
+    window.alternativeRoutePolylines.forEach((p) => {
+      if (p._routeIndex === routeIndex) {
+        // Highlight this route
+        p.setStyle({
+          opacity: 0.8,
+          weight: 6,
+          dashArray: '4, 2'
+        });
+        p._isHighlighted = true;
+        console.log(`✨ ROUTE ${routeIndex}: Highlighted`);
+      } else {
+        // Dim all other routes
+        p.setStyle({
+          opacity: 0.15,
+          weight: 3,
+          dashArray: '8, 4'
+        });
+        p._isHighlighted = false;
+      }
+    });
+  }
   
-  // Zoom to this route's bounds
-  if (polyline.getBounds) {
-    const bounds = polyline.getBounds();
-    if (window.map) {
-      window.map.fitBounds(bounds, { padding: [50, 50] });
+  console.log(`🎨 CARD STYLING: Updating card visuals`);
+  updateAlternativeRouteCardStyling();
+
+  // Zoom to the bounds of all polylines in this route
+  if (routePolylines.length > 0 && window.map) {
+    try {
+      // Calculate bounds from all polylines in this route
+      let allBounds = null;
+      routePolylines.forEach(p => {
+        if (p.getBounds) {
+          const bounds = p.getBounds();
+          if (allBounds) {
+            allBounds.extend(bounds);
+          } else {
+            allBounds = bounds;
+          }
+        }
+      });
+      
+      if (allBounds && allBounds.isValid()) {
+        window.map.fitBounds(allBounds, { padding: [50, 50], maxZoom: 16 });
+        console.log(`📍 Zoomed to route ${routeIndex} bounds`);
+      }
+    } catch (e) {
+      console.warn('Could not zoom to route bounds:', e);
     }
   }
   
   // Show a popup with route details
-  const etaFormatted = formatTime(altRoute.eta_seconds);
-  const distanceKm = (altRoute.distance / 1000).toFixed(2);
+  const etaFormatted = altRoute.eta_formatted || formatTime(altRoute.eta_seconds);
+  const distanceKm = (altRoute.distance_meters / 1000).toFixed(2);
+  const jamColor = altRoute.avg_jam_factor > 5 ? '#ef4444' : '#10b981';
   
   const popupContent = `
-    <div class="p-2" style="min-width: 250px;">
-      <div class="font-bold text-base mb-2 border-b pb-2">
-        🛣️ ${altRoute.description || `Route ${routeIndex + 1}`}
+    <div class="p-3 bg-white rounded-lg" style="min-width: 280px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+      <div class="font-bold text-lg mb-2 border-b pb-2" style="color: #8b5cf6;">
+        🛣️ ${altRoute.description || `Alternative Route ${routeIndex + 1}`}
       </div>
       
       <div class="space-y-2 text-sm">
         <div class="flex justify-between items-center">
-          <span class="text-gray-600">Rank:</span>
-          <span class="font-bold text-blue-600">#${altRoute.rank || (routeIndex + 1)}</span>
+          <span class="text-gray-600 font-medium">Rank:</span>
+          <span class="px-2 py-1 bg-purple-100 text-purple-800 rounded font-bold">#${altRoute.rank || (routeIndex + 1)}</span>
         </div>
         
         <div class="flex justify-between items-center">
-          <span class="text-gray-600">Distance:</span>
-          <span class="font-semibold">${distanceKm} km</span>
+          <span class="text-gray-600 font-medium">Distance:</span>
+          <span class="font-bold text-blue-600">${distanceKm} km</span>
         </div>
         
         <div class="flex justify-between items-center">
-          <span class="text-gray-600">ETA:</span>
-          <span class="font-bold text-green-600">${etaFormatted}</span>
+          <span class="text-gray-600 font-medium">ETA:</span>
+          <span class="font-semibold">${etaFormatted}</span>
         </div>
         
         <div class="flex justify-between items-center">
-          <span class="text-gray-600">Avg Jam Factor:</span>
-          <span class="${altRoute.avg_jam_factor > 5 ? 'text-red-600 font-bold' : 'text-green-600'}">${altRoute.avg_jam_factor.toFixed(1)}</span>
+          <span class="text-gray-600 font-medium">Avg Jam Factor:</span>
+          <span class="font-bold" style="color: ${jamColor};">${altRoute.avg_jam_factor.toFixed(2)}</span>
         </div>
+        
+        <div class="flex justify-between items-center">
+          <span class="text-gray-600 font-medium">Path Segments:</span>
+          <span class="font-semibold">${altRoute.path_length || 'N/A'}</span>
+        </div>
+      </div>
+      
+      <div class="mt-3 pt-3 border-t">
+        <button onclick="switchToAlternativeRoute(${routeIndex})" 
+          class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold py-2 px-3 rounded-lg transition-all text-sm shadow">
+          ✅ Switch to This Route
+        </button>
       </div>
     </div>
   `;
   
-  // Create popup at the midpoint of the route
-  if (polyline.getLatLngs && window.map) {
-    const latlngs = polyline.getLatLngs();
-    if (latlngs.length > 0) {
-      const midpoint = latlngs[Math.floor(latlngs.length / 2)];
-      L.popup({
-        maxWidth: 300,
-        className: 'alternative-route-popup'
-      })
-      .setLatLng(midpoint)
-      .setContent(popupContent)
-      .openOn(window.map);
+  // Show popup on first polyline
+  if (routePolylines.length > 0 && routePolylines[0].bindPopup) {
+    routePolylines[0].bindPopup(popupContent, {
+      maxWidth: 340,
+      className: 'alternative-route-popup',
+      closeButton: true
+    }).openPopup();
+  }
+  
+  showUpdateToast(`✅ Highlighted alternative route ${routeIndex + 1}`, 'success');
+};
+
+/**
+ * Reset alternative routes display to normal state
+ * Called when user deselects a route or needs to see the best route again
+ */
+window.resetAlternativeRoutesDisplay = function() {
+  console.log(`🔄 RESET: Clearing selection (was: ${window.currentSelectedAlternativeRouteIndex})`);
+  
+  // Clear the selected route tracking FIRST
+  window.currentSelectedAlternativeRouteIndex = null;
+  console.log('✅ State cleared: currentSelectedAlternativeRouteIndex = null');
+  
+  // Show the primary/best route again (restore to original opacity)
+  if (window.routePolylines && window.routePolylines.length > 0) {
+    window.routePolylines.forEach(polyline => {
+      if (polyline && polyline.setStyle) {
+        polyline.setStyle({ opacity: 0.8 });
+      }
+    });
+    console.log('👁️ PRIMARY ROUTE: Restored (opacity: 0.8)');
+  } else {
+    console.warn('⚠️ No primary route polylines found');
+  }
+  
+  // Reset all alternative routes to baseline state
+  if (window.alternativeRoutePolylines && window.alternativeRoutePolylines.length > 0) {
+    window.alternativeRoutePolylines.forEach((p) => {
+      if (p && p.setStyle) {
+        p.setStyle({
+          opacity: 0.35,
+          weight: 4,
+          dashArray: '8, 4'
+        });
+        p._isHighlighted = false;
+      }
+    });
+    console.log(`🔀 ALTERNATIVES: Reset ${window.alternativeRoutePolylines.length} routes to baseline`);
+  } else {
+    console.warn('⚠️ No alternative route polylines found');
+  }
+  
+  // Update card styling to remove all highlights
+  console.log('🎨 CARD STYLING: Removing all highlights');
+  updateAlternativeRouteCardStyling();
+  
+  showUpdateToast('✅ Best route visible', 'success');
+};
+
+/**
+ * Update the visual styling of alternative route cards in the metrics panel
+ * Called after selection state changes to reflect current selection
+ */
+function updateAlternativeRouteCardStyling() {
+  console.log(`🎨 Card styling: Updating cards (currentSelectedIndex=${window.currentSelectedAlternativeRouteIndex})`);
+  
+  // Get the primary route color for consistency
+  let primaryRouteColor = '#3b82f6'; // Default blue
+  if (window.routePolylines && window.routePolylines.length > 0) {
+    const mainPolyline = window.routePolylines[0];
+    if (mainPolyline && mainPolyline.options && mainPolyline.options.color) {
+      primaryRouteColor = mainPolyline.options.color;
     }
   }
-};
+  
+  // Update each alternative route card
+  const alternativeRoutesList = document.getElementById('metrics-alternative-routes-list');
+  if (alternativeRoutesList) {
+    const cards = alternativeRoutesList.querySelectorAll('[id^="alt-route-card-"]');
+    console.log(`🎨 Found ${cards.length} route cards to style`);
+    
+    cards.forEach((card, index) => {
+      const isSelected = window.currentSelectedAlternativeRouteIndex === index;
+      console.log(`  Card ${index}: isSelected=${isSelected}`);
+      
+      if (isSelected) {
+        // Selected state: more visible, glow effect, thicker border
+        card.style.backgroundColor = primaryRouteColor + '25'; // 15% opacity
+        card.style.borderColor = primaryRouteColor;
+        card.style.borderWidth = '3px';
+        card.style.boxShadow = `0 0 12px ${primaryRouteColor}40`; // Glow
+        console.log(`    ✨ Applied SELECTED styling (glow, thicker border)`);
+      } else {
+        // Unselected state: normal styling
+        const bgColor = primaryRouteColor + '15'; // 8% opacity
+        card.style.backgroundColor = bgColor;
+        card.style.borderColor = primaryRouteColor;
+        card.style.borderWidth = '2px';
+        card.style.boxShadow = 'none';
+        console.log(`    ⚪ Applied UNSELECTED styling (normal)`);
+      }
+    });
+  } else {
+    console.warn('⚠️ Alternative routes list not found');
+  }
+}
 
 // Alias for backward compatibility - functions.js calls updateDisruptionsPanel
 window.updateDisruptionsPanel = window.populateDisruptionsPanel;

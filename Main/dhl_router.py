@@ -73,7 +73,8 @@ class DHLRouter:
                      start_edge_source: int, start_edge_target: int, start_edge_oneway: int,
                      dest_edge_source: int, dest_edge_target: int, dest_edge_oneway: int,
                      disruption_file: str = "",
-                     tau_threshold: float = 0.5) -> Dict:
+                     tau_threshold: float = 0.5,
+                     generate_alternatives: bool = True) -> Dict:
         """
         Compute route using DHL algorithm via JSON API with snap point information
         Returns route data with polylines and metrics
@@ -97,12 +98,13 @@ class DHLRouter:
             tau_threshold: NOTE: DHL does not use tau threshold (it's only for HC2L/LazyHC2L).
                           This parameter is accepted but ignored by DHL for API compatibility.
                           DHL always performs immediate updates, unlike LazyHC2L.
+            generate_alternatives: Whether to generate alternative routes (default True for backward compatibility)
         """
         try:
             print(f"Executing DHL JSON API route computation...")
             
             # Build command with DHL argument structure
-            # Args: 14 routing params + 3 data files + optional disruption_file + optional tau_threshold
+            # Args: 14 routing params + 3 data files + optional disruption_file + optional tau_threshold + optional generate_alternatives
             cmd = [
                 self.cpp_executable,
                 str(start_pin_lat), str(start_pin_lng),
@@ -120,6 +122,9 @@ class DHLRouter:
             if disruption_file and disruption_file not in ['', 'null', 'NULL']:
                 cmd.append(str(disruption_file))
                 cmd.append(str(tau_threshold))
+            
+            # Add generate_alternatives flag (pass 1 for True, 0 for False)
+            cmd.append(str(1 if generate_alternatives else 0))
             
             print(f"Command: {' '.join(cmd)}")
             

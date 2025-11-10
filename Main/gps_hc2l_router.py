@@ -107,7 +107,8 @@ class GPSRoutingService:
                      dest_snap_lat: float, dest_snap_lng: float,
                      start_edge_source: int, start_edge_target: int, start_edge_oneway: int,
                      dest_edge_source: int, dest_edge_target: int, dest_edge_oneway: int,
-                     disruption_file: str = "", tau_threshold: float = 0.5) -> Dict:
+                     disruption_file: str = "", tau_threshold: float = 0.5,
+                     generate_alternatives: bool = True) -> Dict:
         """
         Compute route using HC2L GPS Routing Service with snap point information
         Returns enhanced route data with Google Maps integration
@@ -129,10 +130,11 @@ class GPSRoutingService:
             dest_edge_oneway: One-way property of dest edge (1=forward, -1=reverse, 0=bidirectional)
             disruption_file: Path to .gr disruption file (empty string or "null" = no disruptions)
             tau_threshold: LazyHC2L threshold parameter (default: 0.5)
+            generate_alternatives: Whether to generate alternative routes (default True for backward compatibility)
         """
         try:
             # Build command with LazyHC2L argument structure
-            # Args: 14 routing params + 3 data files + optional disruption_file + optional tau_threshold
+            # Args: 14 routing params + 3 data files + optional disruption_file + optional tau_threshold + optional generate_alternatives
             cmd = [
                 self.cpp_executable,
                 str(start_pin_lat), str(start_pin_lng),
@@ -150,6 +152,9 @@ class GPSRoutingService:
             if disruption_file and disruption_file not in ['', 'null', 'NULL']:
                 cmd.append(str(disruption_file))
                 cmd.append(str(tau_threshold))
+            
+            # Add generate_alternatives flag (pass 1 for True, 0 for False)
+            cmd.append(str(1 if generate_alternatives else 0))
             
             print(f"🚀 Executing GPS HC2L routing: {' '.join(cmd)}")
             

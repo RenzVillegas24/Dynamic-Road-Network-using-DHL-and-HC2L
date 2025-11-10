@@ -67,6 +67,17 @@ function clearRoutes() {
     // Make routePolylines globally accessible
     window.routePolylines = routePolylines || [];
 
+    // Clear alternative route polylines (Leaflet)
+    if (window.alternativeRoutePolylines && window.alternativeRoutePolylines.length > 0) {
+        window.alternativeRoutePolylines.forEach(polyline => {
+            if (polyline && map) {
+                map.removeLayer(polyline);
+            }
+        });
+        console.log('Cleared', window.alternativeRoutePolylines.length, 'alternative route polylines');
+        window.alternativeRoutePolylines = [];
+    }
+
     // Clear start and destination markers (Leaflet)
     if (startMarker && map) {
         map.removeLayer(startMarker);
@@ -134,6 +145,29 @@ function clearRoutes() {
     resetBottomInfoBar();
 
     console.log('✅ Route clearing complete (Leaflet)');
+}
+
+// Function to reset alternative route highlights to normal display
+function resetAlternativeRouteHighlights() {
+    console.log('🔄 Resetting alternative route highlights...');
+    
+    if (!window.alternativeRoutePolylines || window.alternativeRoutePolylines.length === 0) {
+        return;
+    }
+    
+    // Reset all polylines to normal state
+    window.alternativeRoutePolylines.forEach((p) => {
+        if (p && p.setStyle) {
+            p.setStyle({
+                opacity: 0.35,  // Return to original transparency
+                weight: 4,      // Return to original weight
+                dashArray: '8, 4'  // Return to original dash pattern
+            });
+            p._isHighlighted = false;
+        }
+    });
+    
+    console.log('✅ Alternative route highlights reset');
 }
 
 // Function to reset the Bottom Information Bar
@@ -1066,10 +1100,22 @@ function displayDHLRoute(routeData) {
     // Display route geometry with colors on map using Leaflet
     if (route.geometry && route.geometry.length > 0) {
       route.geometry.forEach((segment, index) => {
-        // Extract coordinates from segment
-        const coords = segment.coordinates;
+        // Extract coordinates from segment (might be string or already parsed)
+        let coords = segment.coordinates;
+        
+        // If coordinates is a string, parse it
+        if (typeof coords === 'string') {
+          try {
+            coords = JSON.parse(coords);
+            console.log(`Parsed DHL coordinates from string for segment ${index}`);
+          } catch (e) {
+            console.error(`Failed to parse DHL coordinates string for segment ${index}:`, coords, e);
+            return;
+          }
+        }
+        
         if (!coords || coords.length < 2) {
-          console.warn('Segment has insufficient coordinates:', segment);
+          console.warn('DHL Segment has insufficient coordinates:', segment);
           return;
         }
         
@@ -1363,10 +1409,22 @@ function displayDHC2LRoute(routeData) {
     if (route.geometry && route.geometry.length > 0) {
       console.log(`✅ HC2L: Processing ${route.geometry.length} geometry segments`);
       route.geometry.forEach((segment, index) => {
-        // Extract coordinates from segment
-        const coords = segment.coordinates;
+        // Extract coordinates from segment (might be string or already parsed)
+        let coords = segment.coordinates;
+        
+        // If coordinates is a string, parse it
+        if (typeof coords === 'string') {
+          try {
+            coords = JSON.parse(coords);
+            console.log(`Parsed HC2L coordinates from string for segment ${index}`);
+          } catch (e) {
+            console.error(`Failed to parse HC2L coordinates string for segment ${index}:`, coords, e);
+            return;
+          }
+        }
+        
         if (!coords || coords.length < 2) {
-          console.warn('Segment has insufficient coordinates:', segment);
+          console.warn('HC2L Segment has insufficient coordinates:', segment);
           return;
         }
         
@@ -1645,64 +1703,95 @@ function displayAlternativeRoutes(alternativeRoutes) {
         return;
     }
 
-    // Color palette for alternative routes (semi-transparent)
-    const routeColors = [
-        { color: '#60a5fa', label: 'Route 1' },      // light blue
-        { color: '#34d399', label: 'Route 2' },      // light green
-        { color: '#fbbf24', label: 'Route 3' },      // light orange
-        { color: '#f87171', label: 'Route 4' },      // light red
-        { color: '#c084fc', label: 'Route 5' }       // light purple
-    ];
+    // Get primary route color from the main route polyline
+    let primaryRouteColor = '#3b82f6'; // Default blue
+    if (window.routePolylines && window.routePolylines.length > 0) {
+        const mainPolyline = window.routePolylines[0];
+        if (mainPolyline && mainPolyline.options && mainPolyline.options.color) {
+            primaryRouteColor = mainPolyline.options.color;
+        }
+    }
 
-    alternativeRoutes.forEach((route, routeIndex) => {
-        if (!route.path_nodes || route.path_nodes.length < 2) {
-            console.warn(`Alternative route ${routeIndex + 1} has insufficient path nodes`);
+    // Filter out rank 1 routes (fastest route - already the main route)
+    const filteredRoutes = alternativeRoutes.filter(r => r.rank > 1);
+
+    if (filteredRoutes.length === 0) {
+        console.warn('No alternative routes to display after filtering rank 1');
+        return;
+    }
+
+    filteredRoutes.forEach((route, routeIndex) => {
+        // Check if route has geometry segments (NEW: all geometry is now in geometry array)
+        if (!route.geometry || route.geometry.length === 0) {
+            console.warn(`Alternative route ${route.rank} has no geometry segments`);
             return;
         }
 
-        // Get route color
-        const colorConfig = routeColors[routeIndex % routeColors.length];
-        const routeColor = colorConfig.color;
+        // Use primary route color for all alternatives with slight variation
+        let routeColor = primaryRouteColor;
+        let opacity = 0.35;  // 35% opacity for alternative routes
+        
+        // Slightly vary the color intensity based on rank
+        if (routeIndex === 1) {
+            opacity = 0.4;  // Slightly more opaque for first alternative
+        }
 
-        // Convert path nodes to Leaflet coordinates [lat, lng]
-        // path_nodes should now contain [lat, lng] coordinate pairs from C++ output
-        const pathCoords = route.path_nodes.map((node, idx) => {
-            if (Array.isArray(node) && node.length === 2) {
-                // Already a coordinate pair [lat, lng]
-                return node;
-            } else {
-                // Fallback in case it's still a node ID
-                console.warn(`Alternative route ${routeIndex + 1} node ${idx} is not a coordinate pair:`, node);
-                return null;
+        console.log(`🔀 Alternative route ${route.rank} has ${route.geometry.length} geometry segments`);
+        
+        // Display using detailed geometry segments (all geometry now contained within geometry array)
+        route.geometry.forEach((segment, segIndex) => {
+            // Coordinates might be a string (from C++ JSON output) or already parsed array
+            let coords = segment.coordinates;
+            
+            // If coordinates is a string, parse it
+            if (typeof coords === 'string') {
+                try {
+                    coords = JSON.parse(coords);
+                    console.log(`Parsed coordinates from string for segment ${segIndex}:`, coords);
+                } catch (e) {
+                    console.error(`Failed to parse coordinates string for segment ${segIndex}:`, coords, e);
+                    return;
+                }
             }
-        }).filter(coord => coord !== null);
-
-        if (pathCoords.length < 2) {
-            console.warn(`Alternative route ${routeIndex + 1} has insufficient valid coordinates after conversion`);
-            return;
-        }
-
-        // Create polyline for alternative route with semi-transparent styling
-        const polyline = L.polyline(pathCoords, {
-            color: routeColor,
-            opacity: 0.35,  // 35% opacity for alternative routes
-            weight: 4,
-            dashArray: '8, 4',  // Dashed line to differentiate from primary route
-            lineCap: 'round',
-            lineJoin: 'round',
-            className: 'alternative-route-polyline'
+            
+            if (!coords || coords.length < 2) {
+                console.warn(`Segment ${segIndex} has insufficient coordinates after parsing:`, segment);
+                return;
+            }
+            
+            // Convert coordinates to Leaflet format [lng, lat] -> [lat, lng]
+            const pathCoords = coords.map(coord => [coord[1], coord[0]]);
+            
+            // Create polyline for this segment
+            const polyline = L.polyline(pathCoords, {
+                color: routeColor,
+                opacity: opacity,
+                weight: 4,
+                dashArray: '8, 4',  // Dashed line to differentiate from primary route
+                lineCap: 'round',
+                lineJoin: 'round',
+                className: 'alternative-route-polyline'
+            }).addTo(map);
+            
+            // Store metadata for highlighting
+            polyline._routeIndex = routeIndex;  // Which alternative route this belongs to
+            polyline._alternativeRoute = true;
+            
+            // Check if toggle is unchecked and hide immediately if so
+            const showAlternativeRoutesToggle = document.getElementById('show-alternative-routes');
+            if (showAlternativeRoutesToggle && !showAlternativeRoutesToggle.checked) {
+                map.removeLayer(polyline);
+            }
+            
+            // Store in window array for later clearing
+            if (!window.alternativeRoutePolylines) {
+                window.alternativeRoutePolylines = [];
+            }
+            window.alternativeRoutePolylines.push(polyline);
         });
-        
-        // Always add to map (toggle will control visibility later if needed)
-        polyline.addTo(map);
-        
-        // Check if toggle is unchecked and hide immediately if so
-        const showAlternativeRoutesToggle = document.getElementById('show-alternative-routes');
-        if (showAlternativeRoutesToggle && !showAlternativeRoutesToggle.checked) {
-            map.removeLayer(polyline);
-        }
 
-        // Build popup with alternative route details
+
+        // Build popup content (same for all polylines of this route)
         const distance_m = route.distance_meters || 0;
         const distance_km = (distance_m / 1000).toFixed(2);
         const eta_seconds = route.eta_seconds || 0;
@@ -1760,77 +1849,91 @@ function displayAlternativeRoutes(alternativeRoutes) {
                 </div>
             </div>
         `;
+        
+        // Helper function to bind popup and events to a polyline
+        function attachPolylineEvents(polyline, routeData, routeIdx) {
+            polyline.bindPopup(popupContent, {
+                maxWidth: 340,
+                className: 'alternative-route-popup'
+            });
 
-        polyline.bindPopup(popupContent, {
-            maxWidth: 340,
-            className: 'alternative-route-popup'
-        });
+            // Store metadata for this alternative route
+            polyline._alternativeRouteIndex = routeIdx;
+            polyline._alternativeRouteData = routeData;
+            polyline._isAlternativeRoute = true;
 
-        // Store metadata for this alternative route
-        polyline._alternativeRouteIndex = routeIndex;
-        polyline._alternativeRouteData = route;
-        polyline._isAlternativeRoute = true;
+            // Add click event to show details
+            polyline.on('click', function(e) {
+                console.log(`🖱️ Clicked alternative route ${routeIdx + 1}:`, routeData);
+                
+                // Highlight this route and dim others
+                if (window.alternativeRoutePolylines) {
+                    window.alternativeRoutePolylines.forEach((p, i) => {
+                        if (i === routeIdx) {
+                            p.setStyle({ 
+                                weight: 6,
+                                opacity: 0.7  // Make more visible when clicked
+                            });
+                            p._isHighlighted = true;
+                        } else {
+                            p.setStyle({ 
+                                weight: 4,
+                                opacity: 0.25  // Dim other routes
+                            });
+                            p._isHighlighted = false;
+                        }
+                    });
+                }
+                
+                L.DomEvent.stop(e);
+                polyline.openPopup();
+            });
 
-        // Add click event to show details
-        polyline.on('click', function(e) {
-            console.log(`🖱️ Clicked alternative route ${routeIndex + 1}:`, route);
-            
-            // Highlight this route and dim others
-            if (window.alternativeRoutePolylines) {
-                window.alternativeRoutePolylines.forEach((p, i) => {
-                    if (i === routeIndex) {
-                        p.setStyle({ 
-                            weight: 6,
-                            opacity: 0.7  // Make more visible when clicked
-                        });
-                        p._isHighlighted = true;
-                    } else {
+            // Reset highlight when popup closes
+            polyline.on('popupclose', function(e) {
+                if (window.alternativeRoutePolylines) {
+                    window.alternativeRoutePolylines.forEach((p, i) => {
                         p.setStyle({ 
                             weight: 4,
-                            opacity: 0.25  // Dim other routes
+                            opacity: 0.35  // Reset to 35%
                         });
                         p._isHighlighted = false;
-                    }
-                });
-            }
-            
-            L.DomEvent.stop(e);
-            polyline.openPopup();
-        });
+                    });
+                }
+            });
 
-        // Reset highlight when popup closes
-        polyline.on('popupclose', function(e) {
-            if (window.alternativeRoutePolylines) {
-                window.alternativeRoutePolylines.forEach((p, i) => {
-                    p.setStyle({ 
+            // Add hover effect
+            polyline.on('mouseover', function(e) {
+                if (!this._isHighlighted) {
+                    this.setStyle({ 
+                        weight: 5,
+                        opacity: 0.6
+                    });
+                }
+            });
+
+            polyline.on('mouseout', function(e) {
+                if (!this._isHighlighted) {
+                    this.setStyle({ 
                         weight: 4,
                         opacity: 0.35  // Reset to 35%
                     });
-                    p._isHighlighted = false;
-                });
-            }
-        });
-
-        // Add hover effect
-        polyline.on('mouseover', function(e) {
-            if (!this._isHighlighted) {
-                this.setStyle({ 
-                    weight: 5,
-                    opacity: 0.6
-                });
-            }
-        });
-
-        polyline.on('mouseout', function(e) {
-            if (!this._isHighlighted) {
-                this.setStyle({ 
-                    weight: 4,
-                    opacity: 0.35  // Reset to 35%
-                });
-            }
-        });
-
-        window.alternativeRoutePolylines.push(polyline);
+                }
+            });
+        }
+        
+        // Attach events to all polylines in the route (whether from geometry or fallback)
+        if (window.alternativeRoutePolylines) {
+            const routePolylines = window.alternativeRoutePolylines.filter(p => 
+                p._alternativeRouteIndex === undefined || p._alternativeRouteIndex === routeIndex
+            );
+            routePolylines.forEach(polyline => {
+                if (polyline && !polyline._eventsAttached) {
+                    attachPolylineEvents(polyline, route, routeIndex);
+                    polyline._eventsAttached = true;
+                }
+            });
+        }
     });
 
     console.log(`✅ Displayed ${alternativeRoutes.length} alternative routes on map`);
