@@ -226,10 +226,11 @@ class HERETrafficService:
                 source = int(row['source'])
                 target = int(row['target'])
                 
-                jam_factor = float(row['jamFactor'])
-                speed_kph = float(row['speed_kph'])
-                free_flow_kph = float(row['freeFlow_kph'])
-                is_closed = bool(row['isClosed'])
+                # Support both old and new column names
+                jam_factor = float(row.get('flow_jam_factor', row.get('jamFactor', 0.0)))
+                speed_kph = float(row.get('flow_speed_kph', row.get('speed_kph', 0.0)))
+                free_flow_kph = float(row.get('flow_free_flow_kph', row.get('freeFlow_kph', 50.0)))
+                is_closed = bool(row.get('incident_road_closed', row.get('isClosed', False)))
                 
                 # Weight formula
                 if is_closed:

@@ -731,7 +731,13 @@ window.populateDisruptionsPanel = function(routeData) {
       // Get road name or use fallback
       const roadName = disruption.road_name || 'Unknown Road';
       const flowStatusDisplay = flowStatus.replace(/_/g, ' ').toUpperCase();
-      const disruptionType = disruption.type || 'Unknown';
+      const disruptionType = getDisruptionField(disruption, 'type') || 'Unknown';
+      const currentSpeed = getDisruptionField(disruption, 'current_speed') || 0;
+      const jamFactor = getDisruptionField(disruption, 'jam_factor') || 0;
+      const timeImpact = getDisruptionField(disruption, 'time_impact_seconds');
+      const confidence = getDisruptionField(disruption, 'confidence');
+      const description = getDisruptionField(disruption, 'description');
+      const roadClosed = getDisruptionField(disruption, 'road_closed');
       
       disruptionCard.innerHTML = `
         <div class="flex items-start gap-3">
@@ -748,30 +754,30 @@ window.populateDisruptionsPanel = function(routeData) {
             <div class="text-xs text-slate-600 space-y-1">
               <div><strong>Type:</strong> ${disruptionType}</div>
               <div><strong>Edge:</strong> ${disruption.source} → ${disruption.target}</div>
-              ${disruption.description ? `<div class="italic text-slate-500">"${disruption.description}"</div>` : ''}
+              ${description ? `<div class="italic text-slate-500">"${description}"</div>` : ''}
               <div class="flex items-center gap-3 mt-2 flex-wrap">
                 <div>
                   <strong>Speed:</strong> 
-                  <span class="font-semibold" style="color: ${flowIconColor};">${(disruption.current_speed || 0).toFixed(1)} km/h</span>
+                  <span class="font-semibold" style="color: ${flowIconColor};">${currentSpeed.toFixed(1)} km/h</span>
                 </div>
                 <div>
                   <strong>Jam Factor:</strong> 
-                  <span class="font-semibold" style="color: ${flowIconColor};">${(disruption.jam_factor || 0).toFixed(2)}</span>
+                  <span class="font-semibold" style="color: ${flowIconColor};">${jamFactor.toFixed(2)}</span>
                 </div>
-                ${disruption.time_impact_seconds !== undefined ? `
+                ${timeImpact !== undefined ? `
                   <div>
                     <strong>Impact:</strong> 
-                    <span class="font-bold" style="color: ${flowIconColor};">+${(disruption.time_impact_seconds || 0).toFixed(0)}s</span>
+                    <span class="font-bold" style="color: ${flowIconColor};">+${timeImpact.toFixed(0)}s</span>
                   </div>
                 ` : ''}
               </div>
-              ${disruption.confidence !== undefined ? `
+              ${confidence !== undefined ? `
                 <div class="mt-1">
                   <strong>Confidence:</strong> 
-                  <span class="font-semibold">${(disruption.confidence * 100).toFixed(0)}%</span>
+                  <span class="font-semibold">${(confidence * 100).toFixed(0)}%</span>
                 </div>
               ` : ''}
-              ${disruption.is_closed ? `
+              ${roadClosed ? `
                 <div class="text-red-600 font-bold mt-1">🚫 ROAD CLOSED</div>
               ` : ''}
             </div>
@@ -878,12 +884,19 @@ window.showEdgeDetails = function(disruption) {
     // Edge not found in current route, show a custom popup at map center with disruption info
     console.warn('⚠️ Edge not found in current route, showing info popup');
     
+    // Get disruption data with compatibility layer
+    const severityLevel = getDisruptionField(disruption, 'severity_level') || 'medium';
+    const type = getDisruptionField(disruption, 'type') || 'Unknown';
+    const timeImpact = getDisruptionField(disruption, 'time_impact_seconds');
+    const confidence = getDisruptionField(disruption, 'confidence');
+    const roadClosed = getDisruptionField(disruption, 'road_closed');
+    const description = getDisruptionField(disruption, 'description');
+    
     // Determine severity color
-    const severity = disruption.severity || 'medium';
     let severityColor = '#f59e0b'; // amber for medium
-    if (severity === 'critical' || severity === 'high') {
+    if (severityLevel === 'critical' || severityLevel === 'high') {
       severityColor = '#ef4444'; // red
-    } else if (severity === 'low') {
+    } else if (severityLevel === 'low' || severityLevel === 'none') {
       severityColor = '#10b981'; // green
     }
     
@@ -906,31 +919,31 @@ window.showEdgeDetails = function(disruption) {
           
           <div class="flex justify-between items-center">
             <span class="text-gray-600">Type:</span>
-            <span class="px-2 py-0.5 bg-slate-100 rounded text-xs font-semibold">${disruption.type || 'Unknown'}</span>
+            <span class="px-2 py-0.5 bg-slate-100 rounded text-xs font-semibold">${type}</span>
           </div>
           
           <div class="flex justify-between items-center">
             <span class="text-gray-600">Severity:</span>
             <span class="px-2 py-0.5 rounded text-xs font-semibold text-white" style="background-color: ${severityColor}">
-              ${severity.toUpperCase()}
+              ${severityLevel.toUpperCase()}
             </span>
           </div>
           
-          ${disruption.time_impact_seconds !== undefined ? `
+          ${timeImpact !== undefined ? `
           <div class="flex justify-between items-center">
             <span class="text-gray-600">Time Impact:</span>
-            <span class="font-bold text-red-600">+${disruption.time_impact_seconds.toFixed(0)}s</span>
+            <span class="font-bold text-red-600">+${timeImpact.toFixed(0)}s</span>
           </div>
           ` : ''}
           
-          ${disruption.confidence !== undefined ? `
+          ${confidence !== undefined ? `
           <div class="flex justify-between items-center">
             <span class="text-gray-600">Confidence:</span>
-            <span class="font-semibold">${(disruption.confidence * 100).toFixed(0)}%</span>
+            <span class="font-semibold">${(confidence * 100).toFixed(0)}%</span>
           </div>
           ` : ''}
           
-          ${disruption.is_closed ? `
+          ${roadClosed ? `
           <div class="mt-2 p-2 bg-red-50 border border-red-200 rounded">
             <div class="flex items-center gap-2">
               <span class="text-red-600 font-bold">🚫 ROAD CLOSED</span>
@@ -938,10 +951,10 @@ window.showEdgeDetails = function(disruption) {
           </div>
           ` : ''}
           
-          ${disruption.description ? `
+          ${description ? `
           <div class="mt-2 p-2 bg-blue-50 border border-blue-200 rounded">
             <div class="text-xs text-blue-800 italic">
-              "${disruption.description}"
+              "${description}"
             </div>
           </div>
           ` : ''}

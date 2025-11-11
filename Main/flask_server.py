@@ -263,8 +263,8 @@ def load_traffic_with_cache(edge_lookup):
             if not edge_data:
                 continue
             
-            # Determine severity
-            jam_factor = float(row.get('jamFactor', 0.0))
+            # Determine severity - check for flow_jam_factor (new CSV format)
+            jam_factor = float(row.get('flow_jam_factor', row.get('jamFactor', 0.0)))
             if jam_factor >= 8.0:
                 severity = 'Heavy'
             elif jam_factor >= 5.0:
@@ -283,6 +283,10 @@ def load_traffic_with_cache(edge_lookup):
             if not geometry or len(geometry) < 2:
                 continue
             
+            # Use flow_speed_kph or speed_kph (backward compatibility)
+            current_speed = float(row.get('flow_speed_kph', row.get('speed_kph', 0.0)))
+            free_flow_speed = float(row.get('flow_free_flow_kph', row.get('freeFlow_kph', 50.0)))
+            
             traffic_segments.append({
                 'type': 'flow',
                 'incident_type': str(row.get('incident_type', 'Congestion')),
@@ -291,10 +295,10 @@ def load_traffic_with_cache(edge_lookup):
                 'road_name': str(row.get('road_name', edge_data['road_name'])),
                 'highway_type': str(row.get('highway_type', edge_data['highway_type'])),
                 'length': float(edge_data['length']),
-                'speed_kph': float(row['speed_kph']),
-                'free_flow_kph': float(row['freeFlow_kph']),
-                'jam_factor': float(jam_factor),
-                'is_closed': bool(row.get('isClosed', False)),
+                'speed_kph': current_speed,
+                'free_flow_kph': free_flow_speed,
+                'jam_factor': jam_factor,
+                'is_closed': bool(row.get('incident_road_closed', row.get('isClosed', False))),
                 'source': int(row['source']),
                 'target': int(row['target'])
             })
@@ -960,6 +964,12 @@ def get_scenario_data():
         edges_with_traffic = []
         
         for _, row in scenario_df.iterrows():
+            # Support both old column names (speed_kph, freeFlow_kph) and new (flow_speed_kph, flow_free_flow_kph)
+            current_speed = float(row.get('flow_speed_kph', row.get('speed_kph', 0.0)))
+            free_flow_speed = float(row.get('flow_free_flow_kph', row.get('freeFlow_kph', 50.0)))
+            jam_factor = float(row.get('flow_jam_factor', row.get('jamFactor', 0.0)))
+            is_closed = bool(row.get('incident_road_closed', row.get('isClosed', False)))
+            
             edges_with_traffic.append({
                 'source_id': int(row['source']),
                 'target_id': int(row['target']),
@@ -968,11 +978,11 @@ def get_scenario_data():
                 'target_lat': float(row['target_lat']),
                 'target_lng': float(row['target_lon']),
                 'road_name': str(row['road_name']),
-                'speed_kph': float(row['speed_kph']),
-                'freeFlow_kph': float(row['freeFlow_kph']),
-                'jamFactor': float(row['jamFactor']),
-                'isClosed': bool(row['isClosed']),
-                'segmentLength': float(row['segmentLength'])
+                'speed_kph': current_speed,
+                'freeFlow_kph': free_flow_speed,
+                'jamFactor': jam_factor,
+                'isClosed': is_closed,
+                'segmentLength': float(row.get('segmentLength', 100.0))
             })
         
         return jsonify({

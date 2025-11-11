@@ -414,11 +414,12 @@ public:
     void remove_edge(NodeID v, NodeID w);
     // change the weight of the edge between v and w in global graph
     void update_edge(NodeID v, NodeID w, distance_t d);
-    std::pair<distance_t, std::pair<NodeID, NodeID> > random_update();
     // remove isolated nodes from subgraph
     void remove_isolated();
     // reset graph to contain all nodes in global graph
     void reset();
+
+    std::pair<distance_t, std::pair<NodeID, NodeID> > random_update();
 
     size_t node_count() const;
     size_t edge_count() const;
@@ -445,6 +446,8 @@ public:
     // repeatedly remove nodes of degree 1, populating closest[removed] with next node on path to closest unremoved node
     void contract(std::vector<Neighbor> &closest);
     // create contraction hierarchy based on index
+
+    
     void create_contraction_hierarchy(ContractionHierarchy &ch, std::vector<CutIndex> &ci, std::vector<Neighbor> &closest) const;
     void create_contraction_hierarchy(ContractionHierarchy &ch, std::vector<CutIndex> &ci) const;
 

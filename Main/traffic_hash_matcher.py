@@ -33,7 +33,7 @@ from dataclasses import dataclass
 
 @dataclass
 class TrafficEdge:
-    """Represents a traffic-matched OSM edge"""
+    """Represents a traffic-matched OSM edge with separated flow and incident data"""
     traffic_hash: str
     source: int
     target: int
@@ -42,18 +42,34 @@ class TrafficEdge:
     target_lat: float
     target_lon: float
     
-    # Traffic metrics (populated from HERE API)
-    speed_kph: float = 0.0
-    freeFlow_kph: float = 0.0
-    jamFactor: float = 0.0
-    isClosed: bool = False
+    # FLOW DATA (from HERE API flow results)
+    flow_speed_kph: float = 0.0
+    flow_free_flow_kph: float = 0.0
+    flow_jam_factor: float = 0.0
+    flow_confidence: float = 0.0
+    flow_traversability: str = 'open'
+    
+    # INCIDENT DATA (from HERE API incidents results)
+    incident_id: str = ''
+    incident_type: str = ''
+    incident_criticality: str = ''
+    incident_description: str = ''
+    incident_road_closed: bool = False
+    incident_start_time: str = ''
+    incident_end_time: str = ''
     
     # Road attributes (from OSM edge data)
     highway_type: str = 'unknown'
     road_name: str = ''
     
+    # DEPRECATED: Use flow_* and incident_* instead
+    speed_kph: float = 0.0
+    freeFlow_kph: float = 0.0
+    jamFactor: float = 0.0
+    isClosed: bool = False
+    
     def to_dict(self) -> Dict:
-        """Convert to dictionary for CSV export"""
+        """Convert to dictionary for CSV export with flow_* and incident_* prefixes"""
         return {
             'traffic_hash': self.traffic_hash,
             'source_lat': self.source_lat,
@@ -62,12 +78,22 @@ class TrafficEdge:
             'target_lon': self.target_lon,
             'source': self.source,
             'target': self.target,
-            'speed_kph': self.speed_kph,
-            'freeFlow_kph': self.freeFlow_kph,
-            'jamFactor': self.jamFactor,
-            'isClosed': self.isClosed,
             'highway_type': self.highway_type,
-            'road_name': self.road_name
+            'road_name': self.road_name,
+            # Flow data with flow_ prefix
+            'flow_speed_kph': self.flow_speed_kph,
+            'flow_free_flow_kph': self.flow_free_flow_kph,
+            'flow_jam_factor': self.flow_jam_factor,
+            'flow_confidence': self.flow_confidence,
+            'flow_traversability': self.flow_traversability,
+            # Incident data with incident_ prefix
+            'incident_id': self.incident_id,
+            'incident_type': self.incident_type,
+            'incident_criticality': self.incident_criticality,
+            'incident_description': self.incident_description,
+            'incident_road_closed': 1 if self.incident_road_closed else 0,
+            'incident_start_time': self.incident_start_time,
+            'incident_end_time': self.incident_end_time,
         }
 
 
@@ -283,12 +309,13 @@ class TrafficHashMatcher:
     def match_traffic_flow_item(self, flow_item: Dict) -> List[TrafficEdge]:
         """
         Match a single HERE API flow item to edges by hashing its location
+        Populates FLOW DATA fields (flow_speed_kph, flow_jam_factor, etc)
         
         Args:
             flow_item: A single item from HERE API flow results
             
         Returns:
-            List of matched TrafficEdge objects with traffic metrics populated
+            List of matched TrafficEdge objects with FLOW metrics populated
         """
         location = flow_item.get('location')
         if not location:
@@ -304,22 +331,23 @@ class TrafficHashMatcher:
             # print(f"⚠️  No match for hash: {traffic_hash}")
             return []
         
-        # Extract traffic metrics from HERE API
+        # Extract FLOW DATA from HERE API
         current_flow = flow_item.get('currentFlow', {})
-        free_flow = flow_item.get('freeFlow', {})
         
         # HERE API returns speed in m/s, convert to km/h
         speed_ms = current_flow.get('speed', 0.0)
-        free_flow_ms = free_flow.get('speed', 0.0)
-        
         speed_kph = speed_ms * 3.6 if speed_ms > 0 else 0.0
+        
+        # Get free flow speed (assume from highway type if not provided)
+        free_flow_ms = current_flow.get('freeFlow', 0.0)
         free_flow_kph = free_flow_ms * 3.6 if free_flow_ms > 0 else 0.0
+        
         jam_factor = current_flow.get('jamFactor', 0.0)
+        confidence = current_flow.get('confidence', 0.0)
+        traversability = current_flow.get('traversability', 'open')
         
         # CRITICAL FIX: If free_flow_kph is 0 or missing, estimate from highway type
-        # This is essential for accurate weight calculations in C++
         if free_flow_kph == 0.0:
-            # Use first matched edge's highway type to estimate free flow speed
             if matched_edges:
                 highway = matched_edges[0].highway_type.lower() if matched_edges[0].highway_type else 'unknown'
                 if 'motorway' in highway:
@@ -335,23 +363,20 @@ class TrafficHashMatcher:
                 elif 'residential' in highway:
                     free_flow_kph = 40.0
                 else:
-                    free_flow_kph = 50.0  # Default for unknown
+                    free_flow_kph = 50.0
             else:
-                free_flow_kph = 50.0  # Default if no edges
+                free_flow_kph = 50.0
         
         # FIX: If current speed is 0 but we have jam_factor, estimate from free flow
         if speed_kph == 0.0 and jam_factor > 0.0 and free_flow_kph > 0.0:
-            # Calculate speed from jam factor: 0 = free flow, 10 = stopped
             speed_reduction_ratio = min(1.0, jam_factor / 10.0)
-            speed_kph = free_flow_kph * (1.0 - speed_reduction_ratio * 0.9)  # Max 90% reduction
+            speed_kph = free_flow_kph * (1.0 - speed_reduction_ratio * 0.9)
         elif speed_kph == 0.0:
-            # If still 0, use free flow (assume no congestion)
             speed_kph = free_flow_kph
         
-        # Populate traffic metrics for all matched edges
+        # Populate FLOW data for all matched edges
         result_edges = []
         for edge in matched_edges:
-            # Create a copy with traffic data (preserving highway_type and road_name)
             traffic_edge = TrafficEdge(
                 traffic_hash=edge.traffic_hash,
                 source=edge.source,
@@ -360,53 +385,618 @@ class TrafficHashMatcher:
                 source_lon=edge.source_lon,
                 target_lat=edge.target_lat,
                 target_lon=edge.target_lon,
+                # Populate FLOW fields
+                flow_speed_kph=speed_kph,
+                flow_free_flow_kph=free_flow_kph,
+                flow_jam_factor=jam_factor,
+                flow_confidence=confidence,
+                flow_traversability=traversability,
+                # Incident fields remain empty (no incident data in this flow item)
+                highway_type=edge.highway_type,
+                road_name=edge.road_name,
+                # DEPRECATED: Keep for backward compatibility
                 speed_kph=speed_kph,
                 freeFlow_kph=free_flow_kph,
                 jamFactor=jam_factor,
-                isClosed=False,  # Flow data doesn't indicate closures
-                highway_type=edge.highway_type,  # Preserve from loaded edge
-                road_name=edge.road_name  # Preserve from loaded edge
+                isClosed=False
             )
             result_edges.append(traffic_edge)
         
         return result_edges
     
-    def match_traffic_incident_item(self, incident_item: Dict) -> List[TrafficEdge]:
+    def _try_tier1_frechet_matching(self, incident_item: Dict, incident_points: list) -> List[TrafficEdge]:
         """
-        Match a single HERE API incident item to edges by hashing its location
+        TIER 1: Fréchet distance-based geometry matching
+        
+        Compare incident geometry with OSM edge geometries using Fréchet distance.
+        This measures how similar two curves (paths) are in shape.
+        
+        Algorithm:
+        1. For each edge in hash_to_edges:
+           - Create edge curve from (source_lat, source_lon) to (target_lat, target_lon)
+           - Calculate Fréchet distance between incident points and edge curve
+           - Keep edges within threshold
+        2. Sort by Fréchet distance (lower = better match)
+        3. Select best edges within tolerance
+        4. Return edges with incident data
+        
+        Args:
+            incident_item: HERE API incident data
+            incident_points: Pre-extracted incident points [(lat, lng), ...]
+            
+        Returns:
+            List[TrafficEdge] with incident data, or [] if no match
+        """
+        from math import radians, cos, sin, asin, sqrt
+        
+        def haversine_distance(lat1, lng1, lat2, lng2):
+            """Calculate distance in meters"""
+            lat1_rad, lng1_rad = radians(lat1), radians(lng1)
+            lat2_rad, lng2_rad = radians(lat2), radians(lng2)
+            dlat = lat2_rad - lat1_rad
+            dlng = lng2_rad - lng1_rad
+            a = sin(dlat/2)**2 + cos(lat1_rad) * cos(lat2_rad) * sin(dlng/2)**2
+            c = 2 * asin(sqrt(a))
+            return 6371000 * c
+        
+        def frechet_distance(curve1, curve2):
+            """
+            Calculate discrete Fréchet distance between two curves.
+            Uses dynamic programming with memoization.
+            
+            Returns distance in meters.
+            """
+            n, m = len(curve1), len(curve2)
+            if n == 0 or m == 0:
+                return float('inf')
+            
+            # Memoization table
+            ca = {}
+            
+            def compute(i, j):
+                if (i, j) in ca:
+                    return ca[(i, j)]
+                
+                dist = haversine_distance(curve1[i][0], curve1[i][1],
+                                         curve2[j][0], curve2[j][1])
+                
+                if i == 0 and j == 0:
+                    result = dist
+                elif i > 0 and j == 0:
+                    result = max(compute(i-1, 0), dist)
+                elif i == 0 and j > 0:
+                    result = max(compute(0, j-1), dist)
+                else:
+                    result = max(min(compute(i-1, j), compute(i, j-1), compute(i-1, j-1)), dist)
+                
+                ca[(i, j)] = result
+                return result
+            
+            return compute(n-1, m-1)
+        
+        # Extract incident details for logging and edge creation
+        incident_details = incident_item.get('incidentDetails', {})
+        incident_id = incident_details.get('id', 'unknown')
+        incident_type = incident_details.get('type', 'unknown')
+        incident_criticality = incident_details.get('criticality', '')
+        incident_description = incident_details.get('description', {}).get('value', '')
+        incident_road_closed = incident_details.get('roadClosed', False)
+        incident_start_time = incident_details.get('startTime', '')
+        incident_end_time = incident_details.get('endTime', '')
+        
+        # Map criticality to jam factor
+        criticality_map = {'critical': 9.0, 'severe': 7.0, 'major': 5.0, 'minor': 2.0}
+        jam_factor = criticality_map.get(incident_criticality.lower(), 0.0) if incident_criticality else 0.0
+        speed_kph = 0.0 if incident_road_closed else 10.0
+        
+        # TIER 1 parameters
+        frechet_threshold_m = 500.0  # Max Fréchet distance to consider
+        tolerance_ratio = 0.10  # Accept edges within 10% of best
+        
+        # Score each edge using Fréchet distance
+        edge_scores = []
+        
+        for edge_list in self.hash_to_edges.values():
+            for edge in edge_list:
+                # Create edge curve (simple 2-point line)
+                edge_curve = [
+                    (edge.source_lat, edge.source_lon),
+                    (edge.target_lat, edge.target_lon)
+                ]
+                
+                # Calculate Fréchet distance
+                frechet_dist = frechet_distance(incident_points, edge_curve)
+                
+                # Keep only edges within threshold
+                if frechet_dist <= frechet_threshold_m:
+                    edge_scores.append({
+                        'edge': edge,
+                        'frechet_distance': frechet_dist
+                    })
+        
+        if not edge_scores:
+            return []
+        
+        # Sort by Fréchet distance (best first)
+        edge_scores.sort(key=lambda x: x['frechet_distance'])
+        
+        # Select best edges within tolerance
+        best_frechet = edge_scores[0]['frechet_distance']
+        tolerance = best_frechet * tolerance_ratio
+        
+        result_edges = []
+        for item in edge_scores:
+            if item['frechet_distance'] <= best_frechet + tolerance:
+                edge = item['edge']
+                traffic_edge = TrafficEdge(
+                    traffic_hash=edge.traffic_hash,
+                    source=edge.source,
+                    target=edge.target,
+                    source_lat=edge.source_lat,
+                    source_lon=edge.source_lon,
+                    target_lat=edge.target_lat,
+                    target_lon=edge.target_lon,
+                    incident_id=incident_id,
+                    incident_type=incident_type,
+                    incident_criticality=incident_criticality,
+                    incident_description=incident_description,
+                    incident_road_closed=incident_road_closed,
+                    incident_start_time=incident_start_time,
+                    incident_end_time=incident_end_time,
+                    highway_type=edge.highway_type,
+                    road_name=edge.road_name,
+                    speed_kph=speed_kph,
+                    freeFlow_kph=50.0,
+                    jamFactor=jam_factor,
+                    isClosed=incident_road_closed
+                )
+                result_edges.append(traffic_edge)
+        
+        # Log success
+        if result_edges:
+            print(f"   [{incident_id}] TIER 1: Fréchet {best_frechet:.1f}m → {len(result_edges)} edge(s)")
+        
+        return result_edges
+        
+    
+    def _try_tier0_point_matching(self, incident_item: Dict, flow_results: List[Dict],
+                                   incident_points: list) -> List[TrafficEdge]:
+        """
+        TIER 0: Point-based matching using flow data hash lookup
+        
+        Algorithm (based on point_matcher.py reference):
+        1. For each flow item, extract all points from location.shape.links
+        2. Count how many incident points are inside each flow (distance ≤ threshold)
+        3. Require minimum 2 points to match
+        4. Select flow with most matched points
+        5. Use flow's hash to lookup edges directly
+        6. Return edges with incident data populated
+        
+        Success Criteria:
+        - At least 2 incident points must be within 100m of flow points
+        - Uses hash-based edge lookup (same as flow matching - most reliable)
+        
+        Args:
+            incident_item: HERE API incident data
+            flow_results: List of flow items from HERE API
+            incident_points: Pre-extracted incident points [(lat, lng), ...]
+            
+        Returns:
+            List[TrafficEdge] with incident data, or [] if no match
+        """
+        from math import radians, cos, sin, asin, sqrt
+        
+        def haversine_distance(lat1, lng1, lat2, lng2):
+            """Calculate distance in meters"""
+            lat1_rad, lng1_rad = radians(lat1), radians(lng1)
+            lat2_rad, lng2_rad = radians(lat2), radians(lng2)
+            dlat = lat2_rad - lat1_rad
+            dlng = lng2_rad - lng1_rad
+            a = sin(dlat/2)**2 + cos(lat1_rad) * cos(lat2_rad) * sin(dlng/2)**2
+            c = 2 * asin(sqrt(a))
+            return 6371000 * c
+        
+        def extract_flow_points(flow_location):
+            """Extract points from flow location.shape.links (ONLY lat/lng)"""
+            points = []
+            shape = flow_location.get('shape', {})
+            links = shape.get('links', [])
+            
+            if isinstance(links, list):
+                for link in links:
+                    if 'points' in link and isinstance(link['points'], list):
+                        for pt in link['points']:
+                            lat = pt.get('lat')
+                            lng = pt.get('lng')
+                            if lat is not None and lng is not None:
+                                points.append((lat, lng))
+            return points
+        
+        # Extract incident ID for logging
+        incident_details = incident_item.get('incidentDetails', {})
+        incident_id = incident_details.get('id', 'unknown')
+        incident_type = incident_details.get('type', 'unknown')
+        
+        # TIER 0 matching parameters
+        distance_threshold_m = 100.0  # 100 meters tolerance
+        min_points_required = 2  # Need at least 2 points inside flow
+        
+        best_flow = None
+        best_match_count = 0
+        best_matched_points = []
+        
+        # Try each flow item
+        for flow_idx, flow_item in enumerate(flow_results):
+            flow_location = flow_item.get('location', {})
+            if not flow_location:
+                continue
+            
+            flow_points = extract_flow_points(flow_location)
+            if not flow_points:
+                continue
+            
+            # Count how many incident points are inside this flow
+            matched_count = 0
+            matched_point_distances = []
+            
+            for inc_lat, inc_lng in incident_points:
+                # Find if ANY flow point is within threshold
+                for flow_lat, flow_lng in flow_points:
+                    dist = haversine_distance(inc_lat, inc_lng, flow_lat, flow_lng)
+                    
+                    if dist <= distance_threshold_m:
+                        matched_count += 1
+                        matched_point_distances.append(dist)
+                        break  # Move to next incident point
+            
+            # Keep flow with most matched points
+            if matched_count >= min_points_required and matched_count > best_match_count:
+                best_match_count = matched_count
+                best_flow = flow_item
+                best_matched_points = matched_point_distances
+        
+        # If found match, use flow's hash to get edges
+        if best_flow and best_match_count >= min_points_required:
+            flow_location = best_flow.get('location', {})
+            
+            try:
+                # Compute hash from flow location (same as flow matching)
+                flow_hash = self.hash_location_javascript_style(flow_location)
+                
+                # Lookup edges using hash
+                if flow_hash in self.hash_to_edges:
+                    edges = self.hash_to_edges[flow_hash]
+                    
+                    # Extract full incident details
+                    incident_criticality = incident_details.get('criticality', '')
+                    incident_description = incident_details.get('description', {}).get('value', '')
+                    incident_road_closed = incident_details.get('roadClosed', False)
+                    incident_start_time = incident_details.get('startTime', '')
+                    incident_end_time = incident_details.get('endTime', '')
+                    
+                    # Map criticality to jam factor
+                    criticality_map = {'critical': 9.0, 'severe': 7.0, 'major': 5.0, 'minor': 2.0}
+                    jam_factor = criticality_map.get(incident_criticality.lower(), 0.0) if incident_criticality else 0.0
+                    speed_kph = 0.0 if incident_road_closed else 10.0
+                    
+                    # Create TrafficEdge objects with incident data
+                    result_edges = []
+                    for edge in edges:
+                        traffic_edge = TrafficEdge(
+                            traffic_hash=edge.traffic_hash,
+                            source=edge.source,
+                            target=edge.target,
+                            source_lat=edge.source_lat,
+                            source_lon=edge.source_lon,
+                            target_lat=edge.target_lat,
+                            target_lon=edge.target_lon,
+                            incident_id=incident_id,
+                            incident_type=incident_type,
+                            incident_criticality=incident_criticality,
+                            incident_description=incident_description,
+                            incident_road_closed=incident_road_closed,
+                            incident_start_time=incident_start_time,
+                            incident_end_time=incident_end_time,
+                            highway_type=edge.highway_type,
+                            road_name=edge.road_name,
+                            speed_kph=speed_kph,
+                            freeFlow_kph=50.0,
+                            jamFactor=jam_factor,
+                            isClosed=incident_road_closed
+                        )
+                        result_edges.append(traffic_edge)
+                    
+                    # Log success with incident details
+                    avg_dist = sum(best_matched_points) / len(best_matched_points) if best_matched_points else 0
+                    print(f"   [{incident_id}] TIER 0: {best_match_count}/{len(incident_points)} pts " +
+                          f"(avg {avg_dist:.1f}m) → {len(result_edges)} edge(s) via hash")
+                    
+                    return result_edges
+                    
+            except Exception as e:
+                print(f"   [{incident_id}] TIER 0 error: {e}")
+        
+        return []  # No match, try TIER 1
+    
+    def match_traffic_incident_item(self, incident_item: Dict, 
+                                      flow_results: List[Dict] = None) -> List[TrafficEdge]:
+        """
+        Match a single HERE API incident item to edges using two-tier approach:
+        
+        TIER 0: Point-based matching with flow data hash lookup
+           - Check if incident points are inside flow points (≥2 points within 100m)
+           - Use flow's hash to lookup edges directly (most reliable)
+           - Skip to next tier if no match
+        
+        TIER 1: Fréchet distance geometry matching
+           - Compare incident geometry with all OSM edge geometries
+           - Use Fréchet distance to measure curve similarity
+           - Select best matching edges
         
         Args:
             incident_item: A single item from HERE API incidents results
+            flow_results: Optional list of flow data items from HERE API
             
         Returns:
-            List of matched TrafficEdge objects with traffic metrics populated
+            List of matched TrafficEdge objects with INCIDENT metrics populated
         """
+        # Extract incident details for logging
+        incident_details = incident_item.get('incidentDetails', {})
+        incident_id = incident_details.get('id', 'unknown')
+        incident_type = incident_details.get('type', 'unknown')
+        
         location = incident_item.get('location')
         if not location:
+            print(f"   [{incident_id}] ❌ No location data")
             return []
         
-        # Hash the location
-        traffic_hash = self.hash_location_javascript_style(location)
+        # Extract all points from incident geometry
+        incident_points = []
         
-        # Lookup matched edges
-        matched_edges = self.hash_to_edges.get(traffic_hash, [])
+        if 'shape' in location and 'links' in location['shape']:
+            links = location['shape']['links']
+            if isinstance(links, list):
+                for link in links:
+                    if 'points' in link and isinstance(link['points'], list):
+                        for point in link['points']:
+                            lat = point.get('lat')
+                            lng = point.get('lng')
+                            if lat is not None and lng is not None:
+                                incident_points.append((lat, lng))
         
-        if not matched_edges:
+        if not incident_points:
+            print(f"   [{incident_id}] ❌ No coordinate points extracted")
             return []
         
-        # Extract incident info
+        # TIER 0: Point matching with flow data (if flow_results available)
+        if flow_results:
+            matched_edges = self._try_tier0_point_matching(
+                incident_item, flow_results, incident_points
+            )
+            if matched_edges:
+                return matched_edges  # Success, skip TIER 1
+        
+        # TIER 1: Fréchet distance geometry matching (fallback)
+        matched_edges = self._try_tier1_frechet_matching(
+            incident_item, incident_points
+        )
+        if matched_edges:
+            return matched_edges
+        
+        # No match found in any tier
+        print(f"   [{incident_id}] ❌ No edges matched")
+        return []
+    
+    def batch_match_flow_data(self, flow_results: List[Dict]) -> List[TrafficEdge]:
+        """
+        Match all flow results to edges
+        
+        Args:
+            flow_results: List of flow items from HERE API
+            
+        Returns:
+            List of all matched TrafficEdge objects
+        """
+        all_edges = []
+        matched_count = 0
+        
+        for flow_item in flow_results:
+            edges = self.match_traffic_flow_item(flow_item)
+            if edges:
+                matched_count += 1
+                all_edges.extend(edges)
+        
+        print(f"   ✅ Matched {matched_count}/{len(flow_results)} flow items "
+              f"-> {len(all_edges)} total edges")
+        
+        return all_edges
+        centroid_lat = sum(p[0] for p in incident_points) / len(incident_points)
+        centroid_lng = sum(p[1] for p in incident_points) / len(incident_points)
+        
+        # Helper functions
+        def haversine_distance(lat1, lng1, lat2, lng2):
+            """Calculate distance in meters between two coordinates"""
+            lat1_rad, lng1_rad = radians(lat1), radians(lng1)
+            lat2_rad, lng2_rad = radians(lat2), radians(lng2)
+            dlat = lat2_rad - lat1_rad
+            dlng = lng2_rad - lng1_rad
+            a = sin(dlat/2)**2 + cos(lat1_rad) * cos(lat2_rad) * sin(dlng/2)**2
+            c = 2 * asin(sqrt(a))
+            return 6371000 * c  # Earth radius in meters
+        
+        def distance_to_segment(point_lat, point_lng, seg_lat1, seg_lng1, seg_lat2, seg_lng2):
+            """Calculate perpendicular distance from point to line segment"""
+            px, py = point_lng, point_lat
+            x1, y1 = seg_lng1, seg_lat1
+            x2, y2 = seg_lng2, seg_lat2
+            
+            dx = x2 - x1
+            dy = y2 - y1
+            
+            if dx == 0 and dy == 0:
+                return haversine_distance(point_lat, point_lng, seg_lat1, seg_lng1)
+            
+            t = max(0, min(1, ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy)))
+            closest_x = x1 + t * dx
+            closest_y = y1 + t * dy
+            
+            return haversine_distance(point_lat, point_lng, closest_y, closest_x)
+        
+        def frechet_distance(curve1, curve2):
+            """
+            Calculate Fréchet Distance between two curves (lists of (lat, lng) tuples)
+            Uses dynamic programming approach for discrete Fréchet distance.
+            
+            Fréchet distance = inf over all pairings the max distance between paired points
+            For curve matching: lower distance means curves are more similar in shape
+            
+            Returns distance in meters
+            """
+            n, m = len(curve1), len(curve2)
+            if n == 0 or m == 0:
+                return float('inf')
+            
+            # Initialize memoization table
+            # ca[i][j] = Fréchet distance between curve1[0:i+1] and curve2[0:j+1]
+            ca = {}
+            
+            def compute_frechet(i, j):
+                """Compute frechet distance recursively with memoization"""
+                if (i, j) in ca:
+                    return ca[(i, j)]
+                
+                dist = haversine_distance(curve1[i][0], curve1[i][1], 
+                                        curve2[j][0], curve2[j][1])
+                
+                if i == 0 and j == 0:
+                    result = dist
+                elif i > 0 and j == 0:
+                    result = max(compute_frechet(i-1, 0), dist)
+                elif i == 0 and j > 0:
+                    result = max(compute_frechet(0, j-1), dist)
+                else:
+                    result = max(min(compute_frechet(i-1, j),
+                                   compute_frechet(i, j-1),
+                                   compute_frechet(i-1, j-1)),
+                               dist)
+                
+                ca[(i, j)] = result
+                return result
+            
+            return compute_frechet(n-1, m-1)
+        
+        # STEP 3: Score each edge using Fréchet Distance + proximity metrics
+        edge_scores = []
+        threshold_m = 1000  # Slightly increased for Fréchet-based matching (more permissive)
+        
+        for edge_list in self.hash_to_edges.values():
+            for edge in edge_list:
+                # Create edge curve: edge represented as a line segment
+                edge_curve = [(edge.source_lat, edge.source_lon),
+                             (edge.target_lat, edge.target_lon)]
+                
+                # Calculate Fréchet Distance between incident and edge
+                frechet_dist = frechet_distance(incident_points, edge_curve)
+                
+                # Distance from incident centroid to edge
+                dist_to_source = haversine_distance(
+                    centroid_lat, centroid_lng,
+                    edge.source_lat, edge.source_lon
+                )
+                dist_to_target = haversine_distance(
+                    centroid_lat, centroid_lng,
+                    edge.target_lat, edge.target_lon
+                )
+                dist_to_segment = distance_to_segment(
+                    centroid_lat, centroid_lng,
+                    edge.source_lat, edge.source_lon,
+                    edge.target_lat, edge.target_lon
+                )
+                min_distance = min(dist_to_source, dist_to_target, dist_to_segment)
+                
+                # Geometry overlap: count incident points close to edge
+                overlap_count = 0
+                for inc_lat, inc_lng in incident_points:
+                    dist_to_seg = distance_to_segment(
+                        inc_lat, inc_lng,
+                        edge.source_lat, edge.source_lon,
+                        edge.target_lat, edge.target_lon
+                    )
+                    if dist_to_seg < 250:  # Slightly increased overlap threshold
+                        overlap_count += 1
+                
+                overlap_ratio = overlap_count / len(incident_points) if incident_points else 0
+                
+                # Only consider edges where Fréchet distance is reasonable
+                # (incident geometry roughly aligns with edge direction)
+                if frechet_dist <= threshold_m:
+                    # Combined scoring: Fréchet takes priority, then proximity, then overlap
+                    # Normalize Fréchet distance to 0-1 scale (lower is better)
+                    frechet_score = frechet_dist / threshold_m if threshold_m > 0 else 1.0
+                    
+                    # Combined score prioritizes Fréchet distance
+                    # frechet_score: 0-1 (lower better)
+                    # overlap_ratio bonus: subtract to reward high overlap
+                    score = frechet_score - (overlap_ratio * 0.3)  # Overlap has small weight
+                    
+                    edge_scores.append({
+                        'edge': edge,
+                        'frechet_distance': frechet_dist,
+                        'min_distance': min_distance,
+                        'overlap_ratio': overlap_ratio,
+                        'overlap_count': overlap_count,
+                        'score': score
+                    })
+        
+        if not edge_scores:
+            print(f"   ⚠️  No edges within {threshold_m}m (Fréchet) of incident geometry")
+            return []
+        
+        # STEP 4: Rank and select best edges
+        # Primary sort: Fréchet distance (lower is better)
+        # Secondary: overlap ratio (higher is better)
+        # Tertiary: proximity (lower is better)
+        edge_scores.sort(key=lambda x: (x['frechet_distance'], -x['overlap_ratio'], x['min_distance']))
+        
+        # Select best edge(s) with similar Fréchet distance
+        best_edges = []
+        if edge_scores:
+            best_frechet = edge_scores[0]['frechet_distance']
+            # Accept edges with Fréchet distance within 5% of best
+            frechet_tolerance = best_frechet * 0.05
+            
+            for item in edge_scores:
+                if item['frechet_distance'] <= best_frechet + frechet_tolerance:
+                    best_edges.append(item['edge'])
+                else:
+                    break
+        
+        # Extract INCIDENT DATA from HERE API
         incident_details = incident_item.get('incidentDetails', {})
         
-        # Determine if road is closed
-        is_closed = 'ROAD_CLOSED' in str(incident_details.get('type', ''))
+        incident_id = incident_details.get('id', '')
+        incident_type = incident_details.get('type', '')
+        incident_criticality = incident_details.get('criticality', '')
+        incident_description = incident_details.get('description', {}).get('value', '')
+        incident_road_closed = incident_details.get('roadClosed', False)
+        incident_start_time = incident_details.get('startTime', '')
+        incident_end_time = incident_details.get('endTime', '')
         
-        # Estimate jam factor from criticality
-        criticality = incident_details.get('criticality', 0)
-        jam_factor = min(criticality / 10.0 * 10.0, 10.0)  # Scale to 0-10
+        # Estimate jam factor from criticality for weighting
+        criticality_map = {
+            'critical': 9.0,
+            'severe': 7.0,
+            'major': 5.0,
+            'minor': 2.0
+        }
+        jam_factor = criticality_map.get(incident_criticality.lower(), 0.0) if incident_criticality else 0.0
         
-        # Populate traffic metrics
+        # Set speed based on closure status
+        speed_kph = 0.0 if incident_road_closed else 10.0
+        
+        # Populate INCIDENT data for all matched edges
         result_edges = []
-        for edge in matched_edges:
+        for edge in best_edges:
             traffic_edge = TrafficEdge(
                 traffic_hash=edge.traffic_hash,
                 source=edge.source,
@@ -415,12 +1005,22 @@ class TrafficHashMatcher:
                 source_lon=edge.source_lon,
                 target_lat=edge.target_lat,
                 target_lon=edge.target_lon,
-                speed_kph=0.0 if is_closed else 10.0,  # Low speed for incidents
-                freeFlow_kph=50.0,  # Assume reasonable free flow
+                # Populate INCIDENT fields
+                incident_id=incident_id,
+                incident_type=incident_type,
+                incident_criticality=incident_criticality,
+                incident_description=incident_description,
+                incident_road_closed=incident_road_closed,
+                incident_start_time=incident_start_time,
+                incident_end_time=incident_end_time,
+                # Flow fields remain empty (no flow data in incident-only item)
+                highway_type=edge.highway_type,
+                road_name=edge.road_name,
+                # DEPRECATED: Keep for backward compatibility
+                speed_kph=speed_kph,
+                freeFlow_kph=50.0,
                 jamFactor=jam_factor,
-                isClosed=is_closed,
-                highway_type=edge.highway_type,  # Preserve from loaded edge
-                road_name=edge.road_name  # Preserve from loaded edge
+                isClosed=incident_road_closed
             )
             result_edges.append(traffic_edge)
         
@@ -450,27 +1050,39 @@ class TrafficHashMatcher:
         
         return all_edges
     
-    def batch_match_incident_data(self, incident_results: List[Dict]) -> List[TrafficEdge]:
+    def batch_match_incident_data(self, incident_results: List[Dict], 
+                                  flow_results: List[Dict] = None) -> List[TrafficEdge]:
         """
-        Match all incident results to edges
+        Match all incident results to edges using multi-tier approach:
+        1. Try traffic-data-based matching (if flow_results provided)
+        2. Fall back to Fréchet distance geometric matching
         
         Args:
             incident_results: List of incident items from HERE API
+            flow_results: Optional list of flow items for Tier 1 matching
             
         Returns:
             List of all matched TrafficEdge objects
         """
         all_edges = []
         matched_count = 0
+        tier1_count = 0
         
-        for incident_item in incident_results:
-            edges = self.match_traffic_incident_item(incident_item)
+        for i, incident_item in enumerate(incident_results):
+            edges = self.match_traffic_incident_item(incident_item, flow_results)
             if edges:
                 matched_count += 1
                 all_edges.extend(edges)
+                incident_details = incident_item.get('incidentDetails', {})
+                incident_type = incident_details.get('type', 'unknown')
+                print(f"   ✅ Incident {i+1}: {incident_type} matched to {len(edges)} edge(s)")
+            else:
+                incident_details = incident_item.get('incidentDetails', {})
+                incident_type = incident_details.get('type', 'unknown')
+                print(f"   ❌ Incident {i+1}: {incident_type} - no nearby edges found")
         
-        print(f"   ✅ Matched {matched_count}/{len(incident_results)} incidents "
-              f"-> {len(all_edges)} total edges")
+        print(f"   ✅ Matched {matched_count}/{len(incident_results)} incidents " +
+              f"-> {len(all_edges)} total edge(s)")
         
         return all_edges
     

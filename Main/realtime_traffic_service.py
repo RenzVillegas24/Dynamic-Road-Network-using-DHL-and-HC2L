@@ -113,7 +113,7 @@ class RealtimeTrafficService:
     
     def generate_traffic_data(self, mode: str = 'flow') -> Tuple[pd.DataFrame, Dict]:
         """
-        Fetch and match traffic data
+        Fetch and match traffic data with intelligent merging of flow and incident data
         
         Args:
             mode: 'flow', 'incidents', or 'both'
@@ -125,7 +125,8 @@ class RealtimeTrafficService:
         print(f"Generating Traffic Data - Mode: {mode.upper()}")
         print(f"{'='*70}\n")
         
-        all_edges = []
+        flow_edges = []
+        incident_edges = []
         metadata = {
             'timestamp': datetime.now().isoformat(),
             'mode': mode,
@@ -142,7 +143,6 @@ class RealtimeTrafficService:
             if flow_results:
                 print(f"\n🔍 Matching flow data...")
                 flow_edges = self.matcher.batch_match_flow_data(flow_results)
-                all_edges.extend(flow_edges)
         
         # Fetch and match incident data
         if mode in ['incidents', 'both']:
@@ -151,8 +151,14 @@ class RealtimeTrafficService:
             
             if incident_results:
                 print(f"\n🔍 Matching incident data...")
-                incident_edges = self.matcher.batch_match_incident_data(incident_results)
-                all_edges.extend(incident_edges)
+                # Pass flow_results for Tier 1 (traffic-data) matching if available
+                incident_edges = self.matcher.batch_match_incident_data(incident_results, flow_results)
+        
+        # Merge flow and incident data intelligently
+        if mode == 'both' and flow_edges and incident_edges:
+            all_edges = self._merge_flow_and_incident_edges(flow_edges, incident_edges)
+        else:
+            all_edges = flow_edges + incident_edges
         
         # Convert to DataFrame
         if all_edges:
@@ -164,6 +170,98 @@ class RealtimeTrafficService:
         else:
             print(f"\n⚠️  No traffic data matched")
             return pd.DataFrame(), metadata
+    
+    def _merge_flow_and_incident_edges(self, flow_edges, incident_edges):
+        """
+        Intelligently merge flow and incident edges so that the same road edge
+        can have both flow and incident data in a single row.
+        
+        For each unique (source, target) pair:
+        - If only flow data exists: use flow edge
+        - If only incident data exists: use incident edge
+        - If both exist: merge them into single edge with both flow_* and incident_* fields
+        
+        Args:
+            flow_edges: List of TrafficEdge objects from flow data
+            incident_edges: List of TrafficEdge objects from incident data
+            
+        Returns:
+            List of merged TrafficEdge objects
+        """
+        from traffic_hash_matcher import TrafficEdge
+        
+        # Create dictionaries keyed by (source, target)
+        flow_dict = {}
+        for edge in flow_edges:
+            key = (edge.source, edge.target)
+            # If multiple flow entries for same edge, keep the one with highest jam_factor
+            if key not in flow_dict or edge.flow_jam_factor > flow_dict[key].flow_jam_factor:
+                flow_dict[key] = edge
+        
+        incident_dict = {}
+        for edge in incident_edges:
+            key = (edge.source, edge.target)
+            # If multiple incidents for same edge, keep the most critical one
+            if key not in incident_dict:
+                incident_dict[key] = edge
+            else:
+                # Compare criticality: critical > severe > major > minor
+                criticality_rank = {'critical': 4, 'severe': 3, 'major': 2, 'minor': 1}
+                new_rank = criticality_rank.get(edge.incident_criticality.lower(), 0)
+                existing_rank = criticality_rank.get(incident_dict[key].incident_criticality.lower(), 0)
+                if new_rank > existing_rank:
+                    incident_dict[key] = edge
+        
+        merged_edges = []
+        all_keys = set(flow_dict.keys()) | set(incident_dict.keys())
+        
+        for key in all_keys:
+            flow_edge = flow_dict.get(key)
+            incident_edge = incident_dict.get(key)
+            
+            if flow_edge and incident_edge:
+                # Merge: copy flow data into incident edge (which has empty flow fields)
+                merged_edge = TrafficEdge(
+                    traffic_hash=flow_edge.traffic_hash or incident_edge.traffic_hash,
+                    source=key[0],
+                    target=key[1],
+                    source_lat=flow_edge.source_lat or incident_edge.source_lat,
+                    source_lon=flow_edge.source_lon or incident_edge.source_lon,
+                    target_lat=flow_edge.target_lat or incident_edge.target_lat,
+                    target_lon=flow_edge.target_lon or incident_edge.target_lon,
+                    # Preserve ALL flow data
+                    flow_speed_kph=flow_edge.flow_speed_kph,
+                    flow_free_flow_kph=flow_edge.flow_free_flow_kph,
+                    flow_jam_factor=flow_edge.flow_jam_factor,
+                    flow_confidence=flow_edge.flow_confidence,
+                    flow_traversability=flow_edge.flow_traversability,
+                    # Preserve ALL incident data
+                    incident_id=incident_edge.incident_id,
+                    incident_type=incident_edge.incident_type,
+                    incident_criticality=incident_edge.incident_criticality,
+                    incident_description=incident_edge.incident_description,
+                    incident_road_closed=incident_edge.incident_road_closed,
+                    incident_start_time=incident_edge.incident_start_time,
+                    incident_end_time=incident_edge.incident_end_time,
+                    # Preserve road attributes
+                    highway_type=flow_edge.highway_type or incident_edge.highway_type,
+                    road_name=flow_edge.road_name or incident_edge.road_name,
+                    # Keep deprecated fields
+                    speed_kph=flow_edge.speed_kph,
+                    freeFlow_kph=flow_edge.freeFlow_kph,
+                    jamFactor=flow_edge.jamFactor,
+                    isClosed=incident_edge.isClosed
+                )
+                merged_edges.append(merged_edge)
+            elif flow_edge:
+                merged_edges.append(flow_edge)
+            else:
+                merged_edges.append(incident_edge)
+        
+        print(f"\n   ✅ Merged {len(flow_dict)} flow + {len(incident_dict)} incident edges")
+        print(f"      -> {len(merged_edges)} unique edges with combined flow+incident data")
+        
+        return merged_edges
     
     def save_traffic_csv(self, df: pd.DataFrame, mode: str) -> Path:
         """
@@ -277,11 +375,29 @@ class RealtimeTrafficService:
                 source = int(row['source'])
                 target = int(row['target'])
                 
-                # Extract traffic metrics
-                jam_factor = float(row['jamFactor'])
-                speed_kph = float(row['speed_kph'])
-                free_flow_kph = float(row['freeFlow_kph'])
-                is_closed = bool(row['isClosed'])
+                # Extract traffic metrics - prefer new flow_* fields, fall back to old fields
+                jam_factor = float(row.get('flow_jam_factor', row.get('jamFactor', 0.0)))
+                speed_kph = float(row.get('flow_speed_kph', row.get('speed_kph', 0.0)))
+                free_flow_kph = float(row.get('flow_free_flow_kph', row.get('freeFlow_kph', 0.0)))
+                
+                # Check for incident data
+                incident_road_closed = bool(row.get('incident_road_closed', False))
+                incident_criticality = str(row.get('incident_criticality', '')).lower()
+                
+                # If incident exists, it takes priority for closed status
+                is_closed = incident_road_closed or bool(row.get('isClosed', False))
+                
+                # Boost jam_factor based on incident criticality
+                if incident_criticality:
+                    criticality_boost = {
+                        'critical': 9.0,
+                        'severe': 7.0,
+                        'major': 5.0,
+                        'minor': 2.0
+                    }
+                    incident_jam = criticality_boost.get(incident_criticality, 0.0)
+                    # Use the higher of flow jam_factor or incident jam_factor
+                    jam_factor = max(jam_factor, incident_jam)
                 
                 # Get highway type (from matched edges CSV)
                 highway_type = str(row.get('highway_type', 'unknown')).replace(' ', '_')

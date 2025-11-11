@@ -1,19 +1,27 @@
-CC = g++ -std=c++2a -O3 -Wall -Wextra -pthread -o
-TCC = g++ -std=c++2a -ggdb -Wall -Wextra -o
+CC = g++
+CXXFLAGS = -std=c++2a -O3 -Wall -Wextra -pthread
+DBGCC = g++
+DBGFLAGS = -std=c++2a -ggdb -Wall -Wextra -pthread
 INC = src/road_network.cpp src/util.cpp
 
-all: index query update dhl_routing_api
+# Output build directory (relative to this package)
+BUILD_DIR = ../Main/build
+BIN_DIR = $(BUILD_DIR)/dhl
 
-index:
-	$(CC) index src/index.cpp $(INC)
-query:
-	$(CC) query src/query.cpp $(INC)
-update:
-	$(CC) update src/update.cpp $(INC)
-dhl_routing_api:
-	$(CC) dhl_routing_api src/dhl_routing_api.cpp $(INC)
+.PHONY: all index dhl_routing_api clean
+
+# Only build the artifacts used by setup.sh
+all: $(BIN_DIR)/index $(BIN_DIR)/dhl_routing_api
+
+$(BIN_DIR):
+	@mkdir -p $(BIN_DIR)
+
+$(BIN_DIR)/index: | $(BIN_DIR)
+	$(CC) $(CXXFLAGS) -o $@ src/index.cpp $(INC)
+
+$(BIN_DIR)/dhl_routing_api: | $(BIN_DIR)
+	$(CC) $(CXXFLAGS) -o $@ src/dhl_routing_api.cpp $(INC)
 
 clean:
-	rm -f index query update dhl_routing_api
+	rm -f $(BIN_DIR)/index $(BIN_DIR)/dhl_routing_api
 
-.PHONY: index query update dhl_routing_api

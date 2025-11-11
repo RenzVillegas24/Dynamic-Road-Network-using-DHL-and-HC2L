@@ -367,10 +367,19 @@ function createDisruptionElement(disruption) {
       'Light': { bg: 'from-green-50 to-emerald-50', border: 'border-green-500', icon: 'from-green-400 to-emerald-500', badge: 'bg-green-500', text: 'text-green-700' }
     };
     
-    const colors = severityColors[disruption.severity] || severityColors['Medium'];
+    // Get severity with compatibility layer and map to old format for colors
+    const severity = getDisruptionField(disruption, 'severity');
+    const colors = severityColors[severity] || severityColors['Medium'];
+    
+    // Get other fields with compatibility layer
+    const incidentType = getDisruptionField(disruption, 'incident_type');
+    const speedKph = getDisruptionField(disruption, 'current_speed') || 0;
+    const jamFactor = getDisruptionField(disruption, 'jam_factor') || 0;
+    const roadName = disruption.road_name || 'Unknown Road';
     
     // Calculate delay estimation
-    const delayMinutes = Math.round((1 - disruption.slowdown_ratio) * 15); // Rough estimate
+    const slowdownRatio = disruption.slowdown_ratio || (speedKph > 0 ? speedKph / 50 : 0.5); // rough estimate
+    const delayMinutes = Math.round((1 - slowdownRatio) * 15); // Rough estimate
     
     const disruptionDiv = document.createElement('div');
     disruptionDiv.className = `bg-gradient-to-br ${colors.bg} border-l-4 ${colors.border} rounded-2xl p-4 hover:shadow-lg transition-all duration-300 mb-3`;
@@ -391,18 +400,18 @@ function createDisruptionElement(disruption) {
       <div class="flex items-start">
         <div class="bg-gradient-to-br ${colors.icon} rounded-xl p-3 mr-4 shadow-md">
           <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            ${getIncidentIcon(disruption.incident_type)}
+            ${getIncidentIcon(incidentType)}
           </svg>
         </div>
         <div class="flex-1">
-          <h3 class="font-bold text-slate-900 text-lg mb-1">${disruption.road_name}</h3>
-          <p class="text-sm ${colors.text} font-semibold mb-2">${disruption.incident_type} • ~${delayMinutes} min delay</p>
+          <h3 class="font-bold text-slate-900 text-lg mb-1">${roadName}</h3>
+          <p class="text-sm ${colors.text} font-semibold mb-2">${incidentType} • ~${delayMinutes} min delay</p>
           <div class="flex items-center justify-between">
             <div class="text-xs text-slate-600">
-              <div>Speed: ${disruption.speed_kph.toFixed(1)} km/h (${Math.round(disruption.slowdown_ratio * 100)}% of normal)</div>
-              <div>Jam Factor: ${disruption.jam_factor.toFixed(1)}</div>
+              <div>Speed: ${speedKph.toFixed(1)} km/h (${Math.round(slowdownRatio * 100)}% of normal)</div>
+              <div>Jam Factor: ${jamFactor.toFixed(1)}</div>
             </div>
-            <span class="px-3 py-1 ${colors.badge} text-white rounded-lg text-xs font-bold">${disruption.severity}</span>
+            <span class="px-3 py-1 ${colors.badge} text-white rounded-lg text-xs font-bold">${severity}</span>
           </div>
         </div>
       </div>
@@ -427,13 +436,22 @@ function showDisruptionOnMap(disruption) {
     const centerLat = (disruption.source_lat + disruption.target_lat) / 2;
     const centerLng = (disruption.source_lng + disruption.target_lng) / 2;
     
+    // Get fields with compatibility layer
+    const severity = getDisruptionField(disruption, 'severity');
+    const incidentType = getDisruptionField(disruption, 'incident_type');
+    const roadName = disruption.road_name || 'Unknown Road';
+    
     // Center map on the disruption using Leaflet
     map.setView([centerLat, centerLng], 16);
+    
+    // Map severity to color
+    const severityColor = severity === 'Heavy' ? '#ef4444' : 
+                         severity === 'Medium' ? '#f59e0b' : '#10b981';
     
     // Create a temporary marker to highlight the disruption using Leaflet
     const svgIcon = L.divIcon({
       html: `<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="16" cy="16" r="12" fill="${disruption.severity === 'Heavy' ? '#ef4444' : disruption.severity === 'Medium' ? '#f59e0b' : '#10b981'}" stroke="white" stroke-width="2"/>
+              <circle cx="16" cy="16" r="12" fill="${severityColor}" stroke="white" stroke-width="2"/>
               <text x="16" y="20" text-anchor="middle" fill="white" font-size="12" font-weight="bold">!</text>
             </svg>`,
       className: 'custom-disruption-marker',
@@ -443,7 +461,7 @@ function showDisruptionOnMap(disruption) {
     
     const marker = L.marker([centerLat, centerLng], { 
       icon: svgIcon,
-      title: `${disruption.incident_type} on ${disruption.road_name}`
+      title: `${incidentType} on ${roadName}`
     }).addTo(map);
     
     // Remove marker after 5 seconds
@@ -454,7 +472,7 @@ function showDisruptionOnMap(disruption) {
     // Close disruptions panel to see the map
     disruptionsPanel.classList.add("translate-x-full");
     
-    showUpdateToast(`Showing ${disruption.incident_type} on ${disruption.road_name}`, 'info');
+    showUpdateToast(`Showing ${incidentType} on ${roadName}`, 'info');
 }
   
 function showAllDisruptionsOnMap(disruptionData) {
@@ -472,9 +490,14 @@ function showAllDisruptionsOnMap(disruptionData) {
         const centerLat = (disruption.source_lat + disruption.target_lat) / 2;
         const centerLng = (disruption.source_lng + disruption.target_lng) / 2;
         
+        // Get fields with compatibility layer
+        const severity = getDisruptionField(disruption, 'severity');
+        const incidentType = getDisruptionField(disruption, 'incident_type');
+        const roadName = disruption.road_name || 'Unknown Road';
+        
         // Get color based on severity
-        const markerColor = disruption.severity === 'Heavy' ? '#ef4444' : 
-                           disruption.severity === 'Medium' ? '#f59e0b' : '#10b981';
+        const markerColor = severity === 'Heavy' ? '#ef4444' : 
+                           severity === 'Medium' ? '#f59e0b' : '#10b981';
         
         // Get icon based on incident type
         const getMarkerSymbol = (type) => {
@@ -497,7 +520,7 @@ function showAllDisruptionsOnMap(disruptionData) {
         const svgIcon = L.divIcon({
           html: `<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                   <circle cx="12" cy="12" r="10" fill="${markerColor}" stroke="white" stroke-width="1"/>
-                  <text x="12" y="16" text-anchor="middle" fill="white" font-size="10" font-weight="bold">${getMarkerSymbol(disruption.incident_type)}</text>
+                  <text x="12" y="16" text-anchor="middle" fill="white" font-size="10" font-weight="bold">${getMarkerSymbol(incidentType)}</text>
                 </svg>`,
           className: 'custom-disruption-marker',
           iconSize: [24, 24],
@@ -506,16 +529,19 @@ function showAllDisruptionsOnMap(disruptionData) {
         
         const marker = L.marker([centerLat, centerLng], { 
           icon: svgIcon,
-          title: `${disruption.incident_type} on ${disruption.road_name}`
+          title: `${incidentType} on ${roadName}`
         }).addTo(map);
         
         // Add popup (Leaflet's equivalent of info window)
+        const speedKph = getDisruptionField(disruption, 'current_speed') || 0;
+        const slowdownRatio = disruption.slowdown_ratio || (speedKph > 0 ? speedKph / 50 : 0.5);
+        
         const popupContent = `
           <div class="p-2">
-            <h3 class="font-bold text-sm">${disruption.road_name}</h3>
-            <p class="text-xs text-gray-600">${disruption.incident_type}</p>
-            <p class="text-xs">Severity: <span class="font-semibold" style="color: ${markerColor}">${disruption.severity}</span></p>
-            <p class="text-xs">Speed: ${disruption.speed_kph.toFixed(1)} km/h (${Math.round(disruption.slowdown_ratio * 100)}% of normal)</p>
+            <h3 class="font-bold text-sm">${roadName}</h3>
+            <p class="text-xs text-gray-600">${incidentType}</p>
+            <p class="text-xs">Severity: <span class="font-semibold" style="color: ${markerColor}">${severity}</span></p>
+            <p class="text-xs">Speed: ${speedKph.toFixed(1)} km/h (${Math.round(slowdownRatio * 100)}% of normal)</p>
           </div>
         `;
         marker.bindPopup(popupContent);
