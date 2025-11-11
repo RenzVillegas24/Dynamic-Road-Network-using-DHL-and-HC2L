@@ -2478,6 +2478,109 @@ def compare_with_google_maps():
         })
 
 
+@app.route('/get_google_maps_route', methods=['POST'])
+def get_google_maps_route():
+    """
+    Fetch a Google Maps route for comparison panel
+    
+    This endpoint is specifically for the algorithm comparison panel.
+    It only fetches the Google Maps route without comparison metrics.
+    
+    Frontend sends:
+    - start_lat, start_lng: Origin coordinates
+    - dest_lat, dest_lng: Destination coordinates
+    
+    Returns:
+    - Google Maps route data with coordinates, distance, duration
+    """
+    data = request.json
+    
+    try:
+        # Validate required input parameters
+        start_lat = float(data['start_lat'])
+        start_lng = float(data['start_lng'])
+        dest_lat = float(data['dest_lat'])
+        dest_lng = float(data['dest_lng'])
+        
+        print(f"\n🗺️  === FETCHING GOOGLE MAPS ROUTE ===")
+        print(f"   Route: ({start_lat}, {start_lng}) → ({dest_lat}, {dest_lng})")
+        
+        # Validate Google Maps service is initialized
+        if not gmaps_service:
+            print(f"   ❌ Google Maps service not initialized")
+            return jsonify({
+                'success': False,
+                'error': 'Google Maps service not initialized. Check API key in .env'
+            })
+        
+        # Fetch Google Maps route
+        google_route = gmaps_service.get_directions(start_lat, start_lng, dest_lat, dest_lng)
+        
+        if not google_route or not google_route.get('success'):
+            error_msg = google_route.get('error') if google_route else 'Google Maps API call failed'
+            print(f"   ❌ Error: {error_msg}")
+            return jsonify({
+                'success': False,
+                'error': f"Failed to fetch Google Maps route: {error_msg}"
+            })
+        
+        google_coords = google_route.get('coordinates', [])
+        
+        if not google_coords:
+            print(f"   ❌ Google Maps returned no coordinates")
+            return jsonify({
+                'success': False,
+                'error': 'Google Maps route has no coordinates'
+            })
+        
+        print(f"   ✅ Google Maps route fetched: {len(google_coords)} points")
+        print(f"      Distance: {google_route.get('distance_meters', 'N/A')} meters")
+        print(f"      Duration: {google_route.get('duration_seconds', 'N/A')} seconds")
+        
+        # Build response with route data
+        result = {
+            'success': True,
+            'route': {
+                'coordinates': google_coords,
+                'distance_meters': google_route.get('distance_meters', 0),
+                'duration_seconds': google_route.get('duration_seconds', 0),
+                'point_count': len(google_coords),
+                'summary': google_route.get('summary', ''),
+                'bounds': google_route.get('bounds', {})
+            },
+            'metadata': {
+                'fetch_time': time.time(),
+                'origin': {'lat': start_lat, 'lng': start_lng},
+                'destination': {'lat': dest_lat, 'lng': dest_lng}
+            }
+        }
+        
+        return jsonify(result)
+        
+    except KeyError as e:
+        error_msg = f"Missing required parameter: {str(e)}"
+        print(f"\n❌ {error_msg}")
+        return jsonify({
+            'success': False,
+            'error': error_msg
+        })
+    except ValueError as e:
+        error_msg = f"Invalid parameter value: {str(e)}"
+        print(f"\n❌ {error_msg}")
+        return jsonify({
+            'success': False,
+            'error': error_msg
+        })
+    except Exception as e:
+        import traceback
+        print(f"\n❌ Google Maps route fetch error: {str(e)}")
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': f"Route fetch failed: {str(e)}"
+        })
+
+
 @app.route('/register_active_route', methods=['POST'])
 def register_active_route():
     """Register a route for automatic disruption monitoring"""

@@ -482,9 +482,9 @@
 
               <!-- Primary Compare Button (keeps id) -->
               <div id="current-path-google-compare-btn-container" class="w-full">
-                <button id="current-path-google-compare-btn" onclick="compareWithGoogleMaps()"
+                <button id="current-path-google-compare-btn" onclick="openComparisonPanel()"
                   class="w-full flex glass-effect items-center gap-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold py-3 px-4 rounded-2xl shadow-md transition-all duration-300"
-                  aria-label="Compare current route with Google Maps">
+                  aria-label="Compare route algorithms">
                   <div class="flex-shrink-0 bg-white/10 p-2 rounded-xl">
                     <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"
                       aria-hidden="true">
@@ -495,8 +495,8 @@
                   </div>
 
                   <div class="flex-1 text-left">
-                    <div class="text-sm">Compare with Google Maps</div>
-                    <div class="text-xs text-white/80 font-medium">Assess route similarity & metrics</div>
+                    <div class="text-sm">Compare Route Algorithms</div>
+                    <div class="text-xs text-white/80 font-medium">DHL, HC2L, and Google Maps</div>
                   </div>
                 </button>
               </div>
@@ -752,10 +752,6 @@
             <label class="flex items-center mb-2 cursor-pointer hover:bg-white p-2 rounded transition">
               <input type="radio" name="algorithm" value="dhl" class="mr-3 w-4 h-4 text-blue-600">
               <span class="text-sm font-medium">DHL (Dual-Hierarchy Labeling)</span>
-            </label>
-            <label class="flex items-center mb-2 cursor-pointer hover:bg-white p-2 rounded transition">
-              <input type="radio" name="algorithm" value="both" class="mr-3 w-4 h-4 text-green-600">
-              <span class="text-sm font-medium">Both (Comparison Mode)</span>
             </label>
           </div>
 
@@ -2001,6 +1997,103 @@
 
     <!-- Start Location Search Modal - REMOVED - Using dropdown combobox instead -->
     <!-- Destination Search Modal - REMOVED - Using dropdown combobox instead -->
+
+    <!-- Algorithm Comparison Panel -->
+    <div id="algorithm-comparison-panel"
+      class="fixed top-0 right-0 w-[50rem] h-full glass-effect shadow-2xl transform translate-x-full transition-transform duration-300 z-[70] border-l border-slate-200/50 flex flex-col overflow-hidden">
+      
+      <div class="p-6 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-700 text-white flex justify-between items-center sticky top-0 z-10 flex-shrink-0">
+        <div>
+          <h2 class="font-bold text-2xl mb-1">Algorithm Comparison</h2>
+          <p class="text-blue-100 text-sm">Compare routing algorithms side-by-side</p>
+        </div>
+        <button onclick="closeComparisonPanel()" class="hover:bg-white/20 rounded-xl p-2 transition-all">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div class="p-6 space-y-5 flex-grow overflow-y-auto">
+        
+        <!-- Algorithm Selector -->
+        <div class="bg-white rounded-2xl p-5 border-2 border-slate-200 shadow-sm">
+          <h3 class="font-bold text-slate-800 mb-4 text-lg flex items-center">
+            <svg class="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"></path>
+            </svg>
+            Select Algorithms to Compare
+          </h3>
+          <div class="space-y-3">
+            <label class="flex items-center justify-between p-3 bg-orange-50 hover:bg-orange-100 border-2 border-orange-300 rounded-lg cursor-pointer transition">
+              <div class="flex items-center">
+                <input type="checkbox" id="compare-google" class="mr-3 w-5 h-5 text-orange-600 rounded comparison-checkbox">
+                <span class="font-semibold text-slate-900">Google Maps</span>
+              </div>
+              <div class="w-4 h-4 rounded-full bg-orange-500"></div>
+            </label>
+            <label class="flex items-center justify-between p-3 bg-purple-50 hover:bg-purple-100 border-2 border-purple-300 rounded-lg cursor-pointer transition">
+              <div class="flex items-center">
+                <input type="checkbox" id="compare-dhl" class="mr-3 w-5 h-5 text-purple-600 rounded comparison-checkbox" checked>
+                <span class="font-semibold text-slate-900">DHL (Dual-Hierarchy Labeling)</span>
+              </div>
+              <div class="w-4 h-4 rounded-full bg-purple-600"></div>
+            </label>
+            <label class="flex items-center justify-between p-3 bg-blue-50 hover:bg-blue-100 border-2 border-blue-300 rounded-lg cursor-pointer transition">
+              <div class="flex items-center">
+                <input type="checkbox" id="compare-hc2l" class="mr-3 w-5 h-5 text-blue-600 rounded comparison-checkbox" checked>
+                <span class="font-semibold text-slate-900">HC2L (Hierarchical Cut 2-Hop)</span>
+              </div>
+              <div class="w-4 h-4 rounded-full bg-blue-500"></div>
+            </label>
+          </div>
+          <button onclick="runComparison()" class="w-full mt-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-3 rounded-xl shadow-md transition-all">
+            Run Comparison
+          </button>
+        </div>
+
+        <!-- Metrics Comparison Table -->
+        <div id="comparison-metrics-container" class="hidden">
+          <div class="bg-white rounded-2xl p-5 border-2 border-slate-200 shadow-sm">
+            <h3 class="font-bold text-slate-800 mb-4 text-lg flex items-center">
+              <svg class="w-5 h-5 text-indigo-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+              </svg>
+              Performance Comparison
+            </h3>
+            <div id="comparison-metrics-table" class="overflow-x-auto">
+              <!-- Comparison table will be inserted here -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Route Details Expandable Sections -->
+        <div id="comparison-route-details" class="hidden space-y-3">
+          <!-- Route details cards will be inserted here -->
+        </div>
+
+        <!-- Color Legend -->
+        <div class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-4 border border-slate-300">
+          <h4 class="font-bold text-slate-700 text-sm mb-3 uppercase">Color Legend</h4>
+          <div class="grid grid-cols-3 gap-3">
+            <div class="flex items-center gap-2">
+              <div class="w-4 h-4 rounded-full bg-orange-500"></div>
+              <span class="text-xs font-medium">Google Maps</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <div class="w-4 h-4 rounded-full bg-purple-600"></div>
+              <span class="text-xs font-medium">DHL</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <div class="w-4 h-4 rounded-full bg-blue-500"></div>
+              <span class="text-xs font-medium">HC2L</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
   </div>
 
 
@@ -2016,6 +2109,7 @@
   <script src="{{ url_for('static', filename='js/location-combobox.js') }}"></script>
   <script src="{{ url_for('static', filename='js/auto-route-updater.js') }}"></script>
   <script src="{{ url_for('static', filename='js/google-maps-comparison.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/algorithm-comparison.js') }}"></script>
   <script src="{{ url_for('static', filename='js/update-regions.js') }}"></script>
   <script src="{{ url_for('static', filename='js/map-legend.js') }}"></script>
   <script src="{{ url_for('static', filename='js/csv-export.js') }}"></script>
@@ -3351,33 +3445,6 @@
             updateMetricsDisplay(dhlResult.metrics);
           }
           return dhlResult;
-          
-        } else if (selections.algorithm === 'both') {
-          // Both algorithms - comparison mode
-          showUpdateToast('Computing comparison routes...', 'info');
-          
-          // Compute both routes in parallel
-          const [hc2lResult, dhlResult] = await Promise.all([
-            computeDHC2LRoute(useDisruptions, selections.threshold, isPreview),
-            computeDHLRoute(useDisruptions, isPreview)
-          ]);
-          
-          // Display both routes
-          if (hc2lResult && hc2lResult.success) {
-            displayDHC2LRoute(hc2lResult);
-          }
-          
-          if (dhlResult && dhlResult.success) {
-            displayDHLRoute(dhlResult);
-          }
-          
-          // Show comparison metrics
-          if (hc2lResult && dhlResult && hc2lResult.success && dhlResult.success) {
-            showComparisonMetrics(hc2lResult.metrics, dhlResult.metrics);
-            showUpdateToast('Comparison routes computed successfully', 'success');
-          }
-          
-          return { hc2l: hc2lResult, dhl: dhlResult };
         }
       } catch (error) {
         console.error('Error computing route:', error);

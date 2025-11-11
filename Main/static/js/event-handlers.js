@@ -135,39 +135,6 @@ function initializeEventHandlers() {
           if (routeData) displayDHC2LRoute(routeData);
           break;
           
-        case 'both':
-          // Both algorithms - comparison mode
-          if (useDisruptions) {
-            // await loadActiveDisruptionsForAlgorithm('Algorithm Comparison');
-          } else {
-            clearDisruptionMarkers();
-          }
-          showUpdateToast('Computing comparison routes...', 'info');
-          
-          // Compute both routes in parallel with isPreview=false (confirmations with alternatives)
-          const [hc2lResult, dhlResult] = await Promise.all([
-            computeDHC2LRoute(useDisruptions, currentThreshold, false),
-            computeDHLRoute(useDisruptions, false)
-          ]);
-          
-          // Display both routes
-          if (hc2lResult && hc2lResult.success) {
-            displayDHC2LRoute(hc2lResult);
-          }
-          
-          if (dhlResult && dhlResult.success) {
-            displayDHLRoute(dhlResult);
-          }
-          
-          // Show comparison metrics
-          if (hc2lResult && dhlResult && hc2lResult.success && dhlResult.success) {
-            showComparisonMetrics(hc2lResult.metrics, dhlResult.metrics);
-            showUpdateToast('Comparison routes computed successfully', 'success');
-          }
-          
-          routeData = { hc2l: hc2lResult, dhl: dhlResult };
-          break;
-          
         default:
           console.warn('Unknown algorithm selected:', selectedAlgorithm);
           // Fallback to HC2L with isPreview=false (confirmation with alternatives)
