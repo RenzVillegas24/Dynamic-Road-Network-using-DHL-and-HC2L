@@ -470,6 +470,27 @@ window.populateRouteMetricsPanel = function(routeData) {
   console.log('✅ Route Metrics Panel populated successfully with all fields');
 };
 
+const FLOW_STATUS_ORDER = ['blocked', 'heavy', 'moderate', 'light'];
+
+function normalizeFlowStatus(status) {
+  if (!status) return 'light';
+  const normalized = status.toString().toLowerCase();
+  if (normalized.includes('block') || normalized.includes('closed') || normalized === 'road_closed') {
+    return 'blocked';
+  }
+  if (normalized === 'high') return 'heavy';
+  if (normalized === 'medium') return 'moderate';
+  if (normalized === 'free_flow') return 'light';
+  if (FLOW_STATUS_ORDER.includes(normalized)) return normalized;
+  return 'light';
+}
+
+function hasFlowCoverage(segment) {
+  if (!segment) return false;
+  const status = (segment.flow?.status || segment.flow_status || '').toString().toLowerCase();
+  return status !== '' && status !== 'default';
+}
+
 /**
  * Populate the Disruption Analysis Panel (disruption-specific data)
  * Shows: disruptions_summary.route.*, disruptions_summary.network.*, all_disruptions list
@@ -581,81 +602,82 @@ window.populateDisruptionsPanel = function(routeData) {
   }
   
   // Traffic Flow Status Breakdown (instead of Severity Breakdown)
-  const flowStatuses = {
-    'free_flow': 0,
-    'light': 0,
-    'moderate': 0,
-    'heavy': 0,
-    'blocked': 0,
-    'default': 0
-  };
+  const flowStatusCounts = FLOW_STATUS_ORDER.reduce((acc, status) => {
+    acc[status] = 0;
+    return acc;
+  }, {});
   
   const flowBreakdown = routeDisruptions.flow_status_breakdown ||
                         routeDisruptions.flow_statuses ||
                         routeDisruptions.flow_breakdown;
+  let hasAggregateFlow = false;
   if (flowBreakdown) {
-    Object.keys(flowStatuses).forEach(status => {
-      if (typeof flowBreakdown[status] === 'number') {
-        flowStatuses[status] = flowBreakdown[status];
+    Object.keys(flowBreakdown).forEach(statusKey => {
+      const normalized = normalizeFlowStatus(statusKey);
+      if (flowStatusCounts.hasOwnProperty(normalized)) {
+        const value = Number(flowBreakdown[statusKey]) || 0;
+        if (value > 0) hasAggregateFlow = true;
+        flowStatusCounts[normalized] += value;
       }
     });
   }
   
-  const hasAggregateFlow = Object.values(flowStatuses).some(count => count > 0);
   if (!hasAggregateFlow && allDisruptions.length > 0) {
     allDisruptions.forEach(disruption => {
-      const statusRaw = (getDisruptionField(disruption, 'flow_status') || 'default').toLowerCase();
-      const status = flowStatuses.hasOwnProperty(statusRaw) ? statusRaw : 'default';
-      flowStatuses[status]++;
+      const rawStatus = (getDisruptionField(disruption, 'flow_status') || '').toLowerCase();
+      const normalized = normalizeFlowStatus(rawStatus);
+      flowStatusCounts[normalized]++;
     });
   }
   
-  const totalFlowSamples = Object.values(flowStatuses).reduce((sum, count) => sum + count, 0) || resolvedRouteDisruptionTotal;
-  
-  // Update counts and percentages
+  const totalFlowSamples = FLOW_STATUS_ORDER.reduce((sum, status) => sum + flowStatusCounts[status], 0);
+
   const flowStatusElements = {
-    'free_flow': { count: 'flow-free-count', percent: 'flow-free-percent', bar: 'flow-free-bar' },
-    'light': { count: 'flow-light-count', percent: 'flow-light-percent', bar: 'flow-light-bar' },
-    'moderate': { count: 'flow-moderate-count', percent: 'flow-moderate-percent', bar: 'flow-moderate-bar' },
+    'blocked': { count: 'flow-blocked-count', percent: 'flow-blocked-percent', bar: 'flow-blocked-bar' },
     'heavy': { count: 'flow-heavy-count', percent: 'flow-heavy-percent', bar: 'flow-heavy-bar' },
-    'blocked': { count: 'flow-blocked-count', percent: 'flow-blocked-percent', bar: 'flow-blocked-bar' }
+    'moderate': { count: 'flow-moderate-count', percent: 'flow-moderate-percent', bar: 'flow-moderate-bar' },
+    'light': { count: 'flow-light-count', percent: 'flow-light-percent', bar: 'flow-light-bar' }
   };
-  
-  if (totalFlowSamples > 0) {
-    Object.keys(flowStatusElements).forEach(status => {
-      const count = flowStatuses[status] || 0;
-      const percent = totalFlowSamples > 0 ? ((count / totalFlowSamples) * 100).toFixed(0) : '0';
-      
-      const countEl = document.getElementById(flowStatusElements[status].count);
-      const percentEl = document.getElementById(flowStatusElements[status].percent);
-      const barEl = document.getElementById(flowStatusElements[status].bar);
-      
-      if (countEl) countEl.textContent = count;
-      if (percentEl) percentEl.textContent = `${percent}%`;
-      if (barEl) barEl.style.width = `${percent}%`;
-    });
-  } else {
-    Object.keys(flowStatusElements).forEach(status => {
-      const countEl = document.getElementById(flowStatusElements[status].count);
-      const percentEl = document.getElementById(flowStatusElements[status].percent);
-      const barEl = document.getElementById(flowStatusElements[status].bar);
-      
-      if (countEl) countEl.textContent = '0';
-      if (percentEl) percentEl.textContent = '0%';
-      if (barEl) barEl.style.width = '0%';
-    });
-  }
-  
+
+  FLOW_STATUS_ORDER.forEach(status => {
+    const count = flowStatusCounts[status] || 0;
+    const percent = totalFlowSamples > 0 ? ((count / totalFlowSamples) * 100).toFixed(0) : '0';
+    const elements = flowStatusElements[status] || {};
+    const countEl = document.getElementById(elements.count);
+    const percentEl = document.getElementById(elements.percent);
+    const barEl = document.getElementById(elements.bar);
+    
+    if (countEl) countEl.textContent = count;
+    if (percentEl) percentEl.textContent = `${percent}%`;
+    if (barEl) barEl.style.width = `${percent}%`;
+  });
+
   // Network Statistics
   const networkTotalEl = document.getElementById('network-total-disruptions');
   if (networkTotalEl) {
     networkTotalEl.textContent = networkDisruptions.total_incidents || '--';
   }
-  
+
+  const routeGeometry = Array.isArray(routeData.route?.geometry)
+    ? routeData.route.geometry
+    : Array.isArray(routeData.route?.polylines)
+      ? routeData.route.polylines
+      : [];
+  const routeSegmentCount = routeGeometry.length;
+  const coveredSegments = routeGeometry.filter(segment => hasFlowCoverage(segment)).length;
+  const coveragePercent = routeSegmentCount > 0
+    ? Math.min(100, Math.round((coveredSegments / routeSegmentCount) * 100))
+    : 0;
+
   const networkCoverageEl = document.getElementById('network-coverage');
   if (networkCoverageEl) {
-    // Placeholder - coverage area not in current C++ output
-    networkCoverageEl.textContent = '--';
+    if (routeSegmentCount > 0) {
+      networkCoverageEl.textContent = `${coveragePercent}%`;
+      networkCoverageEl.title = `${coveredSegments} of ${routeSegmentCount} segments have flow data`;
+    } else {
+      networkCoverageEl.textContent = '--';
+      networkCoverageEl.title = 'Coverage data pending';
+    }
   }
   
   // Algorithm Performance Details
@@ -680,18 +702,31 @@ window.populateDisruptionsPanel = function(routeData) {
   const topDisruptionsCount = document.getElementById('top-disruptions-count');
   
   if (topDisruptionsList && allDisruptions.length > 0) {
-    const flowOnlyCount = allDisruptions.filter(d => {
-      const status = (getDisruptionField(d, 'flow_status') || '').toLowerCase();
-      return status && status !== 'default';
-    }).length;
-    const incidentCount = allDisruptions.filter(d => {
-      const incidentType = getDisruptionField(d, 'incident_type');
-      const roadClosed = getDisruptionField(d, 'road_closed');
-      return Boolean(incidentType) || roadClosed === true;
-    }).length;
-    
+    const summaryCounts = { flow: 0, incident: 0 };
+    allDisruptions.forEach(disruption => {
+      const incidentType = getDisruptionField(disruption, 'incident_type');
+      const roadClosed = getDisruptionField(disruption, 'road_closed');
+      const hasIncident = Boolean(incidentType) || roadClosed === true;
+      const rawFlowStatus = (getDisruptionField(disruption, 'flow_status') || '').toLowerCase();
+      const hasFlow = rawFlowStatus && rawFlowStatus !== 'default';
+      
+      if (hasIncident) {
+        summaryCounts.incident++;
+      } else if (hasFlow) {
+        summaryCounts.flow++;
+      }
+    });
+
     if (topDisruptionsCount) {
-      topDisruptionsCount.textContent = `${allDisruptions.length} disruptions (${flowOnlyCount} flow • ${incidentCount} incident)`;
+      const summaryParts = [];
+      if (summaryCounts.flow) {
+        summaryParts.push(`${summaryCounts.flow} flow${summaryCounts.flow !== 1 ? 's' : ''}`);
+      }
+      if (summaryCounts.incident) {
+        summaryParts.push(`${summaryCounts.incident} incident${summaryCounts.incident !== 1 ? 's' : ''}`);
+      }
+      const summaryText = summaryParts.length > 0 ? ` (${summaryParts.join(' • ')})` : '';
+      topDisruptionsCount.textContent = `${allDisruptions.length} disruptions${summaryText}`;
     }
     
     // Clear existing list
@@ -719,13 +754,14 @@ window.populateDisruptionsPanel = function(routeData) {
       const disruption = sortedDisruptions[i];
       
       // Determine flow status color with both Tailwind classes and inline styles
+      const rawStatus = (getDisruptionField(disruption, 'flow_status') || '').toLowerCase();
+      const flowStatus = normalizeFlowStatus(rawStatus);
       let flowColor = 'slate';
       let flowBgClass = 'bg-slate-50';
       let flowBorderClass = 'border-slate-200';
       let flowIconColor = '#64748b'; // slate-500
       let flowTextColor = '#1e293b'; // slate-900
       let flowIcon = '◑';
-      const flowStatus = disruption.flow_status || 'default';
       
       if (flowStatus === 'blocked') {
         flowColor = 'red';
@@ -755,13 +791,6 @@ window.populateDisruptionsPanel = function(routeData) {
         flowIconColor = '#16a34a'; // green-600
         flowTextColor = '#15803d'; // green-900
         flowIcon = '🟢';
-      } else if (flowStatus === 'free_flow') {
-        flowColor = 'blue';
-        flowBgClass = 'bg-blue-50';
-        flowBorderClass = 'border-blue-500';
-        flowIconColor = '#2563eb'; // blue-600
-        flowTextColor = '#1e40af'; // blue-900
-        flowIcon = '✓';
       }
       
       const disruptionCard = document.createElement('div');
@@ -770,7 +799,7 @@ window.populateDisruptionsPanel = function(routeData) {
       
       // Get road name or use fallback
       const roadName = disruption.road_name || 'Unknown Road';
-      const flowStatusDisplay = flowStatus.replace(/_/g, ' ').toUpperCase();
+  const flowStatusDisplay = flowStatus.replace(/_/g, ' ').toUpperCase();
       const disruptionType = getDisruptionField(disruption, 'type') || 'Unknown';
       const currentSpeed = getDisruptionField(disruption, 'current_speed');
       const jamFactor = getDisruptionField(disruption, 'jam_factor');

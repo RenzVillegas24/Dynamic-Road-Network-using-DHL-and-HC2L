@@ -255,17 +255,10 @@ function initializeEventHandlers() {
     const currentPathClose = document.getElementById("current-path-close");
     if (currentPathClose) {
         currentPathClose.onclick = () => {
-            // Hide the panel using translate
-            currentPathPanel.classList.add("translate-x-full");
+      closeCurrentPathPanel();
             
-            // Reset map container to full width
-            const mapContainer = document.getElementById("map-container");
-            if (mapContainer) {
-                mapContainer.style.marginRight = "0";
-            }
-            
-            // Reset the route and snap points
-            clearRoutes();
+      // Reset the route and snap points
+      clearRoutes();
             
             // Reset snap points visualization
             if (window.startSnapMarker) {
@@ -294,14 +287,7 @@ function initializeEventHandlers() {
                 clearGoogleMapsComparison();
             }
             
-            // Trigger map resize to adjust to full container
-            if (map) {
-                setTimeout(() => {
-                    map.invalidateSize();
-                }, 350); // Wait for transition to complete
-            }
-            
-            console.log('✅ Route and snap points cleared, map resized');
+      console.log('✅ Route and snap points cleared, map resized');
         };
     }
   
@@ -383,6 +369,8 @@ function initializeEventHandlers() {
                     map.invalidateSize();
                 }, 350);
             }
+
+      refreshUserDisruptionsUI();
         };
     }
   
@@ -393,7 +381,142 @@ function initializeEventHandlers() {
         };
     }
   
-    const reportForm = document.getElementById('report-form');
+  async function fetchUserDisruptionsList() {
+    try {
+      const response = await fetch('/user_disruptions');
+      if (!response.ok) {
+        throw new Error('Failed to load custom incidents');
+      }
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error(data.error || 'Unable to load custom incidents');
+      }
+      return data.disruptions || [];
+    } catch (error) {
+      console.error('Error fetching user disruptions:', error);
+      showUpdateToast(error.message, 'warning');
+      return [];
+    }
+  }
+
+  async function refreshActiveDisruptionsOnMapSilently() {
+    try {
+      const response = await fetch('/get_active_disruptions');
+      const data = await response.json();
+      if (data.success && typeof showAllDisruptionsOnMap === 'function') {
+        showAllDisruptionsOnMap(data);
+      }
+    } catch (error) {
+      console.error('Error refreshing disruption markers:', error);
+    }
+  }
+
+  async function refreshUserDisruptionsUI(showToast = false) {
+    const listElement = document.getElementById('user-disruptions-list');
+    const emptyElement = document.getElementById('user-disruptions-empty');
+    if (!listElement || !emptyElement) return;
+
+    const disruptions = await fetchUserDisruptionsList();
+    listElement.innerHTML = '';
+
+    if (!disruptions.length) {
+      emptyElement.classList.remove('hidden');
+      if (showToast) {
+        showUpdateToast('No custom incidents to display', 'info');
+      }
+      return;
+    }
+
+    emptyElement.classList.add('hidden');
+
+    disruptions.forEach((disruption) => {
+      const card = document.createElement('div');
+      card.className = 'bg-white border border-purple-100 rounded-2xl p-4 shadow-sm hover:shadow-md transition';
+      const severityBadge = disruption.severity || 'Custom';
+      const roadName = disruption.road_name || 'Pinned Location';
+      const incidentType = disruption.incident_type || 'User Incident';
+      const speed = typeof disruption.speed_kph === 'number' ? `${disruption.speed_kph.toFixed(1)} km/h` : '--';
+      const jamFactor = typeof disruption.jam_factor === 'number' ? disruption.jam_factor.toFixed(1) : '--';
+      const timestamp = disruption.timestamp ? new Date(disruption.timestamp).toLocaleString() : 'Just now';
+
+      card.innerHTML = `
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <p class="text-xs font-semibold text-purple-500 uppercase tracking-wide">${incidentType}</p>
+            <h4 class="font-bold text-slate-900 text-base">${roadName}</h4>
+            <p class="text-xs text-slate-500">${timestamp}</p>
+          </div>
+          <span class="text-xs font-bold px-2 py-1 rounded-full bg-purple-100 text-purple-700">${severityBadge}</span>
+        </div>
+        <div class="grid grid-cols-2 gap-3 mt-3 text-xs text-slate-600">
+          <div>
+            <p class="font-semibold text-slate-800">Speed</p>
+            <p>${speed}</p>
+          </div>
+          <div>
+            <p class="font-semibold text-slate-800">Jam Factor</p>
+            <p>${jamFactor}</p>
+          </div>
+        </div>
+        <button type="button" class="mt-4 w-full bg-red-50 hover:bg-red-100 text-red-700 font-semibold text-sm py-2 rounded-xl transition delete-user-disruption" data-report-id="${disruption.report_id}">
+          Remove Incident
+        </button>
+      `;
+
+      const removeButton = card.querySelector('.delete-user-disruption');
+      if (removeButton) {
+        removeButton.onclick = () => handleRemoveUserDisruption(disruption.report_id, removeButton);
+      }
+
+      listElement.appendChild(card);
+    });
+
+    if (showToast) {
+      showUpdateToast(`Loaded ${disruptions.length} custom incident${disruptions.length === 1 ? '' : 's'}`, 'success');
+    }
+  }
+
+  async function handleRemoveUserDisruption(reportId, buttonElement) {
+    if (!reportId) return;
+    if (buttonElement) {
+      buttonElement.disabled = true;
+      buttonElement.textContent = 'Removing...';
+    }
+    try {
+      const response = await fetch(`/user_disruptions/${reportId}`, { method: 'DELETE' });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to remove incident');
+      }
+      showUpdateToast('Custom incident removed', 'success');
+      if (Array.isArray(window.disruptionMarkers)) {
+        window.disruptionMarkers = window.disruptionMarkers.filter((marker) => {
+          const shouldRemove = marker?.reportId === reportId;
+          if (shouldRemove && map && typeof map.removeLayer === 'function') {
+            map.removeLayer(marker);
+          }
+          return !shouldRemove;
+        });
+      }
+      await refreshUserDisruptionsUI();
+      await refreshActiveDisruptionsOnMapSilently();
+    } catch (error) {
+      console.error('Error removing user disruption:', error);
+      showUpdateToast(error.message || 'Unable to remove incident', 'warning');
+    } finally {
+      if (buttonElement) {
+        buttonElement.disabled = false;
+        buttonElement.textContent = 'Remove Incident';
+      }
+    }
+  }
+
+  const refreshUserDisruptionsBtn = document.getElementById('refresh-user-disruptions');
+  if (refreshUserDisruptionsBtn) {
+    refreshUserDisruptionsBtn.onclick = () => refreshUserDisruptionsUI(true);
+  }
+
+  const reportForm = document.getElementById('report-form');
     if (reportForm) {
         reportForm.onsubmit = async (e) => {
     e.preventDefault();
@@ -461,6 +584,9 @@ function initializeEventHandlers() {
         const data = await response.json();
         if (data.success) {
             showUpdateToast(data.message || 'Disruption reported successfully!', 'success');
+
+            await refreshUserDisruptionsUI();
+            await refreshActiveDisruptionsOnMapSilently();
             
             // Add incident marker to the map immediately
             if (map && typeof L !== 'undefined') {
@@ -485,6 +611,8 @@ function initializeEventHandlers() {
                 icon: incidentIcon,
                 title: `${incidentType} (${severity}) - Just reported`
               }).addTo(map);
+              incidentMarker.reportId = data.report_id;
+              incidentMarker._isUserReported = true;
               
               // Add popup with info
               const popupContent = `

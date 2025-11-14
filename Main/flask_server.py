@@ -7,6 +7,8 @@ import atexit
 import logging
 from collections import deque
 from datetime import datetime
+import csv
+import uuid
 
 # Import configuration
 from config import Config
@@ -118,6 +120,152 @@ auto_service = init_auto_disruption_service(app, update_interval=60)
 
 # Shutdown service on exit
 atexit.register(shutdown_auto_disruption_service)
+
+# ============================================================================
+# USER-REPORTED DISRUPTIONS HELPERS
+# ============================================================================
+
+USER_DISRUPTION_FIELDNAMES = [
+    'report_id',
+    'timestamp',
+    'source',
+    'target',
+    'lat',
+    'lng',
+    'snapped_lat',
+    'snapped_lng',
+    'road_name',
+    'incident_type',
+    'severity',
+    'speed_kph',
+    'freeFlow_kph',
+    'jamFactor',
+    'isClosed',
+    'description'
+]
+
+
+def get_user_disruptions_file() -> Path:
+    return Config.DISRUPTIONS_DIR / 'user_reported_disruptions.csv'
+
+
+def ensure_user_disruption_fieldnames(fieldnames=None):
+    """Ensure the CSV fieldnames include all required columns."""
+    if not fieldnames:
+        return list(USER_DISRUPTION_FIELDNAMES)
+    updated = list(fieldnames)
+    for field in USER_DISRUPTION_FIELDNAMES:
+        if field not in updated:
+            updated.append(field)
+    return updated
+
+
+def normalize_incident_type(raw_type: str) -> str:
+    if not raw_type:
+        return 'User Incident'
+    label = str(raw_type).replace('-', ' ').replace('_', ' ').strip()
+    if not label:
+        return 'User Incident'
+    return label.title()
+
+
+def normalize_severity(raw_severity: str) -> str:
+    mapping = {
+        'heavy': 'Heavy',
+        'medium': 'Medium',
+        'moderate': 'Medium',
+        'light': 'Light',
+        'minor': 'Light'
+    }
+    if not raw_severity:
+        return 'Medium'
+    return mapping.get(str(raw_severity).lower(), 'Medium')
+
+
+def load_user_disruption_rows() -> list:
+    """Load (and self-heal) user-reported disruptions from CSV."""
+    file_path = get_user_disruptions_file()
+    if not file_path.exists():
+        return []
+
+    with open(file_path, newline='') as csvfile:
+        reader = csv.DictReader(csvfile)
+        fieldnames = ensure_user_disruption_fieldnames(reader.fieldnames)
+        rows = list(reader)
+
+    updated = False
+    for row in rows:
+        if not row.get('report_id'):
+            row['report_id'] = str(uuid.uuid4())
+            updated = True
+
+    if updated:
+        with open(file_path, 'w', newline='') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(rows)
+
+    return rows
+
+
+def format_user_disruption_row(row: dict) -> dict:
+    """Convert a CSV row into the disruption structure used on the map."""
+    def to_float(value, default=0.0):
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return default
+
+    def to_int(value, default=0):
+        try:
+            return int(float(value))
+        except (TypeError, ValueError):
+            return default
+
+    lat = to_float(row.get('snapped_lat') or row.get('lat'))
+    lng = to_float(row.get('snapped_lng') or row.get('lng'))
+    severity = normalize_severity(row.get('severity'))
+    speed_kph = to_float(row.get('speed_kph'), 0.0)
+    free_flow_kph = to_float(row.get('freeFlow_kph'), 50.0)
+    jam_factor = to_float(row.get('jamFactor'), 0.0)
+    slowdown_ratio = 0.0
+    if free_flow_kph > 0:
+        slowdown_ratio = max(0.0, min(1.0, speed_kph / free_flow_kph))
+
+    source_lat = to_float(row.get('source_lat'), lat)
+    source_lng = to_float(row.get('source_lon'), lng)
+    target_lat = to_float(row.get('target_lat'), lat)
+    target_lng = to_float(row.get('target_lon'), lng)
+
+    report_id = row.get('report_id') or f"legacy-{row.get('timestamp', '')}-{row.get('source', '')}-{row.get('target', '')}"
+
+    return {
+        'source_id': to_int(row.get('source')),
+        'target_id': to_int(row.get('target')),
+        'source_lat': source_lat or lat,
+        'source_lng': source_lng or lng,
+        'target_lat': target_lat or lat,
+        'target_lng': target_lng or lng,
+        'road_name': row.get('road_name') or 'User Reported Location',
+        'incident_type': normalize_incident_type(row.get('incident_type')),
+        'severity': severity,
+        'speed_kph': speed_kph,
+        'free_flow_kph': free_flow_kph,
+        'jam_factor': jam_factor,
+        'is_closed': str(row.get('isClosed', '0')) in ('1', 'true', 'True'),
+        'slowdown_ratio': slowdown_ratio,
+        'criticality': severity.lower(),
+        'here_type': 'user_report',
+        'description': row.get('description', ''),
+        'report_id': report_id,
+        'timestamp': row.get('timestamp'),
+        'is_user_reported': True
+    }
+
+
+def get_user_disruptions_for_api() -> list:
+    rows = load_user_disruption_rows()
+    return [format_user_disruption_row(row) for row in rows]
 
 # ============================================================
 # GLOBAL CACHES - Prevent reloading data on every request
@@ -490,9 +638,6 @@ def report_disruption():
     - Saving to disruptions CSV for route calculation
     - OSM snapping for accurate road matching
     """
-    import csv
-    from datetime import datetime
-    
     data = request.json
     print(f"📝 Received disruption report: {data}")
     
@@ -552,47 +697,41 @@ def report_disruption():
         print(f"✅ Mapped to road: {road_name} (Edge: {source_id}→{target_id})")
         print(f"   Custom flow: {custom_speed} km/h, Jam Factor: {jam_factor}, Closed: {is_closed}")
         
-        # Save to user disruptions CSV file
-        user_disruptions_file = Config.DISRUPTIONS_DIR / 'user_reported_disruptions.csv'
-        
-        # Check if file exists to write header
+        report_id = str(uuid.uuid4())
+        user_disruptions_file = get_user_disruptions_file()
         file_exists = user_disruptions_file.exists()
-        
+
+        row_payload = {
+            'report_id': report_id,
+            'timestamp': datetime.now().isoformat(),
+            'source': source_id,
+            'target': target_id,
+            'lat': lat,
+            'lng': lng,
+            'snapped_lat': snapped_lat,
+            'snapped_lng': snapped_lng,
+            'road_name': road_name,
+            'incident_type': incident_type,
+            'severity': severity,
+            'speed_kph': custom_speed,
+            'freeFlow_kph': free_flow_speed,
+            'jamFactor': jam_factor,
+            'isClosed': 1 if is_closed else 0,
+            'description': description
+        }
+        fieldnames = ensure_user_disruption_fieldnames()
         with open(user_disruptions_file, 'a', newline='') as csvfile:
-            fieldnames = [
-                'timestamp', 'source', 'target', 'lat', 'lng',
-                'snapped_lat', 'snapped_lng', 
-                'road_name', 'incident_type', 'severity',
-                'speed_kph', 'freeFlow_kph', 'jamFactor', 'isClosed',
-                'description'
-            ]
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            
             if not file_exists:
                 writer.writeheader()
-            
-            writer.writerow({
-                'timestamp': datetime.now().isoformat(),
-                'source': source_id,
-                'target': target_id,
-                'lat': lat,
-                'lng': lng,
-                'snapped_lat': snapped_lat,
-                'snapped_lng': snapped_lng,
-                'road_name': road_name,
-                'incident_type': incident_type,
-                'severity': severity,
-                'speed_kph': custom_speed,
-                'freeFlow_kph': free_flow_speed,
-                'jamFactor': jam_factor,
-                'isClosed': 1 if is_closed else 0,
-                'description': description
-            })
+            writer.writerow(row_payload)
         
         print(f"💾 Saved user disruption to: {user_disruptions_file.name}")
         
         # IMPORTANT: Merge user disruptions with existing traffic data
         merge_user_disruptions_with_traffic()
+
+        user_disruption = format_user_disruption_row(row_payload)
         
         return jsonify({
             'success': True,
@@ -604,7 +743,9 @@ def report_disruption():
                 'speed_kph': custom_speed,
                 'jam_factor': jam_factor,
                 'is_closed': is_closed
-            }
+            },
+            'report_id': report_id,
+            'user_disruption': user_disruption
         })
         
     except Exception as e:
@@ -709,6 +850,46 @@ def merge_user_disruptions_with_traffic():
         print(f"⚠️  Error merging user disruptions: {e}")
         import traceback
         traceback.print_exc()
+
+
+@app.route('/user_disruptions', methods=['GET'])
+def get_user_disruptions():
+    """Return all user-reported disruptions for management in the UI."""
+    try:
+        disruptions = get_user_disruptions_for_api()
+        return jsonify({
+            'success': True,
+            'disruptions': disruptions,
+            'count': len(disruptions)
+        })
+    except Exception as e:
+        app.logger.error(f"Error loading user disruptions: {e}")
+        return jsonify({'success': False, 'error': str(e), 'disruptions': []})
+
+
+@app.route('/user_disruptions/<report_id>', methods=['DELETE'])
+def delete_user_disruption(report_id):
+    """Delete a user-reported disruption by report_id."""
+    file_path = get_user_disruptions_file()
+    if not file_path.exists():
+        return jsonify({'success': False, 'error': 'No user disruptions recorded yet'}), 404
+
+    rows = load_user_disruption_rows()
+    initial_count = len(rows)
+    rows_to_keep = [row for row in rows if row.get('report_id') != report_id]
+
+    if len(rows_to_keep) == initial_count:
+        return jsonify({'success': False, 'error': 'Custom incident not found'}), 404
+
+    fieldnames = ensure_user_disruption_fieldnames()
+    with open(file_path, 'w', newline='') as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows_to_keep)
+
+    merge_user_disruptions_with_traffic()
+
+    return jsonify({'success': True, 'deleted': report_id, 'remaining': len(rows_to_keep)})
 
 @app.route('/search_location', methods=['POST'])
 def search_location():
@@ -1698,6 +1879,15 @@ def get_active_disruptions():
                 # Silently skip problematic flow items - there are many
                 continue
         
+        # Append user-reported disruptions so they behave like HERE incidents
+        user_disruptions = get_user_disruptions_for_api()
+        for disruption in user_disruptions:
+            incident_type = disruption.get('incident_type', 'User Incident')
+            if incident_type not in disruptions_by_type:
+                disruptions_by_type[incident_type] = []
+            disruptions_by_type[incident_type].append(disruption)
+            total_disruptions += 1
+
         # Calculate statistics
         type_counts = {incident_type: len(disruptions) for incident_type, disruptions in disruptions_by_type.items()}
         severity_counts = {'Heavy': 0, 'Medium': 0, 'Light': 0}
@@ -1720,7 +1910,8 @@ def get_active_disruptions():
             'type_counts': type_counts,
             'severity_counts': severity_counts,
             'timestamp': time.time(),
-            'note': 'Using HERE API with hash-based edge matching - pre-matched edges from CSV'
+            'note': 'Using HERE API with hash-based edge matching - pre-matched edges from CSV',
+            'user_reported_total': len(user_disruptions)
         })
         
     except Exception as e:

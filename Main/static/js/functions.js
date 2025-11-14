@@ -526,10 +526,13 @@ function showAllDisruptionsOnMap(disruptionData) {
         const severity = getDisruptionField(disruption, 'severity');
         const incidentType = getDisruptionField(disruption, 'incident_type');
         const roadName = disruption.road_name || 'Unknown Road';
+        const isUserReported = !!disruption.is_user_reported;
         
         // Get color based on severity
-        const markerColor = severity === 'Heavy' ? '#ef4444' : 
+        const baseColor = severity === 'Heavy' ? '#ef4444' : 
                            severity === 'Medium' ? '#f59e0b' : '#10b981';
+        const markerColor = isUserReported ? '#7c3aed' : baseColor;
+        const markerBorder = isUserReported ? '#c4b5fd' : '#ffffff';
         
         // Get icon based on incident type
         const getMarkerSymbol = (type) => {
@@ -547,14 +550,15 @@ function showAllDisruptionsOnMap(disruptionData) {
           };
           return symbols[type] || '!';
         };
+        const markerSymbol = isUserReported ? '★' : getMarkerSymbol(incidentType);
         
         // Create Leaflet marker with custom SVG icon
         const svgIcon = L.divIcon({
           html: `<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="12" cy="12" r="10" fill="${markerColor}" stroke="white" stroke-width="1"/>
-                  <text x="12" y="16" text-anchor="middle" fill="white" font-size="10" font-weight="bold">${getMarkerSymbol(incidentType)}</text>
+                  <circle cx="12" cy="12" r="10" fill="${markerColor}" stroke="${markerBorder}" stroke-width="2"/>
+                  <text x="12" y="16" text-anchor="middle" fill="white" font-size="10" font-weight="bold">${markerSymbol}</text>
                 </svg>`,
-          className: 'custom-disruption-marker',
+          className: isUserReported ? 'custom-disruption-marker user-reported-marker' : 'custom-disruption-marker',
           iconSize: [24, 24],
           iconAnchor: [12, 12]
         });
@@ -563,6 +567,11 @@ function showAllDisruptionsOnMap(disruptionData) {
           icon: svgIcon,
           title: `${incidentType} on ${roadName}`
         }).addTo(map);
+
+        if (isUserReported && disruption.report_id) {
+          marker.reportId = disruption.report_id;
+          marker._isUserReported = true;
+        }
         
         // Add popup (Leaflet's equivalent of info window)
         const speedKph = getDisruptionField(disruption, 'current_speed') || 0;
@@ -572,7 +581,7 @@ function showAllDisruptionsOnMap(disruptionData) {
           <div class="p-2">
             <h3 class="font-bold text-sm">${roadName}</h3>
             <p class="text-xs text-gray-600">${incidentType}</p>
-            <p class="text-xs">Severity: <span class="font-semibold" style="color: ${markerColor}">${severity}</span></p>
+            <p class="text-xs">Severity: <span class="font-semibold" style="color: ${markerColor}">${severity}${isUserReported ? ' • User Reported' : ''}</span></p>
             <p class="text-xs">Speed: ${speedKph.toFixed(1)} km/h (${Math.round(slowdownRatio * 100)}% of normal)</p>
           </div>
         `;
@@ -2054,6 +2063,26 @@ function resetCurrentPathPanel() {
     
     console.log('Current Path Panel reset to placeholder state');
 }
+
+function closeCurrentPathPanel({ resetPanelContent = true } = {}) {
+    if (!currentPathPanel) return;
+
+    currentPathPanel.classList.add('translate-x-full');
+
+    if (resetPanelContent) {
+      resetCurrentPathPanel();
+    }
+
+    if (mapContainer) {
+      mapContainer.style.marginRight = '0';
+    }
+
+    if (map) {
+      setTimeout(() => map.invalidateSize(), 350);
+    }
+}
+
+window.closeCurrentPathPanel = closeCurrentPathPanel;
 
 
 function highlightDisruptedSegments(disruptedSegments) {

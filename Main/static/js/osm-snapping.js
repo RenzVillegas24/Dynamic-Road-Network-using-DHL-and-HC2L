@@ -256,6 +256,9 @@ function getOSMSnappedLocation(role) {
  * Enhanced start location pin handler with OSM road snapping
  */
 async function handleOSMStartLocationPin(lat, lng) {
+    if (typeof closeCurrentPathPanel === 'function') {
+        closeCurrentPathPanel();
+    }
     try {
         // Attempt OSM road snapping
         const snapData = await snapToOSMRoad(lat, lng, 'start', 25);
@@ -321,6 +324,9 @@ async function handleOSMStartLocationPin(lat, lng) {
  * Enhanced destination location pin handler with OSM road snapping
  */
 async function handleOSMDestLocationPin(lat, lng) {
+    if (typeof closeCurrentPathPanel === 'function') {
+        closeCurrentPathPanel();
+    }
     try {
         // Attempt OSM road snapping
         const snapData = await snapToOSMRoad(lat, lng, 'dest', 25);
