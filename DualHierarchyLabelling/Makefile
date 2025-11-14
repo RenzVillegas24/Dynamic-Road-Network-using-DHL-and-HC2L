@@ -1,8 +1,8 @@
 CC = g++
-CXXFLAGS = -std=c++2a -O3 -Wall -Wextra -pthread
+CXXFLAGS = -std=c++2a -O3 -Wall -Wextra -pthread -I../ApiUtils/src
 DBGCC = g++
-DBGFLAGS = -std=c++2a -ggdb -Wall -Wextra -pthread
-INC = src/road_network.cpp src/util.cpp
+DBGFLAGS = -std=c++2a -ggdb -Wall -Wextra -pthread -I../ApiUtils/src
+INC = src/road_network.cpp src/util.cpp ../ApiUtils/src/base_road_network.cpp
 
 # Output build directory (relative to this package)
 BUILD_DIR = ../Main/build

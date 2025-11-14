@@ -28,6 +28,19 @@ let disruptionMarkers = []; // Store disruption markers
 let allNodesLayer = null; // Leaflet layer for displaying all nodes (toggleable)
 window.alternativeRoutePolylines = []; // Store alternative route polylines
 window.currentSelectedAlternativeRouteIndex = null; // Track which alternative route is currently selected (null = none)
+if (typeof window.currentRouteData === 'undefined') {
+  window.currentRouteData = currentRouteData;
+} else {
+  currentRouteData = window.currentRouteData;
+}
+window.currentRouteGeometry = window.currentRouteGeometry || [];
+window.currentDisruptionsSummary = window.currentDisruptionsSummary || null;
+window.currentDisruptions = window.currentDisruptions || [];
+if (typeof window.disruptionMarkers === 'undefined') {
+  window.disruptionMarkers = disruptionMarkers;
+} else {
+  disruptionMarkers = window.disruptionMarkers;
+}
 
 // ============================================================================
 // DISRUPTION DATA STRUCTURE HELPERS
@@ -107,3 +120,148 @@ function getDisruptionField(disruption, field) {
 function isNewStructure(disruption) {
   return !!(disruption && (disruption.incident || disruption.flow || disruption.disruption_metrics));
 }
+
+function resolveDisruptionEdge(disruption) {
+  if (!disruption) return { source: undefined, target: undefined };
+  const edgeArray = Array.isArray(disruption.edge) ? disruption.edge : null;
+  const source = disruption.source ?? disruption.source_id ?? edgeArray?.[0];
+  const target = disruption.target ?? disruption.target_id ?? edgeArray?.[1];
+  return { source, target };
+}
+
+function normalizeCoordinateList(rawCoords) {
+  if (!rawCoords) return [];
+  let coords = rawCoords;
+  if (typeof coords === 'string') {
+    try {
+      coords = JSON.parse(coords);
+    } catch (err) {
+      console.warn('Failed to parse coordinates string:', err);
+      return [];
+    }
+  }
+  if (!Array.isArray(coords)) return [];
+  return coords
+    .map((coord) => {
+      if (!coord) return null;
+      if (Array.isArray(coord)) {
+        if (coord.length < 2) return null;
+        const [first, second] = coord;
+        // Detect whether format is [lat, lng] or [lng, lat]
+        if (Math.abs(first) <= 90 && Math.abs(second) <= 180) {
+          return { lat: Number(first), lng: Number(second) };
+        }
+        return { lat: Number(second), lng: Number(first) };
+      }
+      if (typeof coord === 'object') {
+        const lat = coord.lat ?? coord.latitude ?? (Array.isArray(coord.coordinates) ? coord.coordinates[1] : undefined);
+        const lng = coord.lng ?? coord.longitude ?? (Array.isArray(coord.coordinates) ? coord.coordinates[0] : undefined);
+        if (typeof lat === 'number' && typeof lng === 'number') {
+          return { lat, lng };
+        }
+      }
+      return null;
+    })
+    .filter(Boolean);
+}
+
+function getMidpointLatLng(latLngs) {
+  if (!latLngs || latLngs.length === 0) return null;
+  const midIndex = Math.floor(latLngs.length / 2);
+  return latLngs[midIndex];
+}
+
+function getActiveRouteGeometry() {
+  if (window.currentRouteData?.route?.geometry?.length) {
+    return window.currentRouteData.route.geometry;
+  }
+  if (currentRouteData?.route?.geometry?.length) {
+    return currentRouteData.route.geometry;
+  }
+  if (Array.isArray(window.currentRouteGeometry) && window.currentRouteGeometry.length) {
+    return window.currentRouteGeometry;
+  }
+  return [];
+}
+
+function matchesEdge(segment, source, target) {
+  if (!segment || source === undefined || target === undefined) return false;
+  const segFrom = Number(segment.from ?? segment.source);
+  const segTo = Number(segment.to ?? segment.target);
+  if (Number.isNaN(segFrom) || Number.isNaN(segTo)) return false;
+  const src = Number(source);
+  const dst = Number(target);
+  return (segFrom === src && segTo === dst) || (segFrom === dst && segTo === src);
+}
+
+function getLatLngFromGeometry(source, target) {
+  const geometrySegments = getActiveRouteGeometry();
+  if (!geometrySegments || geometrySegments.length === 0) return null;
+  const segment = geometrySegments.find((seg) => matchesEdge(seg, source, target));
+  if (!segment || !segment.coordinates) return null;
+  const latLngs = normalizeCoordinateList(segment.coordinates);
+  return getMidpointLatLng(latLngs);
+}
+
+function getLatLngFromPolylines(source, target) {
+  if (!window.routePolylines || window.routePolylines.length === 0) return null;
+  for (const polyline of window.routePolylines) {
+    const seg = polyline?._segmentData;
+    if (seg && matchesEdge(seg, source, target)) {
+      let latLngs = polyline.getLatLngs();
+      if (!Array.isArray(latLngs)) continue;
+      if (Array.isArray(latLngs[0])) {
+        latLngs = latLngs.flat(Infinity);
+      }
+      if (latLngs.length === 0) continue;
+      const mid = getMidpointLatLng(latLngs);
+      if (mid) {
+        return { lat: mid.lat, lng: mid.lng };
+      }
+    }
+  }
+  return null;
+}
+
+function getDisruptionLatLng(disruption) {
+  if (!disruption) return null;
+
+  // Direct lat/lng on object
+  if (typeof disruption.lat === 'number' && typeof disruption.lng === 'number') {
+    return { lat: disruption.lat, lng: disruption.lng };
+  }
+  if (typeof disruption.latitude === 'number' && typeof disruption.longitude === 'number') {
+    return { lat: disruption.latitude, lng: disruption.longitude };
+  }
+
+  // Average of source/target coordinates if provided
+  if (
+    typeof disruption.source_lat === 'number' &&
+    typeof disruption.target_lat === 'number' &&
+    typeof disruption.source_lng === 'number' &&
+    typeof disruption.target_lng === 'number'
+  ) {
+    return {
+      lat: (disruption.source_lat + disruption.target_lat) / 2,
+      lng: (disruption.source_lng + disruption.target_lng) / 2
+    };
+  }
+
+  // Coordinates array on disruption (e.g., HERE raw data)
+  if (disruption.coordinates) {
+    const points = normalizeCoordinateList(disruption.coordinates);
+    const mid = getMidpointLatLng(points);
+    if (mid) return mid;
+  }
+
+  const { source, target } = resolveDisruptionEdge(disruption);
+  const geometryLatLng = getLatLngFromGeometry(source, target);
+  if (geometryLatLng) return geometryLatLng;
+
+  const polylineLatLng = getLatLngFromPolylines(source, target);
+  if (polylineLatLng) return polylineLatLng;
+
+  return null;
+}
+
+window.getDisruptionLatLng = getDisruptionLatLng;

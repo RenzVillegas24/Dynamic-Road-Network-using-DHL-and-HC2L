@@ -20,6 +20,8 @@
 #include "../../ApiUtils/src/routing_utils.h"
 #include <iomanip>
 #include <chrono>
+#include <cmath>
+#include <algorithm>
 
 using namespace std;
 
@@ -176,92 +178,39 @@ EdgeDisruptionMetrics compute_disruption_metrics(
 }
 
 
-// Calculate edge cost with proper priority hierarchy
-// Priority (from highest to lowest):
-// 0. Closed paths - absolutely avoid (cost = infinity)
-// 1. Shortest path - actual GPS distance (primary metric)
-// 2. Highway type - prefer major roads (small multiplier)
-// 3. Shortest segments - prefer fewer turns (segment count penalty)
-// 4. Shortest time - speed/travel time consideration
-// 5. Disruptions - traffic conditions (lowest priority adjustment)
-distance_t calculate_edge_cost(
+// Calculate disruption-aware weight for an edge for DHL path finding
+// DHL uses immediate update strategy - applies full weights
+distance_t calculate_disruption_weight(
     NodeID from, NodeID to,
     distance_t base_distance,
-    const string& highway_type,
-    const map<pair<NodeID, NodeID>, TrafficFlowData>& flow_data,
-    const map<pair<NodeID, NodeID>, IncidentInfo>& incident_data,
-    const map<NodeID, GPSCoordinate>& coordinates) {
+    const TrafficFlowData* flow,
+    const IncidentInfo* incident,
+    const string& highway_type) {
     
-    auto edge_key = make_pair(from, to);
-    
-    // PRIORITY 0: Check for closed roads FIRST
-    if (incident_data.count(edge_key)) {
-        const IncidentInfo& incident = incident_data.at(edge_key);
-        if (incident.road_closed) {
-            return 999999999; // Infinite cost - absolutely avoid
-        }
+    // PRIORITY 0: Closed roads
+    if (incident && incident->road_closed) {
+        return infinity;  // Effectively impassable
     }
     
-    // PRIORITY 1: Start with actual GPS distance (shortest path metric)
-    double distance_meters = base_distance;
-    if (coordinates.count(from) && coordinates.count(to)) {
-        const auto& coord_from = coordinates.at(from);
-        const auto& coord_to = coordinates.at(to);
-        distance_meters = haversine_distance(
-            coord_from.latitude, coord_from.longitude,
-            coord_to.latitude, coord_to.longitude
-        );
+    // Start with base distance
+    double weight = base_distance;
+    
+    // Calculate flow-based penalty
+    if (flow) {
+        // jam_factor: 0.0 = free, 10.0 = blocked
+        double jam_factor_normalized = flow->jam_factor / 10.0;  // 0.0 to 1.0
+        double flow_multiplier = 1.0 + (jam_factor_normalized * 4.0);  // 1.0x to 5.0x
+        weight *= flow_multiplier;
     }
     
-    // Base cost is distance in meters (this ensures shortest path priority)
-    double cost = distance_meters;
-    
-    // PRIORITY 2: Highway type preference (minor adjustment, 1.0-1.3x)
-    // Major roads (motorway, primary) get slight preference over residential
-    double highway_factor = get_highway_weight(highway_type);
-    // Scale down the highway impact to keep distance as primary factor
-    // Instead of 1.0-3.0x, use 1.0-1.3x to maintain distance priority
-    double scaled_highway = 1.0 + (highway_factor - 1.0) * 0.15;
-    cost *= scaled_highway;
-    
-    // PRIORITY 3: Segment count penalty (prefer fewer turns)
-    // Add small penalty per edge to favor routes with fewer segments
-    // This encourages staying on same road rather than making many turns
-    cost += 50.0;  // 50 meters equivalent penalty per segment/turn
-    
-    // PRIORITY 4: Time-based adjustment (speed consideration)
-    // Calculate expected travel time and convert back to distance equivalent
-    double speed_kmh = get_highway_speed(highway_type);  // Free-flow speed
-    
-    // Adjust speed based on traffic flow
-    if (flow_data.count(edge_key)) {
-        const TrafficFlowData& flow = flow_data.at(edge_key);
-        // Reduce speed based on jam factor (0=free, 10=stopped)
-        double jam_reduction = flow.jam_factor / 10.0;  // 0.0 to 1.0
-        speed_kmh *= (1.0 - jam_reduction * 0.8);  // Max 80% reduction
-        speed_kmh = max(speed_kmh, 5.0);  // Minimum 5 km/h
+    // Calculate incident penalty
+    if (incident && incident->has_incident()) {
+        double severity = get_incident_severity(incident->type);
+        weight *= severity;
     }
     
-    // Calculate travel time in seconds
-    double travel_time_sec = (distance_meters / 1000.0) / speed_kmh * 3600.0;
-    
-    // Convert time to distance equivalent (add time penalty as virtual distance)
-    // Using factor that makes time secondary to distance
-    double time_penalty = travel_time_sec * 0.5;  // 1 second = 0.5 meters penalty
-    cost += time_penalty;
-    
-    // PRIORITY 5: Disruption/incident adjustments (lowest priority)
-    if (incident_data.count(edge_key)) {
-        const IncidentInfo& incident = incident_data.at(edge_key);
-        
-        // Apply incident type severity (small multiplier)
-        double incident_severity = get_incident_severity(incident.type);
-        // Scale down incident impact to keep it below distance priority
-        double scaled_incident = 1.0 + (incident_severity - 1.0) * 0.1;
-        cost *= scaled_incident;
-    }
-    
-    return static_cast<distance_t>(cost);
+    // DHL: No tau threshold - apply full weight
+    return static_cast<distance_t>(weight);
 }
 
 // ============================================================
@@ -317,27 +266,16 @@ vector<NodeID> find_shortest_path(
             for (const auto& neighbor : adj_list.at(u)) {
                 NodeID v = neighbor.node;
                 
-                // *** CRITICAL: Use comprehensive cost calculation ***
-                // This considers: GPS distance, highway type, flow, incidents
-                auto edge_key = make_pair(u, v);
-                string highway_type = "road"; // Default
+                // Use the disruption-aware weight that was already set in neighbor.distance
+                // This weight incorporates: flow penalties and incident costs
+                distance_t edge_weight = neighbor.distance;
                 
-                // Get highway type from global map (loaded from CSV for ALL edges)
-                if (g_highway_types.count(edge_key)) {
-                    highway_type = g_highway_types[edge_key];
-                }
-                // Fallback to "unknown" if not in global map (incident data no longer has highway_type)
-                else {
-                    highway_type = "unknown";
+                // Skip impassable edges (from closed roads)
+                if (edge_weight >= infinity) {
+                    continue;
                 }
                 
-                // Calculate edge cost with ALL factors
-                distance_t edge_cost = calculate_edge_cost(
-                    u, v, neighbor.distance, highway_type,
-                    flow_data, incident_data, coordinates
-                );
-                
-                distance_t new_dist = dist[u] + edge_cost;
+                distance_t new_dist = dist[u] + edge_weight;
                 
                 if (!dist.count(v) || new_dist < dist[v]) {
                     dist[v] = new_dist;
@@ -575,23 +513,23 @@ DisruptionAnalysisResult analyze_route_disruptions(
         // Check for disruptions on this edge
         bool has_disruption = false;
         bool is_closed = false;
-        string incident_type = "none";
+        string incident_type = "congestion";
         double jam_factor = 0.0;
         double current_speed = free_flow_speed;
+        
+        if (flow_data.count(edge_key)) {
+            const auto& flow = flow_data.at(edge_key);
+            has_disruption = true;
+            jam_factor = flow.jam_factor;
+            current_speed = flow.current_speed > 0 ? flow.current_speed : free_flow_speed;
+        }
         
         if (incident_data.count(edge_key)) {
             const auto& incident = incident_data.at(edge_key);
             has_disruption = true;
             is_closed = incident.road_closed;
-            incident_type = incident.type;
+            incident_type = incident.type.empty() ? incident_type : incident.type;
             
-            if (flow_data.count(edge_key)) {
-                jam_factor = flow_data.at(edge_key).jam_factor;
-                current_speed = flow_data.at(edge_key).current_speed;
-                if (current_speed <= 0) current_speed = free_flow_speed;
-            }
-            
-            // Get severity and count
             string severity = get_severity_level(jam_factor, incident_type, is_closed);
             severity_counts[severity]++;
             
@@ -600,10 +538,12 @@ DisruptionAnalysisResult analyze_route_disruptions(
             }
             
             result.total_disruptions_on_route++;
+        } else if (has_disruption) {
+            string severity = get_severity_level(jam_factor, incident_type, is_closed);
+            severity_counts[severity]++;
         }
         
-        // Calculate actual time with disruptions
-        if (has_disruption && flow_data.count(edge_key)) {
+        if (has_disruption) {
             actual_travel_time += calculate_edge_duration(edge_distance, current_speed, free_flow_speed, is_closed);
         } else {
             actual_travel_time += baseline_time;
@@ -624,17 +564,9 @@ DisruptionAnalysisResult analyze_route_disruptions(
         : 0.0;
     
     // Count total network disruptions
-    result.total_network_disruptions = incident_data.size();
-    result.total_network_closures = 0;
-    result.active_disruptions = 0;
-    
-    for (const auto& [edge_key, incident] : incident_data) {
-        if (incident.road_closed) {
-            result.total_network_closures++;
-        } else {
-            result.active_disruptions++;
-        }
-    }
+    result.total_network_disruptions = g_disruption_cache.total_incidents;
+    result.total_network_closures = g_disruption_cache.closures;
+    result.active_disruptions = g_disruption_cache.active_disruptions;
     
     return result;
 }
@@ -1136,132 +1068,163 @@ void output_json_response(bool success, const string& error_message = "",
             path, disruption_map, flow_data, coordinates, edge_geometries
         );
         
-        // Calculate disruption statistics on the selected route
-        int route_disruptions_critical = 0;
-        int route_disruptions_high = 0;
-        int route_disruptions_medium = 0;
-        int route_disruptions_low = 0;
-        int route_closures = 0;
+        struct RouteDisruptionDetail {
+            pair<NodeID, NodeID> edge;
+            EdgeDisruptionMetrics metrics;
+            const IncidentInfo* incident;
+            const TrafficFlowData* flow;
+        };
+        vector<RouteDisruptionDetail> route_disruptions;
+        map<string, int> route_severity_counts{{"critical", 0}, {"high", 0}, {"medium", 0}, {"low", 0}};
         double total_time_impact = 0.0;
-        vector<pair<NodeID, NodeID>> affected_edges;
+        int route_closures = 0;
         
-        for (size_t i = 0; i < path.size() - 1; i++) {
+        for (size_t i = 0; i + 1 < path.size(); i++) {
             auto edge_key = make_pair(path[i], path[i + 1]);
+            const IncidentInfo* incident_ptr = nullptr;
+            const TrafficFlowData* flow_ptr = nullptr;
             if (disruption_map.count(edge_key)) {
-                const auto& incident = disruption_map.at(edge_key);
-                
-                // Get flow data
-                const TrafficFlowData* flow_ptr = nullptr;
-                if (flow_data.count(edge_key)) {
-                    flow_ptr = &flow_data.at(edge_key);
-                }
-                
-                // Get highway type
+                incident_ptr = &disruption_map.at(edge_key);
+            } else if (g_disruption_cache.incidents.count(edge_key)) {
+                incident_ptr = &g_disruption_cache.incidents.at(edge_key);
+            }
+            if (flow_data.count(edge_key)) {
+                flow_ptr = &flow_data.at(edge_key);
+            } else if (g_disruption_cache.flow_data.count(edge_key)) {
+                flow_ptr = &g_disruption_cache.flow_data.at(edge_key);
+            }
+            auto metrics_it = g_disruption_cache.disruption_metrics.find(edge_key);
+            EdgeDisruptionMetrics metrics;
+            bool has_metrics = (metrics_it != g_disruption_cache.disruption_metrics.end());
+            if (has_metrics) {
+                metrics = metrics_it->second;
+            } else if (incident_ptr || flow_ptr) {
                 string highway_type = "unknown";
                 if (g_highway_types.count(edge_key)) {
                     highway_type = g_highway_types.at(edge_key);
                 }
-                
-                // Compute metrics
-                EdgeDisruptionMetrics metrics = compute_disruption_metrics(
-                    &incident,
+                double edge_distance = 0.0;
+                if (edge_geometries.count(edge_key)) {
+                    edge_distance = edge_geometries.at(edge_key).length;
+                }
+                metrics = compute_disruption_metrics(
+                    incident_ptr,
                     flow_ptr,
                     highway_type,
-                    0
+                    static_cast<distance_t>(edge_distance)
                 );
-                
-                // DHL uses high/medium/low, map to the same severity levels
-                if (metrics.severity_score >= 0.7) {
-                    route_disruptions_high++;
-                    if (incident.road_closed) route_closures++;
-                } else if (metrics.severity_score >= 0.4) {
-                    route_disruptions_medium++;
-                } else {
-                    route_disruptions_low++;
-                }
-                
-                affected_edges.push_back(edge_key);
+            }
+            bool has_data = incident_ptr || flow_ptr || has_metrics;
+            if (!has_data) continue;
+            bool impactful = (incident_ptr && incident_ptr->road_closed) ||
+                             (flow_ptr && flow_ptr->jam_factor > 0.0) ||
+                             (metrics.severity_level != "none");
+            if (!impactful) continue;
+            route_disruptions.push_back({edge_key, metrics, incident_ptr, flow_ptr});
+            total_time_impact += metrics.time_impact_seconds;
+            if (route_severity_counts.count(metrics.severity_level)) {
+                route_severity_counts[metrics.severity_level]++;
+            } else if (metrics.severity_level == "critical") {
+                route_severity_counts["critical"]++;
+            }
+            if (incident_ptr && incident_ptr->road_closed) {
+                route_closures++;
             }
         }
         
-        // Network-wide statistics
-        int network_total = analysis.total_network_disruptions;
-        int network_closures = analysis.total_network_closures;
-        int network_active = analysis.active_disruptions;
+        int route_disruptions_critical = route_severity_counts["critical"];
+        int route_disruptions_high = route_severity_counts["high"];
+        int route_disruptions_medium = route_severity_counts["medium"];
+        int route_disruptions_low = route_severity_counts["low"];
+        double route_time_impact = max(total_time_impact, analysis.added_delay_seconds);
         
         cout << "    \"route\": {" << endl;
-        cout << "      \"total_disrupted_edges\": " << affected_edges.size() << "," << endl;
+        cout << "      \"total_disrupted_edges\": " << route_disruptions.size() << "," << endl;
         cout << "      \"critical\": " << route_disruptions_critical << "," << endl;
         cout << "      \"high\": " << route_disruptions_high << "," << endl;
         cout << "      \"medium\": " << route_disruptions_medium << "," << endl;
         cout << "      \"low\": " << route_disruptions_low << "," << endl;
         cout << "      \"closures\": " << route_closures << "," << endl;
-        cout << "      \"total_time_impact_seconds\": " << fixed << setprecision(1) << analysis.added_delay_seconds << "," << endl;
-        cout << "      \"total_time_impact_minutes\": " << fixed << setprecision(1) << (analysis.added_delay_seconds / 60.0) << "," << endl;
+        cout << "      \"total_time_impact_seconds\": " << fixed << setprecision(1) << route_time_impact << "," << endl;
+        cout << "      \"total_time_impact_minutes\": " << fixed << setprecision(1) << (route_time_impact / 60.0) << "," << endl;
         cout << "      \"baseline_eta_seconds\": " << fixed << setprecision(1) << analysis.baseline_eta_seconds << "," << endl;
         cout << "      \"actual_eta_seconds\": " << fixed << setprecision(1) << analysis.actual_eta_seconds << "," << endl;
         cout << "      \"percentage_increase\": " << fixed << setprecision(1) << analysis.delay_percentage << endl;
         cout << "    }," << endl;
         
+        int network_total = 0;
+        int network_critical = 0;
+        int network_high = 0;
+        int network_medium = 0;
+        int network_low = 0;
+        int network_closures = 0;
+        int network_active = 0;
+        
+        if (use_disruptions) {
+            for (const auto& [edge_key, metrics] : g_disruption_cache.disruption_metrics) {
+                const IncidentInfo* incident_ptr = nullptr;
+                if (g_disruption_cache.incidents.count(edge_key)) {
+                    incident_ptr = &g_disruption_cache.incidents.at(edge_key);
+                }
+                const TrafficFlowData* flow_ptr = nullptr;
+                if (g_disruption_cache.flow_data.count(edge_key)) {
+                    flow_ptr = &g_disruption_cache.flow_data.at(edge_key);
+                }
+                bool has_data = incident_ptr || flow_ptr;
+                if (!has_data) continue;
+                bool active = (metrics.severity_level != "none") ||
+                              (flow_ptr && flow_ptr->jam_factor > 0.0) ||
+                              (incident_ptr && incident_ptr->road_closed);
+                if (!active) continue;
+                network_total++;
+                if (incident_ptr && incident_ptr->road_closed) {
+                    network_closures++;
+                } else {
+                    network_active++;
+                }
+                if (metrics.severity_level == "critical") network_critical++;
+                else if (metrics.severity_level == "high") network_high++;
+                else if (metrics.severity_level == "medium") network_medium++;
+                else if (metrics.severity_level == "low") network_low++;
+            }
+        }
+        
         cout << "    \"network\": {" << endl;
         cout << "      \"total_incidents\": " << network_total << "," << endl;
-        cout << "      \"high\": " << analysis.high_severity_count << "," << endl;
-        cout << "      \"medium\": " << analysis.medium_severity_count << "," << endl;
-        cout << "      \"low\": " << analysis.low_severity_count << "," << endl;
+        cout << "      \"critical\": " << network_critical << "," << endl;
+        cout << "      \"high\": " << network_high << "," << endl;
+        cout << "      \"medium\": " << network_medium << "," << endl;
+        cout << "      \"low\": " << network_low << "," << endl;
         cout << "      \"closures\": " << network_closures << "," << endl;
         cout << "      \"active_disruptions\": " << network_active << endl;
         cout << "    }," << endl;
         
-        // List ALL disruptions on route (sorted by severity)
-        vector<pair<pair<NodeID, NodeID>, const IncidentInfo*>> all_route_disruptions;
-        for (const auto& edge : affected_edges) {
-            if (disruption_map.count(edge)) {
-                all_route_disruptions.push_back({edge, &disruption_map.at(edge)});
-            }
-        }
-        
-        // Sort by criticality and road_closed status (prioritize closures)
-        sort(all_route_disruptions.begin(), all_route_disruptions.end(),
-             [](const auto& a, const auto& b) {
-                 // Road closures first
-                 if (a.second->road_closed != b.second->road_closed) {
-                     return a.second->road_closed > b.second->road_closed;
+        sort(route_disruptions.begin(), route_disruptions.end(),
+             [](const RouteDisruptionDetail& a, const RouteDisruptionDetail& b) {
+                 bool a_closed = a.incident && a.incident->road_closed;
+                 bool b_closed = b.incident && b.incident->road_closed;
+                 if (a_closed != b_closed) return a_closed > b_closed;
+                 if (std::abs(a.metrics.severity_score - b.metrics.severity_score) > 1e-6) {
+                     return a.metrics.severity_score > b.metrics.severity_score;
                  }
-                 // Then by criticality (critical > major > minor)
-                 if (a.second->criticality != b.second->criticality) {
-                     return a.second->criticality > b.second->criticality;
-                 }
-                 return a.first < b.first;
+                 return a.edge < b.edge;
              });
         
         cout << "    \"all_disruptions\": [" << endl;
-        for (size_t i = 0; i < all_route_disruptions.size(); i++) {
-            const auto& [edge, incident] = all_route_disruptions[i];
+        for (size_t i = 0; i < route_disruptions.size(); i++) {
+            const auto& detail = route_disruptions[i];
+            const auto& edge = detail.edge;
+            const auto* incident = detail.incident;
+            const auto* flow_ptr = detail.flow;
+            const auto& metrics = detail.metrics;
             
-            // Get traffic flow data for this edge
-            const TrafficFlowData* flow_ptr = nullptr;
-            if (flow_data.count(edge)) {
-                flow_ptr = &flow_data.at(edge);
-            }
-            
-            // Get highway type
-            string highway_type = "unknown";
-            if (g_highway_types.count(edge)) {
-                highway_type = g_highway_types.at(edge);
-            }
-            
-            // Compute disruption metrics for this edge
-            EdgeDisruptionMetrics metrics = compute_disruption_metrics(
-                incident,
-                flow_ptr,
-                highway_type,
-                0  // base_distance not needed for display
-            );
-            
-            // Get road name from edge geometries
             string road_name = "";
             if (edge_geometries.count(edge)) {
                 road_name = edge_geometries.at(edge).road_name;
+            }
+            string highway_type = "unknown";
+            if (g_highway_types.count(edge)) {
+                highway_type = g_highway_types.at(edge);
             }
             
             cout << "      {" << endl;
@@ -1270,23 +1233,31 @@ void output_json_response(bool success, const string& error_message = "",
             cout << "        \"road_name\": \"" << escape_json_string(road_name) << "\"," << endl;
             cout << "        \"highway_type\": \"" << highway_type << "\"," << endl;
             
-            // Incident data
             cout << "        \"incident\": {" << endl;
-            cout << "          \"id\": \"" << escape_json_string(incident->id) << "\"," << endl;
-            cout << "          \"type\": \"" << escape_json_string(incident->type) << "\"," << endl;
-            cout << "          \"criticality\": \"" << escape_json_string(incident->criticality) << "\"," << endl;
-            cout << "          \"description\": \"" << escape_json_string(incident->description) << "\"," << endl;
-            cout << "          \"road_closed\": " << (incident->road_closed ? "true" : "false") << "," << endl;
-            cout << "          \"start_time\": \"" << escape_json_string(incident->start_time) << "\"," << endl;
-            cout << "          \"end_time\": \"" << escape_json_string(incident->end_time) << "\"" << endl;
+            if (incident) {
+                cout << "          \"id\": \"" << escape_json_string(incident->id) << "\"," << endl;
+                cout << "          \"type\": \"" << escape_json_string(incident->type) << "\"," << endl;
+                cout << "          \"criticality\": \"" << escape_json_string(incident->criticality) << "\"," << endl;
+                cout << "          \"description\": \"" << escape_json_string(incident->description) << "\"," << endl;
+                cout << "          \"road_closed\": " << (incident->road_closed ? "true" : "false") << "," << endl;
+                cout << "          \"start_time\": \"" << escape_json_string(incident->start_time) << "\"," << endl;
+                cout << "          \"end_time\": \"" << escape_json_string(incident->end_time) << "\"" << endl;
+            } else {
+                cout << "          \"id\": \"\"," << endl;
+                cout << "          \"type\": \"\"," << endl;
+                cout << "          \"criticality\": \"\"," << endl;
+                cout << "          \"description\": \"\"," << endl;
+                cout << "          \"road_closed\": false," << endl;
+                cout << "          \"start_time\": \"\"," << endl;
+                cout << "          \"end_time\": \"\"" << endl;
+            }
             cout << "        }," << endl;
             
-            // Flow data
             cout << "        \"flow\": {" << endl;
             if (flow_ptr) {
                 cout << "          \"status\": \"" << escape_json_string(flow_ptr->flow_status) << "\"," << endl;
-                cout << "          \"speed_kph\": " << fixed << setprecision(1) << flow_ptr->current_speed << "," << endl;
-                cout << "          \"jam_factor\": " << fixed << setprecision(2) << flow_ptr->jam_factor << endl;
+                cout << "          \"speed_kph\": " << fixed << setprecision(1) << sanitize_json_number(flow_ptr->current_speed) << "," << endl;
+                cout << "          \"jam_factor\": " << fixed << setprecision(2) << sanitize_json_number(flow_ptr->jam_factor) << endl;
             } else {
                 cout << "          \"status\": \"default\"," << endl;
                 cout << "          \"speed_kph\": 0.0," << endl;
@@ -1294,18 +1265,17 @@ void output_json_response(bool success, const string& error_message = "",
             }
             cout << "        }," << endl;
             
-            // Disruption metrics
             cout << "        \"disruption_metrics\": {" << endl;
             cout << "          \"severity_level\": \"" << metrics.severity_level << "\"," << endl;
-            cout << "          \"severity_score\": " << fixed << setprecision(2) << metrics.severity_score << "," << endl;
-            cout << "          \"weight_multiplier\": " << fixed << setprecision(2) << metrics.weight_multiplier << "," << endl;
-            cout << "          \"time_impact_seconds\": " << fixed << setprecision(0) << metrics.time_impact_seconds << "," << endl;
+            cout << "          \"severity_score\": " << fixed << setprecision(2) << sanitize_json_number(metrics.severity_score) << "," << endl;
+            cout << "          \"weight_multiplier\": " << fixed << setprecision(2) << sanitize_json_number(metrics.weight_multiplier) << "," << endl;
+            cout << "          \"time_impact_seconds\": " << fixed << setprecision(1) << sanitize_json_number(metrics.time_impact_seconds) << "," << endl;
             cout << "          \"old_weight\": " << metrics.old_weight << "," << endl;
             cout << "          \"new_weight\": " << metrics.new_weight << endl;
             cout << "        }" << endl;
             
             cout << "      }";
-            if (i < all_route_disruptions.size() - 1) cout << ",";
+            if (i < route_disruptions.size() - 1) cout << ",";
             cout << endl;
         }
         cout << "    ]" << endl;
@@ -1499,6 +1469,13 @@ int main(int argc, char* argv[]) {
             output_json_response(false, "Failed to load edges");
             return 1;
         }
+
+        map<pair<NodeID, NodeID>, distance_t> base_weights;
+        for (const auto& [source, neighbors] : adj_list) {
+            for (const auto& neighbor : neighbors) {
+                base_weights[{source, neighbor.node}] = neighbor.distance;
+            }
+        }
         
         // Load DHL index and measure time
         auto index_load_start = chrono::high_resolution_clock::now();
@@ -1546,71 +1523,96 @@ int main(int argc, char* argv[]) {
                 cerr << "⚠️  Failed to load disruptions" << endl;
                 use_disruptions = false;
             } else {
-                // Process incidents: update graph (DHL always immediate update)
+                set<pair<NodeID, NodeID>> disruption_edges;
+                for (const auto& [edge_key, _] : incident_data) {
+                    disruption_edges.insert(edge_key);
+                }
+                for (const auto& [edge_key, _] : flow_data) {
+                    disruption_edges.insert(edge_key);
+                }
+                
                 int disruption_count = 0;
                 int closed_roads_count = 0;
                 set<NodeID> affected_nodes;
                 
-                for (const auto& [edge_key, incident] : incident_data) {
+                for (const auto& edge_key : disruption_edges) {
                     NodeID source = edge_key.first;
                     NodeID target = edge_key.second;
-                    
-                    // Get flow data for this edge
+                    const IncidentInfo* incident_ptr = nullptr;
                     const TrafficFlowData* flow_ptr = nullptr;
+                    
+                    if (incident_data.count(edge_key)) {
+                        incident_ptr = &incident_data.at(edge_key);
+                    }
                     if (flow_data.count(edge_key)) {
                         flow_ptr = &flow_data.at(edge_key);
                     }
+                    if (!incident_ptr && !flow_ptr) continue;
                     
-                    // Get highway type
                     string highway_type = "unknown";
                     if (g_highway_types.count(edge_key)) {
                         highway_type = g_highway_types.at(edge_key);
                     }
                     
-                    // Compute disruption metrics
-                    EdgeDisruptionMetrics metrics = compute_disruption_metrics(
-                        &incident,
+                    distance_t base_weight = 0;
+                    if (base_weights.count(edge_key)) {
+                        base_weight = base_weights.at(edge_key);
+                    } else if (adj_list.count(source)) {
+                        for (const auto& neighbor : adj_list.at(source)) {
+                            if (neighbor.node == target) {
+                                base_weight = neighbor.distance;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    distance_t new_weight = calculate_disruption_weight(
+                        source, target,
+                        base_weight,
                         flow_ptr,
-                        highway_type,
-                        0  // base_distance not needed here
+                        incident_ptr,
+                        highway_type
                     );
                     
-                    // Handle road closures: remove edge from graph
-                    if (incident.road_closed || metrics.new_weight >= 999999.0) {
-                        cerr << "   🚧 Road CLOSED: Edge " << source << "->" << target 
-                             << " (Type: " << incident.type << ", Highway: " << highway_type << ")" << endl;
+                    bool flow_closure = flow_ptr && (flow_ptr->traversability == "closed" || flow_ptr->jam_factor >= 9.5);
+                    bool incident_closure = incident_ptr && incident_ptr->road_closed;
+                    bool is_closed = flow_closure || incident_closure || new_weight >= infinity;
+                    
+                    if (is_closed) {
+                        cerr << "   🚧 Road CLOSED: Edge " << source << "->" << target;
+                        if (incident_ptr && !incident_ptr->type.empty()) {
+                            cerr << " (Type: " << incident_ptr->type << ")";
+                        }
+                        cerr << endl;
                         closed_roads_count++;
                         
-                        // Remove edge from adjacency list to make it unreachable
-                        if (adj_list.count(source)) {
-                            auto& neighbors = adj_list[source];
-                            neighbors.erase(
-                                remove_if(neighbors.begin(), neighbors.end(),
-                                         [target](const Neighbor& n) { return n.node == target; }),
-                                neighbors.end()
-                            );
-                        }
-                        
-                        disruption_impact_score = 1.0; // Maximum impact for closures
-                    } else {
-                        // Normal disruption: update edge weight (DHL immediate update)
                         if (adj_list.count(source)) {
                             for (auto& neighbor : adj_list[source]) {
                                 if (neighbor.node == target) {
-                                    neighbor.distance = metrics.new_weight;
+                                    neighbor.distance = infinity;
                                     break;
                                 }
                             }
                         }
-                        
-                        disruption_impact_score = max(disruption_impact_score, metrics.impact_score);
+                        disruption_impact_score = 1.0;
+                    } else {
+                        if (adj_list.count(source)) {
+                            for (auto& neighbor : adj_list[source]) {
+                                if (neighbor.node == target) {
+                                    neighbor.distance = new_weight;
+                                    break;
+                                }
+                            }
+                        }
+                        double impact = 0.0;
+                        if (base_weight > 0) {
+                            impact = min(1.0, max(0.0, (static_cast<double>(new_weight) - base_weight) / static_cast<double>(base_weight)));
+                        }
+                        disruption_impact_score = max(disruption_impact_score, impact);
                     }
                     
-                    // DHL always updates immediately - track affected nodes
                     affected_nodes.insert(source);
                     affected_nodes.insert(target);
-                    
-                    // Add neighbors
                     if (adj_list.count(source)) {
                         for (const auto& neighbor : adj_list.at(source)) {
                             affected_nodes.insert(neighbor.node);
@@ -1622,15 +1624,11 @@ int main(int argc, char* argv[]) {
                         }
                     }
                     
-                    // Get flow data for logging
-                    double jam_factor_val = 0.0;
-                    if (flow_ptr) {
-                        jam_factor_val = flow_ptr->jam_factor;
-                    }
-                    
+                    double jam_factor_val = flow_ptr ? flow_ptr->jam_factor : 0.0;
+                    string type_label = incident_ptr ? incident_ptr->type : (flow_ptr ? "flow" : "unknown");
                     cerr << "   ⚡ Immediate update for edge " << source << "->" << target 
-                         << " (Impact=" << metrics.impact_score << ", Jam=" << jam_factor_val 
-                         << ", Highway=" << highway_type << ", Type=" << incident.type << ")" << endl;
+                         << " (Weight=" << new_weight << ", Jam=" << jam_factor_val 
+                         << ", Highway=" << highway_type << ", Type=" << type_label << ")" << endl;
                     
                     disruption_count++;
                 }

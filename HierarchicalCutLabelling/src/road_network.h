@@ -19,22 +19,13 @@
     #define MULTI_THREAD_DISTANCES 4 // number of parallel threads for label & shortcut computation
 #endif
 
-#include <cstdint>
-#include <climits>
-#include <vector>
-#include <ostream>
-#include <cassert>
+// Include base road network structures (HC2L-specific extensions below)
+#include "../../ApiUtils/src/base_road_network.h"
 
 namespace road_network {
 
-typedef uint32_t NodeID;
-typedef uint32_t SubgraphID;
-typedef uint32_t distance_t;
-
-const distance_t infinity = UINT32_MAX >> 1;
-
-struct Neighbor;
-class Graph;
+// Base types, structures, and utilities are already defined in base_road_network.h
+// This file extends with HC2L-specific structures and methods
 
 //--------------------------- CutIndex ------------------------------
 
@@ -57,22 +48,6 @@ struct CutIndex
 };
 
 std::ostream& operator<<(std::ostream& os, const CutIndex &ci);
-
-// helper functions for manipulating partition bitvectors
-namespace PBV
-{
-    // construct partition bitvector from bit pattern and length
-    uint64_t from(uint64_t bits, uint16_t length);
-    // split partition bitvector into components
-    uint64_t partition(uint64_t bv);
-    uint16_t cut_level(uint64_t bv);
-    // compute cut level of least common ancestor of given bitvectors
-    uint16_t lca_level(uint64_t bv1, uint64_t bv2);
-    // compute bitvector for least common ancestor of given bitvectors
-    uint64_t lca(uint64_t bv1, uint64_t bv2);
-    // check whether node is an ancestor of another, based on their bitvectors
-    bool is_ancestor(uint64_t bv_ancestor, uint64_t bv_descendant);
-}
 
 class FlatCutIndex
 {
@@ -197,85 +172,11 @@ public:
     friend std::ostream& operator<<(std::ostream& os, const ContractionIndex& ci);
 };
 
-//--------------------------- Graph ---------------------------------
+//--------------------------- Graph Base Structures (HC2L) -----
 
-SubgraphID next_subgraph_id(bool reset = false);
+// Neighbor, Node, MultiThreadNodeData, Partition, Edge, DiffData are defined in base_road_network.h
 
-struct Neighbor
-{
-    NodeID node;
-    distance_t distance;
-    Neighbor(NodeID node, distance_t distance);
-    bool operator<(const Neighbor &other) const;
-};
-
-std::ostream& operator<<(std::ostream& os, const Neighbor &n);
-
-struct Node
-{
-    std::vector<Neighbor> neighbors;
-    // subgraph identifier
-    SubgraphID subgraph_id;
-    Node(SubgraphID subgraph_id);
-private:
-    // temporary data used by algorithms
-    distance_t distance, outcopy_distance;
-#ifdef MULTI_THREAD_DISTANCES
-    distance_t distances[MULTI_THREAD_DISTANCES];
-#endif
-#ifdef CONTRACT2D
-    std::vector<uint32_t> deg2path_ids;
-#endif
-    NodeID inflow, outflow;
-    uint16_t landmark_level;
-
-    friend class Graph;
-};
-
-std::ostream& operator<<(std::ostream& os, const Node &n);
-
-// multi-threading requires thread-local data for s & t nodes
-class MultiThreadNodeData : public std::vector<Node>
-{
-    thread_local static Node s_data, t_data;
-public:
-    Node& operator[](size_type pos);
-    const Node& operator[](size_type pos) const;
-    void normalize();
-};
-
-struct Partition
-{
-    std::vector<NodeID> left, right, cut;
-    // rates quality of partition (cutsize + balance)
-    double rating() const;
-};
-
-std::ostream& operator<<(std::ostream& os, const Partition &p);
-std::ostream& operator<<(std::ostream& os, const Partition *p);
-
-struct Edge
-{
-    NodeID a, b;
-    distance_t d;
-    Edge(NodeID a, NodeID b, distance_t d);
-    bool operator<(Edge other) const;
-};
-
-// helper structure for pre-partitioning
-struct DiffData
-{
-    NodeID node;
-    distance_t dist_a, dist_b;
-    int32_t diff() const;
-    distance_t min() const;
-
-    DiffData(NodeID node, distance_t dist_a, distance_t dist_b);
-    // comparison function for easy sorting by diff values
-    static bool cmp_diff(DiffData x, DiffData y);
-
-    friend std::ostream& operator<<(std::ostream& os, const DiffData &dd);
-};
+// Comment: Graph class definition continues below...
 
 /**
  * full graph information (edges and weights) is only stored once, as static data; graph instances describe induced subgraphs, storing only a list of nodes;
@@ -284,7 +185,7 @@ struct DiffData
  * to speed up this check, each node stores the subgraph it currently belongs to - this information must be carefully maintained;
  * it also causes conflicts between overlapping subgraphs during parallel processing, hence such cases must be avoided
  */
-class Graph
+class Graph : public road_network::BaseGraph
 {
     // global graph
 #ifdef MULTI_THREAD
@@ -313,14 +214,30 @@ class Graph
 
     // (re-)assign nodes to subgraph
     void assign_nodes();
-    // check if node is contained in subgraph
-    bool contains(NodeID node) const;
-    // insert node into subgraph
-    void add_node(NodeID v);
-    // remove set of nodes from subgraph; node_set must be sorted
-    void remove_nodes(const std::vector<NodeID> &node_set);
-    // return single neighbor of degree one node, or NO_NODE otherwise
-    Neighbor single_neighbor(NodeID v) const;
+    
+public:
+    // ============ BaseGraph Pure Virtual Overrides ============
+    MultiThreadNodeData& get_node_data() override;
+    const MultiThreadNodeData& get_node_data() const override;
+    
+    // Algorithm-specific overrides
+    // (contains() is now inherited from BaseGraph)
+    void reset() override;
+    void remove_edge(NodeID v, NodeID w) override;
+    
+    // NOTE: The following methods are inherited from BaseGraph with default implementations:
+    // - contains(), add_node(), remove_nodes(), single_neighbor(), remove_isolated()
+    // - get_nodes(), get_edges(), node_count(), edge_count(), degree()
+    // These use virtual get_node_data() and work correctly without redefinition
+    
+    // Algorithm-specific methods
+    void resize(size_t node_count) override;
+    // BaseGraph interface: add edge without merge
+    void add_edge(NodeID v, NodeID w, distance_t distance, bool add_reverse) override;
+    // HC2L extension: add edge with optional merge
+    void add_edge_with_merge(NodeID v, NodeID w, distance_t distance, bool add_reverse, bool merge = false);
+
+private:
     // return neighbors of degree two node, or pair of NO_NODE if degree > 2
     std::pair<Neighbor,Neighbor> pair_of_neighbors(NodeID v) const;
     // return distances of given neighbors; need not be distinct and need not lie in graph
@@ -393,26 +310,9 @@ public:
     // create top-level graph
     Graph(size_t node_count = 0);
     Graph(size_t node_count, const std::vector<Edge> &edges);
-    // set number of nodes in global graph; global graph must currently be empty
-    void resize(size_t node_count);
-    // insert edge from v to w into global graph, optionally merging with existing edge
-    void add_edge(NodeID v, NodeID w, distance_t distance, bool add_reverse, bool merge = false);
-    // remove edges between v and w from global graph
-    void remove_edge(NodeID v, NodeID w);
-    // remove isolated nodes from subgraph
-    void remove_isolated();
-    // reset graph to contain all nodes in global graph
-    void reset();
-
-    size_t node_count() const;
-    size_t edge_count() const;
-    size_t degree(NodeID v) const;
+    
     // approximate diameter
     distance_t diameter(bool weighted);
-    // returns list of nodes
-    const std::vector<NodeID>& get_nodes() const;
-    // returns list of all edges (one per undirected edge)
-    void get_edges(std::vector<Edge> &edges) const;
 
     // returns distance between u and v in subgraph
     distance_t get_distance(NodeID v, NodeID w, bool weighted);

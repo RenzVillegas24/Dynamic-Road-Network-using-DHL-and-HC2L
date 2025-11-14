@@ -371,26 +371,6 @@ function clearGoogleMapsRoute() {
             overlapElement.textContent = '--%';
         }
         
-        // Reset toggle button state if it exists
-        if (typeof showCurrentRouteOnlyActive !== 'undefined' && showCurrentRouteOnlyActive) {
-            // Reset the toggle state
-            showCurrentRouteOnlyActive = false;
-            
-            // Reset button appearance
-            const button = document.getElementById('show-current-route-only-btn');
-            if (button) {
-                const buttonText = button.querySelector('span');
-                if (buttonText) {
-                    buttonText.textContent = 'Current Route Only';
-                }
-                
-                const iconDiv = button.querySelector('div');
-                if (iconDiv) {
-                    iconDiv.classList.remove('from-green-500', 'to-emerald-600');
-                    iconDiv.classList.add('from-blue-500', 'to-indigo-600');
-                }
-            }
-        }
     } catch (error) {
         console.error('❌ Error clearing Google Maps route:', error);
     }
@@ -458,68 +438,6 @@ function clearGoogleMapsComparison() {
     }
 }
 
-/**
- * Toggle visibility of current algorithm route only
- * When activated, hides Google Maps route overlay and shows only the current algorithm route
- */
-let showCurrentRouteOnlyActive = false; // Track toggle state
-
-function toggleCurrentRouteOnly() {
-    const button = document.getElementById('show-current-route-only-btn');
-    
-    if (!button) {
-        console.warn('Show Current Route Only button not found');
-        return;
-    }
-    
-    showCurrentRouteOnlyActive = !showCurrentRouteOnlyActive;
-    
-    if (showCurrentRouteOnlyActive) {
-        // Hide Google Maps route overlay
-        if (googleMapsRouteLayer && map) {
-            map.removeLayer(googleMapsRouteLayer);
-            console.log('✅ Hidden Google Maps route overlay');
-        }
-        
-        // Update button text to indicate current state
-        const buttonText = button.querySelector('span');
-        if (buttonText) {
-            buttonText.textContent = 'Show All Routes';
-        }
-        
-        // Change button color to indicate active state
-        const iconDiv = button.querySelector('div');
-        if (iconDiv) {
-            iconDiv.classList.remove('from-blue-500', 'to-indigo-600');
-            iconDiv.classList.add('from-green-500', 'to-emerald-600');
-        }
-        
-        console.log('✅ Showing current route only');
-    } else {
-        // Restore Google Maps route overlay
-        if (googleMapsRouteLayer && map) {
-            googleMapsRouteLayer.addTo(map);
-            console.log('✅ Restored Google Maps route overlay');
-        }
-        
-        // Update button text back to original
-        const buttonText = button.querySelector('span');
-        if (buttonText) {
-            buttonText.textContent = 'Current Route Only';
-        }
-        
-        // Change button color back to original
-        const iconDiv = button.querySelector('div');
-        if (iconDiv) {
-            iconDiv.classList.remove('from-green-500', 'to-emerald-600');
-            iconDiv.classList.add('from-blue-500', 'to-indigo-600');
-        }
-        
-        console.log('✅ Showing all routes');
-    }
-}
-
-window.toggleCurrentRouteOnly = toggleCurrentRouteOnly;
 window.clearGoogleMapsComparison = clearGoogleMapsComparison;
 
 console.log('✅ Google Maps comparison module loaded');

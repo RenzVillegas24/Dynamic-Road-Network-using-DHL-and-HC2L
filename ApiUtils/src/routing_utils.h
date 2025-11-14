@@ -22,19 +22,9 @@
 #include <iostream>
 #include <sys/stat.h>
 #include "shared_routing_structures.h"
+#include "base_road_network.h"
 
 using namespace std;
-
-#ifdef ROAD_NETWORK_DHL
-// import the dhl road network structures
-#include "../../DualHierarchyLabelling/src/road_network.h"
-#endif 
-
-#ifdef ROAD_NETWORK_HC2L
-// import the hc2l road network structures
-#include "../../HierarchicalCutLabelling/src/road_network.h"
-#endif
-
 using namespace road_network;
 
 

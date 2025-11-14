@@ -116,7 +116,7 @@ def update_matched_edges(matched_edges_csv: Path, osm_to_seq: dict) -> bool:
     
     # Show sample
     print(f"\n   📋 Sample of updated data:")
-    print(df[['traffic_hash', 'source', 'target', 'source_lat', 'source_lon']].head(3).to_string(index=False))
+    print(df[['id_hash', 'source', 'target', 'source_lat', 'source_lon']].head(3).to_string(index=False))
     
     return True
 

@@ -132,12 +132,6 @@ function clearRoutes() {
     // Clear current route data
     currentRouteData = null;
 
-    // Hide "Current Route Only" button when routes are cleared
-    const showCurrentRouteBtn = document.getElementById('show-current-route-only-btn');
-    if (showCurrentRouteBtn) {
-        showCurrentRouteBtn.style.display = 'none';
-    }
-
     // Reset Current Path Panel to placeholder
     resetCurrentPathPanel();
 
@@ -156,18 +150,18 @@ function resetAlternativeRouteHighlights() {
     }
     
     // Reset all polylines to normal state
-    window.alternativeRoutePolylines.forEach((p) => {
-        if (p && p.setStyle) {
-            p.setStyle({
-                opacity: 0.35,  // Return to original transparency
-                weight: 4,      // Return to original weight
-                dashArray: '8, 4'  // Return to original dash pattern
-            });
-            p._isHighlighted = false;
-        }
-    });
+  window.alternativeRoutePolylines.forEach((p) => {
+    if (p && p.setStyle) {
+      p.setStyle({
+        opacity: 0.35,  // Return to original transparency
+        weight: 4,      // Return to original weight
+        dashArray: '8, 4'  // Return to original dash pattern
+      });
+      p._isHighlighted = false;
+    }
+  });
     
-    console.log('✅ Alternative route highlights reset');
+  console.log('✅ Alternative route highlights reset');
 }
 
 // Function to reset the Bottom Information Bar
@@ -208,9 +202,17 @@ function resetBottomInfoBar() {
 // Function to clear the distruption markers from the map
 function clearDisruptionMarkers() {
     disruptionMarkers.forEach(marker => {
-        marker.setMap(null);
+    if (marker && typeof marker.remove === 'function') {
+      marker.remove();
+    } else if (marker && map && typeof map.removeLayer === 'function') {
+      map.removeLayer(marker);
+    } else if (marker && typeof marker.setMap === 'function') {
+      marker.setMap(null);
+    }
     });
     disruptionMarkers = [];
+  window.disruptionMarkers = disruptionMarkers;
+  window.currentDisruptions = [];
 }
 
 // Function to get selected algorithm from admin panel
@@ -431,47 +433,77 @@ function showDisruptionOnMap(disruption) {
       showUpdateToast("Map not available", 'warning');
       return;
     }
+    if (!disruption) {
+      showUpdateToast('No disruption details supplied', 'warning');
+      return;
+    }
     
-    // Calculate center point of the disrupted segment
-    const centerLat = (disruption.source_lat + disruption.target_lat) / 2;
-    const centerLng = (disruption.source_lng + disruption.target_lng) / 2;
+    const latLng = window.getDisruptionLatLng?.(disruption);
+    if (!latLng) {
+      showUpdateToast('Unable to locate disruption on current route', 'warning');
+      return;
+    }
     
-    // Get fields with compatibility layer
-    const severity = getDisruptionField(disruption, 'severity');
-    const incidentType = getDisruptionField(disruption, 'incident_type');
+    const severity = getDisruptionField(disruption, 'severity') || 'Medium';
+    const incidentType = getDisruptionField(disruption, 'incident_type') || 'Incident';
     const roadName = disruption.road_name || 'Unknown Road';
+    const jamFactor = getDisruptionField(disruption, 'jam_factor');
+    const currentSpeed = getDisruptionField(disruption, 'current_speed');
+    const timeImpact = getDisruptionField(disruption, 'time_impact_seconds');
+    const flowStatus = getDisruptionField(disruption, 'flow_status') || 'default';
     
-    // Center map on the disruption using Leaflet
-    map.setView([centerLat, centerLng], 16);
+    const severityColors = {
+      'Heavy': '#ef4444',
+      'Medium': '#f97316',
+      'Light': '#10b981'
+    };
+    const severityColor = severityColors[severity] || '#f97316';
+    const flowIcons = {
+      'blocked': '🚫',
+      'heavy': '🔴',
+      'moderate': '🟡',
+      'light': '🟢',
+      'free_flow': '✓',
+      'default': '!'
+    };
+    const flowIcon = flowIcons[flowStatus] || flowIcons.default;
     
-    // Map severity to color
-    const severityColor = severity === 'Heavy' ? '#ef4444' : 
-                         severity === 'Medium' ? '#f59e0b' : '#10b981';
+    map.setView([latLng.lat, latLng.lng], 16);
     
-    // Create a temporary marker to highlight the disruption using Leaflet
     const svgIcon = L.divIcon({
       html: `<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
               <circle cx="16" cy="16" r="12" fill="${severityColor}" stroke="white" stroke-width="2"/>
-              <text x="16" y="20" text-anchor="middle" fill="white" font-size="12" font-weight="bold">!</text>
+              <text x="16" y="21" text-anchor="middle" fill="white" font-size="14" font-weight="bold">${flowIcon}</text>
             </svg>`,
       className: 'custom-disruption-marker',
       iconSize: [32, 32],
       iconAnchor: [16, 16]
     });
     
-    const marker = L.marker([centerLat, centerLng], { 
+    const marker = L.marker([latLng.lat, latLng.lng], {
       icon: svgIcon,
       title: `${incidentType} on ${roadName}`
     }).addTo(map);
     
-    // Remove marker after 5 seconds
+    const popupContent = `
+      <div class="p-2 min-w-[220px]">
+        <div class="font-bold text-sm mb-1">${incidentType}</div>
+        <div class="text-xs text-slate-600">${roadName}</div>
+        ${typeof currentSpeed === 'number' ? `<div class="text-xs mt-1">Speed: <strong>${currentSpeed.toFixed(1)} km/h</strong></div>` : ''}
+        ${typeof jamFactor === 'number' ? `<div class="text-xs">Jam Factor: <strong>${jamFactor.toFixed(2)}</strong></div>` : ''}
+        ${typeof timeImpact === 'number' ? `<div class="text-xs">Impact: <strong>+${timeImpact.toFixed(0)}s</strong></div>` : ''}
+        <div class="text-xs mt-1">Status: <strong>${flowStatus.replace(/_/g, ' ')}</strong></div>
+      </div>
+    `;
+    marker.bindPopup(popupContent).openPopup();
+    
     setTimeout(() => {
-      map.removeLayer(marker);
+      if (map.hasLayer(marker)) {
+        map.removeLayer(marker);
+      }
     }, 5000);
     
-    // Close disruptions panel to see the map
     disruptionsPanel.classList.add("translate-x-full");
-    
     showUpdateToast(`Showing ${incidentType} on ${roadName}`, 'info');
 }
   
@@ -1145,11 +1177,12 @@ function displayDHLRoute(routeData) {
           return;
         }
         
-        // Convert coordinates to Leaflet format [lng, lat] -> [lat, lng]
-        const pathCoords = coords.map(coord => [coord[1], coord[0]]);
+  // Convert coordinates to Leaflet format [lng, lat] -> [lat, lng]
+  const pathCoords = coords.map(coord => [coord[1], coord[0]]);
+  const flowInfo = segment.flow || {};
         
-        // Get color from segment (use actual color from C++ data)
-        let segmentColor = segment.color || '#8b5cf6'; // Default DHL violet
+  // Get color from segment (use actual color from C++ data)
+  let segmentColor = flowInfo.color || segment.color || '#8b5cf6'; // Default DHL violet
         
         // Create polyline with segment-specific color
         const polyline = L.polyline(pathCoords, {
@@ -1160,13 +1193,13 @@ function displayDHLRoute(routeData) {
         }).addTo(map);
         
         // Build comprehensive popup with all edge details
-        const distance_m = segment.distance_meters || 0;
-        const distance_km = (distance_m / 1000).toFixed(2);
-        const highway_type = segment.highway_type || 'unknown';
-        const free_flow_speed = segment.free_flow_speed_kmh || 0;
-        const current_speed = segment.speed_kmh || free_flow_speed;
-        const jam_factor = segment.jam_factor || 0;
-        const flow_status = segment.flow_status || 'default';
+  const distance_m = segment.distance_meters || 0;
+  const distance_km = (distance_m / 1000).toFixed(2);
+  const highway_type = segment.highway_type || 'unknown';
+  const free_flow_speed = segment.free_flow_speed_kmh ?? flowInfo.free_flow_kph ?? 0;
+  const current_speed = flowInfo.speed_kph ?? segment.speed_kmh ?? free_flow_speed;
+  const jam_factor = flowInfo.jam_factor ?? segment.jam_factor ?? 0;
+  const flow_status = flowInfo.status || segment.flow_status || 'default';
         const is_closed = segment.is_closed || false;
         const incident_type = segment.incident_type || 'none';
         const incident_confidence = segment.incident_confidence || 0;
@@ -1371,16 +1404,13 @@ function displayDHLRoute(routeData) {
       updateRouteMetrics(routeData);
     }
 
-    // Update disruptions panel if data available
+    // Update disruption alert banner when summary available
     if (routeData.disruptions_summary) {
-      if (typeof updateDisruptionsPanel === 'function') {
-        updateDisruptionsPanel(routeData.disruptions_summary);
-      } else {
-        console.warn('updateDisruptionsPanel function not found');
-      }
-      
-      // Update disruption alert banner
+      window.currentDisruptionsSummary = routeData.disruptions_summary;
       displayRouteDisruptionAlert(routeData.disruptions_summary);
+    } else {
+      window.currentDisruptionsSummary = null;
+      displayRouteDisruptionAlert(null);
     }
 
     // Display alternative routes with transparent overlay
@@ -1423,6 +1453,10 @@ function displayDHC2LRoute(routeData) {
     }
     
     const route = routeData.route;
+    window.currentRouteData = routeData;
+    window.currentRouteGeometry = route.geometry || [];
+    window.currentDisruptionsSummary = routeData.disruptions_summary || null;
+    window.currentDisruptions = [];
     
     // Debug: Check if geometry exists
     console.log('🔍 HC2L route.geometry:', route.geometry);
@@ -1454,11 +1488,12 @@ function displayDHC2LRoute(routeData) {
           return;
         }
         
-        // Convert coordinates to Leaflet format [lng, lat] -> [lat, lng]
-        const pathCoords = coords.map(coord => [coord[1], coord[0]]);
+  // Convert coordinates to Leaflet format [lng, lat] -> [lat, lng]
+  const pathCoords = coords.map(coord => [coord[1], coord[0]]);
+  const flowInfo = segment.flow || {};
         
-        // Get color from segment (use actual color from C++ data)
-        let segmentColor = segment.color || '#0066FF'; // Default HC2L blue
+  // Get color from segment (use actual color from C++ data)
+  let segmentColor = flowInfo.color || segment.color || '#0066FF'; // Default HC2L blue
         
         // Create polyline with segment-specific color
         const polyline = L.polyline(pathCoords, {
@@ -1469,13 +1504,13 @@ function displayDHC2LRoute(routeData) {
         }).addTo(map);
         
         // Build comprehensive popup with all edge details
-        const distance_m = segment.distance_meters || 0;
-        const distance_km = (distance_m / 1000).toFixed(2);
-        const highway_type = segment.highway_type || 'unknown';
-        const free_flow_speed = segment.free_flow_speed_kmh || 0;
-        const current_speed = segment.speed_kmh || free_flow_speed;
-        const jam_factor = segment.jam_factor || 0;
-        const flow_status = segment.flow_status || 'default';
+  const distance_m = segment.distance_meters || 0;
+  const distance_km = (distance_m / 1000).toFixed(2);
+  const highway_type = segment.highway_type || 'unknown';
+  const free_flow_speed = segment.free_flow_speed_kmh ?? flowInfo.free_flow_kph ?? 0;
+  const current_speed = flowInfo.speed_kph ?? segment.speed_kmh ?? free_flow_speed;
+  const jam_factor = flowInfo.jam_factor ?? segment.jam_factor ?? 0;
+  const flow_status = flowInfo.status || segment.flow_status || 'default';
         const is_closed = segment.is_closed || false;
         const incident_type = segment.incident_type || 'none';
         const incident_confidence = segment.incident_confidence || 0;
@@ -1676,16 +1711,13 @@ function displayDHC2LRoute(routeData) {
       updateRouteMetrics(routeData);
     }
 
-    // Update disruptions panel if data available
+    // Update disruption alert banner when summary available
     if (routeData.disruptions_summary) {
-      if (typeof updateDisruptionsPanel === 'function') {
-        updateDisruptionsPanel(routeData.disruptions_summary);
-      } else {
-        console.warn('updateDisruptionsPanel function not found');
-      }
-      
-      // Update disruption alert banner
+      window.currentDisruptionsSummary = routeData.disruptions_summary;
       displayRouteDisruptionAlert(routeData.disruptions_summary);
+    } else {
+      window.currentDisruptionsSummary = null;
+      displayRouteDisruptionAlert(null);
     }
 
     // Display alternative routes with transparent overlay

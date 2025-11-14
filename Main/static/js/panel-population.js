@@ -492,11 +492,19 @@ window.populateDisruptionsPanel = function(routeData) {
   const disruptions = routeData.disruptions_summary;
   const routeDisruptions = disruptions.route || {};
   const networkDisruptions = disruptions.network || {};
+  const allDisruptions = Array.isArray(disruptions.all_disruptions)
+    ? disruptions.all_disruptions
+    : Array.isArray(disruptions.all)
+      ? disruptions.all
+      : [];
+  const resolvedRouteDisruptionTotal = typeof routeDisruptions.total_disrupted_edges === 'number'
+    ? routeDisruptions.total_disrupted_edges
+    : allDisruptions.length || 0;
   
   // Show disruption alert in Current Path Panel
   const alertContainer = document.getElementById('disruption-alert-container');
   if (alertContainer) {
-    const totalDisruptions = routeDisruptions.total_disrupted_edges || 0;
+  const totalDisruptions = resolvedRouteDisruptionTotal;
     if (totalDisruptions > 0) {
       alertContainer.classList.remove('hidden');
       
@@ -582,17 +590,27 @@ window.populateDisruptionsPanel = function(routeData) {
     'default': 0
   };
   
-  const totalDisruptions = routeDisruptions.total_disrupted_edges || 0;
-  
-  // Count disruptions by flow status from all_disruptions
-  if (disruptions.all_disruptions && disruptions.all_disruptions.length > 0) {
-    disruptions.all_disruptions.forEach(disruption => {
-      const status = disruption.flow_status || 'default';
-      if (flowStatuses.hasOwnProperty(status)) {
-        flowStatuses[status]++;
+  const flowBreakdown = routeDisruptions.flow_status_breakdown ||
+                        routeDisruptions.flow_statuses ||
+                        routeDisruptions.flow_breakdown;
+  if (flowBreakdown) {
+    Object.keys(flowStatuses).forEach(status => {
+      if (typeof flowBreakdown[status] === 'number') {
+        flowStatuses[status] = flowBreakdown[status];
       }
     });
   }
+  
+  const hasAggregateFlow = Object.values(flowStatuses).some(count => count > 0);
+  if (!hasAggregateFlow && allDisruptions.length > 0) {
+    allDisruptions.forEach(disruption => {
+      const statusRaw = (getDisruptionField(disruption, 'flow_status') || 'default').toLowerCase();
+      const status = flowStatuses.hasOwnProperty(statusRaw) ? statusRaw : 'default';
+      flowStatuses[status]++;
+    });
+  }
+  
+  const totalFlowSamples = Object.values(flowStatuses).reduce((sum, count) => sum + count, 0) || resolvedRouteDisruptionTotal;
   
   // Update counts and percentages
   const flowStatusElements = {
@@ -603,10 +621,10 @@ window.populateDisruptionsPanel = function(routeData) {
     'blocked': { count: 'flow-blocked-count', percent: 'flow-blocked-percent', bar: 'flow-blocked-bar' }
   };
   
-  if (totalDisruptions > 0) {
+  if (totalFlowSamples > 0) {
     Object.keys(flowStatusElements).forEach(status => {
       const count = flowStatuses[status] || 0;
-      const percent = ((count / totalDisruptions) * 100).toFixed(0);
+      const percent = totalFlowSamples > 0 ? ((count / totalFlowSamples) * 100).toFixed(0) : '0';
       
       const countEl = document.getElementById(flowStatusElements[status].count);
       const percentEl = document.getElementById(flowStatusElements[status].percent);
@@ -661,22 +679,44 @@ window.populateDisruptionsPanel = function(routeData) {
   const topDisruptionsList = document.getElementById('top-disruptions-list');
   const topDisruptionsCount = document.getElementById('top-disruptions-count');
   
-  if (topDisruptionsList && disruptions.all_disruptions && disruptions.all_disruptions.length > 0) {
-    const allDisruptions = disruptions.all_disruptions;
+  if (topDisruptionsList && allDisruptions.length > 0) {
+    const flowOnlyCount = allDisruptions.filter(d => {
+      const status = (getDisruptionField(d, 'flow_status') || '').toLowerCase();
+      return status && status !== 'default';
+    }).length;
+    const incidentCount = allDisruptions.filter(d => {
+      const incidentType = getDisruptionField(d, 'incident_type');
+      const roadClosed = getDisruptionField(d, 'road_closed');
+      return Boolean(incidentType) || roadClosed === true;
+    }).length;
     
-    // Update count
     if (topDisruptionsCount) {
-      topDisruptionsCount.textContent = `${allDisruptions.length} disruptions`;
+      topDisruptionsCount.textContent = `${allDisruptions.length} disruptions (${flowOnlyCount} flow • ${incidentCount} incident)`;
     }
     
     // Clear existing list
     topDisruptionsList.innerHTML = '';
     
-    // Show top 10 disruptions (or all if less than 10)
-    const displayCount = Math.min(allDisruptions.length, 10);
+    // Sort by most impactful disruptions first
+    const sortedDisruptions = [...allDisruptions].sort((a, b) => {
+      const aImpact = getDisruptionField(a, 'time_impact_seconds') ?? 0;
+      const bImpact = getDisruptionField(b, 'time_impact_seconds') ?? 0;
+      if (Math.abs(bImpact - aImpact) > 1e-3) {
+        return bImpact - aImpact;
+      }
+      const aSeverityScore = getDisruptionField(a, 'severity_score') ?? 0;
+      const bSeverityScore = getDisruptionField(b, 'severity_score') ?? 0;
+      if (Math.abs(bSeverityScore - aSeverityScore) > 1e-3) {
+        return bSeverityScore - aSeverityScore;
+      }
+      return 0;
+    });
+    
+    // Show top disruptions (max 10)
+    const displayCount = Math.min(sortedDisruptions.length, 10);
     
     for (let i = 0; i < displayCount; i++) {
-      const disruption = allDisruptions[i];
+      const disruption = sortedDisruptions[i];
       
       // Determine flow status color with both Tailwind classes and inline styles
       let flowColor = 'slate';
@@ -732,12 +772,22 @@ window.populateDisruptionsPanel = function(routeData) {
       const roadName = disruption.road_name || 'Unknown Road';
       const flowStatusDisplay = flowStatus.replace(/_/g, ' ').toUpperCase();
       const disruptionType = getDisruptionField(disruption, 'type') || 'Unknown';
-      const currentSpeed = getDisruptionField(disruption, 'current_speed') || 0;
-      const jamFactor = getDisruptionField(disruption, 'jam_factor') || 0;
+      const currentSpeed = getDisruptionField(disruption, 'current_speed');
+      const jamFactor = getDisruptionField(disruption, 'jam_factor');
       const timeImpact = getDisruptionField(disruption, 'time_impact_seconds');
-      const confidence = getDisruptionField(disruption, 'confidence');
+  const confidenceValue = getDisruptionField(disruption, 'confidence');
       const description = getDisruptionField(disruption, 'description');
       const roadClosed = getDisruptionField(disruption, 'road_closed');
+      const severityLevel = (getDisruptionField(disruption, 'severity_level') || mapSeverityToOld(getDisruptionField(disruption, 'severity')) || '').toString().toUpperCase();
+      const weightMultiplier = getDisruptionField(disruption, 'weight_multiplier');
+  const slowdownRatio = typeof currentSpeed === 'number' && currentSpeed >= 0 ? Math.min(currentSpeed / 50, 1) : null;
+      const delayMinutes = typeof slowdownRatio === 'number' ? Math.max(0, Math.round((1 - slowdownRatio) * 15)) : null;
+      const speedDisplay = typeof currentSpeed === 'number' ? `${currentSpeed.toFixed(1)} km/h` : 'N/A';
+      const jamDisplay = typeof jamFactor === 'number' ? jamFactor.toFixed(2) : 'N/A';
+      const impactDisplay = typeof timeImpact === 'number' ? `+${timeImpact.toFixed(0)}s` : 'N/A';
+      const multiplierDisplay = typeof weightMultiplier === 'number' ? `${weightMultiplier.toFixed(2)}x` : '--';
+      const delayDisplay = delayMinutes !== null ? `~${delayMinutes} min delay` : 'Impact data pending';
+  const confidenceDisplay = typeof confidenceValue === 'number' ? `${(confidenceValue * 100).toFixed(0)}%` : null;
       
       disruptionCard.innerHTML = `
         <div class="flex items-start gap-3">
@@ -752,31 +802,31 @@ window.populateDisruptionsPanel = function(routeData) {
               </div>
             </div>
             <div class="text-xs text-slate-600 space-y-1">
-              <div><strong>Type:</strong> ${disruptionType}</div>
+              <div class="flex items-center gap-2 flex-wrap">
+                <span><strong>Type:</strong> ${disruptionType}</span>
+                <span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 font-semibold">${severityLevel || 'SEVERITY TBD'}</span>
+              </div>
               <div><strong>Edge:</strong> ${disruption.source} → ${disruption.target}</div>
               ${description ? `<div class="italic text-slate-500">"${description}"</div>` : ''}
               <div class="flex items-center gap-3 mt-2 flex-wrap">
                 <div>
                   <strong>Speed:</strong> 
-                  <span class="font-semibold" style="color: ${flowIconColor};">${currentSpeed.toFixed(1)} km/h</span>
+                  <span class="font-semibold" style="color: ${flowIconColor};">${speedDisplay}</span>
                 </div>
                 <div>
                   <strong>Jam Factor:</strong> 
-                  <span class="font-semibold" style="color: ${flowIconColor};">${jamFactor.toFixed(2)}</span>
+                  <span class="font-semibold" style="color: ${flowIconColor};">${jamDisplay}</span>
                 </div>
-                ${timeImpact !== undefined ? `
-                  <div>
-                    <strong>Impact:</strong> 
-                    <span class="font-bold" style="color: ${flowIconColor};">+${timeImpact.toFixed(0)}s</span>
-                  </div>
-                ` : ''}
+                <div>
+                  <strong>Impact:</strong> 
+                  <span class="font-bold" style="color: ${flowIconColor};">${impactDisplay}</span>
+                </div>
               </div>
-              ${confidence !== undefined ? `
-                <div class="mt-1">
-                  <strong>Confidence:</strong> 
-                  <span class="font-semibold">${(confidence * 100).toFixed(0)}%</span>
-                </div>
-              ` : ''}
+              <div class="flex items-center gap-3 flex-wrap text-[11px] text-slate-500">
+                <span><strong>Weight:</strong> ${multiplierDisplay}</span>
+                ${confidenceDisplay ? `<span><strong>Confidence:</strong> ${confidenceDisplay}</span>` : ''}
+                ${delayMinutes !== null ? `<span><strong>Delay:</strong> ${delayDisplay}</span>` : ''}
+              </div>
               ${roadClosed ? `
                 <div class="text-red-600 font-bold mt-1">🚫 ROAD CLOSED</div>
               ` : ''}
@@ -784,6 +834,14 @@ window.populateDisruptionsPanel = function(routeData) {
           </div>
         </div>
       `;
+      
+      disruptionCard.addEventListener('click', () => {
+        if (typeof showDisruptionOnMap === 'function') {
+          showDisruptionOnMap(disruption);
+        } else {
+          showEdgeDetails(disruption);
+        }
+      });
       
       topDisruptionsList.appendChild(disruptionCard);
     }

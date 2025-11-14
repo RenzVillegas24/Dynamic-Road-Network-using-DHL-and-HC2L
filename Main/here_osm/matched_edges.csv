@@ -1,4 +1,4 @@
-traffic_hash,source_lat,source_lon,target_lat,target_lon,source,target
+id_hash,source_lat,source_lon,target_lat,target_lon,source,target
 xqsspa,14.6293428,121.0409496,14.6286652,121.0386239,10,11
 xqsspa,14.6293428,121.0409496,14.630081,121.0435496,10,9798
 xqsspa,14.6286652,121.0386239,14.6293428,121.0409496,11,10

@@ -6,7 +6,7 @@ Fetches HERE API traffic data periodically and generates edge files
 using hash-based matching with pre-matched edges.
 
 Output Format (CSV):
-    traffic_hash,source_lat,source_lon,target_lat,target_lon,source,target,speed_kph,freeFlow_kph,jamFactor,isClosed
+    id_hash,source_lat,source_lon,target_lat,target_lon,source,target,speed_kph,freeFlow_kph,jamFactor,isClosed
 
 Output Format (.gr):
     c <metadata>
@@ -222,7 +222,7 @@ class RealtimeTrafficService:
             if flow_edge and incident_edge:
                 # Merge: copy flow data into incident edge (which has empty flow fields)
                 merged_edge = TrafficEdge(
-                    traffic_hash=flow_edge.traffic_hash or incident_edge.traffic_hash,
+                    id_hash=flow_edge.id_hash or incident_edge.id_hash,
                     source=key[0],
                     target=key[1],
                     source_lat=flow_edge.source_lat or incident_edge.source_lat,

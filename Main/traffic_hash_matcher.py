@@ -34,7 +34,7 @@ from dataclasses import dataclass
 @dataclass
 class TrafficEdge:
     """Represents a traffic-matched OSM edge with separated flow and incident data"""
-    traffic_hash: str
+    id_hash: str
     source: int
     target: int
     source_lat: float
@@ -71,7 +71,7 @@ class TrafficEdge:
     def to_dict(self) -> Dict:
         """Convert to dictionary for CSV export with flow_* and incident_* prefixes"""
         return {
-            'traffic_hash': self.traffic_hash,
+            'id_hash': self.id_hash,
             'source_lat': self.source_lat,
             'source_lon': self.source_lon,
             'target_lat': self.target_lat,
@@ -204,9 +204,9 @@ class TrafficHashMatcher:
         found_attrs = 0
         missing_attrs = 0
         
-        # Group by traffic_hash
+        # Group by id_hash
         for _, row in df.iterrows():
-            traffic_hash = row['traffic_hash']
+            id_hash = row['id_hash']
             
             # matched_edges.csv NOW uses Sequential IDs directly (after conversion)
             seq_source = int(row['source'])
@@ -224,7 +224,7 @@ class TrafficHashMatcher:
                 missing_attrs += 1
             
             edge = TrafficEdge(
-                traffic_hash=traffic_hash,
+                id_hash=id_hash,
                 source=seq_source,  # Use sequential IDs directly from matched_edges.csv
                 target=seq_target,  # Use sequential IDs directly from matched_edges.csv
                 source_lat=float(row['source_lat']),
@@ -235,10 +235,10 @@ class TrafficHashMatcher:
                 road_name=road_name
             )
             
-            if traffic_hash not in self.hash_to_edges:
-                self.hash_to_edges[traffic_hash] = []
+            if id_hash not in self.hash_to_edges:
+                self.hash_to_edges[id_hash] = []
             
-            self.hash_to_edges[traffic_hash].append(edge)
+            self.hash_to_edges[id_hash].append(edge)
         
         print(f"   Loaded {len(self.hash_to_edges)} unique traffic segments")
         print(f"   Matched attributes: {found_attrs}/{found_attrs + missing_attrs} edges")
@@ -322,13 +322,13 @@ class TrafficHashMatcher:
             return []
         
         # Hash the location
-        traffic_hash = self.hash_location_javascript_style(location)
+        id_hash = self.hash_location_javascript_style(location)
         
         # Lookup matched edges
-        matched_edges = self.hash_to_edges.get(traffic_hash, [])
+        matched_edges = self.hash_to_edges.get(id_hash, [])
         
         if not matched_edges:
-            # print(f"⚠️  No match for hash: {traffic_hash}")
+            # print(f"⚠️  No match for hash: {id_hash}")
             return []
         
         # Extract FLOW DATA from HERE API
@@ -378,7 +378,7 @@ class TrafficHashMatcher:
         result_edges = []
         for edge in matched_edges:
             traffic_edge = TrafficEdge(
-                traffic_hash=edge.traffic_hash,
+                id_hash=edge.id_hash,
                 source=edge.source,
                 target=edge.target,
                 source_lat=edge.source_lat,
@@ -529,7 +529,7 @@ class TrafficHashMatcher:
             if item['frechet_distance'] <= best_frechet + tolerance:
                 edge = item['edge']
                 traffic_edge = TrafficEdge(
-                    traffic_hash=edge.traffic_hash,
+                    id_hash=edge.id_hash,
                     source=edge.source,
                     target=edge.target,
                     source_lat=edge.source_lat,
@@ -683,7 +683,7 @@ class TrafficHashMatcher:
                     result_edges = []
                     for edge in edges:
                         traffic_edge = TrafficEdge(
-                            traffic_hash=edge.traffic_hash,
+                            id_hash=edge.id_hash,
                             source=edge.source,
                             target=edge.target,
                             source_lat=edge.source_lat,
@@ -998,7 +998,7 @@ class TrafficHashMatcher:
         result_edges = []
         for edge in best_edges:
             traffic_edge = TrafficEdge(
-                traffic_hash=edge.traffic_hash,
+                id_hash=edge.id_hash,
                 source=edge.source,
                 target=edge.target,
                 source_lat=edge.source_lat,

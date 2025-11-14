@@ -179,9 +179,9 @@ build_dhl() {
 
     # Build routing API
     print_info "Compiling DHL routing API..."
-    if g++ -std=c++2a -O3 -Wall -Wextra -pthread \
+    if g++ -std=c++2a -O3 -Wall -Wextra -pthread -I../ApiUtils/src \
         -o "$BUILD_DIR/dhl/dhl_routing_api" \
-        src/dhl_routing_api.cpp src/road_network.cpp src/util.cpp; then
+        src/dhl_routing_api.cpp src/road_network.cpp src/util.cpp ../ApiUtils/src/base_road_network.cpp; then
         print_success "DHL routing API compiled"
     else
         print_error "DHL routing API compilation failed!"
@@ -190,9 +190,9 @@ build_dhl() {
 
     # Build index executable
     print_info "Compiling DHL index builder..."
-    if g++ -std=c++2a -O3 -Wall -Wextra -pthread \
+    if g++ -std=c++2a -O3 -Wall -Wextra -pthread -I../ApiUtils/src \
         -o "$BUILD_DIR/dhl/index" \
-        src/index.cpp src/road_network.cpp src/util.cpp; then
+        src/index.cpp src/road_network.cpp src/util.cpp ../ApiUtils/src/base_road_network.cpp; then
         print_success "DHL index builder compiled"
     else
         print_error "DHL index builder compilation failed!"
@@ -207,9 +207,9 @@ build_hc2l() {
 
     # Build routing API
     print_info "Compiling HC2L routing API..."
-    if g++ -std=c++20 -O3 -Wall -Wextra \
+    if g++ -std=c++20 -O3 -Wall -Wextra -I../ApiUtils/src \
         -o "$BUILD_DIR/hc2l/hc2l_routing_api" \
-        src/hc2l_routing_api.cpp src/road_network.cpp src/util.cpp; then
+        src/hc2l_routing_api.cpp src/road_network.cpp src/util.cpp ../ApiUtils/src/base_road_network.cpp; then
         print_success "HC2L routing API compiled"
     else
         print_error "HC2L routing API compilation failed!"
@@ -218,9 +218,9 @@ build_hc2l() {
 
     # Build index executable
     print_info "Compiling HC2L index builder..."
-    if g++ -std=c++20 -O3 -Wall -Wextra \
+    if g++ -std=c++20 -O3 -Wall -Wextra -I../ApiUtils/src \
         -o "$BUILD_DIR/hc2l/index" \
-        src/index.cpp src/road_network.cpp src/util.cpp; then
+        src/index.cpp src/road_network.cpp src/util.cpp ../ApiUtils/src/base_road_network.cpp; then
         print_success "HC2L index builder compiled"
     else
         print_error "HC2L index builder compilation failed!"

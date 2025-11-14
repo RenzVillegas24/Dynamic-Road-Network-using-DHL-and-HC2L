@@ -174,12 +174,6 @@ function initializeEventHandlers() {
           console.log('✅ Google Maps comparison cleared for new route');
         }
         
-        // Show "Current Route Only" button after route is calculated
-        const showCurrentRouteBtn = document.getElementById('show-current-route-only-btn');
-        if (showCurrentRouteBtn) {
-            showCurrentRouteBtn.style.display = 'flex';
-        }
-        
         // Enable "Compare with Google Maps" button after route is calculated
         const googleCompareBtn = document.getElementById('admin-google-compare-btn');
         if (googleCompareBtn) {

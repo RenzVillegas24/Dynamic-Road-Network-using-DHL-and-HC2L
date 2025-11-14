@@ -26,8 +26,6 @@ static const bool weighted_diff = false; // use edge weights for computing rough
 
 namespace road_network {
 
-static const NodeID NO_NODE = 0; // null value equivalent for integers identifying nodes
-static const SubgraphID NO_SUBGRAPH = 0; // used to indicate that node does not belong to any active subgraph
 static const uint16_t MAX_CUT_LEVEL = 58; // maximum height of decomposition tree; 58 bits to store binary path, plus 6 bits to store path length = 64 bit integer
 
 // profiling
@@ -180,59 +178,8 @@ static distance_t get_cut_level_distance(const CutIndex &a, const CutIndex &b, s
 
 //--------------------------- PBV -----------------------------------
 
-namespace PBV
-{
 
-uint64_t from(uint64_t bits, uint16_t length)
-{
-    if (length == 0)
-        return 0;
-    return (bits << (64 - length) >> (58 - length)) | length;
-}
-
-uint64_t partition(uint64_t bv)
-{
-    // cutlevel is stored in lowest 6 bits
-    return bv >> 6;
-}
-
-uint16_t cut_level(uint64_t bv)
-{
-    // cutlevel is stored in lowest 6 bits
-    return bv & 63ul;
-}
-
-uint16_t lca_level(uint64_t bv1, uint64_t bv2)
-{
-    // find lowest level at which partitions differ
-    uint16_t lca_level = min(cut_level(bv1), cut_level(bv2));
-    uint64_t p1 = partition(bv1), p2 = partition(bv2);
-    if (p1 != p2)
-    {
-        uint16_t diff_level = __builtin_ctzll(p1 ^ p2); // count trailing zeros
-        if (diff_level < lca_level)
-            lca_level = diff_level;
-    }
-    return lca_level;
-}
-
-uint64_t lca(uint64_t bv1, uint64_t bv2)
-{
-    uint64_t cut_level = lca_level(bv1, bv2);
-    // shifting by 64 does not work
-    if (cut_level == 0)
-        return 0;
-    return (bv1 >> 6) << (64 - cut_level) >> (58 - cut_level) | cut_level;
-}
-
-bool is_ancestor(uint64_t bv_ancestor, uint64_t bv_descendant)
-{
-    uint16_t cla = cut_level(bv_ancestor), cld = cut_level(bv_descendant);
-    // shifting by 64 does not work, so need to check for cla == 0
-    return cla == 0 || (cla <= cld && (bv_ancestor ^ bv_descendant) >> 6 << (64 - cla) == 0);
-}
-
-}
+// PBV namespace implementations moved to ApiUtils/src/base_road_network.cpp
 
 //--------------------------- FlatCutIndex --------------------------
 
@@ -802,6 +749,7 @@ ContractionIndex::ContractionIndex(istream& is)
 
 //--------------------------- Graph ---------------------------------
 
+// DHL-specific implementation of next_subgraph_id (uses atomic for thread safety)
 SubgraphID next_subgraph_id(bool reset)
 {
     static atomic<SubgraphID> next_id = 1;
@@ -810,81 +758,10 @@ SubgraphID next_subgraph_id(bool reset)
     return next_id++;
 }
 
-Neighbor::Neighbor(NodeID node, distance_t distance) : node(node), distance(distance)
-{
-}
+// Neighbor, Node, Edge, Partition, DiffData implementations moved to ApiUtils/src/base_road_network.cpp
+// MultiThreadNodeData implementations moved to ApiUtils/src/base_road_network.cpp
 
-bool Neighbor::operator<(const Neighbor &other) const
-{
-    return node < other.node;
-}
-
-Node::Node(SubgraphID subgraph_id) : subgraph_id(subgraph_id)
-{
-    distance = outcopy_distance = 0;
-    inflow = outflow = NO_NODE;
-    landmark_level = 0;
-}
-
-Node& MultiThreadNodeData::operator[](size_type pos)
-{
-    if (pos == Graph::s)
-        return s_data;
-    if (pos == Graph::t)
-        return t_data;
-    return vector::operator[](pos);
-}
-
-const Node& MultiThreadNodeData::operator[](size_type pos) const
-{
-    if (pos == Graph::s)
-        return s_data;
-    if (pos == Graph::t)
-        return t_data;
-    return vector::operator[](pos);
-}
-
-void MultiThreadNodeData::normalize()
-{
-    vector::operator[](Graph::s) = s_data;
-    vector::operator[](Graph::t) = t_data;
-}
-
-double Partition::rating() const
-{
-    size_t l = left.size(), r = right.size(), c = cut.size();
-    return min(l, r) / (c * c + 1.0);
-}
-
-Edge::Edge(NodeID a, NodeID b, distance_t d) : a(a), b(b), d(d)
-{
-}
-
-bool Edge::operator<(Edge other) const
-{
-    return a < other.a
-        || (a == other.a && b < other.b)
-        || (a == other.a && b == other.b && d < other.d);
-}
-
-int32_t DiffData::diff() const
-{
-    return static_cast<int32_t>(dist_a) - static_cast<int32_t>(dist_b);
-}
-
-distance_t DiffData::min() const
-{
-    return std::min(dist_a, dist_b);
-}
-
-DiffData::DiffData(NodeID node, distance_t dist_a, distance_t dist_b) : node(node), dist_a(dist_a), dist_b(dist_b)
-{
-}
-
-bool DiffData::cmp_diff(DiffData x, DiffData y)
-{
-    return x.diff() < y.diff();
-}
+//--------------------------- Graph ---------------------------------
 
 // definition of static members
 thread_local Node MultiThreadNodeData::s_data(NO_SUBGRAPH), MultiThreadNodeData::t_data(NO_SUBGRAPH);
@@ -901,9 +778,18 @@ void Graph::show_progress(bool state)
     log_progress_on = state;
 }
 
-bool Graph::contains(NodeID node) const
+// ============ BaseGraph Implementations ============
+// get_node_data() is algorithm-specific (accesses static node_data)
+// contains() is inherited from BaseGraph (uses virtual get_node_data())
+
+MultiThreadNodeData& Graph::get_node_data()
 {
-    return node_data[node].subgraph_id == subgraph_id;
+    return node_data;
+}
+
+const MultiThreadNodeData& Graph::get_node_data() const
+{
+    return node_data;
 }
 
 Graph::Graph(size_t node_count)
@@ -980,18 +866,6 @@ void Graph::update_edge(NodeID v, NodeID w, distance_t d)
                 }
 }
 
-void Graph::remove_isolated()
-{
-    unordered_set<NodeID> isolated;
-    for (NodeID node : nodes)
-        if (degree(node) == 0)
-        {
-            isolated.insert(node);
-            node_data[node].subgraph_id = NO_SUBGRAPH;
-        }
-    std::erase_if(nodes, [&isolated](NodeID node) { return isolated.contains(node); });
-}
-
 void Graph::reset()
 {
     nodes.clear();
@@ -1007,77 +881,15 @@ void Graph::reset()
     node_data[t].subgraph_id = NO_SUBGRAPH;
 }
 
-void Graph::add_node(NodeID v)
-{
-    assert(v < node_data.size());
-    nodes.push_back(v);
-    node_data[v].subgraph_id = subgraph_id;
-}
-
-void Graph::remove_nodes(const vector<NodeID> &node_set)
-{
-    util::remove_set(nodes, node_set);
-    for (NodeID node : node_set)
-        node_data[node].subgraph_id = NO_NODE;
-}
-
-size_t Graph::node_count() const
-{
-    return nodes.size();
-}
-
-size_t Graph::edge_count() const
-{
-    size_t ecount = 0;
-    for (NodeID node : nodes)
-        for (Neighbor n : node_data[node].neighbors)
-            if (contains(n.node))
-                ecount++;
-    return ecount / 2;
-}
-
-size_t Graph::degree(NodeID v) const
-{
-    assert(contains(v));
-    size_t deg = 0;
-    for (Neighbor n : node_data[v].neighbors)
-        if (contains(n.node))
-            deg++;
-    return deg;
-}
-
-Neighbor Graph::single_neighbor(NodeID v) const
-{
-    assert(contains(v));
-    Neighbor neighbor(NO_NODE, 0);
-    for (Neighbor n : node_data[v].neighbors)
-        if (contains(n.node))
-        {
-            if (neighbor.node == NO_NODE)
-                neighbor = n;
-            else
-                return Neighbor(NO_NODE, 0);
-        }
-    return neighbor;
-}
+// All other common graph operations are now inherited from BaseGraph:
+// - add_node(), remove_nodes(), single_neighbor(), remove_isolated()
+// - node_count(), edge_count(), degree()
+// - get_nodes(), get_edges(), show_progress()
+// These use virtual get_node_data() and require no separate implementation
 
 size_t Graph::super_node_count()
 {
     return node_data.size() - 3;
-}
-
-const vector<NodeID>& Graph::get_nodes() const
-{
-    return nodes;
-}
-
-void Graph::get_edges(vector<Edge> &edges) const
-{
-    edges.clear();
-    for (NodeID a : nodes)
-        for (const Neighbor &n : node_data[a].neighbors)
-            if (n.node > a && contains(n.node))
-                edges.push_back(Edge(a, n.node, n.distance));
 }
 
 void Graph::assign_nodes()
@@ -3231,28 +3043,7 @@ ostream& operator<<(ostream& os, const ContractionLabel &cl)
     return os << "CL(" << cl.cut_index << ",d=" << cl.distance_offset << ",p=" << cl.parent << ")";
 }
 
-ostream& operator<<(ostream& os, const Neighbor &n)
-{
-    if (n.distance == 1)
-        return os << n.node;
-    else
-        return os << n.node << "@" << Dist(n.distance);
-}
-
-ostream& operator<<(ostream& os, const Node &n)
-{
-    return os << "N(" << n.subgraph_id << "#" << n.neighbors << ")";
-}
-
-ostream& operator<<(ostream& os, const Partition &p)
-{
-    return os << "P(" << p.left << "|" << p.cut << "|" << p.right << ")";
-}
-
-ostream& operator<<(ostream& os, const DiffData &dd)
-{
-    return os << "D(" << dd.node << "@" << dd.dist_a << "-" << dd.dist_b << "=" << dd.diff() << ")";
-}
+// operator<< for Neighbor, Node, Partition, DiffData moved to ApiUtils/src/base_road_network.cpp
 
 ostream& operator<<(ostream& os, const Graph &g)
 {
