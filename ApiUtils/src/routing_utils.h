@@ -762,19 +762,168 @@ inline map<NodeID, vector<Neighbor>> load_edges(const string& filename, map<pair
 // ============================================================
 
 /**
- * Load and cache disruption data from CSV file
- * Supports both flow data and incident data
- * Uses file modification time to detect changes
+ * Find the latest file matching a pattern in a directory
+ * @param directory - Directory path to search
+ * @param prefix - File prefix pattern (e.g., "flow_" or "incident_")
+ * @return Full path to latest file, or empty string if not found
  */
-extern map<pair<NodeID, NodeID>, string> g_highway_types;  // Highway types (defined in routing API files)
+inline string find_latest_file(const string& directory, const string& prefix) {
+    string latest_file = "";
+    time_t latest_time = 0;
+    
+    // Use system command to find files (portable across Linux/Unix)
+    string cmd = "ls -t " + directory + "/" + prefix + "*.csv 2>/dev/null | head -n 1";
+    FILE* pipe = popen(cmd.c_str(), "r");
+    if (!pipe) return "";
+    
+    char buffer[512];
+    if (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
+        latest_file = string(buffer);
+        // Remove trailing newline
+        if (!latest_file.empty() && latest_file[latest_file.length() - 1] == '\n') {
+            latest_file.erase(latest_file.length() - 1);
+        }
+    }
+    pclose(pipe);
+    
+    return latest_file;
+}
 
-// Forward declaration of compute_disruption_metrics
-// (defined in each routing API implementation: dhl_routing_api.cpp, hc2l_routing_api.cpp)
-EdgeDisruptionMetrics compute_disruption_metrics(
+/**
+ * Get disruption directory from a base path
+ * Extracts the directory containing the data files
+ * @param base_path - Path like "/path/to/Main/data/raw/quezon_city_nodes.csv"
+ * @return Directory path like "/path/to/Main/data/disruptions"
+ */
+inline string get_disruptions_base_dir(const string& base_path) {
+    size_t last_slash = base_path.find_last_of('/');
+    if (last_slash == string::npos) return "";
+    
+    string parent_dir = base_path.substr(0, last_slash);  // /path/to/Main/data/raw
+    last_slash = parent_dir.find_last_of('/');
+    if (last_slash == string::npos) return "";
+    
+    string data_dir = parent_dir.substr(0, last_slash);  // /path/to/Main/data
+    return data_dir + "/disruptions";
+}
+
+/**
+ * Compute disruption metrics based on Table 8 from LazyHC2L Team Guide
+ * Priority: Incident data overrides flow data when both exist
+ * 
+ * Table 8 Logic:
+ * - If incident exists: Use incident criticality + jam_factor (if available)
+ * - If only flow exists: Use jam_factor only
+ * - Speed: Prefer flow_speed_kph > flow_free_flow_kph > highway default
+ * - Severity mapping: minor/major/severe/critical → low/medium/high/critical
+ */
+inline EdgeDisruptionMetrics compute_disruption_metrics(
     const IncidentInfo* incident,
     const TrafficFlowData* flow,
     const string& highway_type,
-    distance_t base_distance);
+    distance_t base_distance) {
+    
+    EdgeDisruptionMetrics metrics;
+    metrics.old_weight = base_distance;
+    
+    // PRIORITY: Incident data overrides flow data
+    if (incident && incident->has_incident()) {
+        // === INCIDENT-BASED SEVERITY ===
+        // Map incident criticality (minor/major/severe/critical) to severity level
+        string criticality = incident->criticality;
+        
+        if (incident->road_closed) {
+            metrics.severity_level = "critical";
+            metrics.severity_score = 1.0;
+            metrics.weight_multiplier = 100.0;  // Effectively block the edge
+        } else if (criticality == "critical") {
+            metrics.severity_level = "critical";
+            metrics.severity_score = 1.0;
+            metrics.weight_multiplier = 10.0;
+        } else if (criticality == "severe") {
+            metrics.severity_level = "high";
+            metrics.severity_score = 0.75;
+            metrics.weight_multiplier = 5.0;
+        } else if (criticality == "major") {
+            metrics.severity_level = "medium";
+            metrics.severity_score = 0.5;
+            metrics.weight_multiplier = 3.0;
+        } else if (criticality == "minor") {
+            metrics.severity_level = "low";
+            metrics.severity_score = 0.25;
+            metrics.weight_multiplier = 1.5;
+        } else {
+            // Unknown criticality - use conservative medium severity
+            metrics.severity_level = "medium";
+            metrics.severity_score = 0.5;
+            metrics.weight_multiplier = 2.0;
+        }
+        
+        // If flow data also available, adjust severity based on jam_factor
+        if (flow && flow->jam_factor > 0.0) {
+            double jam_factor = flow->jam_factor;
+            if (jam_factor >= 8.0) {
+                // Heavy traffic + incident = escalate severity
+                if (metrics.severity_score < 0.75) metrics.severity_score = 0.75;
+                if (metrics.severity_level == "low" || metrics.severity_level == "medium") {
+                    metrics.severity_level = "high";
+                    metrics.weight_multiplier = max(metrics.weight_multiplier, 5.0);
+                }
+            } else if (jam_factor >= 5.0) {
+                // Medium traffic + incident
+                if (metrics.severity_score < 0.5) metrics.severity_score = 0.5;
+            }
+        }
+        
+    } else if (flow && flow->jam_factor > 0.0) {
+        // === FLOW-ONLY SEVERITY (no incident) ===
+        double jam_factor = flow->jam_factor;
+        
+        if (jam_factor >= 8.0) {
+            metrics.severity_level = "high";
+            metrics.severity_score = 0.75;
+            metrics.weight_multiplier = 4.0;
+        } else if (jam_factor >= 5.0) {
+            metrics.severity_level = "medium";
+            metrics.severity_score = 0.5;
+            metrics.weight_multiplier = 2.0;
+        } else if (jam_factor >= 2.0) {
+            metrics.severity_level = "low";
+            metrics.severity_score = 0.25;
+            metrics.weight_multiplier = 1.3;
+        } else {
+            metrics.severity_level = "none";
+            metrics.severity_score = 0.0;
+            metrics.weight_multiplier = 1.0;
+        }
+    } else {
+        // No disruption data
+        metrics.severity_level = "none";
+        metrics.severity_score = 0.0;
+        metrics.weight_multiplier = 1.0;
+    }
+    
+    // Compute impact metrics
+    metrics.new_weight = static_cast<distance_t>(base_distance * metrics.weight_multiplier);
+    metrics.impact_score = metrics.severity_score;
+    
+    // Estimate time impact based on speed reduction
+    // Assume default highway speed and compute extra time from multiplier
+    double default_speed_kph = get_highway_speed(highway_type);
+    double distance_km = base_distance / 1000.0;
+    double base_time_seconds = (distance_km / default_speed_kph) * 3600.0;
+    double new_time_seconds = base_time_seconds * metrics.weight_multiplier;
+    metrics.time_impact_seconds = new_time_seconds - base_time_seconds;
+    
+    return metrics;
+}
+
+/**
+ * Load and cache disruption data from flow and incident CSV files
+ * NEW: Reads from separate flow/ and incidents/ directories
+ * Uses file modification time to detect changes
+ */
+extern map<pair<NodeID, NodeID>, string> g_highway_types;  // Highway types (defined in routing API files)
 
 inline bool load_disruptions_with_cache(
     const string& disruption_file,
@@ -783,285 +932,204 @@ inline bool load_disruptions_with_cache(
     const map<NodeID, vector<Neighbor>>& adj_list,
     const map<pair<NodeID, NodeID>, EdgeGeometry>& edge_geometries = map<pair<NodeID, NodeID>, EdgeGeometry>()) {
     
-    // FORCE CSV: Convert .gr file path to .csv
-    string actual_file = disruption_file;
-    if (actual_file.size() > 3 && actual_file.substr(actual_file.size() - 3) == ".gr") {
-        actual_file = actual_file.substr(0, actual_file.size() - 3) + ".csv";
-        cerr << "🔧 FORCE CSV: Converted .gr to .csv: " << actual_file << endl;
+    // NEW: disruption_file is now the base directory path
+    // We find the latest flow and incident files from their respective directories
+    string disruptions_base = disruption_file;
+    
+    // If disruption_file points to an old file format, extract base directory
+    if (disruptions_base.find("traffic_") != string::npos || 
+        disruptions_base.find(".csv") != string::npos ||
+        disruptions_base.find(".gr") != string::npos) {
+        disruptions_base = get_disruptions_base_dir(disruptions_base);
     }
     
-    // Check if cache is valid
-    if (g_disruption_cache.is_valid(actual_file)) {
+    string flow_dir = disruptions_base + "/flow";
+    string incidents_dir = disruptions_base + "/incidents";
+    
+    cerr << "🔍 Loading disruptions from:" << endl;
+    cerr << "   Flow dir: " << flow_dir << endl;
+    cerr << "   Incidents dir: " << incidents_dir << endl;
+    
+    // Find latest flow and incident files
+    string latest_flow_file = find_latest_file(flow_dir, "flow_");
+    string latest_incident_file = find_latest_file(incidents_dir, "incident_");
+    
+    cerr << "   Latest flow: " << (latest_flow_file.empty() ? "none" : latest_flow_file) << endl;
+    cerr << "   Latest incident: " << (latest_incident_file.empty() ? "none" : latest_incident_file) << endl;
+    
+    // Build cache key from both files
+    string cache_key = latest_flow_file + "|" + latest_incident_file;
+    
+    // Check if cache is valid for both files
+    if (g_disruption_cache.is_valid(cache_key)) {
         // SILENT CACHE HIT - don't spam logs on every route calculation
         incidents_out = g_disruption_cache.incidents;
         flow_out = g_disruption_cache.flow_data;
         return true;
     }
     
-    // Cache invalid or file changed - reload
-    cerr << "🔄 Traffic data updated - Loading new disruptions from CSV file" << endl;
-    
-    ifstream disrupt_file(actual_file);
-    if (!disrupt_file.is_open()) {
-        cerr << "⚠️  Could not open disruption file: " << actual_file << endl;
-        return false;
-    }
+    // Cache invalid or files changed - reload
+    cerr << "🔄 Loading new flow and incident data" << endl;
     
     incidents_out.clear();
     flow_out.clear();
     
-    int total_count = 0;
+    int total_flow = 0;
+    int total_incidents = 0;
     int closures = 0;
-    int active_disruptions = 0;
     
-    string line;
-    bool is_csv_format = true;
-    int source_col = -1, target_col = -1, speed_col = -1, freeflow_col = -1;
-    int jam_col = -1, closed_col = -1, length_col = -1;
-    int flow_confidence_col = -1, flow_traversability_col = -1;
-    int incident_id_col = -1, incident_type_col = -1, incident_criticality_col = -1;
-    int incident_description_col = -1, incident_road_closed_col = -1;
-    int incident_start_time_col = -1, incident_end_time_col = -1;
-    
-    // Read and parse CSV header
-    if (getline(disrupt_file, line)) {
-        cerr << "   📋 Parsing CSV header..." << endl;
-        
-        vector<string> headers = parse_csv_line(line);
-        for (size_t i = 0; i < headers.size(); i++) {
-            string h = headers[i];
-            h.erase(0, h.find_first_not_of(" \t\n\r"));
-            h.erase(h.find_last_not_of(" \t\n\r") + 1);
+    // === LOAD FLOW DATA ===
+    if (!latest_flow_file.empty()) {
+        ifstream flow_file(latest_flow_file);
+        if (flow_file.is_open()) {
+            cerr << "📊 Loading flow data from: " << latest_flow_file << endl;
+            string line;
+            int source_col = -1, target_col = -1, speed_col = -1, freeflow_col = -1, jam_col = -1;
+            int flow_confidence_col = -1, flow_traversability_col = -1;
             
-            if (h == "source") source_col = i;
-            else if (h == "target") target_col = i;
-            else if (h == "flow_speed_kph") speed_col = i;
-            else if (h == "speed_kph") speed_col = i;
-            else if (h == "flow_free_flow_kph") freeflow_col = i;
-            else if (h == "freeFlow_kph") freeflow_col = i;
-            else if (h == "flow_jam_factor") jam_col = i;
-            else if (h == "jamFactor") jam_col = i;
-            else if (h == "flow_confidence") flow_confidence_col = i;
-            else if (h == "flow_traversability") flow_traversability_col = i;
-            else if (h == "isClosed") closed_col = i;
-            else if (h == "segmentLength") length_col = i;
-            else if (h == "incident_id") incident_id_col = i;
-            else if (h == "incident_type") incident_type_col = i;
-            else if (h == "incident_criticality") incident_criticality_col = i;
-            else if (h == "incident_description") incident_description_col = i;
-            else if (h == "incident_road_closed") incident_road_closed_col = i;
-            else if (h == "incident_start_time") incident_start_time_col = i;
-            else if (h == "incident_end_time") incident_end_time_col = i;
-        }
-        
-        cerr << "   Column mapping: source=" << source_col << ", target=" << target_col 
-             << ", speed=" << speed_col << ", freeflow=" << freeflow_col << endl;
-    }
-    
-    while (getline(disrupt_file, line)) {
-        if (line.empty() || line[0] == 'c' || line[0] == 'p') continue;
-        
-        NodeID source, target;
-        distance_t new_weight = 0;
-        double jam_factor = 5.0, current_speed = 0.0, free_flow_speed = 50.0;
-        double impact_score = 0.5;
-        string highway_type = "unknown", disruption_type = "unknown";
-        int is_closed = 0;
-        
-        string incident_id_val = "";
-        string incident_type_val = "";
-        string incident_criticality_val = "";
-        string incident_description_val = "";
-        string incident_start_time_val = "";
-        string incident_end_time_val = "";
-        int incident_road_closed = 0;
-        double flow_confidence_val = 0.99;
-        string flow_traversability_val = "open";
-        
-        if (is_csv_format) {
-            vector<string> fields = parse_csv_line(line);
-            
-            if (source_col < 0 || target_col < 0 || 
-                (int)fields.size() <= max(source_col, target_col)) continue;
-            
-            try {
-                source = stoul(fields[source_col]);
-                target = stoul(fields[target_col]);
-                
-                if (speed_col >= 0 && speed_col < (int)fields.size()) 
-                    current_speed = stod(fields[speed_col]);
-                if (freeflow_col >= 0 && freeflow_col < (int)fields.size()) 
-                    free_flow_speed = stod(fields[freeflow_col]);
-                if (jam_col >= 0 && jam_col < (int)fields.size()) 
-                    jam_factor = stod(fields[jam_col]);
-                
-                if (incident_id_col >= 0 && incident_id_col < (int)fields.size() && !fields[incident_id_col].empty()) {
-                    incident_id_val = fields[incident_id_col];
-                }
-                if (incident_type_col >= 0 && incident_type_col < (int)fields.size() && !fields[incident_type_col].empty()) {
-                    incident_type_val = fields[incident_type_col];
-                }
-                if (incident_criticality_col >= 0 && incident_criticality_col < (int)fields.size()) {
-                    incident_criticality_val = fields[incident_criticality_col];
-                }
-                if (incident_description_col >= 0 && incident_description_col < (int)fields.size()) {
-                    incident_description_val = fields[incident_description_col];
-                }
-                if (incident_road_closed_col >= 0 && incident_road_closed_col < (int)fields.size()) {
-                    string closed_str = fields[incident_road_closed_col];
-                    incident_road_closed = (closed_str == "True" || closed_str == "true" || closed_str == "1") ? 1 : 0;
-                }
-                if (incident_start_time_col >= 0 && incident_start_time_col < (int)fields.size()) {
-                    incident_start_time_val = fields[incident_start_time_col];
-                }
-                if (incident_end_time_col >= 0 && incident_end_time_col < (int)fields.size()) {
-                    incident_end_time_val = fields[incident_end_time_col];
-                }
-                
-                if (flow_confidence_col >= 0 && flow_confidence_col < (int)fields.size() && !fields[flow_confidence_col].empty()) {
-                    flow_confidence_val = stod(fields[flow_confidence_col]);
-                }
-                if (flow_traversability_col >= 0 && flow_traversability_col < (int)fields.size() && !fields[flow_traversability_col].empty()) {
-                    flow_traversability_val = fields[flow_traversability_col];
-                }
-                
-                if (!incident_type_val.empty() && incident_road_closed) {
-                    is_closed = 1;
-                    disruption_type = incident_type_val;
+            // Parse flow CSV header
+            if (getline(flow_file, line)) {
+                vector<string> headers = parse_csv_line(line);
+                for (size_t i = 0; i < headers.size(); i++) {
+                    string h = headers[i];
+                    h.erase(0, h.find_first_not_of(" \t\n\r"));
+                    h.erase(h.find_last_not_of(" \t\n\r") + 1);
                     
-                    string crit_lower = incident_criticality_val;
-                    transform(crit_lower.begin(), crit_lower.end(), crit_lower.begin(), ::tolower);
-                    
-                    if (crit_lower.find("critical") != string::npos) {
-                        jam_factor = max(jam_factor, 9.0);
-                    } else if (crit_lower.find("severe") != string::npos) {
-                        jam_factor = max(jam_factor, 7.0);
-                    } else if (crit_lower.find("major") != string::npos) {
-                        jam_factor = max(jam_factor, 5.0);
-                    } else if (crit_lower.find("minor") != string::npos) {
-                        jam_factor = max(jam_factor, 2.0);
-                    }
-                } else if (closed_col >= 0 && closed_col < (int)fields.size()) {
-                    string closed_str = fields[closed_col];
-                    is_closed = (closed_str == "True" || closed_str == "true" || closed_str == "1") ? 1 : 0;
+                    if (h == "source") source_col = i;
+                    else if (h == "target") target_col = i;
+                    else if (h == "flow_speed_kph") speed_col = i;
+                    else if (h == "flow_free_flow_kph") freeflow_col = i;
+                    else if (h == "flow_jam_factor") jam_col = i;
+                    else if (h == "flow_confidence") flow_confidence_col = i;
+                    else if (h == "flow_traversability") flow_traversability_col = i;
                 }
-                
-                if (length_col >= 0 && length_col < (int)fields.size()) {
-                    new_weight = static_cast<distance_t>(stod(fields[length_col]));
-                }
-                
-                if (free_flow_speed == 0.0) {
-                    if (fields.size() > 11) {
-                        string hw_type = fields[11];
-                        if (hw_type.find("motorway") != string::npos) free_flow_speed = 110.0;
-                        else if (hw_type.find("trunk") != string::npos) free_flow_speed = 90.0;
-                        else if (hw_type.find("primary") != string::npos) free_flow_speed = 70.0;
-                        else if (hw_type.find("secondary") != string::npos) free_flow_speed = 60.0;
-                        else if (hw_type.find("tertiary") != string::npos) free_flow_speed = 50.0;
-                        else if (hw_type.find("residential") != string::npos) free_flow_speed = 40.0;
-                        else free_flow_speed = 50.0;
-                    } else {
-                        free_flow_speed = 50.0;
-                    }
-                }
-                
-                if (is_closed) {
-                    disruption_type = "road_closure";
-                    new_weight = 999999.0;
-                } else if (jam_factor >= 8.0) {
-                    disruption_type = "accident";
-                } else if (jam_factor >= 5.0) {
-                    disruption_type = "congestion";
-                } else {
-                    disruption_type = "normal";
-                }
-                
-                if (free_flow_speed >= 80) {
-                    highway_type = "motorway";
-                } else if (free_flow_speed >= 60) {
-                    highway_type = "trunk";
-                } else if (free_flow_speed >= 50) {
-                    highway_type = "primary";
-                } else if (free_flow_speed >= 40) {
-                    highway_type = "secondary";
-                } else {
-                    highway_type = "residential";
-                }
-                
-                double speed_reduction = (free_flow_speed > 0) ? 
-                    (free_flow_speed - current_speed) / free_flow_speed : 0.0;
-                impact_score = min(1.0, max(0.0, jam_factor / 10.0 * 0.5 + speed_reduction * 0.5));
-                
-                if (!is_closed) {
-                    distance_t old_weight = 0;
-                    if (adj_list.count(source)) {
-                        for (const auto& neighbor : adj_list.at(source)) {
-                            if (neighbor.node == target) {
-                                old_weight = neighbor.distance;
-                                break;
-                            }
-                        }
-                    }
-                    
-                    if (current_speed > 0.1 && free_flow_speed > 0.1) {
-                        double speed_ratio = free_flow_speed / current_speed;
-                        speed_ratio = min(10.0, max(1.0, speed_ratio));
-                        new_weight = static_cast<distance_t>(old_weight * speed_ratio);
-                    } else {
-                        double flow_multiplier = 1.0 + (jam_factor / 10.0) * 4.0;
-                        new_weight = static_cast<distance_t>(old_weight * flow_multiplier);
-                    }
-                }
-                
-            } catch (const exception& e) {
-                cerr << "⚠️  Error parsing CSV line: " << e.what() << endl;
-                continue;
             }
-        } else {
-            istringstream iss(line);
-            if (!(iss >> source >> target >> new_weight)) continue;
-            iss >> jam_factor >> current_speed >> free_flow_speed 
-                >> impact_score >> highway_type >> is_closed >> disruption_type;
-        }
-        
-        auto edge_key = make_pair(source, target);
-        
-        IncidentInfo incident;
-        incident.id = incident_id_val;
-        incident.type = incident_type_val;
-        incident.criticality = incident_criticality_val;
-        incident.description = incident_description_val;
-        incident.road_closed = (incident_road_closed == 1);
-        incident.start_time = incident_start_time_val;
-        incident.end_time = incident_end_time_val;
-        
-        if (incident.has_incident() || incident.road_closed) {
-            incidents_out[edge_key] = incident;
-        }
-        
-        TrafficFlowData flow = get_flow_color(jam_factor, current_speed, free_flow_speed);
-        
-        if (is_csv_format) {
-            flow.confidence = flow_confidence_val;
-            flow.traversability = flow_traversability_val;
-        }
-        
-        flow_out[edge_key] = flow;
-        
-        total_count++;
-        if (is_closed || new_weight >= 999999.0) {
-            closures++;
-        } else {
-            active_disruptions++;
+            
+            // Parse flow data rows
+            while (getline(flow_file, line)) {
+                if (line.empty()) continue;
+                
+                vector<string> fields = parse_csv_line(line);
+                if (source_col < 0 || target_col < 0 || 
+                    (int)fields.size() <= max(source_col, target_col)) continue;
+                
+                try {
+                    NodeID source = stoul(fields[source_col]);
+                    NodeID target = stoul(fields[target_col]);
+                    
+                    double current_speed = (speed_col >= 0 && speed_col < (int)fields.size()) 
+                        ? stod(fields[speed_col]) : 0.0;
+                    double free_flow_speed = (freeflow_col >= 0 && freeflow_col < (int)fields.size()) 
+                        ? stod(fields[freeflow_col]) : 50.0;
+                    double jam_factor = (jam_col >= 0 && jam_col < (int)fields.size()) 
+                        ? stod(fields[jam_col]) : 0.0;
+                    double flow_confidence = (flow_confidence_col >= 0 && flow_confidence_col < (int)fields.size()) 
+                        ? stod(fields[flow_confidence_col]) : 0.99;
+                    string flow_traversability = (flow_traversability_col >= 0 && flow_traversability_col < (int)fields.size()) 
+                        ? fields[flow_traversability_col] : "open";
+                    
+                    auto edge_key = make_pair(source, target);
+                    TrafficFlowData flow = get_flow_color(jam_factor, current_speed, free_flow_speed);
+                    flow.confidence = flow_confidence;
+                    flow.traversability = flow_traversability;
+                    flow_out[edge_key] = flow;
+                    total_flow++;
+                } catch (const exception& e) {
+                    continue;
+                }
+            }
+            flow_file.close();
+            cerr << "   ✅ Loaded " << total_flow << " flow edges" << endl;
         }
     }
     
-    disrupt_file.close();
+    // === LOAD INCIDENT DATA ===
+    if (!latest_incident_file.empty()) {
+        ifstream incident_file(latest_incident_file);
+        if (incident_file.is_open()) {
+            cerr << "🚨 Loading incident data from: " << latest_incident_file << endl;
+            string line;
+            int source_col = -1, target_col = -1;
+            int incident_id_col = -1, incident_type_col = -1, incident_criticality_col = -1;
+            int incident_description_col = -1, incident_road_closed_col = -1;
+            int incident_start_time_col = -1, incident_end_time_col = -1;
+            
+            // Parse incident CSV header
+            if (getline(incident_file, line)) {
+                vector<string> headers = parse_csv_line(line);
+                for (size_t i = 0; i < headers.size(); i++) {
+                    string h = headers[i];
+                    h.erase(0, h.find_first_not_of(" \t\n\r"));
+                    h.erase(h.find_last_not_of(" \t\n\r") + 1);
+                    
+                    if (h == "source") source_col = i;
+                    else if (h == "target") target_col = i;
+                    else if (h == "incident_id") incident_id_col = i;
+                    else if (h == "incident_type") incident_type_col = i;
+                    else if (h == "incident_criticality") incident_criticality_col = i;
+                    else if (h == "incident_description") incident_description_col = i;
+                    else if (h == "incident_road_closed") incident_road_closed_col = i;
+                    else if (h == "incident_start_time") incident_start_time_col = i;
+                    else if (h == "incident_end_time") incident_end_time_col = i;
+                }
+            }
+            
+            // Parse incident data rows
+            while (getline(incident_file, line)) {
+                if (line.empty()) continue;
+                
+                vector<string> fields = parse_csv_line(line);
+                if (source_col < 0 || target_col < 0 || 
+                    (int)fields.size() <= max(source_col, target_col)) continue;
+                
+                try {
+                    NodeID source = stoul(fields[source_col]);
+                    NodeID target = stoul(fields[target_col]);
+                    
+                    IncidentInfo incident;
+                    incident.id = (incident_id_col >= 0 && incident_id_col < (int)fields.size()) 
+                        ? fields[incident_id_col] : "";
+                    incident.type = (incident_type_col >= 0 && incident_type_col < (int)fields.size()) 
+                        ? fields[incident_type_col] : "";
+                    incident.criticality = (incident_criticality_col >= 0 && incident_criticality_col < (int)fields.size()) 
+                        ? fields[incident_criticality_col] : "";
+                    incident.description = (incident_description_col >= 0 && incident_description_col < (int)fields.size()) 
+                        ? fields[incident_description_col] : "";
+                    incident.start_time = (incident_start_time_col >= 0 && incident_start_time_col < (int)fields.size()) 
+                        ? fields[incident_start_time_col] : "";
+                    incident.end_time = (incident_end_time_col >= 0 && incident_end_time_col < (int)fields.size()) 
+                        ? fields[incident_end_time_col] : "";
+                    
+                    if (incident_road_closed_col >= 0 && incident_road_closed_col < (int)fields.size()) {
+                        string closed_str = fields[incident_road_closed_col];
+                        incident.road_closed = (closed_str == "True" || closed_str == "true" || closed_str == "1");
+                    }
+                    
+                    auto edge_key = make_pair(source, target);
+                    if (incident.has_incident() || incident.road_closed) {
+                        incidents_out[edge_key] = incident;
+                        total_incidents++;
+                        if (incident.road_closed) closures++;
+                    }
+                } catch (const exception& e) {
+                    continue;
+                }
+            }
+            incident_file.close();
+            cerr << "   ✅ Loaded " << total_incidents << " incidents (" << closures << " closures)" << endl;
+        }
+    }
     
+    // === COMPUTE DISRUPTION METRICS ===
+    // PRIORITY: Incidents override flow data on the same edge
     map<pair<NodeID, NodeID>, EdgeDisruptionMetrics> disruption_metrics_out;
     
+    // Process incidents first (higher priority)
     for (const auto& [edge_key, incident] : incidents_out) {
         const IncidentInfo* incident_ptr = &incident;
+        
+        // Check if flow data also exists for this edge
+        // If yes, pass it to help refine severity, but incident takes priority
         const TrafficFlowData* flow_ptr = flow_out.count(edge_key) ? &flow_out.at(edge_key) : nullptr;
         
         string edge_highway_type = "unknown";
@@ -1081,7 +1149,9 @@ inline bool load_disruptions_with_cache(
         disruption_metrics_out[edge_key] = metrics;
     }
     
+    // Process flow data ONLY for edges without incidents
     for (const auto& [edge_key, flow] : flow_out) {
+        // Skip if incident already processed for this edge (incident priority)
         if (disruption_metrics_out.count(edge_key) > 0) continue;
         
         const IncidentInfo* incident_ptr = nullptr;
@@ -1104,20 +1174,18 @@ inline bool load_disruptions_with_cache(
         disruption_metrics_out[edge_key] = metrics;
     }
     
-    struct stat file_stat;
-    if (stat(disruption_file.c_str(), &file_stat) == 0) {
-        g_disruption_cache.file_modified_time = file_stat.st_mtime;
-    }
-    g_disruption_cache.file_path = disruption_file;
+    // Update cache
+    g_disruption_cache.file_path = cache_key;
+    g_disruption_cache.file_modified_time = time(nullptr);
     g_disruption_cache.incidents = incidents_out;
     g_disruption_cache.flow_data = flow_out;
     g_disruption_cache.disruption_metrics = disruption_metrics_out;
-    g_disruption_cache.total_incidents = total_count;
+    g_disruption_cache.total_incidents = total_flow + total_incidents;
     g_disruption_cache.closures = closures;
-    g_disruption_cache.active_disruptions = active_disruptions;
+    g_disruption_cache.active_disruptions = total_flow + total_incidents - closures;
     
-    cerr << "✅ Loaded " << total_count << " disruptions (Closures: " << closures 
-         << ", Active: " << active_disruptions << ")" << endl;
+    cerr << "✅ Loaded flow (" << total_flow << ") + incidents (" << total_incidents 
+         << " with " << closures << " closures)" << endl;
     
     return true;
 }

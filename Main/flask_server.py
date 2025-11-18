@@ -24,8 +24,12 @@ from auto_disruption_service import init_auto_disruption_service, shutdown_auto_
 # Import Google Maps service
 from google_maps_service import GoogleMapsService
 
-# Import HERE Traffic service (V2 - hash-based)
-from realtime_traffic_service import RealtimeTrafficService
+# Import Real-Time Data Services (V3 - Separated Flow and Incidents)
+from flow_service import FlowService
+from incident_service import IncidentService
+from traffic_data_manager import (
+    merge_user_disruptions_with_traffic
+)
 
 
 app = Flask(__name__)
@@ -107,16 +111,23 @@ except Exception as e:
     print(f"❌ Error initializing Google Maps Service: {e}")
     gmaps_service = None
 
-# Initialize HERE Traffic Service (V2 - hash-based)
+# Initialize Real-Time Data Services (V3 - Separated Flow and Incidents)
 try:
-    traffic_service = RealtimeTrafficService()
-    print("✅ HERE Traffic Service V2 initialized successfully")
+    flow_service = FlowService()
+    print("✅ Flow Service initialized successfully")
 except Exception as e:
-    print(f"❌ Error initializing HERE Traffic Service: {e}")
-    traffic_service = None
+    print(f"❌ Error initializing Flow Service: {e}")
+    flow_service = None
 
-# Auto-disruption service with 1-minute updates
-auto_service = init_auto_disruption_service(app, update_interval=60)
+try:
+    incident_service = IncidentService()
+    print("✅ Incident Service initialized successfully")
+except Exception as e:
+    print(f"❌ Error initializing Incident Service: {e}")
+    incident_service = None
+
+# Auto-disruption service with 2-minute updates
+auto_service = init_auto_disruption_service(app, update_interval=120)
 
 # Shutdown service on exit
 atexit.register(shutdown_auto_disruption_service)
@@ -380,16 +391,16 @@ def load_traffic_with_cache(edge_lookup):
     import os
     
     try:
-        # Find latest disruption files
+        # Find latest flow files from disruptions directory
         disruptions_dir = Config.DISRUPTIONS_DIR
-        both_files = glob.glob(str(disruptions_dir / 'traffic_*_both.csv'))
+        flow_files = glob.glob(str(disruptions_dir / 'flow' / 'flow_*.csv'))
         
-        if not both_files:
-            print("   ℹ️  No traffic files found")
+        if not flow_files:
+            print("   ℹ️  No traffic files found in disruptions/flow/")
             return []
         
         # Get most recent file
-        latest_file = max(both_files, key=os.path.getmtime)
+        latest_file = max(flow_files, key=os.path.getmtime)
         current_mtime = os.path.getmtime(latest_file)
         
         # Check cache validity
@@ -467,44 +478,30 @@ def load_traffic_with_cache(edge_lookup):
 
 def get_dynamic_disruption_file(algorithm: str = 'hc2l', dataset_mode: str = None) -> str:
     """
-    Get the path to the current traffic disruption CSV file.
+    Get the disruption directory path for C++ routers.
     
-    **CACHE-ONLY SYSTEM**: 
-    - Only uses existing CSV files (NO auto-fetching)
-    - Returns latest CSV file regardless of age
-    - Traffic updates must be manually triggered via /fetch_here_traffic endpoint
-    - This prevents automatic API calls on every route calculation
+    The C++ routing engines expect a directory path and automatically look for:
+    - {path}/flow/flow_*.csv - Latest flow CSV file
+    - {path}/incidents/incident_*.csv - Latest incident CSV file
+    
+    The C++ code parses these CSV files directly (NOT .gr files).
     
     Args:
         algorithm: 'hc2l' or 'dhl' (for backward compatibility, not used)
-        dataset_mode: 'none' or 'both' (simplified from old 4-option system)
+        dataset_mode: 'none', 'incidents', 'flow', or 'both'
         
     Returns:
-        Path to disruption CSV file as string, or empty string if no disruptions
+        str: Path to disruptions directory, or "" if no disruptions
     """
-    import time
-    from pathlib import Path
-    
-    # Simplified: only 'none' or 'both' modes now
-    if dataset_mode is None:
-        dataset_mode = 'both'  # Default to using traffic data
-    
     # If mode is 'none', return empty string (no disruptions)
     if dataset_mode == 'none':
         return ""
     
-    # Find latest traffic CSV file
-    traffic_pattern = f"traffic_*_{dataset_mode}.csv"
-    traffic_files = sorted(Config.DISRUPTIONS_DIR.glob(traffic_pattern), reverse=True)
+    # Check if disruptions directory exists
+    if Config.DISRUPTIONS_DIR.exists():
+        print(f"   🔄 Using disruption directory: {Config.DISRUPTIONS_DIR}")
+        return str(Config.DISRUPTIONS_DIR)
     
-    # Use latest file if available (regardless of age - CACHE ONLY)
-    if traffic_files:
-        latest_file = traffic_files[0]
-        file_age = time.time() - latest_file.stat().st_mtime
-        # Always use cached file, never auto-fetch
-        return str(latest_file)
-    
-    # No traffic files found - return empty (do NOT auto-fetch)
     return ""
 
 
@@ -603,22 +600,34 @@ def get_backend_logs():
 
 @app.route('/request_new_dataset')
 def request_new_dataset():
-    """Fetch latest traffic data using hash-based matching"""
+    """Fetch latest flow and incident data using separated services"""
     try:
-        if traffic_service:
-            # Fetch and save latest traffic data
-            metadata = traffic_service.fetch_and_save(mode='both')
-            
-            return jsonify({
-                'success': True,
-                'message': f'Traffic data updated: {metadata.get("total_edges", 0)} edges affected',
-                'metadata': metadata
-            })
-        else:
-            return jsonify({
-                'success': False,
-                'message': 'Traffic service not initialized'
-            })
+        flow_metadata = {}
+        incident_metadata = {}
+        total_edges = 0
+        
+        # Fetch flow data
+        if flow_service:
+            flow_metadata = flow_service.fetch_and_save()
+            total_edges += flow_metadata.get('total_edges', 0)
+        
+        # Fetch incident data
+        if incident_service:
+            incident_metadata = incident_service.fetch_and_save()
+            total_edges += incident_metadata.get('total_edges', 0)
+        
+        # Merge user disruptions into both CSV sources
+        merge_user_disruptions_with_traffic(
+            flow_metadata.get('csv_file'),
+            incident_metadata.get('csv_file')
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': f'Data updated: {total_edges} total edges',
+            'flow_metadata': flow_metadata,
+            'incident_metadata': incident_metadata
+        })
     except Exception as e:
         return jsonify({
             'success': False,
@@ -757,99 +766,6 @@ def report_disruption():
             'error': str(e)
         })
 
-
-def merge_user_disruptions_with_traffic():
-    """
-    Merge user-reported disruptions with existing traffic data
-    This ensures user disruptions appear on top of real-time traffic
-    """
-    import glob
-    import pandas as pd
-    
-    try:
-        user_disruptions_file = Config.DISRUPTIONS_DIR / 'user_reported_disruptions.csv'
-        
-        if not user_disruptions_file.exists():
-            print("ℹ️  No user disruptions to merge")
-            return
-        
-        # Load user disruptions
-        user_df = pd.read_csv(user_disruptions_file)
-        print(f"📊 Found {len(user_df)} user-reported disruptions")
-        
-        # Find latest traffic file
-        traffic_pattern = "traffic_*_both.csv"
-        traffic_files = sorted(Config.DISRUPTIONS_DIR.glob(traffic_pattern), reverse=True)
-        
-        if traffic_files:
-            # Load existing traffic data
-            latest_traffic = traffic_files[0]
-            traffic_df = pd.read_csv(latest_traffic)
-            print(f"📊 Loaded {len(traffic_df)} traffic segments from {latest_traffic.name}")
-            
-            # Rename columns to match traffic format
-            user_df_renamed = user_df.rename(columns={
-                'snapped_lat': 'source_lat',
-                'snapped_lng': 'source_lon'
-            })
-            
-            # Add missing columns with defaults
-            if 'target_lat' not in user_df_renamed.columns:
-                user_df_renamed['target_lat'] = user_df_renamed['source_lat']
-            if 'target_lon' not in user_df_renamed.columns:
-                user_df_renamed['target_lon'] = user_df_renamed['source_lon']
-            
-            # Ensure all required columns exist
-            required_cols = ['source', 'target', 'source_lat', 'source_lon', 'target_lat', 'target_lon',
-                           'road_name', 'speed_kph', 'freeFlow_kph', 'jamFactor', 'isClosed']
-            
-            for col in required_cols:
-                if col not in user_df_renamed.columns:
-                    if col in ['speed_kph', 'freeFlow_kph', 'jamFactor']:
-                        user_df_renamed[col] = 30.0 if col == 'speed_kph' else 50.0 if col == 'freeFlow_kph' else 5.0
-                    elif col == 'isClosed':
-                        user_df_renamed[col] = 0
-                    else:
-                        user_df_renamed[col] = ''
-            
-            # Merge: user disruptions take priority (added first)
-            merged_df = pd.concat([user_df_renamed[required_cols], traffic_df[required_cols]], ignore_index=True)
-            
-            # Remove duplicates (keep user-reported ones)
-            merged_df = merged_df.drop_duplicates(subset=['source', 'target'], keep='first')
-            
-            # Save merged data
-            from datetime import datetime
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            merged_file = Config.DISRUPTIONS_DIR / f'traffic_{timestamp}_both.csv'
-            merged_df.to_csv(merged_file, index=False)
-            
-            print(f"✅ Merged traffic data saved: {merged_file.name} ({len(merged_df)} total segments)")
-            print(f"   📍 User disruptions: {len(user_df_renamed)}, Traffic: {len(traffic_df)}")
-            
-        else:
-            # No existing traffic data, just save user disruptions as traffic data
-            from datetime import datetime
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            new_file = Config.DISRUPTIONS_DIR / f'traffic_{timestamp}_both.csv'
-            
-            # Prepare user disruptions in traffic format
-            user_traffic = user_df.copy()
-            user_traffic = user_traffic.rename(columns={
-                'snapped_lat': 'source_lat',
-                'snapped_lng': 'source_lon'
-            })
-            
-            required_cols = ['source', 'target', 'source_lat', 'source_lon',
-                           'road_name', 'speed_kph', 'freeFlow_kph', 'jamFactor', 'isClosed']
-            
-            user_traffic.to_csv(new_file, index=False, columns=required_cols)
-            print(f"✅ Created traffic file from user disruptions: {new_file.name}")
-            
-    except Exception as e:
-        print(f"⚠️  Error merging user disruptions: {e}")
-        import traceback
-        traceback.print_exc()
 
 
 @app.route('/user_disruptions', methods=['GET'])
@@ -1512,25 +1428,31 @@ def compute_dhc2l_route():
                   f"(Edge: {dest_edge_source}→{dest_edge_target}, oneway={dest_edge_oneway})")
         
         # LazyHC2L: Extract optional disruption parameters
-        # disruption_file: path to .gr disruption file (optional)
+        # disruption_files: path to disruption directory (string, not tuple)
         # tau_threshold: threshold for lazy vs immediate update (default 0.5)
-        disruption_file = data.get('disruption_file', '')
+        disruption_files = data.get('disruption_files', '')  # Default to empty string, not tuple
         dataset_mode = data.get('dataset_mode', None)  # Get dataset mode from request
         generate_alternatives = data.get('generate_alternatives', True)  # NEW: Control alternative route generation
         
-        # If no disruption file specified, use dynamic disruptions based on dataset mode
-        if not disruption_file:
-            disruption_file = get_dynamic_disruption_file('hc2l', dataset_mode)
+        # If no disruption files specified, use dynamic disruptions based on dataset mode
+        if not disruption_files or isinstance(disruption_files, tuple):  # Handle legacy tuple format
+            disruption_files = get_dynamic_disruption_file('hc2l', dataset_mode)
+        
+        # For backward compatibility, accept single disruption_file parameter
+        disruption_file = data.get('disruption_file', '')
+        if disruption_file and not disruption_files:
+            disruption_files = disruption_file
                 
         print(f"Computing GPS HC2L route with snap points:")
         print(f"  Start: Pin({start_pin_lat}, {start_pin_lng}) → Snap({start_snap_lat}, {start_snap_lng})")
         print(f"  Dest:  Pin({dest_pin_lat}, {dest_pin_lng}) → Snap({dest_snap_lat}, {dest_snap_lng})")
         print(f"  Dataset mode: {dataset_mode if dataset_mode else 'auto'}")
-        print(f"  Disruption file: {disruption_file if disruption_file else '(none)'}")
+        print(f"  Disruption directory: {disruption_files if disruption_files else '(none)'}")
         print(f"  Tau threshold: {tau_threshold}")
         print(f"  Generate alternatives: {generate_alternatives}")
         
         # Compute route using GPS HC2L with LazyHC2L parameters
+        # Pass disruption directory to C++ - it will find flow/incident CSV files automatically
         start_time = time.time()
         route_result = gps_router.compute_route(
             start_pin_lat, start_pin_lng,
@@ -1539,7 +1461,7 @@ def compute_dhc2l_route():
             dest_snap_lat, dest_snap_lng,
             start_edge_source, start_edge_target, start_edge_oneway,
             dest_edge_source, dest_edge_target, dest_edge_oneway,
-            disruption_file, tau_threshold, generate_alternatives  # Pass disruption_file, tau_threshold, and generate_alternatives
+            disruption_files, tau_threshold, generate_alternatives  # Pass directory path
         )
         computation_time = time.time() - start_time
         
@@ -1692,13 +1614,28 @@ def get_active_disruptions():
     Maps HERE traffic data to actual road network edges using pre-matched edges
     """
     try:
-        # Use the hash-based traffic matcher (already initialized in traffic_service)
+        def edge_value(edge, attr, aliases=None, default=None):
+            keys = [attr]
+            if aliases:
+                keys.extend(aliases)
+
+            if isinstance(edge, dict):
+                for key in keys:
+                    if key in edge:
+                        value = edge.get(key)
+                        if value is not None:
+                            return value
+                return default
+
+            for key in keys:
+                if hasattr(edge, key):
+                    value = getattr(edge, key)
+                    if value is not None:
+                        return value
+            return default
+
+        # Use the separated flow and incident services
         from config import Config
-        from traffic_hash_matcher import TrafficHashMatcher
-        
-        # Initialize hash matcher with pre-matched edges
-        print("🚀 Initializing TrafficHashMatcher for traffic overlay...")
-        matcher = traffic_service.matcher
         
         disruptions_by_type = {}
         total_disruptions = 0
@@ -1707,114 +1644,120 @@ def get_active_disruptions():
         # ============================================================
         # FETCH INCIDENTS (primary data source for incident types)
         # ============================================================
-        incidents = traffic_service.fetch_incidents_data()
-        
-        print(f"\n📊 Processing {len(incidents)} HERE Traffic incidents with hash-based matching...")
-        
-        for incident in incidents:
-            try:
-                # Extract HERE API fields directly
-                incident_details = incident.get('incidentDetails', {})
-                incident_type = incident_details.get('type', 'other')
-                criticality = incident_details.get('criticality', 'low')
-                road_closed = incident_details.get('roadClosed', False)
-                
-                # Match incident to edges using hash-based matcher
-                matched_edges = matcher.match_traffic_incident_item(incident)
-                
-                if not matched_edges:
-                    print(f"   ⚠️  No edges matched for incident: {incident_type}")
-                    continue
-                
-                matched_edges_count += len(matched_edges)
-                
-                # Map HERE incident types to our display types
-                type_map = {
-                    'accident': 'Accident',
-                    'construction': 'Construction',
-                    'congestion': 'Congestion',
-                    'disabledVehicle': 'Disabled Vehicle',
-                    'massTransit': 'Mass Transit Event',
-                    'plannedEvent': 'Planned Event',
-                    'roadHazard': 'Road Hazard',
-                    'roadClosure': 'Road Closure',
-                    'weather': 'Weather',
-                    'laneRestriction': 'Lane Restriction',
-                    'other': 'Other'
-                }
-                
-                # Map HERE criticality to our severity
-                criticality_map = {
-                    'low': 'Light',
-                    'minor': 'Light',
-                    'major': 'Medium',
-                    'critical': 'Heavy'
-                }
-                
-                display_type = type_map.get(incident_type, 'Other')
-                severity = criticality_map.get(criticality, 'Light')
-                
-                # Calculate jam factor based on HERE data
-                if road_closed or incident_type == 'roadClosure':
-                    jam_factor = 10.0
-                elif criticality == 'critical':
-                    jam_factor = 8.0
-                elif criticality == 'major':
-                    jam_factor = 6.0
-                elif criticality == 'minor':
-                    jam_factor = 4.0
-                else:
-                    jam_factor = 2.0
-                
-                # Calculate speed reduction
-                if road_closed or incident_type == 'roadClosure':
-                    speed_reduction = 1.0
-                    current_speed_kph = 0
-                else:
-                    speed_reduction = 1.0 - (jam_factor / 10.0)
-                    current_speed_kph = 50 * (1 - speed_reduction)
-                
-                # Create disruption entries for each matched edge (TrafficEdge objects)
-                for edge in matched_edges:
-                    disruption = {
-                        'source_id': edge.source,
-                        'target_id': edge.target,
-                        'source_lat': edge.source_lat,
-                        'source_lng': edge.source_lon,
-                        'target_lat': edge.target_lat,
-                        'target_lng': edge.target_lon,
-                        'road_name': incident_details.get('description', {}).get('value', 'Unknown Road'),
-                        'incident_type': display_type,
-                        'severity': severity,
-                        'speed_kph': edge.speed_kph,
-                        'free_flow_kph': edge.freeFlow_kph,
-                        'jam_factor': edge.jamFactor,
-                        'is_closed': edge.isClosed,
-                        'slowdown_ratio': round(1.0 - speed_reduction, 3),
-                        'criticality': criticality,
-                        'here_type': incident_type,
-                        'start_time': incident_details.get('startTime', ''),
-                        'end_time': incident_details.get('endTime', '')
+        if incident_service:
+            incidents = incident_service.fetch_incidents_data()
+            
+            print(f"\n📊 Processing {len(incidents)} HERE incidents...")
+            
+            for incident in incidents:
+                try:
+                    # Extract HERE API fields directly
+                    incident_details = incident.get('incidentDetails', {})
+                    incident_type = incident_details.get('type', 'other')
+                    criticality = incident_details.get('criticality', 'low')
+                    road_closed = incident_details.get('roadClosed', False)
+                    
+                    # Match incident to edges using incident matcher
+                    matched_edges = incident_service.matcher.match_incident(incident)
+                    
+                    if not matched_edges:
+                        print(f"   ⚠️  No edges matched for incident: {incident_type}")
+                        continue
+                    
+                    matched_edges_count += len(matched_edges)
+                    
+                    # Map HERE incident types to our display types
+                    type_map = {
+                        'accident': 'Accident',
+                        'construction': 'Construction',
+                        'congestion': 'Congestion',
+                        'disabledVehicle': 'Disabled Vehicle',
+                        'massTransit': 'Mass Transit Event',
+                        'plannedEvent': 'Planned Event',
+                        'roadHazard': 'Road Hazard',
+                        'roadClosure': 'Road Closure',
+                        'weather': 'Weather',
+                        'laneRestriction': 'Lane Restriction',
+                        'other': 'Other'
                     }
                     
-                    # Group by incident type
-                    if display_type not in disruptions_by_type:
-                        disruptions_by_type[display_type] = []
-                    disruptions_by_type[display_type].append(disruption)
-                    total_disruptions += 1
-                
-                print(f"   ✅ {display_type} ({severity}) matched to {len(matched_edges)} edges")
+                    # Map HERE criticality to our severity
+                    criticality_map = {
+                        'low': 'Light',
+                        'minor': 'Light',
+                        'major': 'Medium',
+                        'critical': 'Heavy'
+                    }
                     
-            except Exception as e:
-                print(f"   ⚠️  Error processing incident: {e}")
-                import traceback
-                traceback.print_exc()
-                continue
+                    display_type = type_map.get(incident_type, 'Other')
+                    severity = criticality_map.get(criticality, 'Light')
+                    
+                    # Calculate jam factor based on HERE data
+                    if road_closed or incident_type == 'roadClosure':
+                        jam_factor = 10.0
+                    elif criticality == 'critical':
+                        jam_factor = 8.0
+                    elif criticality == 'major':
+                        jam_factor = 6.0
+                    elif criticality == 'minor':
+                        jam_factor = 4.0
+                    else:
+                        jam_factor = 2.0
+                    
+                    # Calculate speed reduction
+                    if road_closed or incident_type == 'roadClosure':
+                        speed_reduction = 1.0
+                        current_speed_kph = 0
+                    else:
+                        speed_reduction = 1.0 - (jam_factor / 10.0)
+                        current_speed_kph = 50 * (1 - speed_reduction)
+                    
+                    # Create disruption entries for each matched edge (TrafficEdge objects or dicts)
+                    for edge in matched_edges:
+                        speed_kph = edge_value(edge, 'speed_kph', aliases=['flow_speed_kph'], default=0)
+                        free_flow_kph = edge_value(edge, 'freeFlow_kph', aliases=['flow_free_flow_kph'], default=0)
+                        jam_factor_value = edge_value(edge, 'jamFactor', aliases=['flow_jam_factor'], default=0)
+                        is_closed_value = edge_value(edge, 'isClosed', aliases=['incident_road_closed'], default=False)
+
+                        disruption = {
+                            'source_id': edge_value(edge, 'source', default=0),
+                            'target_id': edge_value(edge, 'target', default=0),
+                            'source_lat': edge_value(edge, 'source_lat', default=0),
+                            'source_lng': edge_value(edge, 'source_lon', default=0),
+                            'target_lat': edge_value(edge, 'target_lat', default=0),
+                            'target_lng': edge_value(edge, 'target_lon', default=0),
+                            'road_name': incident_details.get('description', {}).get('value', 'Unknown Road'),
+                            'incident_type': display_type,
+                            'severity': severity,
+                            'speed_kph': speed_kph or 0,
+                            'free_flow_kph': free_flow_kph or 0,
+                            'jam_factor': jam_factor_value or 0,
+                            'is_closed': bool(is_closed_value),
+                            'slowdown_ratio': round(1.0 - speed_reduction, 3),
+                            'criticality': criticality,
+                            'here_type': incident_type,
+                            'start_time': incident_details.get('startTime', ''),
+                            'end_time': incident_details.get('endTime', '')
+                        }
+                        
+                        # Group by incident type
+                        if display_type not in disruptions_by_type:
+                            disruptions_by_type[display_type] = []
+                        disruptions_by_type[display_type].append(disruption)
+                        total_disruptions += 1
+                    
+                    print(f"   ✅ {display_type} ({severity}) matched to {len(matched_edges)} edges")
+                    
+                except Exception as e:
+                    print(f"   ⚠️  Error processing incident: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    continue
         
         # ============================================================
         # FETCH FLOW DATA (congestion/traffic conditions)
         # ============================================================
-        flow_data = traffic_service.fetch_flow_data()
+        flow_data = flow_service.fetch_flow_data()
         
         print(f"\n📊 Processing {len(flow_data)} HERE Traffic flow segments...")
         
@@ -1832,7 +1775,7 @@ def get_active_disruptions():
                     continue
                 
                 # Match flow segment to edges using hash-based matcher
-                matched_edges = matcher.match_traffic_flow_item(flow)
+                matched_edges = flow_service.matcher.match_traffic_flow_item(flow)
                 
                 if not matched_edges:
                     continue  # Skip silently for flow - too many segments
@@ -1931,7 +1874,7 @@ def get_raw_here_traffic():
     Returns original HERE flow segments and incidents with their geometries
     """
     try:
-        here_service = traffic_service
+        here_service = flow_service
         
         raw_traffic = {
             'flow_segments': [],
@@ -1939,7 +1882,7 @@ def get_raw_here_traffic():
         }
         
         # Fetch flow data
-        flow_data = traffic_service.fetch_flow_data()
+        flow_data = flow_service.fetch_flow_data()
         print(f"📊 Fetching {len(flow_data)} raw HERE flow segments...")
         
         for flow in flow_data:
@@ -1991,7 +1934,7 @@ def get_raw_here_traffic():
                 continue
         
         # Fetch incidents
-        incidents = traffic_service.fetch_incidents_data()
+        incidents = incident_service.fetch_incidents_data()
         print(f"📊 Fetching {len(incidents)} raw HERE incidents...")
         
         for incident in incidents:
@@ -2184,41 +2127,48 @@ def compute_dhl_route():
         use_disruptions = data.get('use_disruptions', False)
         dataset_mode = data.get('dataset_mode', None)  # Get dataset mode from request
         
-        # DHL: Convert use_disruptions to actual disruption file path
-        # If disruption_file is explicitly provided, use it
-        # Otherwise, if use_disruptions is True or dataset_mode is provided, use appropriate file
+        # DHL: Get disruption directory path (string, not tuple)
+        # If disruption_files is explicitly provided, use it
+        # Otherwise, if use_disruptions is True or dataset_mode is provided, use appropriate files
+        disruption_files = data.get('disruption_files', '')  # Default to empty string, not tuple
+        
+        # For backward compatibility, also check disruption_file (single)
         disruption_file = data.get('disruption_file', '')
         
         # Handle different ways disruptions can be specified
-        if not disruption_file or disruption_file in ['', 'null', 'NULL']:
-            # If use_disruptions is True or dataset_mode is set, use appropriate disruption file
+        if not disruption_files or isinstance(disruption_files, tuple):  # Handle legacy tuple format
+            # If use_disruptions is True or dataset_mode is set, use appropriate disruption files
             if use_disruptions or dataset_mode:
-                # Get the file based on dataset mode (incidents/flow/both)
-                disruption_file = get_dynamic_disruption_file('dhl', dataset_mode)
+                # Get the directory path based on dataset mode
+                disruption_files = get_dynamic_disruption_file('dhl', dataset_mode)
                 
-                # If no dynamic file and use_disruptions is True, fall back to static file
-                if not disruption_file and use_disruptions:
+                # If no dynamic files and use_disruptions is True, fall back to static file
+                if not disruption_files and use_disruptions:
                     disruption_gr = Config.PROCESSED_DATA_DIR / 'qc_disrupted_scenario_1.gr'
                     if disruption_gr.exists():
-                        disruption_file = str(disruption_gr)
-                        print(f"📍 Using static disruption file: {disruption_file}")
+                        disruption_files = str(disruption_gr)
+                        print(f"📍 Using static disruption file: {disruption_files}")
                     else:
-                        print(f"⚠️  No disruption file found")
-                        disruption_file = ''
+                        print(f"⚠️  No disruption files found")
+                        disruption_files = ''
             else:
-                disruption_file = ''
-        elif disruption_file == 'active_disruptions':
-            # Frontend sent 'active_disruptions' - use dynamic disruptions based on mode
-            disruption_file = get_dynamic_disruption_file('dhl', dataset_mode)
-            if not disruption_file:
+                disruption_files = ''
+        elif isinstance(disruption_files, str) and disruption_files == 'active_disruptions':
+            # Frontend sent 'active_disruptions' - use dynamic disruptions
+            disruption_files = get_dynamic_disruption_file('dhl', dataset_mode)
+            if not disruption_files:
                 # Fall back to static
                 disruption_gr = Config.PROCESSED_DATA_DIR / 'qc_disrupted_scenario_1.gr'
                 if disruption_gr.exists():
-                    disruption_file = str(disruption_gr)
-                    print(f"📍 Using static disruption file: {disruption_file}")
+                    disruption_files = str(disruption_gr)
+                    print(f"📍 Using static disruption file: {disruption_files}")
                 else:
-                    print(f"⚠️  No disruption file found")
-                    disruption_file = ''
+                    print(f"⚠️  No disruption files found")
+                    disruption_files = ''
+        
+        # Support legacy single disruption_file parameter
+        if disruption_file and not disruption_files:
+            disruption_files = disruption_file
         
         tau_threshold = float(data.get('tau_threshold', 0.5))
         generate_alternatives = data.get('generate_alternatives', True)  # Default: True (generate alternatives)
@@ -2227,11 +2177,12 @@ def compute_dhl_route():
         print(f"  Start: Pin({start_pin_lat}, {start_pin_lng}) → Snap({start_snap_lat}, {start_snap_lng})")
         print(f"  Dest:  Pin({dest_pin_lat}, {dest_pin_lng}) → Snap({dest_snap_lat}, {dest_snap_lng})")
         print(f"  Dataset mode: {dataset_mode if dataset_mode else 'auto'}")
-        print(f"  Disruption file: {disruption_file if disruption_file else '(none)'}")
+        print(f"  Disruption directory: {disruption_files if disruption_files else '(none)'}")
         print(f"  Tau threshold: {tau_threshold}")
         print(f"  Generate alternatives: {generate_alternatives}")
         
         # Compute route using DHL with disruption parameters
+        # Pass disruption directory to C++ - it will find flow/incident CSV files automatically
         start_time = time.time()
         route_result = dhl_router.compute_route(
             start_pin_lat, start_pin_lng,
@@ -2240,7 +2191,7 @@ def compute_dhl_route():
             dest_snap_lat, dest_snap_lng,
             start_edge_source, start_edge_target, start_edge_oneway,
             dest_edge_source, dest_edge_target, dest_edge_oneway,
-            disruption_file, tau_threshold, generate_alternatives  # Pass disruption_file, tau_threshold, and generate_alternatives
+            disruption_files, tau_threshold, generate_alternatives  # Pass directory path
         )
         computation_time = time.time() - start_time
         
@@ -2903,8 +2854,11 @@ def fetch_here_traffic():
                 'error': f"Invalid traffic_mode: {traffic_mode}. Must be 'incidents', 'flow', or 'both'"
             })
         
-        # Get HERE traffic service
-        here_service = traffic_service
+        # Fetch both flow and incident data (services are independent)
+        flow_metadata = flow_service.fetch_and_save()
+        incident_metadata = incident_service.fetch_and_save()
+        
+        total_edges = flow_metadata.get('total_edges', 0) + incident_metadata.get('total_edges', 0)
         
         # Determine output file
         if algorithm in ['hc2l', 'dhl']:
@@ -2912,20 +2866,16 @@ def fetch_here_traffic():
         else:
             output_file = Config.DISRUPTIONS_DIR / "here_traffic_disruptions_current.gr"
         
-        # Fetch and save traffic data using new hash-based system
-        metadata = traffic_service.fetch_and_save(mode=traffic_mode)
-        edges_count = metadata.get('total_edges', 0)
-        
-        # If apply_immediately, the files are already created as current_traffic_*.gr
-        if apply_immediately and edges_count > 0:
-            print(f"✅ Traffic data updated ({traffic_mode} mode): {edges_count} edges")
+        # If apply_immediately, the files are already created
+        if apply_immediately and total_edges > 0:
+            print(f"✅ Data updated: {total_edges} total edges (flow: {flow_metadata.get('total_edges', 0)}, incidents: {incident_metadata.get('total_edges', 0)})")
         
         return jsonify({
             'success': True,
-            'edges_affected': edges_count,
-            'metadata': metadata,
-            'output_file': str(output_file),
-            'traffic_mode': traffic_mode
+            'edges_affected': total_edges,
+            'flow_metadata': flow_metadata,
+            'incident_metadata': incident_metadata,
+            'output_file': str(output_file)
         })
         
     except Exception as e:
@@ -2937,55 +2887,22 @@ def fetch_here_traffic():
         })
 
 
-@app.route('/set_traffic_mode', methods=['POST'])
-def set_traffic_mode():
-    """
-    Set the traffic data mode for HERE API integration
-    
-    Request body:
-    {
-        "mode": "incidents" | "flow" | "both"
-    }
-    """
-    try:
-        data = request.get_json() or {}
-        mode = data.get('mode', 'both')
-        
-        # Validate mode
-        if mode not in ['incidents', 'flow', 'both']:
-            return jsonify({
-                'success': False,
-                'error': f"Invalid mode: {mode}. Must be 'incidents', 'flow', or 'both'"
-            })
-        
-        # Get HERE traffic service and set mode
-        here_service = traffic_service
-        traffic_service.set_traffic_mode(mode)
-        
-        return jsonify({
-            'success': True,
-            'mode': mode,
-            'message': f'Traffic mode set to: {mode.upper()}'
-        })
-        
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        })
-
-
 @app.route('/get_traffic_status', methods=['GET'])
 def get_traffic_status():
-    """Get current traffic mode and statistics"""
+    """Get current traffic services status"""
     try:
-        here_service = traffic_service
-        
         return jsonify({
             'success': True,
-            'traffic_mode': traffic_service.traffic_mode,
-            'api_key_configured': bool(traffic_service.api_key),
-            'bbox': traffic_service.bbox
+            'flow_service': {
+                'initialized': flow_service is not None,
+                'api_key_configured': bool(flow_service.api_key if flow_service else False),
+                'bbox': flow_service.bbox if flow_service else None
+            },
+            'incident_service': {
+                'initialized': incident_service is not None,
+                'api_key_configured': bool(incident_service.api_key if incident_service else False),
+                'bbox': incident_service.bbox if incident_service else None
+            }
         })
         
     except Exception as e:
@@ -2993,6 +2910,50 @@ def get_traffic_status():
             'success': False,
             'error': str(e)
         })
+
+
+@app.route('/set_auto_update_interval', methods=['POST'])
+def set_auto_update_interval():
+    """Set the auto-disruption update interval (1-30 minutes)"""
+    try:
+        payload = request.get_json(silent=True) or {}
+        requested_minutes = int(payload.get('interval_minutes', 2))
+        interval_minutes = max(1, min(30, requested_minutes))
+        auto_service = get_auto_disruption_service()
+
+        if not auto_service:
+            return jsonify({'success': False, 'error': 'Auto-disruption service not initialized'}), 503
+
+        actual_seconds = auto_service.set_update_interval(interval_minutes * 60)
+        return jsonify({
+            'success': True,
+            'interval_seconds': actual_seconds,
+            'interval_minutes': actual_seconds // 60,
+            'message': f'Update interval set to {actual_seconds // 60} minutes'
+        })
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
+@app.route('/get_auto_update_status', methods=['GET'])
+def get_auto_update_status():
+    """Return the current auto-disruption interval and whether the service is running"""
+    try:
+        auto_service = get_auto_disruption_service()
+        if not auto_service:
+            return jsonify({'success': False, 'error': 'Auto-disruption service not initialized'}), 503
+
+        interval_seconds = auto_service.update_interval
+        return jsonify({
+            'success': True,
+            'running': auto_service.running,
+            'interval_seconds': interval_seconds,
+            'interval_minutes': interval_seconds // 60,
+            'active_routes': len(auto_service.active_routes)
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 if __name__ == '__main__':
@@ -3001,7 +2962,7 @@ if __name__ == '__main__':
     
     print("\n" + "="*80)
     print("🔄 Auto-Disruption Service Status:")
-    print(f"   Update Interval: 90 seconds")
+    print(f"   Update Interval: 120 seconds")
     print(f"   Monitoring: Dynamic disruption files")
     print(f"   Auto-recalculation: Enabled for active routes")
     print("="*80 + "\n")
@@ -3011,5 +2972,5 @@ if __name__ == '__main__':
         debug=Config.FLASK_DEBUG,
         host=Config.FLASK_HOST,
         port=Config.FLASK_PORT,
-        # use_reloader=False  # Disable auto-reloader to prevent unwanted restarts
+        use_reloader=False  # Disable auto-reloader to prevent unwanted restarts
     )

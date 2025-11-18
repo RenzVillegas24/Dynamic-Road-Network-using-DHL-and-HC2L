@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """
-Unified Data Generator - Hash-Based Traffic Matching (CSV Only)
-================================================================
+Unified Data Generator - Separated Flow and Incident Services
+==============================================================
 
-Simplified version using pre-matched edges from matched_edges.csv
-No runtime geospatial matching - just hash lookup!
-Only generates CSV files (no .gr files)
+Generates separate flow and incident CSV files using pre-matched edges.
+Flow data uses hash-based matching (flow_service.py)
+Incident data uses spatial matching (incident_service.py)
 
 Usage:
     python unified_data_generator.py --mode flow
+    python unified_data_generator.py --mode incidents
     python unified_data_generator.py --mode both
     
 Note: --continuous mode removed (use manual refresh in UI)
@@ -27,7 +28,8 @@ MAIN_DIR = SCRIPT_DIR / "Main"
 sys.path.insert(0, str(MAIN_DIR))
 
 from config import Config
-from realtime_traffic_service import RealtimeTrafficService
+from flow_service import FlowService
+from incident_service import IncidentService
 
 # Load environment
 load_dotenv()
@@ -106,13 +108,13 @@ def check_and_generate_graph():
 def main():
     """Main entry point"""
     parser = argparse.ArgumentParser(
-        description='Unified traffic data generator with hash-based matching (CSV only)'
+        description='Unified traffic data generator with separated flow and incident services'
     )
     parser.add_argument(
         '--mode', 
         choices=['flow', 'incidents', 'both'], 
-        default='flow',
-        help='Traffic data mode'
+        default='both',
+        help='Traffic data mode: flow, incidents, or both (default: both)'
     )
     
     args = parser.parse_args()
@@ -124,26 +126,45 @@ def main():
         return 1
     
     print("\n" + "="*70)
-    print("Unified Data Generator V2 - Hash-Based Matching (CSV Only)")
+    print("Unified Data Generator - Separated Flow and Incident Services")
     print("="*70)
     print(f"Mode: {args.mode}")
-    print(f"Output: CSV files only (no .gr files)")
+    print(f"Output:")
+    print(f"  - Flow data: {Config.FLOW_DIR}")
+    print(f"  - Incident data: {Config.INCIDENTS_DIR}")
     print("="*70 + "\n")
     
-    # Initialize service
     try:
-        service = RealtimeTrafficService()
+        # Generate flow data if requested
+        if args.mode in ['flow', 'both']:
+            print("📊 Generating flow data...")
+            flow_service = FlowService()
+            flow_metadata = flow_service.fetch_and_save()
+            print(f"✅ Flow data completed")
+            print(f"   CSV: {flow_metadata.get('csv_file', 'N/A')}")
+            print(f"   Edges: {flow_metadata.get('total_edges', 0)}\n")
+        
+        # Generate incident data if requested
+        if args.mode in ['incidents', 'both']:
+            print("🚨 Generating incident data...")
+            incident_service = IncidentService()
+            incident_metadata = incident_service.fetch_and_save()
+            print(f"✅ Incident data completed")
+            print(f"   CSV: {incident_metadata.get('csv_file', 'N/A')}")
+            print(f"   Matched: {incident_metadata.get('total_matched', 0)}\n")
+        
+        print(f"✅ Done!")
+        print(f"   Use UI refresh button for updates (no auto-refresh)")
+        
     except ValueError as e:
         print(f"❌ Error: {e}")
         print("Make sure HERE_API_KEY is set in your .env file")
         return 1
-    
-    # Generate single dataset (no continuous mode)
-    metadata = service.fetch_and_save(mode=args.mode)
-    
-    print(f"\n✅ Done!")
-    print(f"   CSV: {metadata.get('csv_file', 'N/A')}")
-    print(f"   Note: Use UI refresh button for updates (no auto-refresh)")
+    except Exception as e:
+        print(f"❌ Unexpected error: {e}")
+        import traceback
+        traceback.print_exc()
+        return 1
     
     return 0
 

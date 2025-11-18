@@ -782,6 +782,24 @@
           </div>
         </div>
 
+        <!-- Auto-Disruption Update Interval -->
+        <div class="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-2xl p-5 border-2 border-purple-300 shadow-sm">
+          <h3 class="font-bold text-purple-900 mb-2 text-lg">Update Interval</h3>
+          <p class="text-sm text-purple-700 mb-3">Control how often the auto-disruption service polls HERE traffic (1-30 minutes).</p>
+          <div class="flex items-center gap-3">
+            <input id="auto-update-interval-slider" type="range" min="1" max="30" value="2" class="flex-1" />
+            <div class="text-3xl font-bold text-purple-900">
+              <span id="auto-update-interval-display">2</span>
+              <span class="text-base"> min</span>
+            </div>
+          </div>
+          <button id="auto-update-interval-set"
+            class="mt-4 w-full px-4 py-3 bg-gradient-to-br from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold rounded-xl shadow-lg transition-all duration-200">
+            Apply Interval
+          </button>
+          <p id="auto-update-interval-status" class="mt-2 text-xs text-purple-700/80">Current interval: 2 minutes</p>
+        </div>
+
         <!-- Threshold (τ) with Input - ONLY FOR HC2L -->
         <div id="threshold-container" class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-5 border border-slate-300 shadow-sm">
           <h3 class="font-bold text-slate-800 mb-4 text-lg">Threshold (τ) - HC2L Only</h3>
@@ -868,8 +886,8 @@
           <!-- Show Traffic Overlay Toggle -->
           <label class="flex items-center justify-between py-2 px-3 hover:bg-purple-100 rounded-lg cursor-pointer">
             <div>
-              <span class="text-sm font-medium text-purple-900">Show Traffic Overlay</span>
-              <p class="text-xs text-purple-600 mt-0.5">Traffic flow & congestion data</p>
+              <span class="text-sm font-medium text-purple-900">Show Flow Overlay</span>
+              <p class="text-xs text-purple-600 mt-0.5">Real-time flow & congestion data</p>
             </div>
             <input type="checkbox" id="show-traffic-overlay" class="toggle-checkbox" />
           </label>
@@ -882,14 +900,6 @@
             </div>
             <input type="checkbox" id="show-alternative-routes" class="toggle-checkbox" checked />
           </label>
-          
-          <!-- For Current Route Only (conditional) -->
-          <div id="route-only-container" class="hidden ml-4 mt-2">
-            <label class="flex items-center justify-between py-2 px-3 hover:bg-indigo-100 rounded-lg cursor-pointer">
-              <span class="text-sm font-medium text-indigo-900">For Current Route Only</span>
-              <input type="checkbox" id="traffic-route-only" class="toggle-checkbox" />
-            </label>
-          </div>
         </div>
 
         <!-- Update Mode Status -->
@@ -3640,6 +3650,7 @@
           console.log('Opening admin panel');
           adminPanel.classList.remove('translate-x-full');
           showUpdateToast('Admin panel opened', 'info');
+          refreshAutoIntervalStatus(true);
         });
       }
       
@@ -3695,6 +3706,89 @@
             
             showUpdateToast(`Threshold set to ${value}`, 'info');
           });
+        });
+      }
+
+      // Auto-Disruption Interval Controls
+      const autoIntervalSlider = document.getElementById('auto-update-interval-slider');
+      const autoIntervalDisplay = document.getElementById('auto-update-interval-display');
+      const autoIntervalStatus = document.getElementById('auto-update-interval-status');
+      const autoIntervalSetBtn = document.getElementById('auto-update-interval-set');
+
+      const clampInterval = (value) => Math.min(30, Math.max(1, Number(value) || 1));
+
+      const updateIntervalUI = (minutes) => {
+        if (!autoIntervalSlider || !autoIntervalDisplay || !autoIntervalStatus) return;
+        const clamped = clampInterval(minutes);
+        autoIntervalSlider.value = clamped;
+        autoIntervalDisplay.textContent = clamped;
+        autoIntervalStatus.textContent = `Current interval: ${clamped} minute${clamped === 1 ? '' : 's'}`;
+      };
+
+      if (autoIntervalSlider && autoIntervalDisplay) {
+        autoIntervalSlider.addEventListener('input', (e) => {
+          const value = clampInterval(e.target.value);
+          autoIntervalDisplay.textContent = value;
+        });
+      }
+
+      const refreshAutoIntervalStatus = async (showFeedback = false) => {
+        if (!autoIntervalStatus) return;
+        autoIntervalStatus.textContent = 'Checking current interval...';
+        try {
+          const response = await fetch('/get_auto_update_status');
+          const data = await response.json();
+          if (data.success && typeof data.interval_minutes === 'number') {
+            updateIntervalUI(data.interval_minutes);
+            if (showFeedback) {
+              showUpdateToast(`Update interval is ${data.interval_minutes} minutes`, 'info');
+            }
+          } else {
+            autoIntervalStatus.textContent = 'Unable to fetch interval';
+            if (showFeedback) {
+              showUpdateToast(data.error || 'Could not retrieve interval', 'warning');
+            }
+          }
+        } catch (error) {
+          autoIntervalStatus.textContent = 'Unable to reach the server';
+          if (showFeedback) {
+            showUpdateToast('Failed to read interval', 'warning');
+          }
+          console.error('Auto interval fetch error', error);
+        }
+      };
+
+      const setAutoUpdateInterval = async (minutes) => {
+        if (!autoIntervalSetBtn) return;
+        const clamped = clampInterval(minutes);
+        autoIntervalSetBtn.disabled = true;
+        autoIntervalStatus.textContent = 'Saving interval...';
+        try {
+          const response = await fetch('/set_auto_update_interval', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({interval_minutes: clamped})
+          });
+          const data = await response.json();
+          if (data.success && typeof data.interval_minutes === 'number') {
+            updateIntervalUI(data.interval_minutes);
+            showUpdateToast(`Interval updated to ${data.interval_minutes} minutes`, 'success');
+          } else {
+            autoIntervalStatus.textContent = 'Update failed';
+            showUpdateToast(data.error || 'Update failed', 'warning');
+          }
+        } catch (error) {
+          autoIntervalStatus.textContent = 'Update failed';
+          showUpdateToast('Unable to update interval', 'warning');
+          console.error('Auto interval update error', error);
+        } finally {
+          autoIntervalSetBtn.disabled = false;
+        }
+      };
+
+      if (autoIntervalSetBtn && autoIntervalSlider) {
+        autoIntervalSetBtn.addEventListener('click', () => {
+          setAutoUpdateInterval(autoIntervalSlider.value);
         });
       }
 
@@ -3826,6 +3920,8 @@
         return jamFactor;
       }
 
+  refreshAutoIntervalStatus();
+
       // Sync slider and input
       if (customSpeedSlider && customSpeedInput) {
         customSpeedSlider.addEventListener('input', (e) => {
@@ -3920,108 +4016,225 @@
       const trafficRouteOnly = document.getElementById('traffic-route-only');
       const routeOnlyContainer = document.getElementById('route-only-container');
 
-      if (showActiveIncidents) {
-        showActiveIncidents.addEventListener('change', async (e) => {
-          if (e.target.checked) {
-            // Load and display active incidents (EXCLUDE congestion/flow data)
-            showUpdateToast('Loading active incidents...', 'info');
-            try {
-              const response = await fetch('/get_active_disruptions');
-              const data = await response.json();
-              
-              if (data.success) {
-                // Filter out "Congestion" type (which comes from flow data)
-                // Only show actual incidents: accidents, construction, closures, etc.
-                const filteredData = {
-                  ...data,
-                  disruptions_by_type: {},
-                  total_disruptions: 0
-                };
-                
-                // Keep only incident types, exclude flow-based congestion
-                for (const [incidentType, disruptions] of Object.entries(data.disruptions_by_type)) {
-                  if (incidentType !== 'Congestion') {
-                    filteredData.disruptions_by_type[incidentType] = disruptions;
-                    filteredData.total_disruptions += disruptions.length;
-                  }
-                }
-                
-                // Recalculate severity counts for filtered data
-                filteredData.severity_counts = { Heavy: 0, Medium: 0, Light: 0 };
-                for (const disruptions of Object.values(filteredData.disruptions_by_type)) {
-                  for (const disruption of disruptions) {
-                    filteredData.severity_counts[disruption.severity] += 1;
-                  }
-                }
-                
-                console.log(`Filtered incidents: ${filteredData.total_disruptions} (excluded ${data.disruptions_by_type['Congestion']?.length || 0} congestion segments)`);
-                
-                // Display incidents as markers on the map
-                if (typeof showAllDisruptionsOnMap === 'function') {
-                  showAllDisruptionsOnMap(filteredData);
-                  showUpdateToast(`Showing ${filteredData.total_disruptions} active incidents (incidents only, no flow)`, 'success');
-                } else {
-                  console.error('showAllDisruptionsOnMap function not found');
-                  showUpdateToast('Error: Display function not available', 'warning');
-                }
-              } else {
-                throw new Error(data.error || 'Failed to load incidents');
-              }
-            } catch (error) {
-              console.error('Error loading incidents:', error);
-              showUpdateToast(`Error loading incidents: ${error.message}`, 'warning');
-              // Uncheck the toggle
-              e.target.checked = false;
-            }
-          } else {
-            // Hide active incidents
-            if (typeof clearDisruptionMarkers === 'function') {
-              clearDisruptionMarkers();
-              showUpdateToast('Active incidents hidden', 'info');
+      const INCIDENT_ONLY_TYPES = new Set([
+        'Accident',
+        'Road Closure',
+        'Construction',
+        'Weather',
+        'Road Hazard',
+        'Disabled Vehicle',
+        'Mass Transit Event',
+        'Planned Event',
+        'Lane Restriction'
+      ]);
+
+      let cachedIncidentPayload = null;
+      let incidentFetchPromise = null;
+
+      const buildIncidentPayload = (rawData) => {
+        const payload = {
+          ...rawData,
+          disruptions_by_type: {},
+          total_disruptions: 0,
+          severity_counts: { Heavy: 0, Medium: 0, Light: 0 }
+        };
+
+        const disruptionsByType = rawData.disruptions_by_type || {};
+        Object.entries(disruptionsByType).forEach(([incidentType, disruptions]) => {
+          if (!INCIDENT_ONLY_TYPES.has(incidentType)) return;
+          payload.disruptions_by_type[incidentType] = disruptions;
+          payload.total_disruptions += disruptions.length;
+          disruptions.forEach(disruption => {
+            const severity = disruption.severity || 'Light';
+            if (payload.severity_counts[severity] !== undefined) {
+              payload.severity_counts[severity] += 1;
             } else {
-              console.error('clearDisruptionMarkers function not found');
+              payload.severity_counts[severity] = (payload.severity_counts[severity] || 0) + 1;
             }
+          });
+        });
+
+        return payload;
+      };
+
+      const fetchActiveIncidentData = async () => {
+        if (cachedIncidentPayload) {
+          return cachedIncidentPayload;
+        }
+        if (incidentFetchPromise) {
+          return incidentFetchPromise;
+        }
+
+        incidentFetchPromise = fetch('/get_active_disruptions')
+          .then(response => response.json())
+          .then(data => {
+            if (!data.success) {
+              throw new Error(data.error || 'Failed to load incidents');
+            }
+
+            cachedIncidentPayload = buildIncidentPayload(data);
+            console.log(`Filtered incidents: ${cachedIncidentPayload.total_disruptions} (cached)`);
+            return cachedIncidentPayload;
+          })
+          .catch(error => {
+            throw error;
+          })
+          .finally(() => {
+            incidentFetchPromise = null;
+          });
+
+        return incidentFetchPromise;
+      };
+
+      async function handleActiveIncidentsToggle(isChecked, options = {}) {
+        const { silent = false } = options;
+        if (showActiveIncidents) {
+          showActiveIncidents.checked = isChecked;
+        }
+        localStorage.setItem('showActiveIncidents', isChecked ? 'true' : 'false');
+
+        if (isChecked) {
+          if (!silent) {
+            showUpdateToast('Loading active incidents...', 'info');
           }
+          try {
+            const data = await fetchActiveIncidentData();
+            if (typeof showAllDisruptionsOnMap === 'function') {
+              showAllDisruptionsOnMap(data);
+            }
+            if (!silent) {
+              showUpdateToast(`Showing ${data.total_disruptions} active incidents`, 'success');
+            }
+          } catch (error) {
+            console.error('Error loading incidents:', error);
+            if (!silent) {
+              showUpdateToast(`Error loading incidents: ${error.message}`, 'warning');
+            }
+            if (showActiveIncidents) {
+              showActiveIncidents.checked = false;
+            }
+            localStorage.setItem('showActiveIncidents', 'false');
+          }
+        } else {
+          if (typeof clearDisruptionMarkers === 'function') {
+            clearDisruptionMarkers();
+          }
+          if (!silent) {
+            showUpdateToast('Active incidents hidden', 'info');
+          }
+        }
+      }
+
+      const setRouteOnlyVisibility = (visible) => {
+        if (routeOnlyContainer) {
+          routeOnlyContainer.classList.toggle('hidden', !visible);
+        }
+      };
+
+      async function handleTrafficOverlayToggle(isChecked, options = {}) {
+        const { silent = false } = options;
+        if (showTrafficOverlay) {
+          showTrafficOverlay.checked = isChecked;
+        }
+        localStorage.setItem('showTrafficOverlay', isChecked ? 'true' : 'false');
+        setRouteOnlyVisibility(isChecked);
+
+        if (isChecked) {
+          const routeOnly = trafficRouteOnly ? trafficRouteOnly.checked : false;
+          if (!silent) {
+            showUpdateToast('Loading traffic overlay...', 'info');
+          }
+          if (typeof applyTrafficOverlay === 'function') {
+            try {
+              await applyTrafficOverlay('both', routeOnly);
+            } catch (error) {
+              console.error('Error loading traffic overlay:', error);
+              if (!silent) {
+                showUpdateToast(`Error loading traffic overlay: ${error.message}`, 'warning');
+              }
+              if (typeof hideTrafficOverlayLayer === 'function') {
+                hideTrafficOverlayLayer();
+              }
+              if (showTrafficOverlay) {
+                showTrafficOverlay.checked = false;
+              }
+              localStorage.setItem('showTrafficOverlay', 'false');
+            }
+          } else if (!silent) {
+            showUpdateToast('Traffic overlay module not ready', 'warning');
+          }
+        } else {
+          if (typeof hideTrafficOverlayLayer === 'function') {
+            hideTrafficOverlayLayer();
+          } else if (typeof clearTrafficOverlay === 'function') {
+            clearTrafficOverlay();
+          }
+          if (!silent) {
+            showUpdateToast('Traffic Overlay disabled', 'info');
+          }
+        }
+      }
+
+      if (showActiveIncidents) {
+        showActiveIncidents.addEventListener('change', (e) => {
+          handleActiveIncidentsToggle(e.target.checked);
         });
       }
 
       if (showTrafficOverlay) {
         showTrafficOverlay.addEventListener('change', (e) => {
-          // Show/hide conditional controls
-          if (routeOnlyContainer) {
-            routeOnlyContainer.classList.toggle('hidden', !e.target.checked);
-          }
-
-          if (e.target.checked) {
-            // Apply traffic overlay (always show all traffic flow)
-            const routeOnly = trafficRouteOnly ? trafficRouteOnly.checked : false;
-            
-            if (typeof applyTrafficOverlay === 'function') {
-              applyTrafficOverlay('both', routeOnly);
-            }
-            showUpdateToast('Traffic Overlay enabled', 'info');
-          } else {
-            // Clear traffic overlay
-            if (typeof clearTrafficOverlay === 'function') {
-              clearTrafficOverlay();
-            }
-            showUpdateToast('Traffic Overlay disabled', 'info');
-          }
+          handleTrafficOverlayToggle(e.target.checked);
         });
       }
 
       if (trafficRouteOnly) {
         trafficRouteOnly.addEventListener('change', (e) => {
-          if (typeof applyTrafficOverlay === 'function') {
+          localStorage.setItem('trafficRouteOnly', e.target.checked ? 'true' : 'false');
+          if (showTrafficOverlay?.checked && typeof applyTrafficOverlay === 'function') {
             applyTrafficOverlay('both', e.target.checked);
           }
-          
           const msg = e.target.checked ? 
             'Showing traffic for current route only' : 
             'Showing all traffic';
           showUpdateToast(msg, 'info');
         });
       }
+
+      const restoreToggleDefaults = () => {
+        const savedIncidents = localStorage.getItem('showActiveIncidents') === 'true';
+        const savedOverlay = localStorage.getItem('showTrafficOverlay') === 'true';
+        const savedRouteOnly = localStorage.getItem('trafficRouteOnly') === 'true';
+
+        if (showActiveIncidents) {
+          showActiveIncidents.checked = savedIncidents;
+        }
+        if (trafficRouteOnly) {
+          trafficRouteOnly.checked = savedRouteOnly;
+        }
+        setRouteOnlyVisibility(savedOverlay);
+        if (showTrafficOverlay) {
+          showTrafficOverlay.checked = savedOverlay;
+        }
+      };
+
+      restoreToggleDefaults();
+
+      window.addEventListener('load', async () => {
+        if (showActiveIncidents?.checked) {
+          try {
+            await handleActiveIncidentsToggle(true, { silent: true });
+          } catch (err) {
+            console.error('Unable to restore active incidents cache', err);
+          }
+        }
+        if (showTrafficOverlay?.checked) {
+          try {
+            await handleTrafficOverlayToggle(true, { silent: true });
+          } catch (err) {
+            console.error('Unable to restore traffic overlay cache', err);
+          }
+        }
+      });
 
 
       // Wire up Run Demo button

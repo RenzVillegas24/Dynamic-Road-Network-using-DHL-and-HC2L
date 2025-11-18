@@ -58,6 +58,8 @@ class Config:
     RAW_DATA_DIR = DATA_DIR / 'raw'
     PROCESSED_DATA_DIR = DATA_DIR / 'processed'
     DISRUPTIONS_DIR = DATA_DIR / 'disruptions'
+    FLOW_DIR = DISRUPTIONS_DIR / 'flow'
+    INCIDENTS_DIR = DISRUPTIONS_DIR / 'incidents'
     
     # OSM Geometry cache (DEPRECATED - now using CSV-based geometry)
     # Previously used osm_geometry.graphml but now geometry is stored in edges CSV
@@ -249,6 +251,8 @@ class Config:
             cls.RAW_DATA_DIR,
             cls.PROCESSED_DATA_DIR,
             cls.DISRUPTIONS_DIR,
+            cls.FLOW_DIR,
+            cls.INCIDENTS_DIR,
             cls.BUILD_DIR,
             cls.DHL_BUILD_DIR,
             cls.HC2L_BUILD_DIR,

@@ -9,7 +9,9 @@ const trafficVisualization = {
   incidentsLayer: null,
   trafficOverlayLayer: null,
   currentRoute: null,
-  trafficMode: 'both' // 'incidents', 'flow', or 'both'
+  trafficMode: 'both', // 'incidents', 'flow', or 'both'
+  cachedSegments: null,
+  segmentsPromise: null
 };
 
 /**
@@ -214,190 +216,221 @@ function applyTrafficOverlay(mode, routeOnly) {
   // Update state
   trafficVisualization.trafficMode = mode;
   
-  // Clear existing overlay
-  if (trafficVisualization.trafficOverlayLayer) {
-    trafficVisualization.trafficOverlayLayer.clearLayers();
-  }
-  
   // Always show matched edges with full OSM road geometries
-  applyMatchedTrafficWithGeometry(mode, routeOnly);
+  return applyMatchedTrafficWithGeometry(mode, routeOnly);
 }
 
 /**
  * Apply matched traffic overlay with full OSM road geometries
  * Uses the new hash-based matching system with LineString geometries
  */
-function applyMatchedTrafficWithGeometry(mode, routeOnly) {
+function applyMatchedTrafficWithGeometry(mode, routeOnly, options = {}) {
   console.log(`🗺️  Loading traffic with OSM geometries...`);
-  
-  // Create layer group if it doesn't exist
-  if (!trafficVisualization.trafficOverlayLayer) {
-    trafficVisualization.trafficOverlayLayer = L.layerGroup().addTo(map);
-  }
-  
-  // Clear existing overlay
-  trafficVisualization.trafficOverlayLayer.clearLayers();
-  
-  // Fetch traffic with geometry
-  fetch('/get_traffic_with_geometry')
-    .then(response => response.json())
-    .then(data => {
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to load traffic data');
-      }
-      
-      console.log(`   📊 Received ${data.total_segments} traffic segments with geometry`);
-      
-      if (data.segments && data.segments.length > 0) {
-        console.log(`   🔍 Sample segment:`, data.segments[0]);
-      }
-      
-      let displayedCount = 0;
-      
-      // Process each traffic segment
-      data.segments.forEach(segment => {
-        try {
-          // Mode filtering
-          const isIncident = segment.type === 'incident';
-          const isFlow = segment.type === 'flow';
-          
-          if (mode === 'incidents' && !isIncident) return;
-          if (mode === 'flow' && !isFlow) return;
-          
-          // Route filtering (if enabled and route exists)
-          if (routeOnly && trafficVisualization.currentRoute) {
-            const onRoute = isSegmentOnRoute(
-              segment.source,
-              segment.target,
-              trafficVisualization.currentRoute
-            );
-            if (!onRoute) return;
-          }
-          
-          // Get color and style based on severity
-          let color, opacity, weight;
-          
-          if (segment.is_closed) {
-            color = '#000000';  // Black for closed roads
-            opacity = 0.9;
-            weight = 7;
-          } else {
-            switch (segment.severity) {
-              case 'Heavy':
-                color = '#ef4444';  // Red
-                opacity = 0.85;
-                weight = 6;
-                break;
-              case 'Medium':
-                color = '#f59e0b';  // Orange
-                opacity = 0.75;
-                weight = 5;
-                break;
-              default:  // Light
-                color = '#10b981';  // Green
-                opacity = 0.65;
-                weight = 4;
-            }
-          }
-          
-          // Parse geometry coordinates
-          // Geometry is [[lat, lon], [lat, lon], ...] format from OSM edges CSV
-          // Leaflet expects [lat, lng] so we can use it directly
-          if (!segment.geometry || !Array.isArray(segment.geometry) || segment.geometry.length < 2) {
-            console.warn(`   ⚠️  Skipping segment with invalid geometry:`, segment);
-            return;
-          }
-          
-          const latlngs = segment.geometry;
-          
-          console.log(`   🔍 Plotting segment on ${segment.road_name}: ${latlngs.length} points, severity: ${segment.severity}`);
-          
-          // Create polyline with geometry
-          const polyline = L.polyline(latlngs, {
-            color: color,
-            weight: weight,
-            opacity: opacity,
-            className: `traffic-segment traffic-${segment.severity.toLowerCase()}`
-          });
-          
-          // Get icon for incident type
-          const incidentIcons = {
-            'Accident': '🚗',
-            'Road Closure': '🚧',
-            'Construction': '🏗️',
-            'Congestion': '🚦',
-            'Weather': '🌧️',
-            'Road Hazard': '⚠️',
-            'Disabled Vehicle': '🚙',
-            'Other': '📍'
-          };
-          
-          const icon = incidentIcons[segment.incident_type] || '📍';
-          
-          // Create popup with detailed info
-          const popup = `
-            <div class="p-3 min-w-[250px]">
-              <div class="flex items-center mb-2">
-                <span class="text-2xl mr-2">${icon}</span>
-                <h3 class="font-bold text-lg">${segment.incident_type}</h3>
-              </div>
-              <div class="space-y-1 text-sm">
-                <p><span class="font-semibold">Road:</span> ${segment.road_name}</p>
-                <p><span class="font-semibold">Type:</span> ${segment.highway_type}</p>
-                <p><span class="font-semibold">Severity:</span> 
-                  <span class="px-2 py-1 rounded text-white" style="background-color: ${color};">
-                    ${segment.severity}
-                  </span>
-                </p>
-                <p><span class="font-semibold">Speed:</span> ${segment.speed_kph.toFixed(1)} km/h 
-                  <span class="text-gray-500">(Free flow: ${segment.free_flow_kph.toFixed(1)} km/h)</span>
-                </p>
-                <p><span class="font-semibold">Jam Factor:</span> ${segment.jam_factor.toFixed(1)}/10</p>
-                <p><span class="font-semibold">Length:</span> ${segment.length.toFixed(0)}m</p>
-                ${segment.is_closed ? '<p class="text-red-600 font-bold mt-2">⛔ ROAD CLOSED</p>' : ''}
-                ${segment.description ? `<p class="text-xs text-gray-600 mt-2">${segment.description}</p>` : ''}
-                <p class="text-xs text-teal-600 mt-2">✅ Matched to OSM network with geometry</p>
-              </div>
-            </div>
-          `;
-          
-          polyline.bindPopup(popup);
-          
-          // Add hover effect
-          polyline.on('mouseover', function() {
-            this.setStyle({
-              weight: weight + 2,
-              opacity: Math.min(opacity + 0.2, 1)
-            });
-          });
-          
-          polyline.on('mouseout', function() {
-            this.setStyle({
-              weight: weight,
-              opacity: opacity
-            });
-          });
-          
-          trafficVisualization.trafficOverlayLayer.addLayer(polyline);
-          displayedCount++;
-          
-        } catch (error) {
-          console.error('Error processing segment:', error, segment);
-        }
-      });
-      
-      console.log(`   ✅ Displayed ${displayedCount} traffic segments on map`);
-      
+
+  return ensureTrafficSegments(options.forceReload)
+    .then(segments => {
+      const displayedCount = renderTrafficSegments(segments, mode, routeOnly);
       if (displayedCount > 0) {
         showUpdateToast(`Showing ${displayedCount} traffic segments with road geometries`, 'success');
       } else {
         showUpdateToast('No traffic data to display for current filters', 'info');
       }
+      return displayedCount;
     })
     .catch(error => {
       console.error('Error applying traffic overlay:', error);
       showUpdateToast('Error loading traffic overlay', 'error');
+      throw error;
     });
+}
+
+function ensureTrafficSegments(forceReload = false) {
+  if (trafficVisualization.cachedSegments && !forceReload) {
+    return Promise.resolve(trafficVisualization.cachedSegments);
+  }
+
+  if (trafficVisualization.segmentsPromise && !forceReload) {
+    return trafficVisualization.segmentsPromise;
+  }
+
+  trafficVisualization.segmentsPromise = fetch('/get_traffic_with_geometry')
+    .then(response => response.json())
+    .then(data => {
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to load traffic data');
+      }
+
+      const segments = Array.isArray(data.segments) ? data.segments : [];
+      trafficVisualization.cachedSegments = segments;
+
+      if (segments.length > 0) {
+        console.log(`   📊 Received ${data.total_segments || segments.length} traffic segments with geometry`);
+        console.log(`   🔍 Sample segment:`, segments[0]);
+      }
+
+      return segments;
+    })
+    .catch(error => {
+      console.error('Error fetching traffic data:', error);
+      throw error;
+    })
+    .finally(() => {
+      trafficVisualization.segmentsPromise = null;
+    });
+
+  return trafficVisualization.segmentsPromise;
+}
+
+function renderTrafficSegments(segments, mode, routeOnly) {
+  if (!map) {
+    console.warn('Map not ready for traffic overlay');
+    return 0;
+  }
+
+  if (!trafficVisualization.trafficOverlayLayer) {
+    trafficVisualization.trafficOverlayLayer = L.layerGroup().addTo(map);
+  } else if (!map.hasLayer(trafficVisualization.trafficOverlayLayer)) {
+    trafficVisualization.trafficOverlayLayer.addTo(map);
+  }
+
+  trafficVisualization.trafficOverlayLayer.clearLayers();
+
+  if (!Array.isArray(segments) || segments.length === 0) {
+    console.log('   ⚠️  No traffic segments to render');
+    return 0;
+  }
+
+  const incidentIcons = {
+    'Accident': '🚗',
+    'Road Closure': '🚧',
+    'Construction': '🏗️',
+    'Congestion': '🚦',
+    'Weather': '🌧️',
+    'Road Hazard': '⚠️',
+    'Disabled Vehicle': '🚙',
+    'Other': '📍'
+  };
+
+  let displayedCount = 0;
+
+  segments.forEach(segment => {
+    try {
+      const isIncident = segment.type === 'incident';
+      const isFlow = segment.type === 'flow';
+
+      if (mode === 'incidents' && !isIncident) return;
+      if (mode === 'flow' && !isFlow) return;
+
+      if (routeOnly && trafficVisualization.currentRoute) {
+        const onRoute = isSegmentOnRoute(
+          segment.source,
+          segment.target,
+          trafficVisualization.currentRoute
+        );
+        if (!onRoute) return;
+      }
+
+      let color, opacity, weight;
+      if (segment.is_closed) {
+        color = '#000000';
+        opacity = 0.9;
+        weight = 7;
+      } else {
+        switch (segment.severity) {
+          case 'Heavy':
+            color = '#ef4444';
+            opacity = 0.85;
+            weight = 6;
+            break;
+          case 'Medium':
+            color = '#f59e0b';
+            opacity = 0.75;
+            weight = 5;
+            break;
+          default:
+            color = '#10b981';
+            opacity = 0.65;
+            weight = 4;
+        }
+      }
+
+      if (!segment.geometry || !Array.isArray(segment.geometry) || segment.geometry.length < 2) {
+        console.warn('   ⚠️  Skipping segment with invalid geometry:', segment);
+        return;
+      }
+
+      const geometry = segment.geometry
+        .map(coord => [parseFloat(coord[0]), parseFloat(coord[1])])
+        .filter(coord => coord.every(value => Number.isFinite(value)));
+
+      if (!geometry || geometry.length < 2) {
+        return;
+      }
+
+      const polyline = L.polyline(geometry, {
+        color: color,
+        weight: weight,
+        opacity: opacity,
+        className: `traffic-segment traffic-${(segment.severity || 'light').toLowerCase()}`
+      });
+
+      const icon = incidentIcons[segment.incident_type] || '📍';
+      const popup = `
+        <div class="p-3 min-w-[250px]">
+          <div class="flex items-center mb-2">
+            <span class="text-2xl mr-2">${icon}</span>
+            <h3 class="font-bold text-lg">${segment.incident_type}</h3>
+          </div>
+          <div class="space-y-1 text-sm">
+            <p><span class="font-semibold">Road:</span> ${segment.road_name}</p>
+            <p><span class="font-semibold">Type:</span> ${segment.highway_type}</p>
+            <p><span class="font-semibold">Severity:</span> 
+              <span class="px-2 py-1 rounded text-white" style="background-color: ${color};">
+                ${segment.severity}
+              </span>
+            </p>
+            <p><span class="font-semibold">Speed:</span> ${(segment.speed_kph || 0).toFixed(1)} km/h 
+              <span class="text-gray-500">(Free flow: ${(segment.free_flow_kph || 0).toFixed(1)} km/h)</span>
+            </p>
+            <p><span class="font-semibold">Jam Factor:</span> ${(segment.jam_factor || 0).toFixed(1)}/10</p>
+            <p><span class="font-semibold">Length:</span> ${segment.length ? segment.length.toFixed(0) : 0}m</p>
+            ${segment.is_closed ? '<p class="text-red-600 font-bold mt-2">⛔ ROAD CLOSED</p>' : ''}
+            ${segment.description ? `<p class="text-xs text-gray-600 mt-2">${segment.description}</p>` : ''}
+            <p class="text-xs text-teal-600 mt-2">✅ Matched to OSM network with geometry</p>
+          </div>
+        </div>
+      `;
+
+      polyline.bindPopup(popup);
+      polyline.on('mouseover', function() {
+        this.setStyle({
+          weight: weight + 2,
+          opacity: Math.min(opacity + 0.2, 1)
+        });
+      });
+
+      polyline.on('mouseout', function() {
+        this.setStyle({
+          weight: weight,
+          opacity: opacity
+        });
+      });
+
+      trafficVisualization.trafficOverlayLayer.addLayer(polyline);
+      displayedCount++;
+    } catch (error) {
+      console.error('Error processing segment:', error, segment);
+    }
+  });
+
+  console.log(`   ✅ Displayed ${displayedCount} traffic segments on map`);
+  return displayedCount;
+}
+
+function hideTrafficOverlayLayer() {
+  if (trafficVisualization.trafficOverlayLayer && map && map.hasLayer(trafficVisualization.trafficOverlayLayer)) {
+    map.removeLayer(trafficVisualization.trafficOverlayLayer);
+  }
 }
 
 /**
@@ -457,4 +490,5 @@ window.loadActiveIncidents = loadActiveIncidents;
 window.clearActiveIncidents = clearActiveIncidents;
 window.applyTrafficOverlay = applyTrafficOverlay;
 window.clearTrafficOverlay = clearTrafficOverlay;
+window.hideTrafficOverlayLayer = hideTrafficOverlayLayer;
 window.updateCurrentRoute = updateCurrentRoute;

@@ -243,6 +243,13 @@ class TrafficHashMatcher:
         print(f"   Loaded {len(self.hash_to_edges)} unique traffic segments")
         print(f"   Matched attributes: {found_attrs}/{found_attrs + missing_attrs} edges")
     
+    def lookup_edges_by_hash(self, id_hash: str) -> List[Dict]:
+        """Return hash-matched edges as dictionaries (used by IncidentMatcher)."""
+        edges = self.hash_to_edges.get(id_hash, [])
+        if not edges:
+            return []
+        return [edge.to_dict() for edge in edges]
+
     @staticmethod
     def hash_location_javascript_style(location: Dict) -> str:
         """

@@ -13,6 +13,10 @@ from datetime import datetime
 from typing import Optional, Dict, Any
 import logging
 
+from traffic_data_manager import (
+    merge_user_disruptions_with_traffic
+)
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -25,13 +29,13 @@ class AutoDisruptionService:
     recalculation for active routes
     """
     
-    def __init__(self, app, update_interval: int = 60):
+    def __init__(self, app, update_interval: int = 120):
         """
         Initialize the auto-disruption service
         
         Args:
             app: Flask app instance
-            update_interval: Seconds between updates (default: 60 - 1 minute)
+            update_interval: Seconds between updates (default: 120 - 2 minutes)
         """
         self.app = app
         self.update_interval = update_interval
@@ -41,6 +45,18 @@ class AutoDisruptionService:
         # Track active routes
         self.active_routes: Dict[str, Any] = {}
         self.last_disruption_hash = None
+        
+        # Initialize services once
+        try:
+            from flow_service import FlowService
+            from incident_service import IncidentService
+            self.flow_service = FlowService()
+            self.incident_service = IncidentService()
+            logger.info("✅ Flow and Incident services initialized")
+        except Exception as e:
+            logger.error(f"❌ Error initializing services: {e}")
+            self.flow_service = None
+            self.incident_service = None
         
         logger.info(f"AutoDisruptionService initialized (interval: {update_interval}s)")
     
@@ -92,31 +108,54 @@ class AutoDisruptionService:
         self.active_routes.clear()
         logger.info(f"🗑️  Cleared {count} active route(s)")
     
+    def set_update_interval(self, interval_seconds: int):
+        """
+        Update the fetch interval (must be between 60 and 1800 seconds)
+        
+        Args:
+            interval_seconds: New interval in seconds (1-30 minutes)
+        """
+        # Clamp to 60-1800 seconds (1-30 minutes)
+        interval_seconds = max(60, min(1800, interval_seconds))
+        self.update_interval = interval_seconds
+        logger.info(f"⏱️  Update interval changed to {interval_seconds}s ({interval_seconds//60} minutes)")
+        return interval_seconds
+    
     def _get_disruption_hash(self) -> Optional[str]:
         """Get hash of current traffic files to detect changes"""
         try:
             from config import Config
             import hashlib
             
-            # Check new hash-based traffic files (symlinks always point to latest)
-            files_to_check = [
-                Config.DISRUPTIONS_DIR / "current_traffic_flow.gr",
-                Config.DISRUPTIONS_DIR / "current_traffic_incidents.gr",
-                Config.DISRUPTIONS_DIR / "current_traffic_both.gr",
-                Config.DISRUPTIONS_DIR / "current_traffic_flow.csv",
-                Config.DISRUPTIONS_DIR / "current_traffic_both.csv"
-            ]
+            # Check flow and incident directories for latest files
+            flow_dir = Config.FLOW_DIR
+            incidents_dir = Config.INCIDENTS_DIR
             
             combined_content = ""
-            for file_path in files_to_check:
-                if file_path.exists():
-                    try:
-                        # For symlinks, get the actual file modification time
-                        real_path = file_path.resolve()
-                        mtime = real_path.stat().st_mtime
-                        combined_content += f"{file_path.name}:{mtime}:"
-                    except Exception as e:
-                        logger.debug(f"Error reading {file_path}: {e}")
+            
+            # Check flow directory
+            if flow_dir.exists():
+                try:
+                    # Get the most recent flow file
+                    flow_files = sorted(flow_dir.glob("flow_*.csv"))
+                    if flow_files:
+                        latest_flow = flow_files[-1]
+                        mtime = latest_flow.stat().st_mtime
+                        combined_content += f"flow:{mtime}:"
+                except Exception as e:
+                    logger.debug(f"Error reading flow directory: {e}")
+            
+            # Check incidents directory
+            if incidents_dir.exists():
+                try:
+                    # Get the most recent incident file
+                    incident_files = sorted(incidents_dir.glob("incident_*.csv"))
+                    if incident_files:
+                        latest_incident = incident_files[-1]
+                        mtime = latest_incident.stat().st_mtime
+                        combined_content += f"incident:{mtime}:"
+                except Exception as e:
+                    logger.debug(f"Error reading incidents directory: {e}")
             
             if combined_content:
                 return hashlib.md5(combined_content.encode()).hexdigest()
@@ -153,18 +192,28 @@ class AutoDisruptionService:
             logger.error(f"Error triggering recalculation: {e}")
     
     def _fetch_traffic_data(self):
-        """Fetch latest traffic data using the traffic service"""
+        """Fetch latest traffic data from both flow and incident services"""
         try:
-            from realtime_traffic_service import RealtimeTrafficService
+            if not self.flow_service or not self.incident_service:
+                logger.error("❌ Services not initialized")
+                return False
             
-            # Initialize traffic service
-            traffic_service = RealtimeTrafficService()
-            
-            # Fetch and save traffic data
             logger.info("🌐 Fetching latest traffic data from HERE API...")
-            metadata = traffic_service.fetch_and_save(mode='both')
             
-            logger.info(f"✅ Traffic update complete: {metadata.get('total_edges', 0)} edges affected")
+            # Fetch and save flow data
+            flow_metadata = self.flow_service.fetch_and_save()
+            logger.info(f"✅ Flow data updated: {flow_metadata.get('total_edges', 0)} edges")
+            
+            # Fetch and save incident data
+            incident_metadata = self.incident_service.fetch_and_save()
+            logger.info(f"✅ Incident data updated: {incident_metadata.get('total_matched', 0)} incidents matched")
+            
+            # Merge user disruptions into both CSV sources
+            merge_user_disruptions_with_traffic(
+                flow_metadata.get('csv_file'),
+                incident_metadata.get('csv_file')
+            )
+            
             return True
             
         except Exception as e:
@@ -216,13 +265,13 @@ class AutoDisruptionService:
 auto_disruption_service: Optional[AutoDisruptionService] = None
 
 
-def init_auto_disruption_service(app, update_interval: int = 60):
+def init_auto_disruption_service(app, update_interval: int = 120):
     """
     Initialize and start the auto-disruption service
     
     Args:
         app: Flask app instance
-        update_interval: Seconds between checks (default: 60 - 1 minute)
+        update_interval: Seconds between checks (default: 120 - 2 minutes)
     """
     global auto_disruption_service
     

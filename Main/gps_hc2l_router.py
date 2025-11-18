@@ -150,8 +150,11 @@ class GPSRoutingService:
             
             # Add optional disruption parameters if provided
             if disruption_file and disruption_file not in ['', 'null', 'NULL']:
+                print(f"   📂 Adding disruption directory: {disruption_file}")
                 cmd.append(str(disruption_file))
                 cmd.append(str(tau_threshold))
+            else:
+                print(f"   ⚠️  No disruption directory passed (disruption_file={repr(disruption_file)})")
             
             # Add generate_alternatives flag (pass 1 for True, 0 for False)
             cmd.append(str(1 if generate_alternatives else 0))
