@@ -521,169 +521,96 @@ function initializeEventHandlers() {
         reportForm.onsubmit = async (e) => {
     e.preventDefault();
     
-    if (!reportLocation) {
+    if (!window.reportLocation) {
       showUpdateToast("Please pin the incident location on the map", 'warning');
       return;
     }
     
-    // Get incident type
-    const incidentType = document.getElementById('disruption-type')?.value;
+    // Collect all form data
+    const incidentType = document.getElementById('disruption-type').value;
     if (!incidentType) {
       showUpdateToast("Please select an incident type", 'warning');
       return;
     }
     
-    // Get traffic severity
-    const severityRadio = document.querySelector('input[name="traffic"]:checked');
-    if (!severityRadio) {
+    const severity = document.querySelector('input[name="traffic"]:checked')?.value;
+    if (!severity) {
       showUpdateToast("Please select traffic severity", 'warning');
       return;
     }
-    const severity = severityRadio.value;
     
-    // Get custom flow parameters
-    const isClosed = document.getElementById('road-closure-toggle')?.checked || false;
-    const customSpeed = parseFloat(document.getElementById('custom-speed-input')?.value || 30);
-    const freeFlowSpeed = 50; // Normal city speed
+    const customSpeedSlider = document.getElementById('custom-speed-slider');
+    const customSpeed = customSpeedSlider ? parseInt(customSpeedSlider.value) : 0;
     
-    // Calculate jam factor
-    let jamFactor;
-    if (isClosed) {
-      jamFactor = 10.0;
-    } else {
-      jamFactor = Math.max(0, Math.min(10, 10 * (1 - customSpeed / freeFlowSpeed)));
-    }
+    const isRoadClosed = document.getElementById('road-closure-toggle')?.checked || false;
+    
+    const description = document.getElementById('disruption-description')?.value || '';
     
     // Disable submit button to prevent multiple submissions
     const submitButton = reportForm.querySelector('button[type="submit"]');
     const originalText = submitButton.innerHTML;
-    submitButton.innerHTML = 'Submitting...';
+    submitButton.innerHTML = '💾 Saving...';
     submitButton.disabled = true;
     
     try {
-      const response = await fetch('/report_disruption', {
+      // Save the custom disruption
+      const response = await fetch('/save_custom_disruption', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          lat: reportLocation.lat,
-          lng: reportLocation.lng,
+          lat: window.reportLocation.lat,
+          lng: window.reportLocation.lng,
+          snapped_lat: window.reportLocation.snapped_lat,
+          snapped_lng: window.reportLocation.snapped_lng,
+          source_id: window.reportLocation.source_id || 0,
+          target_id: window.reportLocation.target_id || 0,
+          road_name: window.reportLocation.road_name || 'Custom Report',
           incident_type: incidentType,
           severity: severity,
-          custom_speed: customSpeed,
-          free_flow_speed: freeFlowSpeed,
-          jam_factor: jamFactor,
-          is_closed: isClosed,
-          description: `User reported ${incidentType} (${severity} severity)`
+          custom_speed_kph: customSpeed,
+          is_road_closed: isRoadClosed,
+          description: description
         })
       });
-        if (!response.ok) { 
-            throw new Error(`HTTP error! status: ${response.status}`);
+      
+      if (!response.ok) { 
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        // Success: disruption saved
+        showUpdateToast(`✅ Disruption saved: ${data.road_name} (${data.incident_type})`, 'success');
+        
+        // Reset form
+        document.getElementById('report-form').reset();
+        
+        // Clear all map markers and UI elements
+        clearReportMarkers();
+        document.getElementById('pin-disruption-text').textContent = 'Click to pin location on map';
+        document.getElementById('disruption-coords').classList.add('hidden');
+        document.getElementById('disruption-coords').textContent = '';
+        
+        // Refresh user disruptions list
+        await refreshUserDisruptionsUI(true);
+        
+        // Refresh active disruptions on map
+        await refreshActiveDisruptionsOnMapSilently();
+        
+        // Close report panel
+        const reportPanel = document.getElementById('report-panel');
+        if (reportPanel) {
+          reportPanel.classList.add('translate-x-full');
         }
-        const data = await response.json();
-        if (data.success) {
-            showUpdateToast(data.message || 'Disruption reported successfully!', 'success');
-
-            await refreshUserDisruptionsUI();
-            await refreshActiveDisruptionsOnMapSilently();
-            
-            // Add incident marker to the map immediately
-            if (map && typeof L !== 'undefined') {
-              const severityColorMap = {
-                'heavy': '#ef4444',
-                'medium': '#f59e0b',
-                'light': '#10b981'
-              };
-              const markerColor = severityColorMap[severity] || '#f59e0b';
-              
-              const incidentIcon = L.divIcon({
-                html: `<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-                        <circle cx="16" cy="16" r="14" fill="${markerColor}" stroke="white" stroke-width="2"/>
-                        <text x="16" y="21" text-anchor="middle" fill="white" font-size="14" font-weight="bold">!</text>
-                      </svg>`,
-                className: 'reported-incident-marker',
-                iconSize: [32, 32],
-                iconAnchor: [16, 32]
-              });
-              
-              const incidentMarker = L.marker([reportLocation.lat, reportLocation.lng], {
-                icon: incidentIcon,
-                title: `${incidentType} (${severity}) - Just reported`
-              }).addTo(map);
-              incidentMarker.reportId = data.report_id;
-              incidentMarker._isUserReported = true;
-              
-              // Add popup with info
-              const popupContent = `
-                <div class="p-2">
-                  <h3 class="font-bold text-sm">${data.road_name || 'Reported Location'}</h3>
-                  <p class="text-xs text-gray-600">${incidentType}</p>
-                  <p class="text-xs">Severity: <span class="font-semibold" style="color: ${markerColor}">${severity}</span></p>
-                  <p class="text-xs">Speed: ${customSpeed} km/h</p>
-                  ${isClosed ? '<p class="text-xs text-red-600 font-bold">⚠️ ROAD BLOCKED</p>' : ''}
-                  <p class="text-xs text-green-600 mt-1">✅ Just reported</p>
-                </div>
-              `;
-              
-              incidentMarker.bindPopup(popupContent);
-              incidentMarker.openPopup(); // Show popup immediately
-              
-              // Store in disruptionMarkers array
-              if (typeof disruptionMarkers !== 'undefined') {
-                disruptionMarkers.push(incidentMarker);
-              } else {
-                // Create array if it doesn't exist
-                window.disruptionMarkers = window.disruptionMarkers || [];
-                window.disruptionMarkers.push(incidentMarker);
-              }
-              
-              console.log('✅ Incident marker added to map');
-              
-              // Ensure the "Show Active Incidents" toggle is checked
-              const showIncidentsToggle = document.getElementById('show-active-incidents');
-              if (showIncidentsToggle && !showIncidentsToggle.checked) {
-                showIncidentsToggle.checked = true;
-                console.log('✅ Auto-enabled "Show Active Incidents" toggle');
-              }
-            }
-            
-            // Reset form and remove report markers (but keep the incident marker)
-            document.getElementById('report-form').reset();
-            if (reportMarker) {
-                map.removeLayer(reportMarker);
-                reportMarker = null;
-            }
-            if (window.reportSnapMarker) {
-                map.removeLayer(window.reportSnapMarker);
-                window.reportSnapMarker = null;
-            }
-            if (window.reportConnectorLine) {
-                map.removeLayer(window.reportConnectorLine);
-                window.reportConnectorLine = null;
-            }
-            reportLocation = null;
-            
-            // Close report panel
-            const reportPanel = document.getElementById('report-panel');
-            if (reportPanel) {
-              reportPanel.classList.add('translate-x-full');
-            }
-            
-            // Reset custom flow controls
-            if (document.getElementById('road-closure-toggle')) {
-              document.getElementById('road-closure-toggle').checked = false;
-            }
-            if (document.getElementById('custom-speed-input')) {
-              document.getElementById('custom-speed-input').value = 30;
-              document.getElementById('custom-speed-slider').value = 30;
-            }
-            
-        } else {
-            throw new Error(data.error || 'Failed to report disruption');
-        }
+      } else {
+        throw new Error(data.error || 'Failed to save disruption');
+      }
+      
     } catch (error) {
-      console.error('Error reporting disruption:', error);
+      console.error('Error saving disruption:', error);
       showUpdateToast(`Error: ${error.message}`, 'warning');
     } finally {
       submitButton.innerHTML = originalText;

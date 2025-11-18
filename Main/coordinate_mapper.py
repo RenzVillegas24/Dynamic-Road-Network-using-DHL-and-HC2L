@@ -4,6 +4,9 @@ import numpy as np
 from math import radians, cos, sin, asin, sqrt
 import os
 from typing import Optional, Dict, Tuple
+from functools import lru_cache
+from datetime import datetime, timedelta
+import time
 
 def haversine(lon1, lat1, lon2, lat2):
     """Calculate distance between two points on Earth"""
@@ -20,6 +23,14 @@ class NodeMapper:
         """Load node coordinates from CSV"""
         self.nodes_df = pd.read_csv(nodes_csv_path)
         self.nodes_csv_path = nodes_csv_path
+        
+        # Initialize snap cache to reduce repeated geometry calculations
+        # Cache format: {rounded_coords: (result, timestamp)}
+        # We round to 6 decimal places (~10cm precision) to catch nearby duplicates
+        self.snap_cache = {}
+        self.snap_cache_ttl_seconds = 300  # 5-minute TTL for cache entries
+        self.cache_hits = 0
+        self.cache_misses = 0
         
         # Initialize OSM road snapper for geometry-aware selection
         try:
@@ -140,6 +151,60 @@ class NodeMapper:
             traceback.print_exc()
             return None
     
+    def _get_snap_cache_key(self, lat: float, lng: float, max_distance_m: float = 25.0) -> str:
+        """
+        Generate cache key for snap operation.
+        Rounds coordinates to ~10cm precision to catch nearby duplicates.
+        """
+        # Round to 6 decimal places = ~10 cm precision
+        lat_rounded = round(lat, 6)
+        lng_rounded = round(lng, 6)
+        dist_rounded = round(max_distance_m, 1)
+        return f"{lat_rounded}|{lng_rounded}|{dist_rounded}"
+    
+    def _check_snap_cache(self, lat: float, lng: float, max_distance_m: float = 25.0) -> Optional[Dict]:
+        """
+        Check if a snap result is in cache and still valid.
+        """
+        cache_key = self._get_snap_cache_key(lat, lng, max_distance_m)
+        
+        if cache_key in self.snap_cache:
+            result, timestamp = self.snap_cache[cache_key]
+            age_seconds = time.time() - timestamp
+            
+            if age_seconds < self.snap_cache_ttl_seconds:
+                self.cache_hits += 1
+                if self.cache_hits % 10 == 0:
+                    print(f"🚀 Snap cache stats: {self.cache_hits} hits, {self.cache_misses} misses")
+                return result
+            else:
+                # Remove expired entry
+                del self.snap_cache[cache_key]
+        
+        self.cache_misses += 1
+        return None
+    
+    def _store_snap_cache(self, lat: float, lng: float, max_distance_m: float, result: Dict) -> None:
+        """
+        Store a snap result in cache with timestamp.
+        Limit cache size to prevent memory issues.
+        """
+        cache_key = self._get_snap_cache_key(lat, lng, max_distance_m)
+        self.snap_cache[cache_key] = (result, time.time())
+        
+        # Cleanup old entries if cache gets too large
+        if len(self.snap_cache) > 1000:
+            # Remove oldest 25% of entries
+            current_time = time.time()
+            entries_by_age = [
+                (key, timestamp) for key, (_, timestamp) in self.snap_cache.items()
+            ]
+            entries_by_age.sort(key=lambda x: x[1])
+            
+            for key, _ in entries_by_age[:len(entries_by_age)//4]:
+                del self.snap_cache[key]
+            print(f"🧹 Cleaned snap cache: now {len(self.snap_cache)} entries")
+    
     def snap_to_osm_road(
         self, 
         lat: float, 
@@ -155,6 +220,9 @@ class NodeMapper:
         to provide more accurate snapping that follows real road shapes.
         If no road is found within max_distance_m, it progressively increases
         the search radius to always find a road (never falls back to nodes).
+        
+        OPTIMIZED: Uses LRU cache to avoid repeated geometry calculations for
+        the same coordinates within 5 minutes.
         
         Args:
             lat: Latitude of point to snap
@@ -180,6 +248,12 @@ class NodeMapper:
                 'validation': dict
             }
         """
+        # CHECK CACHE FIRST - Huge performance improvement!
+        cached_result = self._check_snap_cache(lat, lng, max_distance_m)
+        if cached_result is not None:
+            print(f"✨ Cache hit: ({lat:.6f}, {lng:.6f}) - saved geometry calculations")
+            return cached_result
+        
         # Try OSM-based snapping first if available
         if self.osm_snapper is not None:
             # Progressive search with increasing radius
@@ -210,6 +284,9 @@ class NodeMapper:
                         if search_dist > max_distance_m:
                             result['metadata']['warning'] = f'Expanded search to {search_dist}m to find nearest road'
                             print(f"⚠️  Expanded search to {search_dist}m to find road: {result['road_name']}")
+                        
+                        # STORE IN CACHE before returning
+                        self._store_snap_cache(lat, lng, max_distance_m, result)
                         
                         return result
                 except Exception as e:

@@ -26,8 +26,15 @@ let directionsService, directionsRenderer;
 let routePolylines = []; // Store D-HC2L route polylines
 let disruptionMarkers = []; // Store disruption markers
 let allNodesLayer = null; // Leaflet layer for displaying all nodes (toggleable)
+
+// Initialize window scope versions for consistency
 window.alternativeRoutePolylines = []; // Store alternative route polylines
 window.currentSelectedAlternativeRouteIndex = null; // Track which alternative route is currently selected (null = none)
+window.reportLocation = null; // Initialize report location on window object
+window.reportMarker = null; // Initialize report marker on window object
+window.reportSnapMarker = null; // Initialize snapped report marker
+window.reportConnectorLine = null; // Initialize connector line
+
 if (typeof window.currentRouteData === 'undefined') {
   window.currentRouteData = currentRouteData;
 } else {

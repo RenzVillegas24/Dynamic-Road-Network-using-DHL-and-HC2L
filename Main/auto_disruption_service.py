@@ -45,6 +45,7 @@ class AutoDisruptionService:
         # Track active routes
         self.active_routes: Dict[str, Any] = {}
         self.last_disruption_hash = None
+        self.last_fetch_time = None  # Track when we last fetched data
         
         # Initialize services once
         try:
@@ -58,7 +59,7 @@ class AutoDisruptionService:
             self.flow_service = None
             self.incident_service = None
         
-        logger.info(f"AutoDisruptionService initialized (interval: {update_interval}s)")
+        logger.info(f"AutoDisruptionService initialized (interval: {update_interval}s) - NO AUTO-FETCH")
     
     def start(self):
         """Start the background service"""
@@ -120,6 +121,169 @@ class AutoDisruptionService:
         self.update_interval = interval_seconds
         logger.info(f"⏱️  Update interval changed to {interval_seconds}s ({interval_seconds//60} minutes)")
         return interval_seconds
+    
+    def should_fetch_now(self) -> bool:
+        """Check if enough time has passed to fetch new data based on latest disruption file timestamp"""
+        try:
+            from config import Config
+            import re
+            
+            # Check flow and incident directories for latest files
+            flow_dir = Config.FLOW_DIR
+            incidents_dir = Config.INCIDENTS_DIR
+            
+            latest_timestamp = None
+            
+            # Check flow directory
+            if flow_dir.exists():
+                try:
+                    flow_files = sorted(flow_dir.glob("flow_*.csv"))
+                    if flow_files:
+                        latest_flow = flow_files[-1]
+                        # Parse timestamp from filename (format: flow_YYYYMMDDTHHMMSS.csv)
+                        match = re.search(r'flow_(\d{8}T\d{6})\.csv', latest_flow.name)
+                        if match:
+                            timestamp_str = match.group(1)
+                            # Convert YYYYMMDDTHHMMSS to datetime
+                            dt = datetime.strptime(timestamp_str, '%Y%m%dT%H%M%S')
+                            file_timestamp = dt.timestamp()
+                            if latest_timestamp is None or file_timestamp > latest_timestamp:
+                                latest_timestamp = file_timestamp
+                except Exception as e:
+                    logger.debug(f"Error parsing flow file timestamp: {e}")
+            
+            # Check incidents directory
+            if incidents_dir.exists():
+                try:
+                    incident_files = sorted(incidents_dir.glob("incident_*.csv"))
+                    if incident_files:
+                        latest_incident = incident_files[-1]
+                        # Parse timestamp from filename (format: incident_YYYYMMDDTHHMMSS.csv)
+                        match = re.search(r'incident_(\d{8}T\d{6})\.csv', latest_incident.name)
+                        if match:
+                            timestamp_str = match.group(1)
+                            # Convert YYYYMMDDTHHMMSS to datetime
+                            dt = datetime.strptime(timestamp_str, '%Y%m%dT%H%M%S')
+                            file_timestamp = dt.timestamp()
+                            if latest_timestamp is None or file_timestamp > latest_timestamp:
+                                latest_timestamp = file_timestamp
+                except Exception as e:
+                    logger.debug(f"Error parsing incident file timestamp: {e}")
+            
+            # If no disruption files exist, we should fetch
+            if latest_timestamp is None:
+                logger.debug("No disruption files found - should fetch")
+                return True
+            
+            # Check if enough time has passed since the latest file
+            current_time = time.time()
+            time_since_last_file = current_time - latest_timestamp
+            should_fetch = time_since_last_file >= self.update_interval
+            
+            if should_fetch:
+                logger.debug(f"✅ Fetch allowed: {time_since_last_file:.0f}s since latest file >= {self.update_interval}s")
+            else:
+                remaining = self.update_interval - time_since_last_file
+                logger.debug(f"⏳ Fetch blocked: {remaining:.0f}s remaining until next fetch")
+            
+            return should_fetch
+            
+        except Exception as e:
+            logger.error(f"Error in should_fetch_now: {e}")
+            # On error, default to fetching to be safe
+            return True
+    
+    def get_last_fetch_time(self) -> Optional[str]:
+        """Get the last time data was fetched based on latest disruption file (ISO format)"""
+        try:
+            from config import Config
+            import re
+            
+            flow_dir = Config.FLOW_DIR
+            incidents_dir = Config.INCIDENTS_DIR
+            
+            latest_timestamp = None
+            
+            # Check flow directory
+            if flow_dir.exists():
+                flow_files = sorted(flow_dir.glob("flow_*.csv"))
+                if flow_files:
+                    latest_flow = flow_files[-1]
+                    match = re.search(r'flow_(\d{8}T\d{6})\.csv', latest_flow.name)
+                    if match:
+                        timestamp_str = match.group(1)
+                        dt = datetime.strptime(timestamp_str, '%Y%m%dT%H%M%S')
+                        file_timestamp = dt.timestamp()
+                        if latest_timestamp is None or file_timestamp > latest_timestamp:
+                            latest_timestamp = file_timestamp
+            
+            # Check incidents directory
+            if incidents_dir.exists():
+                incident_files = sorted(incidents_dir.glob("incident_*.csv"))
+                if incident_files:
+                    latest_incident = incident_files[-1]
+                    match = re.search(r'incident_(\d{8}T\d{6})\.csv', latest_incident.name)
+                    if match:
+                        timestamp_str = match.group(1)
+                        dt = datetime.strptime(timestamp_str, '%Y%m%dT%H%M%S')
+                        file_timestamp = dt.timestamp()
+                        if latest_timestamp is None or file_timestamp > latest_timestamp:
+                            latest_timestamp = file_timestamp
+            
+            if latest_timestamp is None:
+                return None
+            return datetime.fromtimestamp(latest_timestamp).isoformat()
+            
+        except Exception as e:
+            logger.error(f"Error getting last fetch time: {e}")
+            return None
+    
+    def get_next_fetch_time(self) -> Optional[str]:
+        """Get when the next fetch will be allowed based on latest disruption file (ISO format)"""
+        try:
+            from config import Config
+            import re
+            
+            flow_dir = Config.FLOW_DIR
+            incidents_dir = Config.INCIDENTS_DIR
+            
+            latest_timestamp = None
+            
+            # Check flow directory
+            if flow_dir.exists():
+                flow_files = sorted(flow_dir.glob("flow_*.csv"))
+                if flow_files:
+                    latest_flow = flow_files[-1]
+                    match = re.search(r'flow_(\d{8}T\d{6})\.csv', latest_flow.name)
+                    if match:
+                        timestamp_str = match.group(1)
+                        dt = datetime.strptime(timestamp_str, '%Y%m%dT%H%M%S')
+                        file_timestamp = dt.timestamp()
+                        if latest_timestamp is None or file_timestamp > latest_timestamp:
+                            latest_timestamp = file_timestamp
+            
+            # Check incidents directory
+            if incidents_dir.exists():
+                incident_files = sorted(incidents_dir.glob("incident_*.csv"))
+                if incident_files:
+                    latest_incident = incident_files[-1]
+                    match = re.search(r'incident_(\d{8}T\d{6})\.csv', latest_incident.name)
+                    if match:
+                        timestamp_str = match.group(1)
+                        dt = datetime.strptime(timestamp_str, '%Y%m%dT%H%M%S')
+                        file_timestamp = dt.timestamp()
+                        if latest_timestamp is None or file_timestamp > latest_timestamp:
+                            latest_timestamp = file_timestamp
+            
+            if latest_timestamp is None:
+                return None
+            
+            next_time = latest_timestamp + self.update_interval
+            return datetime.fromtimestamp(next_time).isoformat()
+            
+        except Exception as e:
+            logger.error(f"Error getting next fetch time: {e}")
+            return None
     
     def _get_disruption_hash(self) -> Optional[str]:
         """Get hash of current traffic files to detect changes"""
@@ -223,34 +387,46 @@ class AutoDisruptionService:
             return False
     
     def _run_loop(self):
-        """Main service loop - automatically fetches traffic data every update_interval"""
-        logger.info("🔄 Auto-disruption service loop started (AUTO-FETCH ENABLED)")
-        logger.info(f"   Fetching traffic data every {self.update_interval} seconds")
+        """Main service loop - fetches traffic data only when update_interval has passed since last disruption file"""
+        logger.info("🔄 Auto-disruption service loop started")
+        logger.info(f"   ⏰ Will fetch traffic data every {self.update_interval} seconds")
+        logger.info(f"   � Based on latest disruption file timestamps")
         
         while self.running:
             try:
-                # Fetch latest traffic data from HERE API
-                fetch_success = self._fetch_traffic_data()
+                # Check if we should fetch new traffic data based on file timestamps
+                should_fetch = self.should_fetch_now()
                 
-                if fetch_success:
-                    # Check if there are active routes
-                    if self.active_routes:
-                        # Get new disruption hash after fetch
-                        current_hash = self._get_disruption_hash()
+                if should_fetch:
+                    logger.info(f"   ✅ Time to fetch - checking disruption files...")
+                    # Fetch latest traffic data from HERE API
+                    fetch_success = self._fetch_traffic_data()
+                    
+                    if fetch_success:
+                        # Update last_fetch_time for compatibility (though we don't use it anymore)
+                        self.last_fetch_time = time.time()
                         
-                        if current_hash and current_hash != self.last_disruption_hash:
-                            if self.last_disruption_hash is not None:  # Skip first time
-                                logger.info(f"🚦 Traffic data changed - triggering route updates")
-                                
-                                # Trigger recalculation for all active routes
-                                for route_id, route_info in list(self.active_routes.items()):
-                                    self._trigger_route_recalculation(route_id, route_info)
-                                    route_info['last_update'] = datetime.now().isoformat()
+                        # Check if there are active routes
+                        if self.active_routes:
+                            # Get new disruption hash after fetch
+                            current_hash = self._get_disruption_hash()
                             
-                            self.last_disruption_hash = current_hash
+                            if current_hash and current_hash != self.last_disruption_hash:
+                                if self.last_disruption_hash is not None:  # Skip first time
+                                    logger.info(f"🚦 Traffic data changed - triggering route updates")
+                                    
+                                    # Trigger recalculation for all active routes
+                                    for route_id, route_info in list(self.active_routes.items()):
+                                        self._trigger_route_recalculation(route_id, route_info)
+                                        route_info['last_update'] = datetime.now().isoformat()
+                                
+                                self.last_disruption_hash = current_hash
+                else:
+                    # Log current status occasionally (not every 10 seconds to avoid spam)
+                    pass  # should_fetch_now() already logs debug info
                 
-                # Sleep for the configured interval
-                time.sleep(self.update_interval)
+                # Sleep for a short interval to keep the loop responsive (check every 10 seconds)
+                time.sleep(10)
                 
             except Exception as e:
                 logger.error(f"Error in auto-disruption loop: {e}")

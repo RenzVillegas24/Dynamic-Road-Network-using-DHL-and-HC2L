@@ -388,4 +388,211 @@ async function handleOSMDestLocationPin(lat, lng) {
     map.getContainer().style.cursor = 'default';
 }
 
+/**
+ * Report disruption location pin handler with OSM road snapping
+ */
+/**
+ * Enhanced incident location pin handler with OSM road snapping
+ * Consistent with start/dest location handlers
+ */
+async function handleOSMReportLocationPin(lat, lng) {
+    try {
+        // Attempt OSM road snapping
+        const snapData = await snapToOSMRoad(lat, lng, 'report', 25);
+        
+        if (snapData) {
+            // Clear previous report markers before creating new ones
+            clearReportMarkers();
+            
+            const clickedLat = lat;
+            const clickedLng = lng;
+            const snappedLat = snapData.snapped_point.lat;
+            const snappedLng = snapData.snapped_point.lng;
+            const distance = snapData.distance_m;
+            
+            // 1. Create clicked marker (semi-transparent purple)
+            const clickedIcon = L.icon({
+                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-violet.png',
+                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+                iconSize: [20, 33],
+                iconAnchor: [10, 33],
+                popupAnchor: [0, -28],
+                shadowSize: [33, 33]
+            });
+            
+            window.reportMarker = L.marker([clickedLat, clickedLng], {
+                icon: clickedIcon,
+                title: 'Incident (Clicked)',
+                opacity: 0.4,
+                zIndexOffset: 1
+            }).addTo(map);
+            
+            window.reportMarker.bindPopup(
+                `<div class="p-2 min-w-[220px]">` +
+                `<div class="font-bold text-lg mb-2 text-violet-700">🟣 Incident Location</div>` +
+                `<div class="text-sm text-slate-600 mb-1">📍 Clicked Point</div>` +
+                `<div class="text-xs text-slate-500 font-mono bg-slate-50 px-2 py-1 rounded">${clickedLat.toFixed(6)}, ${clickedLng.toFixed(6)}</div>` +
+                `</div>`
+            );
+            
+            // 2. Create snapped marker (solid purple on the road)
+            const snappedIcon = L.divIcon({
+                className: 'report-snap-marker',
+                html: '<div style="background: #A855F7; border: 3px solid white; border-radius: 50%; width: 18px; height: 18px; box-shadow: 0 3px 6px rgba(0,0,0,0.5);"></div>',
+                iconSize: [18, 18],
+                iconAnchor: [9, 9]
+            });
+            
+            window.reportSnapMarker = L.marker([snappedLat, snappedLng], {
+                icon: snappedIcon,
+                title: 'Incident on Road',
+                zIndexOffset: 10
+            }).addTo(map);
+            
+            const methodText = snapData.method === 'osm_geometry' 
+                ? 'Snapped to OSM Road Geometry' 
+                : 'Fallback to Nearest Node';
+            
+            window.reportSnapMarker.bindPopup(
+                `<div class="p-3 min-w-[300px]">` +
+                `<div class="font-bold text-xl mb-3 text-violet-700 flex items-center">` +
+                `<span class="mr-2">🚨</span> Incident Location` +
+                `</div>` +
+                `<div class="bg-gradient-to-r from-violet-50 to-purple-50 px-3 py-2 rounded-lg mb-2 border border-violet-200">` +
+                `<div class="text-xs text-violet-600 font-semibold uppercase tracking-wide">${methodText}</div>` +
+                `</div>` +
+                `<div class="space-y-2 text-sm">` +
+                `<div class="flex items-start"><span class="font-semibold text-slate-700 w-20">🛣️ Road:</span><span class="text-slate-900 flex-1">${snapData.road_name}</span></div>` +
+                `<div class="flex items-start"><span class="font-semibold text-slate-700 w-20">🏷️ Type:</span><span class="text-slate-600">${snapData.highway_type}</span></div>` +
+                `${snapData.oneway ? '<div class="bg-yellow-50 border border-yellow-300 px-2 py-1 rounded text-yellow-800 font-semibold text-xs">⚠️ One-way road</div>' : ''}` +
+                `<div class="flex items-start"><span class="font-semibold text-slate-700 w-20">📏 Distance:</span><span class="text-violet-600 font-bold">${distance.toFixed(1)}m</span> <span class="text-slate-500 text-xs ml-1">from click</span></div>` +
+                `${snapData.snap_position ? `<div class="flex items-start"><span class="font-semibold text-slate-700 w-20">📍 Position:</span><span class="text-blue-600">${(snapData.snap_position * 100).toFixed(0)}%</span> <span class="text-slate-500 text-xs ml-1">along edge</span></div>` : ''}` +
+                `<div class="text-xs text-slate-400 font-mono bg-slate-50 px-2 py-1 rounded mt-2">${snappedLat.toFixed(6)}, ${snappedLng.toFixed(6)}</div>` +
+                `</div>` +
+                `</div>`
+            );
+            
+            // 3. Create connector line (walking path)
+            if (distance > 3) {
+                window.reportConnectorLine = L.polyline([
+                    [clickedLat, clickedLng],
+                    [snappedLat, snappedLng]
+                ], {
+                    color: '#A855F7',
+                    weight: 2,
+                    dashArray: '8, 12',
+                    opacity: 0.7,
+                    zIndexOffset: 0
+                }).addTo(map);
+                
+                window.reportConnectorLine.bindPopup(
+                    `<div class="p-2 min-w-[200px]">` +
+                    `<div class="font-bold text-lg mb-2 text-violet-700">🚶 Walking Distance</div>` +
+                    `<div class="text-2xl font-bold text-violet-600 mb-1">${distance.toFixed(1)}m</div>` +
+                    `<div class="text-xs text-slate-500">From clicked point to<br/><span class="font-semibold text-slate-700">${snapData.road_name}</span></div>` +
+                    `</div>`
+                );
+                
+                // Add permanent tooltip showing distance
+                window.reportConnectorLine.bindTooltip(
+                    `🚶 ${distance.toFixed(0)}m walk`,
+                    {
+                        permanent: true,
+                        direction: 'center',
+                        className: 'walking-distance-label',
+                        opacity: 0.9
+                    }
+                );
+            }
+            
+            // Store location data for form submission
+            window.reportLocation = {
+                lat: clickedLat,
+                lng: clickedLng,
+                snapped_lat: snappedLat,
+                snapped_lng: snappedLng,
+                source_id: snapData.routing_nodes[0] || 0,
+                target_id: snapData.routing_nodes[1] || 0,
+                road_name: snapData.road_name,
+                distance_m: distance,
+                snap_data: snapData
+            };
+            
+            // Update UI text elements
+            const roadName = snapData.road_name || 'Unknown Road';
+            const displayText = distance > 5 
+                ? `${roadName} (${distance.toFixed(0)}m from click)` 
+                : roadName;
+            
+            document.getElementById('pin-disruption-text').textContent = displayText;
+            document.getElementById('disruption-coords').textContent = 
+              `📍 ${snappedLat.toFixed(6)}, ${snappedLng.toFixed(6)}`;
+            document.getElementById('disruption-coords').classList.remove('hidden');
+            
+            const message = snapData.method === 'osm_geometry'
+                ? `✅ Incident location pinned on ${snapData.highway_type} road`
+                : '✅ Incident location pinned (fallback to node)';
+            
+            showUpdateToast(message, 'success');
+            
+            console.log('✅ Incident location pinned successfully:', {
+                method: snapData.method,
+                road: snapData.road_name,
+                distance_m: distance,
+                snapped_lat: snappedLat,
+                snapped_lng: snappedLng
+            });
+            
+        } else {
+            showUpdateToast('❌ Could not snap to road. Please try a different location.', 'warning');
+            console.warn('OSM snapping failed for incident location');
+        }
+        
+    } catch (error) {
+        console.error('Error in incident location pin:', error);
+        showUpdateToast('Error setting incident location', 'warning');
+    }
+    
+    pinningMode = null;
+    map.getContainer().style.cursor = 'default';
+}
+
+/**
+ * Clear report location markers and reset UI elements
+ */
+function clearReportMarkers() {
+    // Remove map layers
+    if (window.reportMarker && map && map.hasLayer(window.reportMarker)) {
+        try {
+            map.removeLayer(window.reportMarker);
+        } catch (e) {
+            console.warn('Error removing reportMarker:', e);
+        }
+        window.reportMarker = null;
+    }
+    
+    if (window.reportSnapMarker && map && map.hasLayer(window.reportSnapMarker)) {
+        try {
+            map.removeLayer(window.reportSnapMarker);
+        } catch (e) {
+            console.warn('Error removing reportSnapMarker:', e);
+        }
+        window.reportSnapMarker = null;
+    }
+    
+    if (window.reportConnectorLine && map && map.hasLayer(window.reportConnectorLine)) {
+        try {
+            map.removeLayer(window.reportConnectorLine);
+        } catch (e) {
+            console.warn('Error removing reportConnectorLine:', e);
+        }
+        window.reportConnectorLine = null;
+    }
+    
+    // Reset location storage
+    window.reportLocation = null;
+    
+    console.log('🧹 Report markers cleared');
+}
+
 console.log('✅ OSM Road Snapping module loaded');

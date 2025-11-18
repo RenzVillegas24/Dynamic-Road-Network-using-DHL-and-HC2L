@@ -9,7 +9,9 @@
     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- <script src="https://cdn.tailwindcss.com"></script> -->
+
+<script src="https://unpkg.com/tailwindcss-cdn@3.4.10/tailwindcss.js"></script>
 
   <style>
     @keyframes float {
@@ -647,6 +649,15 @@
               </div>
               <p class="text-xs text-slate-600 mt-1">Based on speed reduction from 50 km/h</p>
             </div>
+          </div>
+
+          <!-- Description Field -->
+          <div>
+            <label class="block text-sm font-bold text-slate-700 mb-3">Additional Details (Optional)</label>
+            <textarea id="disruption-description"
+              class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-300 rounded-2xl focus:border-purple-500 focus:ring-4 focus:ring-purple-200 outline-none font-medium text-slate-700 transition-all resize-none"
+              rows="3"
+              placeholder="Describe what you observed (e.g., accident details, lane closures, etc.)"></textarea>
           </div>
 
           <!-- User-reported incidents management -->
@@ -2731,143 +2742,7 @@
 
         } else if (pinningMode === 'report') {
           // Use OSM road snapping for incident reporting
-          try {
-            showUpdateToast("Snapping to nearest road...", 'info');
-            
-            // Find nearest road using OSM snapping
-            const snapResponse = await fetch('/find_nearest_osm_road', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ lat, lng, max_distance: 100 })
-            });
-            
-            const snapData = await snapResponse.json();
-            
-            if (!snapData.success) {
-              showUpdateToast('No road found within 100m. Click closer to a road.', 'warning');
-              return;
-            }
-            
-            // Clear previous markers
-            if (reportMarker) map.removeLayer(reportMarker);
-            if (window.reportSnapMarker) {
-              map.removeLayer(window.reportSnapMarker);
-              window.reportSnapMarker = null;
-            }
-            if (window.reportConnectorLine) {
-              map.removeLayer(window.reportConnectorLine);
-              window.reportConnectorLine = null;
-            }
-            
-            // Create semi-transparent marker at clicked location
-            const violetIcon = L.icon({
-              iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-violet.png',
-              shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-              iconSize: [25, 41],
-              iconAnchor: [12, 41],
-              popupAnchor: [1, -34],
-              shadowSize: [41, 41],
-              className: 'report-location-marker'
-            });
-            
-            reportMarker = L.marker([lat, lng], {
-              icon: violetIcon,
-              title: "Report Location (Click Point)",
-              opacity: 0.6
-            }).addTo(map);
-            
-            // Create solid snap marker at road
-            const snapIcon = L.divIcon({
-              className: 'snap-marker',
-              html: '<div style="background: #8B5CF6; border: 3px solid white; border-radius: 50%; width: 16px; height: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.4);"></div>',
-              iconSize: [16, 16],
-              iconAnchor: [8, 8]
-            });
-            
-            window.reportSnapMarker = L.marker(
-              [snapData.snapped_point.lat, snapData.snapped_point.lng],
-              {
-                icon: snapIcon,
-                title: `Snapped to: ${snapData.road_name}`
-              }
-            ).addTo(map);
-            
-            // Draw connector line if distance > 5m
-            const distance = snapData.distance_m;
-            if (distance > 5) {
-              window.reportConnectorLine = L.polyline([
-                [lat, lng],
-                [snapData.snapped_point.lat, snapData.snapped_point.lng]
-              ], {
-                color: '#8B5CF6',
-                weight: 2,
-                dashArray: '5, 10',
-                opacity: 0.7
-              }).addTo(map);
-              
-              window.reportConnectorLine.bindPopup(
-                `Incident will be placed on road<br>` +
-                `Road: ${snapData.road_name}<br>` +
-                `Distance: ${distance.toFixed(0)}m`
-              );
-            }
-            
-            // Store both original and snapped locations
-            reportLocation = {
-              lat: snapData.snapped_point.lat,
-              lng: snapData.snapped_point.lng,
-              original_lat: lat,
-              original_lng: lng,
-              snap_distance: distance,
-              road_name: snapData.road_name,
-              osm_nodes: snapData.osm_nodes,
-              routing_nodes: snapData.routing_nodes
-            };
-            
-            // Update UI with road name
-            const roadName = snapData.road_name || 'Unknown Road';
-            document.getElementById('pin-disruption-text').textContent = 
-              distance > 5 ? `${roadName} (${distance.toFixed(0)}m from click)` : roadName;
-            
-            document.getElementById('disruption-coords').textContent = 
-              `${snapData.snapped_point.lat.toFixed(6)}, ${snapData.snapped_point.lng.toFixed(6)} (on road)`;
-            document.getElementById('disruption-coords').classList.remove('hidden');
-            
-            const message = distance > 5
-              ? `Location snapped to ${roadName} (${distance.toFixed(0)}m away)`
-              : `Location pinned on ${roadName}`;
-            showUpdateToast(message, 'success');
-            
-          } catch (error) {
-            console.error('Error snapping to road:', error);
-            showUpdateToast('Error snapping to road. Using clicked location.', 'warning');
-            
-            // Fallback to simple marker without snapping
-            if (reportMarker) map.removeLayer(reportMarker);
-            
-            const violetIcon = L.icon({
-              iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-violet.png',
-              shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-              iconSize: [25, 41],
-              iconAnchor: [12, 41],
-              popupAnchor: [1, -34],
-              shadowSize: [41, 41]
-            });
-            
-            reportMarker = L.marker([lat, lng], {
-              icon: violetIcon,
-              title: "Report Location"
-            }).addTo(map);
-            
-            reportLocation = { lat, lng };
-            
-            document.getElementById('pin-disruption-text').textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-            document.getElementById('disruption-coords').textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-            document.getElementById('disruption-coords').classList.remove('hidden');
-          }
-          
-          pinningMode = null;
-          map.getContainer().style.cursor = 'default';
+          await handleOSMReportLocationPin(lat, lng);
         }
       });
     }
@@ -4220,19 +4095,59 @@
       restoreToggleDefaults();
 
       window.addEventListener('load', async () => {
-        if (showActiveIncidents?.checked) {
-          try {
-            await handleActiveIncidentsToggle(true, { silent: true });
-          } catch (err) {
-            console.error('Unable to restore active incidents cache', err);
+        console.log('📍 Page loaded - initializing disruptions...');
+        
+        // Smart loader: If empty → fetch, If exists → load with respect to toggles
+        try {
+          const loadResponse = await fetch('/load_disruptions');
+          const loadData = await loadResponse.json();
+          
+          if (!loadData.success) {
+            console.error('❌ Error loading disruptions:', loadData.error);
           }
-        }
-        if (showTrafficOverlay?.checked) {
-          try {
-            await handleTrafficOverlayToggle(true, { silent: true });
-          } catch (err) {
-            console.error('Unable to restore traffic overlay cache', err);
+          
+          console.log(`📊 Load action: ${loadData.action}`);
+          console.log(`   Message: ${loadData.message}`);
+          console.log(`   Total edges: ${loadData.total_edges}`);
+          
+          // Now show disruptions based on toggle states
+          if (loadData.success) {
+            if (showActiveIncidents?.checked) {
+              console.log('🎯 Loading active incidents (Show Active Incidents = ON)');
+              try {
+                await handleActiveIncidentsToggle(true, { silent: true });
+              } catch (err) {
+                console.error('Unable to load active incidents', err);
+              }
+            } else {
+              console.log('⏭️  Skipping incidents (Show Active Incidents = OFF)');
+            }
+            
+            if (showTrafficOverlay?.checked) {
+              console.log('🎯 Loading traffic overlay (Show Flow Overlay = ON)');
+              try {
+                await handleTrafficOverlayToggle(true, { silent: true });
+              } catch (err) {
+                console.error('Unable to load traffic overlay', err);
+              }
+            } else {
+              console.log('⏭️  Skipping traffic overlay (Show Flow Overlay = OFF)');
+            }
+            
+            // Show status message
+            if (loadData.action === 'fetched') {
+              showUpdateToast('✅ Fresh disruptions loaded (was empty)', 'success');
+            } else if (loadData.action === 'refreshed') {
+              showUpdateToast('✅ Disruptions refreshed (update interval expired)', 'info');
+            } else if (loadData.action === 'cached') {
+              showUpdateToast(
+                `📦 Using cached disruptions (${Math.ceil(loadData.time_until_next_fetch)}s until next update)`,
+                'info'
+              );
+            }
           }
+        } catch (err) {
+          console.error('Error in page load disruption handler:', err);
         }
       });
 

@@ -307,8 +307,23 @@ def combine_flow_and_incident_data(flow_df: pd.DataFrame, incident_df: pd.DataFr
     return pd.DataFrame(merged_rows)
 
 
-def build_user_disruption_dataframe(user_rows: List[Dict[str, Any]]) -> pd.DataFrame:
-    """Convert user-reported disruption rows into a traffic DataFrame."""
+def build_user_disruption_dataframe(user_rows: List[Dict[str, Any]], target_type: str = 'flow') -> pd.DataFrame:
+    """
+    Convert user-reported disruption rows into a traffic DataFrame.
+    
+    CRITICAL: This function MUST match the EXACT column format from the respective services:
+    - flow_service.py: Creates 14-column flow CSV
+    - incident_service.py: Creates 15-column incident CSV
+    
+    Column consistency is ESSENTIAL to prevent pandas concat() from adding unwanted columns.
+    
+    Args:
+        user_rows: List of user disruption dictionaries
+        target_type: 'flow' or 'incident' - determines which columns to include
+    
+    Returns:
+        DataFrame with EXACT columns matching flow_service.py or incident_service.py
+    """
     if not user_rows:
         return pd.DataFrame()
 
@@ -318,33 +333,59 @@ def build_user_disruption_dataframe(user_rows: List[Dict[str, Any]]) -> pd.DataF
         target = _safe_int(row.get('target'))
         if source == 0 and target == 0:
             continue
+        
         speed = _safe_float(row.get('speed_kph'))
         free_flow = _safe_float(row.get('freeFlow_kph'), 50.0)
         jam_factor = _safe_float(row.get('jamFactor'))
         severity = normalize_severity(row.get('severity'))
         incident_type = normalize_incident_type(row.get('incident_type'))
-        records.append({
-            'source': source,
-            'target': target,
-            'source_lat': _safe_float(row.get('snapped_lat') or row.get('lat')),
-            'source_lon': _safe_float(row.get('snapped_lng') or row.get('lng')),
-            'target_lat': _safe_float(row.get('target_lat') or row.get('lat')),
-            'target_lon': _safe_float(row.get('target_lon') or row.get('lng')),
-            'road_name': _safe_str(row.get('road_name', 'User Reported Location')),
-            'highway_type': _safe_str(row.get('highway_type', 'unknown')),
-            'flow_speed_kph': speed,
-            'flow_free_flow_kph': free_flow,
-            'flow_jam_factor': jam_factor,
-            'speed_kph': speed,
-            'freeFlow_kph': free_flow,
-            'jamFactor': jam_factor,
-            'jam_factor': jam_factor,
-            'incident_type': incident_type,
-            'incident_criticality': severity,
-            'incident_description': _safe_str(row.get('description')),
-            'incident_road_closed': _bool_from_value(row.get('isClosed')),
-            'isClosed': _bool_from_value(row.get('isClosed'))
-        })
+        
+        if target_type == 'flow':
+            # MUST match flow_service.py exactly: 14 columns
+            # id_hash,source_lat,source_lon,target_lat,target_lon,source,target,
+            # flow_speed_kph,flow_free_flow_kph,flow_jam_factor,flow_confidence,
+            # flow_traversability,highway_type,road_name
+            record = {
+                'id_hash': f'user_{source}_{target}',
+                'source_lat': _safe_float(row.get('snapped_lat') or row.get('lat')),
+                'source_lon': _safe_float(row.get('snapped_lng') or row.get('lng')),
+                'target_lat': _safe_float(row.get('target_lat') or row.get('lat')),
+                'target_lon': _safe_float(row.get('target_lon') or row.get('lng')),
+                'source': source,
+                'target': target,
+                'flow_speed_kph': speed,
+                'flow_free_flow_kph': free_flow,
+                'flow_jam_factor': jam_factor,
+                'flow_confidence': 0.95,
+                'flow_traversability': 'closed' if _bool_from_value(row.get('isClosed')) else 'open',
+                'highway_type': _safe_str(row.get('highway_type', 'unknown')),
+                'road_name': _safe_str(row.get('road_name', 'User Reported Location'))
+            }
+        else:  # target_type == 'incident'
+            # MUST match incident_service.py exactly: 15 columns
+            # source,target,source_lat,source_lon,target_lat,target_lon,
+            # incident_id,incident_type,incident_criticality,incident_description,
+            # incident_road_closed,incident_start_time,incident_end_time,
+            # highway_type,road_name
+            record = {
+                'source': source,
+                'target': target,
+                'source_lat': _safe_float(row.get('snapped_lat') or row.get('lat')),
+                'source_lon': _safe_float(row.get('snapped_lng') or row.get('lng')),
+                'target_lat': _safe_float(row.get('target_lat') or row.get('lat')),
+                'target_lon': _safe_float(row.get('target_lon') or row.get('lng')),
+                'incident_id': f'user_{source}_{target}',
+                'incident_type': incident_type,
+                'incident_criticality': severity,
+                'incident_description': _safe_str(row.get('description')),
+                'incident_road_closed': _bool_from_value(row.get('isClosed')),
+                'incident_start_time': '',  # User disruptions don't have timestamps
+                'incident_end_time': '',    # User disruptions don't have timestamps
+                'highway_type': _safe_str(row.get('highway_type', 'unknown')),
+                'road_name': _safe_str(row.get('road_name', 'User Reported Location'))
+            }
+        
+        records.append(record)
 
     if not records:
         return pd.DataFrame()
@@ -352,9 +393,19 @@ def build_user_disruption_dataframe(user_rows: List[Dict[str, Any]]) -> pd.DataF
     return pd.DataFrame(records)
 
 
-def merge_user_disruptions_dataframe(base_df: pd.DataFrame, user_rows: List[Dict[str, Any]]) -> pd.DataFrame:
-    """Append user disruptions to a base traffic DataFrame."""
-    user_df = build_user_disruption_dataframe(user_rows)
+def merge_user_disruptions_dataframe(base_df: pd.DataFrame, user_rows: List[Dict[str, Any]], target_type: str = 'flow') -> pd.DataFrame:
+    """
+    Append user disruptions to a base traffic DataFrame, maintaining column integrity.
+    
+    Args:
+        base_df: The base traffic DataFrame (flow or incident CSV)
+        user_rows: List of user disruption records
+        target_type: 'flow' or 'incident' - specifies which columns to use
+    
+    Returns:
+        Combined DataFrame with duplicate handling
+    """
+    user_df = build_user_disruption_dataframe(user_rows, target_type=target_type)
     if user_df.empty:
         return base_df or pd.DataFrame()
 
@@ -507,6 +558,10 @@ def merge_user_disruptions_with_traffic(flow_csv: Optional[str] = None, incident
     flow and incident CSV files. If CSV paths are not provided, it uses the
     latest available CSV files from the respective directories.
     
+    IMPORTANT: User disruptions are merged with ONLY the appropriate columns
+    for each CSV type. Flow CSVs get flow-related columns, incident CSVs get
+    incident-related columns. This prevents data corruption.
+    
     Args:
         flow_csv: Path to the flow CSV file. If None, uses latest from Config.FLOW_DIR
         incident_csv: Path to the incident CSV file. If None, uses latest from Config.INCIDENTS_DIR
@@ -523,7 +578,8 @@ def merge_user_disruptions_with_traffic(flow_csv: Optional[str] = None, incident
             if flow_path and flow_path.exists():
                 try:
                     flow_df = _read_csv_safely(flow_path)
-                    flow_df = merge_user_disruptions_dataframe(flow_df, user_rows)
+                    # Merge with ONLY flow columns (not incident columns)
+                    flow_df = merge_user_disruptions_dataframe(flow_df, user_rows, target_type='flow')
                     flow_df.to_csv(flow_path, index=False)
                 except Exception as e:
                     print(f"⚠️  Failed to merge user disruptions into flow CSV: {e}")
@@ -534,7 +590,8 @@ def merge_user_disruptions_with_traffic(flow_csv: Optional[str] = None, incident
             if incident_path and incident_path.exists():
                 try:
                     incident_df = _read_csv_safely(incident_path)
-                    incident_df = merge_user_disruptions_dataframe(incident_df, user_rows)
+                    # Merge with ONLY incident columns (not flow columns)
+                    incident_df = merge_user_disruptions_dataframe(incident_df, user_rows, target_type='incident')
                     incident_df.to_csv(incident_path, index=False)
                 except Exception as e:
                     print(f"⚠️  Failed to merge user disruptions into incident CSV: {e}")

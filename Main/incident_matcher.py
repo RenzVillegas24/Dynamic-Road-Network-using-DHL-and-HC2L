@@ -191,6 +191,51 @@ class IncidentMatcher:
         matches.sort(key=lambda x: x['distance'])
         return matches[:max_results]
     
+    def _extract_criticality(self, criticality_value) -> str:
+        """
+        Extract criticality from HERE API v7 response
+        
+        HERE API v7 returns criticality as a string like 'critical', 'major', 'minor', 'severe'
+        Older versions might return numeric: 0=minor, 1=major, 2=severe, 3=critical
+        
+        Args:
+            criticality_value: Raw criticality value from HERE API
+            
+        Returns:
+            Standardized criticality string: 'minor', 'major', 'severe', 'critical', or 'unknown'
+        """
+        if criticality_value is None:
+            return 'unknown'
+        
+        # If it's a dict, extract the value
+        if isinstance(criticality_value, dict):
+            criticality_value = criticality_value.get('id', criticality_value.get('value'))
+        
+        # Convert to string for comparison
+        criticality_str = str(criticality_value).lower().strip()
+        
+        # Direct string matches (HERE API v7 format)
+        if criticality_str in ('critical', 'major', 'severe', 'minor'):
+            return criticality_str
+        
+        # Numeric mappings (older API versions)
+        numeric_map = {
+            '0': 'minor',
+            '1': 'major',
+            '2': 'severe',
+            '3': 'critical',
+            0: 'minor',
+            1: 'major',
+            2: 'severe',
+            3: 'critical'
+        }
+        
+        if criticality_value in numeric_map:
+            return numeric_map[criticality_value]
+        
+        # Unknown
+        return 'unknown'
+    
     def _create_incident_edges_from_hash_match(self, incident: Dict, matched_edges: List[Dict]) -> List[Dict]:
         """
         Create incident edge records from hash-matched edges
@@ -212,20 +257,9 @@ class IncidentMatcher:
         else:
             incident_type = str(incident_type) if incident_type else 'unknown'
         
-        # Map criticality - HERE API v7 returns 0-3 numeric values
+        # Extract criticality using standardized method
         criticality_value = incident.get('incidentDetails', {}).get('criticality')
-        if isinstance(criticality_value, dict):
-            criticality_value = criticality_value.get('id', criticality_value.get('value'))
-        
-        criticality_map = {0: 'minor', 1: 'major', 2: 'severe', 3: 'critical'}
-        try:
-            if criticality_value is not None:
-                incident_criticality = criticality_map.get(int(criticality_value), 'unknown')
-            else:
-                incident_criticality = 'unknown'
-        except (ValueError, TypeError):
-            criticality_str_map = {'0': 'minor', '1': 'major', '2': 'severe', '3': 'critical'}
-            incident_criticality = criticality_str_map.get(str(criticality_value), 'unknown')
+        incident_criticality = self._extract_criticality(criticality_value)
         
         incident_description = incident.get('incidentDetails', {}).get('description', {})
         if isinstance(incident_description, dict):
@@ -331,38 +365,9 @@ class IncidentMatcher:
             else:
                 incident_type = str(incident_type) if incident_type else 'unknown'
             
-            # Map criticality - HERE API v7 returns 0-3 numeric values
-            # 0=minor, 1=major, 2=severe, 3=critical
+            # Extract criticality using standardized method
             criticality_value = incident.get('incidentDetails', {}).get('criticality')
-            
-            # Handle both numeric and dict formats
-            if isinstance(criticality_value, dict):
-                criticality_value = criticality_value.get('id', criticality_value.get('value'))
-            
-            # Convert to int and map
-            criticality_map = {
-                0: 'minor',
-                1: 'major',
-                2: 'severe',
-                3: 'critical'
-            }
-            
-            # Try to convert to int
-            try:
-                if criticality_value is not None:
-                    criticality_int = int(criticality_value)
-                    incident_criticality = criticality_map.get(criticality_int, 'unknown')
-                else:
-                    incident_criticality = 'unknown'
-            except (ValueError, TypeError):
-                # Fallback for string values '0', '1', '2', '3'
-                criticality_str_map = {
-                    '0': 'minor',
-                    '1': 'major',
-                    '2': 'severe',
-                    '3': 'critical'
-                }
-                incident_criticality = criticality_str_map.get(str(criticality_value), 'unknown')
+            incident_criticality = self._extract_criticality(criticality_value)
             
             incident_description = incident.get('incidentDetails', {}).get('description', {})
             if isinstance(incident_description, dict):
