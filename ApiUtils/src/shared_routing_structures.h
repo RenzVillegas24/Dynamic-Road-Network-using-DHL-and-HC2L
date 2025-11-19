@@ -102,7 +102,13 @@ struct IncidentInfo {
         : id(""), type(""), criticality(""), description(""),
           road_closed(false), start_time(""), end_time("") {}
     
-    bool has_incident() const { return !id.empty(); }
+    // An incident exists if:
+    // 1. It has a non-empty ID, OR
+    // 2. It has a non-empty type, OR
+    // 3. The road is closed
+    bool has_incident() const { 
+        return !id.empty() || !type.empty() || road_closed; 
+    }
 };
 
 // ============================================================

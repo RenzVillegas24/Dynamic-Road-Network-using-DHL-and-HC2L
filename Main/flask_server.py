@@ -624,6 +624,7 @@ def load_disruptions():
             # Count disruption records from ONLY the latest files
             total_flow_records = 0
             total_incident_records = 0
+            total_user_incidents = 0
 
             # Get latest flow file and count its records
             if recent_flow_files:
@@ -645,17 +646,37 @@ def load_disruptions():
                 except Exception as e:
                     console_logger.warning(f"Error reading latest incident file {latest_incident_file.name}: {e}")
 
-            disruptions_size = total_flow_records + total_incident_records
+            # Count user-reported incidents
+            try:
+                user_disruptions = get_user_disruptions_for_api()
+                total_user_incidents = len(user_disruptions)
+                if total_user_incidents > 0:
+                    console_logger.data(f"User-reported incidents: {total_user_incidents} records")
+            except Exception as e:
+                console_logger.warning(f"Error counting user incidents: {e}")
+
+            disruptions_size = total_flow_records + total_incident_records + total_user_incidents
             disruptions_exist = disruptions_size > 0
 
             if disruptions_exist:
-                console_logger.info(f"HERE API disruptions found: {total_flow_records} flow + {total_incident_records} incident = {disruptions_size} total records")
+                console_logger.info(f"Total disruptions: {total_flow_records} flow + {total_incident_records} HERE incidents + {total_user_incidents} user incidents = {disruptions_size} total records")
                 console_logger.data(f"Latest flow file: {latest_flow_file.name if recent_flow_files else 'None'}")
                 console_logger.data(f"Latest incident file: {latest_incident_file.name if recent_incident_files else 'None'}")
             else:
                 console_logger.info("Latest HERE API disruption files exist but are empty")
         else:
-            console_logger.info(f"No recent HERE API disruption files found (checked within {recent_threshold/3600:.1f} hours)")
+            # Even if no HERE API files, check for user incidents
+            try:
+                user_disruptions = get_user_disruptions_for_api()
+                total_user_incidents = len(user_disruptions)
+                if total_user_incidents > 0:
+                    disruptions_size = total_user_incidents
+                    disruptions_exist = True
+                    console_logger.info(f"User-reported incidents found: {total_user_incidents} records")
+                else:
+                    console_logger.info(f"No recent HERE API disruption files found (checked within {recent_threshold/3600:.1f} hours)")
+            except Exception:
+                console_logger.info(f"No recent HERE API disruption files found (checked within {recent_threshold/3600:.1f} hours)")
         
         # Decision logic:
         # 1. If NO disruptions exist → MUST fetch

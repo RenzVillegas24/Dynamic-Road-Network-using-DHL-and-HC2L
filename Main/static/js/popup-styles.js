@@ -13,17 +13,8 @@ const PopupStyles = {
     if (sev === 'major') return 'icon-badge-major';
     if (sev === 'heavy') return 'icon-badge-heavy';
     if (sev === 'medium') return 'icon-badge-medium';
+    if (sev === 'default') return 'icon-badge-default';
     return 'icon-badge-light';
-  },
-    /**
-     * Get color based on severity
-     */
-  getColor: (value) => {
-    value = value?.toLowerCase() || 'low';
-    if (value === 'low') return '#10b981'; // green
-    if (value === 'critical' || value === 'heavy') return '#dc2626'; // dark red
-    if (value === 'medium') return '#f59e0b'; // amber
-    return '#10b981'; // default green
   },
   /**
    * Get icon for incident type
@@ -65,7 +56,6 @@ const PopupStyles = {
     const criticality = incident_criticality.toLowerCase();
     const badgeClass = PopupStyles.getBadgeClass(criticality);
     const icon = PopupStyles.getIncidentIcon(incident_type);
-    const severityColor = PopupStyles.getColor(criticality);
 
     return `
       <div class="popup-container">
@@ -137,7 +127,6 @@ const PopupStyles = {
     const slowdownRatio = speed_kph > 0 ? (speed_kph / free_flow_kph) : 0.5;
     const badgeClass = PopupStyles.getBadgeClass(severity);
     const icon = PopupStyles.getIncidentIcon(severity);
-    const severityColor = PopupStyles.getColor(severity);
 
     return `
       <div class="popup-container">

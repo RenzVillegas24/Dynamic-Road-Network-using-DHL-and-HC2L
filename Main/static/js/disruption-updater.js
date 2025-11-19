@@ -127,9 +127,30 @@ async function handleDisruptionUpdate(updateData) {
       try {
         // Get the stored route data
         const routeData = window.currentRouteData;
-        const algorithm = routeData.metrics?.algorithm || 'hc2l';
         
-        console.log('[Disruption Monitor] Route algorithm:', algorithm);
+        // Get algorithm from currently selected radio button
+        // First priority: UI selection (what user currently selected)
+        let algorithm = 'hc2l'; // Default fallback
+        
+        // Try using getSelectedAlgorithm() function if available (most reliable)
+        if (typeof getSelectedAlgorithm === 'function') {
+          algorithm = getSelectedAlgorithm();
+          console.log('[Disruption Monitor] Algorithm from getSelectedAlgorithm():', algorithm);
+        } else {
+          // Fallback: Direct radio button selection
+          const selectedAlgo = document.querySelector('input[name="algorithm"]:checked');
+          if (selectedAlgo && selectedAlgo.value) {
+            algorithm = selectedAlgo.value.toLowerCase();
+            console.log('[Disruption Monitor] Algorithm from UI radio button:', algorithm);
+          } else {
+            // Last resort: Use stored algorithm from route data
+            const storedAlgo = routeData?.metrics?.algorithm || routeData?.algorithm || 'hc2l';
+            algorithm = (storedAlgo.toLowerCase().includes('dhl') || storedAlgo.includes('DHL')) ? 'dhl' : 'hc2l';
+            console.log('[Disruption Monitor] Using stored algorithm:', algorithm, '(from:', storedAlgo, ')');
+          }
+        }
+        
+        console.log('[Disruption Monitor] Route algorithm (normalized):', algorithm);
         console.log('[Disruption Monitor] Start:', routeData.input?.start_snap_lat, routeData.input?.start_snap_lng);
         console.log('[Disruption Monitor] Destination:', routeData.input?.dest_snap_lat, routeData.input?.dest_snap_lng);
         
@@ -141,21 +162,96 @@ async function handleDisruptionUpdate(updateData) {
         // Recalculate route based on algorithm
         let newRouteData = null;
         
-        if (algorithm === 'dhl') {
-          // Recalculate DHL route with disruptions enabled
-          newRouteData = await computeDHLRoute(true, false);
-          if (newRouteData && typeof displayDHLRoute === 'function') {
-            displayDHLRoute(newRouteData);
-            console.log('[Disruption Monitor] DHL route recalculated');
+        // Make direct API call instead of using frontend functions
+        // This ensures we have all the required snap point data
+        try {
+          const startSnap = window.osmSnapMarkers?.start?.data;
+          const destSnap = window.osmSnapMarkers?.dest?.data;
+          
+          if (!startSnap || !destSnap) {
+            console.error('[Disruption Monitor] Missing snap point data:', { startSnap, destSnap });
+            showUpdateToast('⚠️ Error: Missing snap point data for route recalculation', 'warning');
+            return;
           }
-        } else {
-          // Recalculate HC2L route with disruptions enabled
-          const threshold = routeData.metrics?.tau_threshold || 0.5;
-          newRouteData = await computeDHC2LRoute(true, threshold, false);
-          if (newRouteData && typeof displayDHC2LRoute === 'function') {
-            displayDHC2LRoute(newRouteData);
-            console.log('[Disruption Monitor] HC2L route recalculated');
+          
+          console.log('[Disruption Monitor] Using snap points for recalculation:', {
+            start: { lat: startSnap.latitude, lng: startSnap.longitude, edge: startSnap.edge_id },
+            dest: { lat: destSnap.latitude, lng: destSnap.longitude, edge: destSnap.edge_id }
+          });
+          
+          if (algorithm === 'dhl') {
+            console.log('[Disruption Monitor] Recalculating DHL route with disruptions...');
+            const response = await fetch('/compute_dhl_route', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                start_pin_lat: routeData.input?.start_snap_lat || startSnap.latitude,
+                start_pin_lng: routeData.input?.start_snap_lng || startSnap.longitude,
+                dest_pin_lat: routeData.input?.dest_snap_lat || destSnap.latitude,
+                dest_pin_lng: routeData.input?.dest_snap_lng || destSnap.longitude,
+                start_snap_lat: startSnap.latitude,
+                start_snap_lng: startSnap.longitude,
+                dest_snap_lat: destSnap.latitude,
+                dest_snap_lng: destSnap.longitude,
+                start_edge_source: startSnap.edge_source || 0,
+                start_edge_target: startSnap.edge_target || 0,
+                start_edge_oneway: startSnap.oneway || 0,
+                dest_edge_source: destSnap.edge_source || 0,
+                dest_edge_target: destSnap.edge_target || 0,
+                dest_edge_oneway: destSnap.oneway || 0,
+                use_disruptions: true,
+                tau_threshold: 0.5,
+                generate_alternatives: false
+              })
+            });
+            
+            if (response.ok) {
+              newRouteData = await response.json();
+              if (newRouteData.success && typeof displayDHLRoute === 'function') {
+                displayDHLRoute(newRouteData);
+                console.log('[Disruption Monitor] DHL route recalculated successfully');
+              }
+            }
+          } else if (algorithm === 'hc2l') {
+            console.log('[Disruption Monitor] Recalculating HC2L route with disruptions...');
+            const threshold = routeData.metrics?.tau_threshold || 0.5;
+            const response = await fetch('/compute_dhc2l_route', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                start_pin_lat: routeData.input?.start_snap_lat || startSnap.latitude,
+                start_pin_lng: routeData.input?.start_snap_lng || startSnap.longitude,
+                dest_pin_lat: routeData.input?.dest_snap_lat || destSnap.latitude,
+                dest_pin_lng: routeData.input?.dest_snap_lng || destSnap.longitude,
+                start_snap_lat: startSnap.latitude,
+                start_snap_lng: startSnap.longitude,
+                dest_snap_lat: destSnap.latitude,
+                dest_snap_lng: destSnap.longitude,
+                start_edge_source: startSnap.edge_source || 0,
+                start_edge_target: startSnap.edge_target || 0,
+                start_edge_oneway: startSnap.oneway || 0,
+                dest_edge_source: destSnap.edge_source || 0,
+                dest_edge_target: destSnap.edge_target || 0,
+                dest_edge_oneway: destSnap.oneway || 0,
+                use_disruptions: true,
+                tau_threshold: threshold,
+                generate_alternatives: false
+              })
+            });
+            
+            if (response.ok) {
+              newRouteData = await response.json();
+              if (newRouteData.success && typeof displayDHC2LRoute === 'function') {
+                displayDHC2LRoute(newRouteData);
+                console.log('[Disruption Monitor] HC2L route recalculated successfully');
+              }
+            }
+          } else {
+            console.error('[Disruption Monitor] Unknown algorithm:', algorithm);
           }
+        } catch (apiError) {
+          console.error('[Disruption Monitor] API call error:', apiError);
+          throw apiError;
         }
         
         if (newRouteData) {

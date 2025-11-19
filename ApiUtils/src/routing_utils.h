@@ -353,6 +353,8 @@ inline double get_highway_speed(const string& highway_type) {
 inline double get_incident_severity(const string& incident_type) {
     static const map<string, double> severities = {
         {"closure", 999.0},             // Impassable - effectively infinite cost
+        {"road-closure", 999.0},        // User-reported road closure
+        {"road_closure", 999.0},        // Alternative format
         {"accident", 5.0},              // Major incident - avoid heavily
         {"construction", 2.5},          // Work zone - avoid moderately
         {"congestion", 1.8},            // Heavy traffic - avoid if alternatives exist
@@ -360,6 +362,9 @@ inline double get_incident_severity(const string& incident_type) {
         {"moderate_traffic", 1.3},      // Moderate congestion
         {"weather", 1.5},               // Weather impact - minor avoidance
         {"light_traffic", 1.1},         // Light congestion
+        {"user-incident", 2.0},         // Generic user-reported incident
+        {"traffic", 1.5},               // Generic traffic incident
+        {"hazard", 3.0},                // Road hazard
         {"unknown", 1.3}                // Default - slight avoidance
     };
     
@@ -1515,6 +1520,7 @@ inline int load_user_reported_disruptions(
     }
     
     int loaded_count = 0;
+    int closures_count = 0;
     
     // Parse data rows
     while (getline(file, line)) {
@@ -1553,6 +1559,12 @@ inline int load_user_reported_disruptions(
             string end_time = (incident_end_time_col >= 0 && incident_end_time_col < (int)fields.size()) 
                 ? fields[incident_end_time_col] : "";
             
+            // Trim whitespace from string fields
+            incident_type.erase(0, incident_type.find_first_not_of(" \t\n\r"));
+            incident_type.erase(incident_type.find_last_not_of(" \t\n\r") + 1);
+            criticality.erase(0, criticality.find_first_not_of(" \t\n\r"));
+            criticality.erase(criticality.find_last_not_of(" \t\n\r") + 1);
+            
             // Create incident info for this user incident
             IncidentInfo incident;
             incident.id = incident_id;
@@ -1567,6 +1579,9 @@ inline int load_user_reported_disruptions(
             incident_out[edge_key] = incident;
             
             loaded_count++;
+            if (is_closed) {
+                closures_count++;
+            }
             
         } catch (const exception& e) {
             cerr << "   ⚠️  Skipping invalid user disruption row: " << e.what() << endl;
@@ -1576,8 +1591,17 @@ inline int load_user_reported_disruptions(
     
     file.close();
     
+    // Update global cache with user disruption counts
     if (loaded_count > 0) {
-        cerr << "   ✅ Loaded " << loaded_count << " user-reported disruptions" << endl;
+        g_disruption_cache.total_incidents += loaded_count;
+        g_disruption_cache.closures += closures_count;
+        g_disruption_cache.active_disruptions += (loaded_count - closures_count);
+        
+        cerr << "   ✅ Loaded " << loaded_count << " user-reported disruptions";
+        if (closures_count > 0) {
+            cerr << " (" << closures_count << " closures)";
+        }
+        cerr << endl;
     } else {
         cerr << "   ℹ️  No user disruptions found in file" << endl;
     }
