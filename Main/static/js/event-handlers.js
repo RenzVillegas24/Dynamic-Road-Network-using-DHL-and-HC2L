@@ -225,7 +225,7 @@ function initializeEventHandlers() {
         }
         routeData.metrics.algorithm = selectedAlgorithm;
         
-        currentRouteData = routeData;
+        window.currentRouteData = routeData;
         
         console.log('✅ Route data stored with input coordinates:', {
           algorithm: selectedAlgorithm,
@@ -580,6 +580,14 @@ function initializeEventHandlers() {
       }
       await refreshUserDisruptionsUI();
       await refreshActiveDisruptionsOnMapSilently();
+      
+      // Trigger automatic route recalculation if route is active
+      console.log('[EventHandlers] Triggering auto route recalculation after incident removal...');
+      if (typeof triggerAutoRouteRecalculation === 'function') {
+        setTimeout(() => {
+          triggerAutoRouteRecalculation();
+        }, 500); // Small delay to allow disruption files to be updated
+      }
     } catch (error) {
       console.error('Error removing user disruption:', error);
       showUpdateToast(error.message || 'Unable to remove incident', 'warning');
@@ -703,6 +711,14 @@ function initializeEventHandlers() {
         const reportPanel = document.getElementById('report-panel');
         if (reportPanel) {
           reportPanel.classList.add('translate-x-full');
+        }
+        
+        // Trigger automatic route recalculation if route is active
+        console.log('[EventHandlers] Triggering auto route recalculation after incident addition...');
+        if (typeof triggerAutoRouteRecalculation === 'function') {
+          setTimeout(() => {
+            triggerAutoRouteRecalculation();
+          }, 500); // Small delay to allow disruption files to be updated
         }
       } else {
         throw new Error(data.error || 'Failed to save incident');

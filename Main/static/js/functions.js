@@ -99,7 +99,7 @@ function clearRoutes() {
     }
 
     // Clear current route data
-    currentRouteData = null;
+    window.currentRouteData = null;
 
     // Reset Current Path Panel to placeholder
     resetCurrentPathPanel();

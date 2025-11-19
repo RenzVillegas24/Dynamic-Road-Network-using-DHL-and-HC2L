@@ -45,6 +45,9 @@ from user_disruptions import (
     cleanup_old_user_incidents
 )
 
+# Import route recalculation endpoint
+import route_recalculation_endpoint
+
 # Get logger instance
 console_logger = get_logger("FlaskServer")
 
@@ -151,6 +154,11 @@ auto_service = init_auto_disruption_service(app)  # Will load interval from sett
 
 # Shutdown service on exit
 atexit.register(shutdown_auto_disruption_service)
+
+# Initialize Route Recalculation Endpoint (for automatic route updates on disruption changes)
+console_logger.info("Initializing Route Recalculation Endpoint")
+route_recalculation_endpoint.init_route_recalculation(app, gps_router, dhl_router, console_logger)
+console_logger.success("Route Recalculation Endpoint initialized")
 
 # ============================================================================
 # USER-REPORTED DISRUPTIONS HELPERS
@@ -908,6 +916,18 @@ def save_custom_disruption():
         console_logger.success(f"Saved to: {csv_path.name}")
         console_logger.success("User incident saved - will be loaded by C++ routing API")
         
+        # Trigger auto route recalculation if an active route exists
+        try:
+            auto_service = get_auto_disruption_service()
+            if auto_service and auto_service.active_routes:
+                console_logger.info("Triggering auto route recalculation due to custom incident added...")
+                # Manually trigger recalculation for each active route
+                for route_id, route_info in list(auto_service.active_routes.items()):
+                    auto_service._trigger_route_recalculation(route_id, route_info)
+                console_logger.success("Auto route recalculation triggered")
+        except Exception as e:
+            console_logger.warning(f"Could not trigger auto route recalculation: {e}")
+        
         return jsonify({
             'success': True,
             'message': f'Custom incident saved: {road_name}',
@@ -1090,6 +1110,18 @@ def delete_user_disruption(incident_id):
 
     # Cleanup old files (keep max 10)
     cleanup_old_user_incidents(max_files=10)
+
+    # Trigger auto route recalculation if an active route exists
+    try:
+        auto_service = get_auto_disruption_service()
+        if auto_service and auto_service.active_routes:
+            console_logger.info("Triggering auto route recalculation due to custom incident removed...")
+            # Manually trigger recalculation for each active route
+            for route_id, route_info in list(auto_service.active_routes.items()):
+                auto_service._trigger_route_recalculation(route_id, route_info)
+            console_logger.success("Auto route recalculation triggered")
+    except Exception as e:
+        console_logger.warning(f"Could not trigger auto route recalculation: {e}")
 
     return jsonify({
         'success': True, 

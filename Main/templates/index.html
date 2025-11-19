@@ -1940,7 +1940,8 @@
   <script src="{{ url_for('static', filename='js/search-and-drag.js') }}"></script>
   <script src="{{ url_for('static', filename='js/location-combobox.js') }}"></script>
   <script src="{{ url_for('static', filename='js/auto-route-updater.js') }}"></script>
-  <script src="{{ url_for('static', filename='js/disruption-updater.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/auto-route-recalculator.js') }}"></script>
+  <!-- Disruption updater removed - route recalculation triggered by backend on incident add/remove -->
   <script src="{{ url_for('static', filename='js/google-maps-comparison.js') }}"></script>
   <script src="{{ url_for('static', filename='js/algorithm-comparison.js') }}"></script>
   <script src="{{ url_for('static', filename='js/update-regions.js') }}"></script>
@@ -3092,8 +3093,8 @@
           // Pass dataset mode to backend
           dataset_mode: selections.dataset_mode,
           disruption_file: useDisruptions ? 'active_disruptions' : '',
-          // Control alternative route generation: false during preview, true on confirmation
-          generate_alternatives: !isPreview
+          // Control alternative route generation: false during preview, use toggle on confirmation
+          generate_alternatives: isPreview ? false : document.getElementById('show-alternative-routes').checked
         };
 
         // Add OSM edge-based routing if snapping was used
@@ -3172,8 +3173,8 @@
           tau_threshold: selections.threshold,  // FIXED: Use tau_threshold for HC2L
           use_disruptions: useDisruptions,
           dataset_mode: selections.dataset_mode,  // Pass dataset mode to backend
-          // Control alternative route generation: false during preview, true on confirmation
-          generate_alternatives: !isPreview
+          // Control alternative route generation: false during preview, use toggle on confirmation
+          generate_alternatives: isPreview ? false : document.getElementById('show-alternative-routes').checked
         };
 
         // Add OSM edge-based routing if snapping was used
@@ -3439,26 +3440,46 @@
       if (showAlternativeRoutes) {
         showAlternativeRoutes.addEventListener('change', (e) => {
           if (e.target.checked) {
-            // Show alternative routes
-            if (window.alternativeRoutePolylines && window.alternativeRoutePolylines.length > 0) {
-              window.alternativeRoutePolylines.forEach(polyline => {
-                if (polyline && map) {
-                  polyline.addTo(map);
+            // Show alternative routes - trigger route recalculation
+            if (window.currentRouteData) {
+              // Trigger recalculation with new generate_alternatives flag
+              setTimeout(() => {
+                if (typeof triggerAutoRouteRecalculation === 'function') {
+                  triggerAutoRouteRecalculation();
                 }
-              });
-              showUpdateToast('Alternative routes displayed', 'info');
+              }, 100);
             } else {
-              showUpdateToast('No alternative routes available', 'warning');
+              // No active route, just show available routes
+              if (window.alternativeRoutePolylines && window.alternativeRoutePolylines.length > 0) {
+                window.alternativeRoutePolylines.forEach(polyline => {
+                  if (polyline && map) {
+                    polyline.addTo(map);
+                  }
+                });
+                showUpdateToast('Alternative routes displayed', 'info');
+              } else {
+                showUpdateToast('No alternative routes available', 'warning');
+              }
             }
           } else {
-            // Hide alternative routes
-            if (window.alternativeRoutePolylines && window.alternativeRoutePolylines.length > 0) {
-              window.alternativeRoutePolylines.forEach(polyline => {
-                if (polyline && map) {
-                  map.removeLayer(polyline);
+            // Hide alternative routes - trigger route recalculation
+            if (window.currentRouteData) {
+              // Trigger recalculation with generate_alternatives=false
+              setTimeout(() => {
+                if (typeof triggerAutoRouteRecalculation === 'function') {
+                  triggerAutoRouteRecalculation();
                 }
-              });
-              showUpdateToast('Alternative routes hidden', 'info');
+              }, 100);
+            } else {
+              // No active route, just hide the polylines
+              if (window.alternativeRoutePolylines && window.alternativeRoutePolylines.length > 0) {
+                window.alternativeRoutePolylines.forEach(polyline => {
+                  if (polyline && map) {
+                    map.removeLayer(polyline);
+                  }
+                });
+                showUpdateToast('Alternative routes hidden', 'info');
+              }
             }
           }
         });
