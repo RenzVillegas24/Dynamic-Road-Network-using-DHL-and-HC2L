@@ -550,13 +550,14 @@ def get_latest_traffic_gr(mode: str, output_dir: Path = Config.DISRUPTIONS_DIR) 
     return files[0] if files else None
 
 
-def merge_user_disruptions_with_traffic(flow_csv: Optional[str] = None, incident_csv: Optional[str] = None) -> None:
+def merge_user_disruptions_with_traffic(flow_csv: Optional[str] = None, incident_csv: Optional[str] = None) -> Dict[str, Any]:
     """
-    Merge user-reported disruptions into separate flow and incident CSV sources.
+    Merge user-reported disruptions into NEW timestamped flow and incident CSV files.
     
     This function loads user disruptions and merges them into the specified
-    flow and incident CSV files. If CSV paths are not provided, it uses the
-    latest available CSV files from the respective directories.
+    flow and incident CSV files. Instead of overwriting existing files, it creates
+    NEW timestamped CSV files in the respective directories to trigger auto-disruption
+    service updates.
     
     IMPORTANT: User disruptions are merged with ONLY the appropriate columns
     for each CSV type. Flow CSVs get flow-related columns, incident CSVs get
@@ -565,12 +566,37 @@ def merge_user_disruptions_with_traffic(flow_csv: Optional[str] = None, incident
     Args:
         flow_csv: Path to the flow CSV file. If None, uses latest from Config.FLOW_DIR
         incident_csv: Path to the incident CSV file. If None, uses latest from Config.INCIDENTS_DIR
+        
+    Returns:
+        Dict with metadata about created files:
+        {
+            'flow_file': Path or None,
+            'incident_file': Path or None,
+            'flow_records': int,
+            'incident_records': int,
+            'success': bool
+        }
     """
+    metadata = {
+        'flow_file': None,
+        'incident_file': None,
+        'flow_records': 0,
+        'incident_records': 0,
+        'success': False
+    }
+    
     try:
         # Load user disruptions
         user_rows = load_user_disruption_rows()
-        if not user_rows:
-            return  # No user disruptions to merge
+        
+        # Note: We create new files even if user_rows is empty, because deletion
+        # of the last user disruption should still trigger route updates
+        
+        # Use microseconds to ensure unique timestamps even for rapid operations
+        # Format: YYYYMMDDTHHMMSS (includes microseconds for uniqueness)
+        now = datetime.now()
+        # Add microseconds to timestamp to ensure uniqueness
+        timestamp = now.strftime('%Y%m%dT%H%M%S') + str(now.microsecond // 10000).zfill(2)
         
         # Process flow CSV if available or requested
         if flow_csv or (not incident_csv):
@@ -578,9 +604,22 @@ def merge_user_disruptions_with_traffic(flow_csv: Optional[str] = None, incident
             if flow_path and flow_path.exists():
                 try:
                     flow_df = _read_csv_safely(flow_path)
-                    # Merge with ONLY flow columns (not incident columns)
-                    flow_df = merge_user_disruptions_dataframe(flow_df, user_rows, target_type='flow')
-                    flow_df.to_csv(flow_path, index=False)
+                    
+                    if user_rows:
+                        # Merge with ONLY flow columns (not incident columns)
+                        merged_flow_df = merge_user_disruptions_dataframe(flow_df, user_rows, target_type='flow')
+                    else:
+                        # No user disruptions - just use the base flow data
+                        # But still create a new timestamped file to trigger updates
+                        merged_flow_df = flow_df.copy()
+                    
+                    # Create NEW timestamped file
+                    new_flow_file = Config.FLOW_DIR / f'flow_{timestamp}.csv'
+                    merged_flow_df.to_csv(new_flow_file, index=False)
+                    
+                    metadata['flow_file'] = str(new_flow_file)
+                    metadata['flow_records'] = len(merged_flow_df)
+                    print(f"✅ Created new flow CSV: {new_flow_file.name} ({len(merged_flow_df)} records)")
                 except Exception as e:
                     print(f"⚠️  Failed to merge user disruptions into flow CSV: {e}")
         
@@ -590,14 +629,34 @@ def merge_user_disruptions_with_traffic(flow_csv: Optional[str] = None, incident
             if incident_path and incident_path.exists():
                 try:
                     incident_df = _read_csv_safely(incident_path)
-                    # Merge with ONLY incident columns (not flow columns)
-                    incident_df = merge_user_disruptions_dataframe(incident_df, user_rows, target_type='incident')
-                    incident_df.to_csv(incident_path, index=False)
+                    
+                    if user_rows:
+                        # Merge with ONLY incident columns (not flow columns)
+                        merged_incident_df = merge_user_disruptions_dataframe(incident_df, user_rows, target_type='incident')
+                    else:
+                        # No user disruptions - just use the base incident data
+                        # But still create a new timestamped file to trigger updates
+                        merged_incident_df = incident_df.copy()
+                    
+                    # Create NEW timestamped file
+                    new_incident_file = Config.INCIDENTS_DIR / f'incident_{timestamp}.csv'
+                    merged_incident_df.to_csv(new_incident_file, index=False)
+                    
+                    metadata['incident_file'] = str(new_incident_file)
+                    metadata['incident_records'] = len(merged_incident_df)
+                    print(f"✅ Created new incident CSV: {new_incident_file.name} ({len(merged_incident_df)} records)")
                 except Exception as e:
                     print(f"⚠️  Failed to merge user disruptions into incident CSV: {e}")
+        
+        metadata['success'] = metadata['flow_file'] is not None or metadata['incident_file'] is not None
+        return metadata
+        
     except Exception as e:
         # Log but don't raise - user disruptions are nice-to-have, not critical
-        pass
+        print(f"❌ Error in merge_user_disruptions_with_traffic: {e}")
+        import traceback
+        traceback.print_exc()
+        return metadata
 
 
 def generate_disruption_gr_file(disruption_type: str, csv_file: str) -> Optional[Path]:

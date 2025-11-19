@@ -598,6 +598,84 @@ def get_backend_logs():
             'logs': []
         })
 
+@app.route('/get_auto_update_status', methods=['GET'])
+def get_auto_update_status():
+    """Get the status of the auto-disruption service"""
+    try:
+        auto_service = get_auto_disruption_service()
+        if not auto_service:
+            return jsonify({
+                'success': False,
+                'error': 'Auto-disruption service not available'
+            })
+        
+        # Get current disruption hash to detect changes
+        current_hash = auto_service._get_disruption_hash()
+        
+        return jsonify({
+            'success': True,
+            'update_interval': auto_service.update_interval,
+            'last_fetch_time': auto_service.get_last_fetch_time(),
+            'next_fetch_time': auto_service.get_next_fetch_time(),
+            'active_routes_count': len(auto_service.active_routes),
+            'disruption_hash': current_hash,
+            'should_fetch': auto_service.should_fetch_now()
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
+
+@app.route('/check_disruption_updates', methods=['GET'])
+def check_disruption_updates():
+    """
+    Check if disruptions have been updated since last check.
+    Frontend can poll this endpoint to detect when new disruption files are created.
+    
+    Query params:
+      - last_hash: Last known disruption hash (optional)
+    
+    Returns:
+      - updated: Boolean indicating if disruptions changed
+      - current_hash: Current disruption hash
+      - message: Update message for notification
+    """
+    try:
+        auto_service = get_auto_disruption_service()
+        if not auto_service:
+            return jsonify({
+                'success': False,
+                'error': 'Auto-disruption service not available'
+            })
+        
+        last_hash = request.args.get('last_hash', None)
+        current_hash = auto_service._get_disruption_hash()
+        
+        # Check if hash changed
+        updated = (last_hash is not None and current_hash != last_hash)
+        
+        result = {
+            'success': True,
+            'updated': updated,
+            'current_hash': current_hash,
+            'last_fetch_time': auto_service.get_last_fetch_time()
+        }
+        
+        if updated:
+            result['message'] = '🔄 Disruptions updated! Routes may have changed.'
+            result['notification_type'] = 'info'
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
+
 @app.route('/should_fetch_disruptions', methods=['GET'])
 def should_fetch_disruptions():
     """Check if disruptions should be fetched (time-based check)"""
@@ -922,7 +1000,7 @@ def save_custom_disruption():
         
         print(f"   ✅ Saved to: {csv_path.name}")
         
-        # Merge user disruptions with traffic data
+        # Merge user disruptions with traffic data - creates NEW timestamped CSV files
         print(f"   🔀 Merging user disruptions with traffic data...")
         from config import Config
         
@@ -933,22 +1011,34 @@ def save_custom_disruption():
         latest_flow = flow_files[0].name if flow_files else None
         latest_incident = incident_files[0].name if incident_files else None
         
+        merge_metadata = {'success': False}
         if latest_flow and latest_incident:
             latest_flow_path = str(Config.FLOW_DIR / latest_flow)
             latest_incident_path = str(Config.INCIDENTS_DIR / latest_incident)
             
-            merge_user_disruptions_with_traffic(latest_flow_path, latest_incident_path)
-            print(f"   ✅ Merged with: {latest_flow}, {latest_incident}")
+            # merge_user_disruptions_with_traffic now CREATES new timestamped files
+            merge_metadata = merge_user_disruptions_with_traffic(latest_flow_path, latest_incident_path)
+            
+            if merge_metadata['success']:
+                print(f"   ✅ Created new timestamped disruption files:")
+                if merge_metadata.get('flow_file'):
+                    print(f"      Flow: {Path(merge_metadata['flow_file']).name} ({merge_metadata['flow_records']} records)")
+                if merge_metadata.get('incident_file'):
+                    print(f"      Incident: {Path(merge_metadata['incident_file']).name} ({merge_metadata['incident_records']} records)")
+            else:
+                print(f"   ⚠️  Merge completed but no new files created")
         else:
             print(f"   ⚠️  No traffic files found to merge with")
         
         # Signal auto-disruption service to recalculate routes
+        # The new timestamped files will be automatically detected by the auto-disruption service
         print(f"   📊 Triggering route recalculation...")
         auto_service = get_auto_disruption_service()
         if auto_service:
             # Force a recalculation by clearing the disruption hash
+            # This ensures the new files are detected immediately
             auto_service.last_disruption_hash = None
-            print(f"   ✅ Route recalculation triggered")
+            print(f"   ✅ Route recalculation triggered (new files will be detected)")
         else:
             print(f"   ⚠️  Auto-disruption service not available")
         
@@ -1098,7 +1188,11 @@ def get_user_disruptions():
 
 @app.route('/user_disruptions/<report_id>', methods=['DELETE'])
 def delete_user_disruption(report_id):
-    """Delete a user-reported disruption by report_id."""
+    """
+    Delete a user-reported disruption by report_id and create new timestamped CSV files.
+    
+    This ensures the auto-disruption service detects the change and triggers route updates.
+    """
     file_path = get_user_disruptions_file()
     if not file_path.exists():
         return jsonify({'success': False, 'error': 'No user disruptions recorded yet'}), 404
@@ -1110,13 +1204,61 @@ def delete_user_disruption(report_id):
     if len(rows_to_keep) == initial_count:
         return jsonify({'success': False, 'error': 'Custom incident not found'}), 404
 
+    # Save updated user disruptions CSV
     fieldnames = ensure_user_disruption_fieldnames()
     with open(file_path, 'w', newline='') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows_to_keep)
 
-    return jsonify({'success': True, 'deleted': report_id, 'remaining': len(rows_to_keep)})
+    print(f"\n🗑️  === DELETING CUSTOM DISRUPTION ===")
+    print(f"   Deleted report_id: {report_id}")
+    print(f"   Remaining disruptions: {len(rows_to_keep)}")
+    
+    # Create new timestamped CSV files to trigger auto-disruption service updates
+    print(f"   🔀 Creating new timestamped disruption files...")
+    from config import Config
+    
+    # Get latest flow and incident files
+    flow_files = sorted(Config.FLOW_DIR.glob("flow_*.csv"), reverse=True)
+    incident_files = sorted(Config.INCIDENTS_DIR.glob("incident_*.csv"), reverse=True)
+    
+    latest_flow = flow_files[0].name if flow_files else None
+    latest_incident = incident_files[0].name if incident_files else None
+    
+    merge_metadata = {'success': False}
+    if latest_flow and latest_incident:
+        latest_flow_path = str(Config.FLOW_DIR / latest_flow)
+        latest_incident_path = str(Config.INCIDENTS_DIR / latest_incident)
+        
+        # Create new timestamped files with updated user disruptions
+        merge_metadata = merge_user_disruptions_with_traffic(latest_flow_path, latest_incident_path)
+        
+        if merge_metadata['success']:
+            print(f"   ✅ Created new timestamped disruption files:")
+            if merge_metadata.get('flow_file'):
+                print(f"      Flow: {Path(merge_metadata['flow_file']).name} ({merge_metadata['flow_records']} records)")
+            if merge_metadata.get('incident_file'):
+                print(f"      Incident: {Path(merge_metadata['incident_file']).name} ({merge_metadata['incident_records']} records)")
+        else:
+            print(f"   ⚠️  Merge completed but no new files created")
+    else:
+        print(f"   ⚠️  No traffic files found to merge with")
+    
+    # Trigger auto-disruption service to detect new files
+    auto_service = get_auto_disruption_service()
+    if auto_service:
+        auto_service.last_disruption_hash = None
+        print(f"   ✅ Route recalculation triggered (new files will be detected)")
+    else:
+        print(f"   ⚠️  Auto-disruption service not available")
+
+    return jsonify({
+        'success': True, 
+        'deleted': report_id, 
+        'remaining': len(rows_to_keep),
+        'new_files_created': merge_metadata['success']
+    })
 
 @app.route('/search_location', methods=['POST'])
 def search_location():
@@ -3149,42 +3291,6 @@ def unregister_active_route():
         })
 
 
-@app.route('/check_disruption_updates')
-def check_disruption_updates():
-    """Check if disruption files have been updated (polling endpoint)"""
-    try:
-        import hashlib
-        
-        files_to_check = [
-            Config.DISRUPTIONS_DIR / "dynamic_disruptions_hc2l.gr",
-            Config.DISRUPTIONS_DIR / "dynamic_disruptions_dhl.gr",
-            Config.DISRUPTIONS_DIR / "dynamic_disruptions_current.gr"
-        ]
-        
-        combined_content = ""
-        file_mtimes = {}
-        
-        for file_path in files_to_check:
-            if file_path.exists():
-                combined_content += file_path.read_text()
-                file_mtimes[file_path.name] = file_path.stat().st_mtime
-        
-        current_hash = hashlib.md5(combined_content.encode()).hexdigest() if combined_content else None
-        
-        return jsonify({
-            'success': True,
-            'hash': current_hash,
-            'file_mtimes': file_mtimes,
-            'timestamp': time.time()
-        })
-        
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        })
-
-
 @app.route('/fetch_here_traffic', methods=['POST'])
 def fetch_here_traffic():
     """
@@ -3290,26 +3396,6 @@ def set_auto_update_interval():
 
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 400
-
-
-@app.route('/get_auto_update_status', methods=['GET'])
-def get_auto_update_status():
-    """Return the current auto-disruption interval and whether the service is running"""
-    try:
-        auto_service = get_auto_disruption_service()
-        if not auto_service:
-            return jsonify({'success': False, 'error': 'Auto-disruption service not initialized'}), 503
-
-        interval_seconds = auto_service.update_interval
-        return jsonify({
-            'success': True,
-            'running': auto_service.running,
-            'interval_seconds': interval_seconds,
-            'interval_minutes': interval_seconds // 60,
-            'active_routes': len(auto_service.active_routes)
-        })
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 if __name__ == '__main__':

@@ -140,8 +140,8 @@ class AutoDisruptionService:
                     flow_files = sorted(flow_dir.glob("flow_*.csv"))
                     if flow_files:
                         latest_flow = flow_files[-1]
-                        # Parse timestamp from filename (format: flow_YYYYMMDDTHHMMSS.csv)
-                        match = re.search(r'flow_(\d{8}T\d{6})\.csv', latest_flow.name)
+                        # Parse timestamp from filename (format: flow_YYYYMMDDTHHMMSS.csv with optional microseconds)
+                        match = re.search(r'flow_(\d{8}T\d{6})\d*\.csv', latest_flow.name)
                         if match:
                             timestamp_str = match.group(1)
                             # Convert YYYYMMDDTHHMMSS to datetime
@@ -158,8 +158,8 @@ class AutoDisruptionService:
                     incident_files = sorted(incidents_dir.glob("incident_*.csv"))
                     if incident_files:
                         latest_incident = incident_files[-1]
-                        # Parse timestamp from filename (format: incident_YYYYMMDDTHHMMSS.csv)
-                        match = re.search(r'incident_(\d{8}T\d{6})\.csv', latest_incident.name)
+                        # Parse timestamp from filename (format: incident_YYYYMMDDTHHMMSS.csv with optional microseconds)
+                        match = re.search(r'incident_(\d{8}T\d{6})\d*\.csv', latest_incident.name)
                         if match:
                             timestamp_str = match.group(1)
                             # Convert YYYYMMDDTHHMMSS to datetime
@@ -209,7 +209,7 @@ class AutoDisruptionService:
                 flow_files = sorted(flow_dir.glob("flow_*.csv"))
                 if flow_files:
                     latest_flow = flow_files[-1]
-                    match = re.search(r'flow_(\d{8}T\d{6})\.csv', latest_flow.name)
+                    match = re.search(r'flow_(\d{8}T\d{6})\d*\.csv', latest_flow.name)
                     if match:
                         timestamp_str = match.group(1)
                         dt = datetime.strptime(timestamp_str, '%Y%m%dT%H%M%S')
@@ -222,7 +222,7 @@ class AutoDisruptionService:
                 incident_files = sorted(incidents_dir.glob("incident_*.csv"))
                 if incident_files:
                     latest_incident = incident_files[-1]
-                    match = re.search(r'incident_(\d{8}T\d{6})\.csv', latest_incident.name)
+                    match = re.search(r'incident_(\d{8}T\d{6})\d*\.csv', latest_incident.name)
                     if match:
                         timestamp_str = match.group(1)
                         dt = datetime.strptime(timestamp_str, '%Y%m%dT%H%M%S')
@@ -254,7 +254,7 @@ class AutoDisruptionService:
                 flow_files = sorted(flow_dir.glob("flow_*.csv"))
                 if flow_files:
                     latest_flow = flow_files[-1]
-                    match = re.search(r'flow_(\d{8}T\d{6})\.csv', latest_flow.name)
+                    match = re.search(r'flow_(\d{8}T\d{6})\d*\.csv', latest_flow.name)
                     if match:
                         timestamp_str = match.group(1)
                         dt = datetime.strptime(timestamp_str, '%Y%m%dT%H%M%S')
@@ -267,7 +267,7 @@ class AutoDisruptionService:
                 incident_files = sorted(incidents_dir.glob("incident_*.csv"))
                 if incident_files:
                     latest_incident = incident_files[-1]
-                    match = re.search(r'incident_(\d{8}T\d{6})\.csv', latest_incident.name)
+                    match = re.search(r'incident_(\d{8}T\d{6})\d*\.csv', latest_incident.name)
                     if match:
                         timestamp_str = match.group(1)
                         dt = datetime.strptime(timestamp_str, '%Y%m%dT%H%M%S')
