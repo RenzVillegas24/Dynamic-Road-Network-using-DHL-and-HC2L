@@ -9,13 +9,22 @@ from collections import deque
 from datetime import datetime
 import csv
 import uuid
+import traceback
+import glob
+import os
+import requests
+import numpy as np
 
 # Import configuration
 from config import Config
 
-# Import your coordinate mapper and GPS HC2L router
+# Import new modules for optimization
+from settings_manager import init_settings_manager, get_settings_manager
+from console_formatter import get_logger, ConsoleFormatter
+
+# Import your coordinate mapper and HC2L router
 from coordinate_mapper import NodeMapper
-from gps_hc2l_router import GPSRoutingService
+from hc2l_router import HC2LRouter
 from dhl_router import DHLRouter
 
 # Import auto-disruption service
@@ -28,11 +37,11 @@ from google_maps_service import GoogleMapsService
 from flow_service import FlowService
 from incident_service import IncidentService
 
-# Import traffic data manager for merging disruptions
-# TODO: User disruptions are now processed in C++ API, not merged into CSV files
-
 # Import user disruptions utilities for loading user-reported disruptions
 from user_disruptions import load_user_disruption_rows
+
+# Get logger instance
+console_logger = get_logger("FlaskServer")
 
 app = Flask(__name__)
 
@@ -40,9 +49,10 @@ app = Flask(__name__)
 app.config['DEBUG'] = Config.FLASK_DEBUG
 app.config['ENV'] = Config.FLASK_ENV
 
-# ============================================================
-# BACKEND LOGGING SYSTEM
-# ============================================================
+# Initialize settings manager (persistent storage)
+settings_manager = init_settings_manager()
+
+console_logger.info("Flask Server Initialization")
 
 # In-memory log buffer (thread-safe circular buffer)
 backend_logs = deque(maxlen=1000)  # Keep last 1000 logs
@@ -68,7 +78,7 @@ class BackendLogHandler(logging.Handler):
             backend_logs.append(log_entry)
         except Exception as e:
             # Fail silently to avoid breaking the app
-            print(f"Error in BackendLogHandler: {e}")
+            console_logger.error(f"Error in BackendLogHandler: {e}")
 
 # Configure backend logging
 backend_handler = BackendLogHandler()
@@ -89,47 +99,50 @@ app.logger.info("Backend logging system initialized")
 # ============================================================
 
 # Initialize components using config paths
+console_logger.info("Initializing Core Components")
+
 mapper = NodeMapper(str(Config.NODES_CSV))
 try:
-    gps_router = GPSRoutingService()
-    print("✅ GPS HC2L Router initialized successfully")
+    gps_router = HC2LRouter()
+    console_logger.success("HC2L Router initialized")
 except Exception as e:
-    print(f"❌ Error initializing GPS HC2L Router: {e}")
+    console_logger.error(f"Error initializing HC2L Router: {e}")
     gps_router = None
 
 # Initialize DHL Router
 try:
     dhl_router = DHLRouter()
-    print("✅ DHL Router initialized successfully")
+    console_logger.success("DHL Router initialized")
 except Exception as e:
-    print(f"❌ Error initializing DHL Router: {e}")
+    console_logger.error(f"Error initializing DHL Router: {e}")
     dhl_router = None
 
 # Initialize Google Maps Service
 try:
     gmaps_service = GoogleMapsService()
-    print("✅ Google Maps Service initialized successfully")
+    console_logger.success("Google Maps Service initialized")
 except Exception as e:
-    print(f"❌ Error initializing Google Maps Service: {e}")
+    console_logger.error(f"Error initializing Google Maps Service: {e}")
     gmaps_service = None
 
 # Initialize Real-Time Data Services (V3 - Separated Flow and Incidents)
 try:
     flow_service = FlowService()
-    print("✅ Flow Service initialized successfully")
+    console_logger.success("Flow Service initialized")
 except Exception as e:
-    print(f"❌ Error initializing Flow Service: {e}")
+    console_logger.error(f"Error initializing Flow Service: {e}")
     flow_service = None
 
 try:
     incident_service = IncidentService()
-    print("✅ Incident Service initialized successfully")
+    console_logger.success("Incident Service initialized")
 except Exception as e:
-    print(f"❌ Error initializing Incident Service: {e}")
+    console_logger.error(f"Error initializing Incident Service: {e}")
     incident_service = None
 
-# Auto-disruption service with 2-minute updates
-auto_service = init_auto_disruption_service(app, update_interval=120)
+# Auto-disruption service (load interval from persistent settings)
+console_logger.info("Initializing Auto-Disruption Service")
+auto_service = init_auto_disruption_service(app)  # Will load interval from settings
 
 # Shutdown service on exit
 atexit.register(shutdown_auto_disruption_service)
@@ -338,10 +351,9 @@ def load_edges_with_cache():
             # Cache hit - reuse existing data
             return _edges_cache['data'], _edges_cache['lookup']
         
-        # Cache miss or invalidated - reload
-        print(f"🔄 Loading OSM edges with geometry from {Config.EDGES_CSV.name}...")
+        console_logger.processing(f"Loading OSM edges with geometry from {Config.EDGES_CSV.name}...")
         edges_df = pd.read_csv(edges_file)
-        print(f"   📂 Loaded {len(edges_df)} OSM edges")
+        console_logger.data(f"Loaded {len(edges_df)} OSM edges")
         
         # Build edge lookup dictionary
         edge_lookup = {}
@@ -382,11 +394,11 @@ def load_edges_with_cache():
         _edges_cache['file_mtime'] = current_mtime
         _edges_cache['loaded_at'] = time.time()
         
-        print(f"   ✅ Cached {len(edge_lookup)} edges with geometries")
+        console_logger.success(f"Cached {len(edge_lookup)} edges with geometries")
         return edges_df, edge_lookup
         
     except Exception as e:
-        print(f"   ❌ Error loading edges: {e}")
+        console_logger.error(f"Error loading edges: {e}")
         return None, None
 
 
@@ -411,7 +423,7 @@ def load_traffic_with_cache(edge_lookup):
         flow_files = glob.glob(str(disruptions_dir / 'flow' / 'flow_*.csv'))
         
         if not flow_files:
-            print("   ℹ️  No traffic files found in disruptions/flow/")
+            console_logger.warning("No traffic files found in disruptions/flow/")
             return []
         
         # Get most recent file
@@ -426,7 +438,7 @@ def load_traffic_with_cache(edge_lookup):
             return _traffic_cache['segments']
         
         # Cache miss - reload traffic data
-        print(f"   🔄 Loading traffic data from: {os.path.basename(latest_file)}")
+        console_logger.processing(f"Loading traffic data from: {os.path.basename(latest_file)}")
         traffic_df = pd.read_csv(latest_file)
         
         traffic_segments = []
@@ -483,11 +495,11 @@ def load_traffic_with_cache(edge_lookup):
         _traffic_cache['file_mtime'] = current_mtime
         _traffic_cache['loaded_at'] = time.time()
         
-        print(f"   ✅ Cached {len(traffic_segments)} traffic segments")
+        console_logger.success(f"Cached {len(traffic_segments)} traffic segments")
         return traffic_segments
         
     except Exception as e:
-        print(f"   ❌ Error loading traffic: {e}")
+        console_logger.error(f"Error loading traffic: {e}")
         return []
 
 
@@ -514,7 +526,7 @@ def get_dynamic_disruption_file(algorithm: str = 'hc2l', dataset_mode: str = Non
     
     # Check if disruptions directory exists
     if Config.DISRUPTIONS_DIR.exists():
-        print(f"   🔄 Using disruption directory: {Config.DISRUPTIONS_DIR}")
+        console_logger.info(f"Using disruption directory: {Config.DISRUPTIONS_DIR}")
         return str(Config.DISRUPTIONS_DIR)
     
     return ""
@@ -543,18 +555,18 @@ def enhance_alternative_routes_with_geometry(alternative_routes):
         for route in alternative_routes:
             # Check if route already has geometry from C++ API
             if route.get('geometry') and len(route.get('geometry', [])) > 0:
-                print(f"✅ Alternative route rank {route.get('rank')} has {len(route['geometry'])} geometry segments from C++")
+                console_logger.success(f"Alternative route rank {route.get('rank')} has {len(route['geometry'])} geometry segments from C++")
                 enhanced_routes.append(route)
             else:
                 # Fallback: just pass through the route as-is
-                print(f"⚠️  Alternative route rank {route.get('rank')} has no geometry from C++, will use geometry as-is")
+                console_logger.warning(f"Alternative route rank {route.get('rank')} has no geometry from C++, will use geometry as-is")
                 enhanced_routes.append(route)
         
-        print(f"✅ Processed {len(enhanced_routes)} alternative routes with geometry")
+        console_logger.success(f"Processed {len(enhanced_routes)} alternative routes with geometry")
         return enhanced_routes
         
     except Exception as e:
-        print(f"⚠️  Error processing alternative routes: {e}")
+        console_logger.warning(f"Error processing alternative routes: {e}")
         return alternative_routes
 
 
@@ -575,9 +587,9 @@ def cleanup_old_traffic_files(mode: str, max_files: int = 10):
         for old_file in files_to_remove:
             try:
                 old_file.unlink()
-                print(f"   🗑️  Removed old file: {old_file.name}")
+                console_logger.info(f"Removed old file: {old_file.name}")
             except Exception as e:
-                print(f"   ⚠️  Failed to remove {old_file.name}: {e}")
+                console_logger.warning(f"Failed to remove {old_file.name}: {e}")
 
 
 @app.route('/')
@@ -761,9 +773,9 @@ def load_disruptions():
                 try:
                     flow_df = pd.read_csv(latest_flow_file)
                     total_flow_records = len(flow_df)
-                    print(f"   📊 Latest flow file: {latest_flow_file.name} ({total_flow_records} records)")
+                    console_logger.data(f"Latest flow file: {latest_flow_file.name} ({total_flow_records} records)")
                 except Exception as e:
-                    print(f"⚠️  Error reading latest flow file {latest_flow_file.name}: {e}")
+                    console_logger.warning(f"Error reading latest flow file {latest_flow_file.name}: {e}")
 
             # Get latest incident file and count its records
             if recent_incident_files:
@@ -771,27 +783,27 @@ def load_disruptions():
                 try:
                     incident_df = pd.read_csv(latest_incident_file)
                     total_incident_records = len(incident_df)
-                    print(f"   📊 Latest incident file: {latest_incident_file.name} ({total_incident_records} records)")
+                    console_logger.data(f"Latest incident file: {latest_incident_file.name} ({total_incident_records} records)")
                 except Exception as e:
-                    print(f"⚠️  Error reading latest incident file {latest_incident_file.name}: {e}")
+                    console_logger.warning(f"Error reading latest incident file {latest_incident_file.name}: {e}")
 
             disruptions_size = total_flow_records + total_incident_records
             disruptions_exist = disruptions_size > 0
 
             if disruptions_exist:
-                print(f"📊 HERE API disruptions found: {total_flow_records} flow + {total_incident_records} incident = {disruptions_size} total records")
-                print(f"   Latest flow file: {latest_flow_file.name if recent_flow_files else 'None'}")
-                print(f"   Latest incident file: {latest_incident_file.name if recent_incident_files else 'None'}")
+                console_logger.info(f"HERE API disruptions found: {total_flow_records} flow + {total_incident_records} incident = {disruptions_size} total records")
+                console_logger.data(f"Latest flow file: {latest_flow_file.name if recent_flow_files else 'None'}")
+                console_logger.data(f"Latest incident file: {latest_incident_file.name if recent_incident_files else 'None'}")
             else:
-                print(f"📊 Latest HERE API disruption files exist but are empty")
+                console_logger.info("Latest HERE API disruption files exist but are empty")
         else:
-            print(f"📊 No recent HERE API disruption files found (checked within {recent_threshold/3600:.1f} hours)")
+            console_logger.info(f"No recent HERE API disruption files found (checked within {recent_threshold/3600:.1f} hours)")
         
         # Decision logic:
         # 1. If NO disruptions exist → MUST fetch
         # 2. If disruptions exist → Check time interval
         if not disruptions_exist:
-            print("📥 Disruptions empty - fetching fresh data...")
+            console_logger.info("Disruptions empty - fetching fresh data")
             
             # Fetch fresh data
             flow_metadata = {}
@@ -807,7 +819,7 @@ def load_disruptions():
             if auto_service:
                 auto_service.last_fetch_time = time.time()
             
-            print("✅ Fresh disruptions fetched and loaded")
+            console_logger.success("Fresh disruptions fetched and loaded")
             
             return jsonify({
                 'success': True,
@@ -822,7 +834,7 @@ def load_disruptions():
             should_fetch = auto_service.should_fetch_now() if auto_service else False
             
             if should_fetch:
-                print("🔄 Disruptions exist and update interval expired - refreshing...")
+                console_logger.info("Disruptions exist and update interval expired - refreshing...")
                 
                 # Fetch fresh data
                 flow_metadata = {}
@@ -838,7 +850,7 @@ def load_disruptions():
                 if auto_service:
                     auto_service.last_fetch_time = time.time()
                 
-                print("✅ Disruptions refreshed")
+                console_logger.success("Disruptions refreshed")
                 
                 return jsonify({
                     'success': True,
@@ -850,7 +862,7 @@ def load_disruptions():
             
             else:
                 # Disruptions exist and interval hasn't expired - use cached data
-                print(f"⏭️  Using cached disruptions ({disruptions_size} edges)")
+                console_logger.info(f"Using cached disruptions ({disruptions_size} edges)")
                 
                 next_fetch = auto_service.get_next_fetch_time() if auto_service else None
                 if next_fetch:
@@ -932,8 +944,8 @@ def save_custom_disruption():
     4. Triggers auto-disruption service to recalculate active routes
     """
     data = request.json
-    print(f"\n📍 === SAVING CUSTOM DISRUPTION ===")
-    print(f"   Received data keys: {list(data.keys())}")
+    console_logger.info("=== SAVING CUSTOM DISRUPTION ===")
+    console_logger.data(f"Received data keys: {list(data.keys())}")
     
     try:
         import uuid
@@ -971,10 +983,10 @@ def save_custom_disruption():
             jam_factor = 4.0  # Default moderate
             effective_speed = 30.0
         
-        print(f"   ✅ Parsed incident: {incident_type} ({severity})")
-        print(f"      Location: ({lat:.4f}, {lng:.4f}) → snap: ({snapped_lat:.4f}, {snapped_lng:.4f})")
-        print(f"      Road: {road_name} (Edge: {source_id}→{target_id})")
-        print(f"      Speed: {effective_speed} km/h, Jam Factor: {jam_factor:.1f}, Closed: {is_closed}")
+        console_logger.success(f"Parsed incident: {incident_type} ({severity})")
+        console_logger.data(f"Location: ({lat:.4f}, {lng:.4f}) → snap: ({snapped_lat:.4f}, {snapped_lng:.4f})")
+        console_logger.data(f"Road: {road_name} (Edge: {source_id}→{target_id})")
+        console_logger.data(f"Speed: {effective_speed} km/h, Jam Factor: {jam_factor:.1f}, Closed: {is_closed}")
         
         # Create disruption record
         report_id = str(uuid.uuid4())[:8]
@@ -1000,7 +1012,7 @@ def save_custom_disruption():
         }
         
         # Save to timestamped user incident CSV (similar to flow/incident files)
-        print(f"   💾 Saving to timestamped user_incident CSV...")
+        console_logger.processing("Saving to timestamped user_incident CSV...")
         from user_disruptions import ensure_user_disruption_fieldnames, load_user_disruption_rows
         
         # Create timestamped filename
@@ -1020,8 +1032,8 @@ def save_custom_disruption():
             writer.writeheader()
             writer.writerows(rows)
         
-        print(f"   ✅ Saved to: {csv_path.name}")
-        print(f"   ✅ User disruption saved - will be loaded by C++ routing API")
+        console_logger.success(f"Saved to: {csv_path.name}")
+        console_logger.success("User disruption saved - will be loaded by C++ routing API")
         
         return jsonify({
             'success': True,
@@ -1034,13 +1046,13 @@ def save_custom_disruption():
         })
         
     except ValueError as e:
-        print(f"   ❌ Validation error: {e}")
+        console_logger.error(f"Validation error: {e}")
         return jsonify({
             'success': False,
             'error': f'Invalid data format: {str(e)}'
         }), 400
     except Exception as e:
-        print(f"   ❌ Error saving disruption: {e}")
+        console_logger.error(f"Error saving disruption: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({
@@ -1063,7 +1075,7 @@ def report_disruption():
     IMPORTANT: Only displays HERE API incidents, not custom user-created ones
     """
     data = request.json
-    print(f"� Received location report: {data}")
+    console_logger.data(f"Received location report: {data}")
     
     try:
         # Extract location
@@ -1077,7 +1089,7 @@ def report_disruption():
                 'error': 'Location outside Quezon City bounds'
             })
         
-        print(f"🗺️  Snapping location ({lat:.4f}, {lng:.4f}) to nearest road...")
+        console_logger.processing(f"Snapping location ({lat:.4f}, {lng:.4f}) to nearest road...")
         
         # Snap to nearest OSM road
         snap_result = mapper.snap_to_nearest_road(lat, lng, max_distance=100)
@@ -1095,7 +1107,7 @@ def report_disruption():
         snapped_lat = snap_result['projection_point']['lat']
         snapped_lng = snap_result['projection_point']['lng']
         
-        print(f"✅ Snapped to road: {road_name} (Edge: {source_id}→{target_id})")
+        console_logger.success(f"Snapped to road: {road_name} (Edge: {source_id}→{target_id})")
         
         # Check if any HERE API incidents exist on this road
         # Load latest incident CSV if it exists
@@ -1116,13 +1128,13 @@ def report_disruption():
                 
                 if not edge_incidents.empty:
                     nearby_incidents = edge_incidents.to_dict('records')
-                    print(f"   ⚠️  Found {len(nearby_incidents)} HERE API incident(s) on this road:")
+                    console_logger.warning(f"Found {len(nearby_incidents)} HERE API incident(s) on this road:")
                     for incident in nearby_incidents:
-                        print(f"      - {incident.get('incident_type')}: {incident.get('incident_description')}")
-                        print(f"        Severity: {incident.get('incident_criticality')}, Closed: {incident.get('incident_road_closed')}")
+                        console_logger.data(f"- {incident.get('incident_type')}: {incident.get('incident_description')}")
+                        console_logger.data(f"  Severity: {incident.get('incident_criticality')}, Closed: {incident.get('incident_road_closed')}")
                 
             except Exception as e:
-                print(f"   ⚠️  Error reading incident file: {e}")
+                console_logger.warning(f"Error reading incident file: {e}")
         
         # Return response (no custom incident is saved)
         response_data = {
@@ -1142,7 +1154,7 @@ def report_disruption():
         return jsonify(response_data)
         
     except Exception as e:
-        print(f"❌ Error in report_disruption: {e}")
+        console_logger.error(f"Error in report_disruption: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({
@@ -1197,11 +1209,11 @@ def delete_user_disruption(report_id):
         writer.writeheader()
         writer.writerows(rows_to_keep)
 
-    print(f"\n🗑️  === DELETING CUSTOM DISRUPTION ===")
-    print(f"   Deleted report_id: {report_id}")
-    print(f"   Remaining disruptions: {len(rows_to_keep)}")
-    print(f"   ✅ Created new timestamped file: {csv_path.name}")
-    print(f"   ✅ C++ API will reload updated user disruptions")
+        console_logger.info("=== DELETING CUSTOM DISRUPTION ===")
+        console_logger.data(f"Deleted report_id: {report_id}")
+        console_logger.data(f"Remaining disruptions: {len(rows_to_keep)}")
+        console_logger.success(f"Created new timestamped file: {csv_path.name}")
+        console_logger.success("C++ API will reload updated user disruptions")
 
     return jsonify({
         'success': True, 
@@ -1219,10 +1231,10 @@ def search_location():
     
     data = request.json
     query = data.get('query', '').strip()
-    print(f"[SEARCH] Query received: '{query}'")
+    console_logger.info(f"[SEARCH] Query received: '{query}'")
     
     if not query:
-        print("[SEARCH] ❌ Query is empty")
+        console_logger.error("[SEARCH] Query is empty")
         return jsonify({
             'success': False,
             'error': 'Search query is required'
@@ -1247,13 +1259,13 @@ def search_location():
             'User-Agent': 'REACT-Navigation-App/1.0'
         }
         
-        print(f"[SEARCH] Trying Photon API: {photon_url}")
+        console_logger.info(f"[SEARCH] Trying Photon API: {photon_url}")
         response = requests.get(photon_url, params=params, headers=headers, timeout=5)
         response.raise_for_status()
         
         data_response = response.json()
         results = data_response.get('features', [])
-        print(f"[SEARCH] Photon returned {len(results)} results")
+        console_logger.data(f"[SEARCH] Photon returned {len(results)} results")
         
         # Process Photon results
         filtered_results = []
@@ -1290,14 +1302,14 @@ def search_location():
                         'type': loc_type,
                         'address': properties
                     })
-                    print(f"  ✅ Added: {name} ({lat:.4f}, {lng:.4f})")
+                    console_logger.data(f"  ✅ Added: {name} ({lat:.4f}, {lng:.4f})")
                 else:
-                    print(f"  ⚠️  Outside bounds: {name} ({lat:.4f}, {lng:.4f})")
+                    console_logger.data(f"  ⚠️  Outside bounds: {name} ({lat:.4f}, {lng:.4f})")
             except (ValueError, TypeError, KeyError) as e:
-                print(f"  ⚠️  Parse error: {e}")
+                console_logger.warning(f"  ⚠️  Parse error: {e}")
                 continue
         
-        print(f"[SEARCH] ✅ Returning {len(filtered_results)} results from Photon")
+        console_logger.success(f"[SEARCH] Returning {len(filtered_results)} results from Photon")
         return jsonify({
             'success': True,
             'results': filtered_results,
@@ -1305,7 +1317,7 @@ def search_location():
         })
         
     except requests.exceptions.Timeout:
-        print(f"[SEARCH] ⚠️  Photon timeout, trying fallback...")
+        console_logger.warning("[SEARCH] Photon timeout, trying fallback...")
         # Fallback: try Nominatim if Photon fails
         try:
             nominatim_url = "https://nominatim.openstreetmap.org/search"
@@ -1347,20 +1359,20 @@ def search_location():
                 'count': len(filtered_results)
             })
         except Exception as e:
-            print(f"[SEARCH] ❌ Nominatim fallback also failed: {str(e)}")
+            console_logger.error(f"[SEARCH] Nominatim fallback also failed: {str(e)}")
             return jsonify({
                 'success': False,
                 'error': f'Location search unavailable: {str(e)}'
             })
     
     except requests.exceptions.RequestException as e:
-        print(f"[SEARCH] ❌ API request failed: {str(e)}")
+        console_logger.error(f"[SEARCH] API request failed: {str(e)}")
         return jsonify({
             'success': False,
             'error': f'Search service error: {str(e)}'
         })
     except Exception as e:
-        print(f"[SEARCH] ❌ Unexpected error: {str(e)}")
+        console_logger.error(f"[SEARCH] Unexpected error: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({
@@ -1751,14 +1763,14 @@ def get_osm_graph_edges():
 
 @app.route('/compute_dhc2l_route', methods=['POST'])
 def compute_dhc2l_route():
-    """Compute optimal route using GPS HC2L (Hierarchical Cut Labelling) algorithm"""
+    """Compute optimal route using HC2L (Hierarchical Cut Labelling) algorithm"""
     data = request.json
     
     try:
         if gps_router is None:
             return jsonify({
                 'success': False,
-                'error': 'GPS HC2L Router not initialized properly'
+                'error': 'HC2L Router not initialized properly'
             })
         
         # Extract pin coordinates (original user click points)
@@ -1805,7 +1817,7 @@ def compute_dhc2l_route():
             except (ValueError, TypeError):
                 start_edge_oneway = 0
             
-            print(f"🗺️  Start snap: {start_osm_edge.get('road_name', 'Unknown')} " +
+            console_logger.success(f"Start snap: {start_osm_edge.get('road_name', 'Unknown')} " +
                   f"(Edge: {start_edge_source}→{start_edge_target}, oneway={start_edge_oneway})")
         
         if dest_osm_edge:
@@ -1826,7 +1838,7 @@ def compute_dhc2l_route():
             except (ValueError, TypeError):
                 dest_edge_oneway = 0
             
-            print(f"🗺️  Dest snap: {dest_osm_edge.get('road_name', 'Unknown')} " +
+            console_logger.success(f"Dest snap: {dest_osm_edge.get('road_name', 'Unknown')} " +
                   f"(Edge: {dest_edge_source}→{dest_edge_target}, oneway={dest_edge_oneway})")
         
         # LazyHC2L: Extract optional disruption parameters
@@ -1845,15 +1857,15 @@ def compute_dhc2l_route():
         if disruption_file and not disruption_files:
             disruption_files = disruption_file
                 
-        print(f"Computing GPS HC2L route with snap points:")
-        print(f"  Start: Pin({start_pin_lat}, {start_pin_lng}) → Snap({start_snap_lat}, {start_snap_lng})")
-        print(f"  Dest:  Pin({dest_pin_lat}, {dest_pin_lng}) → Snap({dest_snap_lat}, {dest_snap_lng})")
-        print(f"  Dataset mode: {dataset_mode if dataset_mode else 'auto'}")
-        print(f"  Disruption directory: {disruption_files if disruption_files else '(none)'}")
-        print(f"  Tau threshold: {tau_threshold}")
-        print(f"  Generate alternatives: {generate_alternatives}")
+        console_logger.processing(f"Computing HC2L route with snap points:")
+        console_logger.data(f"  Start: Pin({start_pin_lat}, {start_pin_lng}) → Snap({start_snap_lat}, {start_snap_lng})")
+        console_logger.data(f"  Dest:  Pin({dest_pin_lat}, {dest_pin_lng}) → Snap({dest_snap_lat}, {dest_snap_lng})")
+        console_logger.data(f"  Dataset mode: {dataset_mode if dataset_mode else 'auto'}")
+        console_logger.data(f"  Disruption directory: {disruption_files if disruption_files else '(none)'}")
+        console_logger.data(f"  Tau threshold: {tau_threshold}")
+        console_logger.data(f"  Generate alternatives: {generate_alternatives}")
         
-        # Compute route using GPS HC2L with LazyHC2L parameters
+        # Compute route using HC2L with LazyHC2L parameters
         # Pass disruption directory to C++ - it will find flow/incident CSV files automatically
         start_time = time.time()
         route_result = gps_router.compute_route(
@@ -1887,34 +1899,23 @@ def compute_dhc2l_route():
         # Merge summary into cpp_metrics (keeping all C++ fields, adding Python-calculated fields)
         full_metrics = {**cpp_metrics, **summary}
         
-        # # Debug: Print labeling metrics
-        # print(f"Route Summary Metrics:")
-        # print(f"Labeling size: {summary.get('labeling_size_mb', 'N/A')} MB")
-        # print(f"Labeling time: {summary.get('labeling_time_ms', 'N/A')} s")
-
-        # Debug: Print the route structure
-        # print(f"Route result structure: {list(route_result.get('route', {}).keys())}")
-        if 'turn_by_turn_directions' in route_result.get('route', {}):
-            directions = route_result['route']['turn_by_turn_directions']
-            # print(f"Turn-by-turn directions ({len(directions)} steps): {directions[:3]}...")  # First 3 steps
-        
         # Debug: Check HC2L geometry
         hc2l_geometry = route_result.get('route', {}).get('geometry', [])
-        print(f"🔍 HC2L geometry in Flask: {len(hc2l_geometry)} segments")
+        console_logger.data(f"HC2L geometry in Flask: {len(hc2l_geometry)} segments")
         if hc2l_geometry:
-            print(f"🔍 HC2L First segment keys: {list(hc2l_geometry[0].keys()) if hc2l_geometry else 'No segments'}")
+            console_logger.data(f"HC2L First segment keys: {list(hc2l_geometry[0].keys()) if hc2l_geometry else 'No segments'}")
         
         # Extract disruption_analysis from C++ output
         disruption_analysis = route_result.get('disruption_analysis', {})
         if disruption_analysis:
-            print(f"🔍 Disruption analysis detected: {disruption_analysis.get('route_disruptions', {}).get('total_count', 0)} disruptions")
+            console_logger.data(f"Disruption analysis detected: {disruption_analysis.get('route_disruptions', {}).get('total_count', 0)} disruptions")
         
         # Enhance alternative routes with geometry (only if requested)
         if generate_alternatives:
             enhanced_alt_routes = enhance_alternative_routes_with_geometry(route_result.get('alternative_routes', []))
         else:
             enhanced_alt_routes = []
-            print(f"⏭️  Alternative routes generation skipped (generate_alternatives=False)")
+            console_logger.data(f"Alternative routes generation skipped (generate_alternatives=False)")
         
         return jsonify({
             'success': True,
@@ -1960,7 +1961,7 @@ def compute_dhc2l_route():
 
 @app.route('/compare_routes', methods=['POST'])
 def compare_routes():
-    """Compare GPS HC2L base route with disrupted route"""
+    """Compare HC2L base route with disrupted route"""
     data = request.json
     
     try:
@@ -1970,7 +1971,7 @@ def compare_routes():
         dest_lng = float(data['dest_lng'])
         threshold = float(data.get('threshold', 0.5))
         
-        # Use the GPS router's built-in comparison function
+        # Use the HC2L router's built-in comparison function
         comparison_result = gps_router.compare_routes(start_lat, start_lng, dest_lat, dest_lng, threshold)
 
         if not comparison_result['success']:
@@ -2057,11 +2058,11 @@ def get_active_disruptions():
         use_cached_data = bool(recent_flow_files or recent_incident_files)
         
         if use_cached_data:
-            print(f"📊 Using cached disruption data for active disruptions")
-            print(f"   Recent flow files: {[f.name for f in recent_flow_files]}")
-            print(f"   Recent incident files: {[f.name for f in recent_incident_files]}")
+            console_logger.info("Using cached disruption data for active disruptions")
+            console_logger.data(f"Recent flow files: {[f.name for f in recent_flow_files]}")
+            console_logger.data(f"Recent incident files: {[f.name for f in recent_incident_files]}")
         else:
-            print(f"📊 No recent disruption data found - fetching fresh data")
+            console_logger.info("No recent disruption data found - fetching fresh data")
         
         # ============================================================
         # FETCH INCIDENTS (primary data source for incident types)
@@ -2073,15 +2074,15 @@ def get_active_disruptions():
                 try:
                     incidents_df = pd.read_csv(latest_incident_file)
                     incidents = incidents_df.to_dict('records')
-                    print(f"   📂 Loaded {len(incidents)} cached incidents from {latest_incident_file.name}")
+                    console_logger.data(f"Loaded {len(incidents)} cached incidents from {latest_incident_file.name}")
                 except Exception as e:
-                    print(f"   ⚠️  Error loading cached incidents: {e} - falling back to API")
+                    console_logger.warning(f"Error loading cached incidents: {e} - falling back to API")
                     incidents = incident_service.fetch_incidents_data()
             else:
                 # Fetch fresh incident data
                 incidents = incident_service.fetch_incidents_data()
             
-            print(f"\n📊 Processing {len(incidents)} HERE incidents...")
+            console_logger.info(f"Processing {len(incidents)} HERE incidents...")
             
             for incident in incidents:
                 try:
@@ -2120,7 +2121,7 @@ def get_active_disruptions():
                         matched_edges = incident_service.matcher.match_incident(incident)
                     
                     if not matched_edges:
-                        print(f"   ⚠️  No edges matched for incident: {incident_type}")
+                        console_logger.warning(f"No edges matched for incident: {incident_type}")
                         continue
                     
                     matched_edges_count += len(matched_edges)
@@ -2205,10 +2206,10 @@ def get_active_disruptions():
                         disruptions_by_type[display_type].append(disruption)
                         total_disruptions += 1
                     
-                    print(f"   ✅ {display_type} ({severity}) matched to {len(matched_edges)} edges")
+                    console_logger.success(f"{display_type} ({severity}) matched to {len(matched_edges)} edges")
                     
                 except Exception as e:
-                    print(f"   ⚠️  Error processing incident: {e}")
+                    console_logger.warning(f"Error processing incident: {e}")
                     import traceback
                     traceback.print_exc()
                     continue
@@ -2223,15 +2224,15 @@ def get_active_disruptions():
                 try:
                     flow_df = pd.read_csv(latest_flow_file)
                     flow_data = flow_df.to_dict('records')
-                    print(f"   📂 Loaded {len(flow_data)} cached flow segments from {latest_flow_file.name}")
+                    console_logger.data(f"Loaded {len(flow_data)} cached flow segments from {latest_flow_file.name}")
                 except Exception as e:
-                    print(f"   ⚠️  Error loading cached flow: {e} - falling back to API")
+                    console_logger.warning(f"Error loading cached flow: {e} - falling back to API")
                     flow_data = flow_service.fetch_flow_data()
             else:
                 # Fetch fresh flow data
                 flow_data = flow_service.fetch_flow_data()
             
-            print(f"\n📊 Processing {len(flow_data)} HERE Traffic flow segments...")
+            console_logger.info(f"Processing {len(flow_data)} HERE Traffic flow segments...")
             
             for flow in flow_data:
                 try:
@@ -2311,11 +2312,11 @@ def get_active_disruptions():
             for disruption in disruptions:
                 severity_counts[disruption['severity']] += 1
         
-        print(f"\n📈 Summary:")
-        print(f"   Total disruptions: {total_disruptions}")
-        print(f"   Matched edges: {matched_edges_count}")
-        print(f"   By type: {type_counts}")
-        print(f"   By severity: {severity_counts}")
+        console_logger.info("Summary:")
+        console_logger.data(f"Total disruptions: {total_disruptions}")
+        console_logger.data(f"Matched edges: {matched_edges_count}")
+        console_logger.data(f"By type: {type_counts}")
+        console_logger.data(f"By severity: {severity_counts}")
         
         return jsonify({
             'success': True,
@@ -2330,7 +2331,7 @@ def get_active_disruptions():
         })
         
     except Exception as e:
-        print(f"❌ Error in get_active_disruptions: {e}")
+        console_logger.error(f"Error in get_active_disruptions: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({
@@ -2355,7 +2356,7 @@ def get_raw_here_traffic():
         
         # Fetch flow data
         flow_data = flow_service.fetch_flow_data()
-        print(f"📊 Fetching {len(flow_data)} raw HERE flow segments...")
+        console_logger.info(f"Fetching {len(flow_data)} raw HERE flow segments...")
         
         for flow in flow_data:
             try:
@@ -2407,7 +2408,7 @@ def get_raw_here_traffic():
         
         # Fetch incidents
         incidents = incident_service.fetch_incidents_data()
-        print(f"📊 Fetching {len(incidents)} raw HERE incidents...")
+        console_logger.info(f"Fetching {len(incidents)} raw HERE incidents...")
         
         for incident in incidents:
             try:
@@ -2457,7 +2458,7 @@ def get_raw_here_traffic():
             except Exception as e:
                 continue
         
-        print(f"✅ Returning {len(raw_traffic['flow_segments'])} flow segments and {len(raw_traffic['incidents'])} incidents")
+        console_logger.success(f"Returning {len(raw_traffic['flow_segments'])} flow segments and {len(raw_traffic['incidents'])} incidents")
         
         return jsonify({
             'success': True,
@@ -2467,7 +2468,7 @@ def get_raw_here_traffic():
         })
         
     except Exception as e:
-        print(f"❌ Error in get_raw_here_traffic: {e}")
+        console_logger.error(f"Error in get_raw_here_traffic: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({
@@ -2507,7 +2508,7 @@ def get_traffic_with_geometry():
         })
         
     except Exception as e:
-        print(f"❌ Error in get_traffic_with_geometry: {e}")
+        console_logger.error(f"Error in get_traffic_with_geometry: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({
@@ -2571,7 +2572,7 @@ def compute_dhl_route():
             except (ValueError, TypeError):
                 start_edge_oneway = 0
             
-            print(f"🗺️  Start snap (DHL): {start_osm_edge.get('road_name', 'Unknown')} " +
+            console_logger.success(f"Start snap (DHL): {start_osm_edge.get('road_name', 'Unknown')} " +
                   f"(Edge: {start_edge_source}→{start_edge_target}, oneway={start_edge_oneway})")
         
         if dest_osm_edge:
@@ -2592,7 +2593,7 @@ def compute_dhl_route():
             except (ValueError, TypeError):
                 dest_edge_oneway = 0
             
-            print(f"🗺️  Dest snap (DHL): {dest_osm_edge.get('road_name', 'Unknown')} " +
+            console_logger.success(f"Dest snap (DHL): {dest_osm_edge.get('road_name', 'Unknown')} " +
                   f"(Edge: {dest_edge_source}→{dest_edge_target}, oneway={dest_edge_oneway})")
         
         # Check if disruptions should be used
@@ -2619,9 +2620,9 @@ def compute_dhl_route():
                     disruption_gr = Config.PROCESSED_DATA_DIR / 'qc_disrupted_scenario_1.gr'
                     if disruption_gr.exists():
                         disruption_files = str(disruption_gr)
-                        print(f"📍 Using static disruption file: {disruption_files}")
+                        console_logger.data(f"Using static disruption file: {disruption_files}")
                     else:
-                        print(f"⚠️  No disruption files found")
+                        console_logger.warning("No disruption files found")
                         disruption_files = ''
             else:
                 disruption_files = ''
@@ -2633,9 +2634,9 @@ def compute_dhl_route():
                 disruption_gr = Config.PROCESSED_DATA_DIR / 'qc_disrupted_scenario_1.gr'
                 if disruption_gr.exists():
                     disruption_files = str(disruption_gr)
-                    print(f"📍 Using static disruption file: {disruption_files}")
+                    console_logger.data(f"📍 Using static disruption file: {disruption_files}")
                 else:
-                    print(f"⚠️  No disruption files found")
+                    console_logger.warning(f"⚠️  No disruption files found")
                     disruption_files = ''
         
         # Support legacy single disruption_file parameter
@@ -2645,13 +2646,13 @@ def compute_dhl_route():
         tau_threshold = float(data.get('tau_threshold', 0.5))
         generate_alternatives = data.get('generate_alternatives', True)  # Default: True (generate alternatives)
         
-        print(f"Computing DHL route with snap points:")
-        print(f"  Start: Pin({start_pin_lat}, {start_pin_lng}) → Snap({start_snap_lat}, {start_snap_lng})")
-        print(f"  Dest:  Pin({dest_pin_lat}, {dest_pin_lng}) → Snap({dest_snap_lat}, {dest_snap_lng})")
-        print(f"  Dataset mode: {dataset_mode if dataset_mode else 'auto'}")
-        print(f"  Disruption directory: {disruption_files if disruption_files else '(none)'}")
-        print(f"  Tau threshold: {tau_threshold}")
-        print(f"  Generate alternatives: {generate_alternatives}")
+        console_logger.processing(f"Computing DHL route with snap points:")
+        console_logger.data(f"  Start: Pin({start_pin_lat}, {start_pin_lng}) → Snap({start_snap_lat}, {start_snap_lng})")
+        console_logger.data(f"  Dest:  Pin({dest_pin_lat}, {dest_pin_lng}) → Snap({dest_snap_lat}, {dest_snap_lng})")
+        console_logger.data(f"  Dataset mode: {dataset_mode if dataset_mode else 'auto'}")
+        console_logger.data(f"  Disruption directory: {disruption_files if disruption_files else '(none)'}")
+        console_logger.data(f"  Tau threshold: {tau_threshold}")
+        console_logger.data(f"  Generate alternatives: {generate_alternatives}")
         
         # Compute route using DHL with disruption parameters
         # Pass disruption directory to C++ - it will find flow/incident CSV files automatically
@@ -2695,14 +2696,14 @@ def compute_dhl_route():
         # Extract disruption_analysis from C++ output
         disruption_analysis = route_result.get('disruption_analysis', {})
         if disruption_analysis:
-            print(f"🔍 DHL Disruption analysis detected: {disruption_analysis.get('route_disruptions', {}).get('total_count', 0)} disruptions")
+            console_logger.data(f"DHL Disruption analysis detected: {disruption_analysis.get('route_disruptions', {}).get('total_count', 0)} disruptions")
         
         # Enhance alternative routes with geometry (only if requested)
         if generate_alternatives:
             enhanced_alt_routes = enhance_alternative_routes_with_geometry(route_result.get('alternative_routes', []))
         else:
             enhanced_alt_routes = []
-            print(f"⏭️  Alternative routes generation skipped (generate_alternatives=False)")
+            console_logger.data(f"Alternative routes generation skipped (generate_alternatives=False)")
         
         return jsonify({
             'success': True,
@@ -2799,7 +2800,7 @@ def compare_dhl_routes():
                         route_data['enhanced_directions'] = enhanced_directions
                         route_data['enhanced_details'] = enhanced_details
                         
-                        print(f"🛣️  Enhanced {route_type} route: {enhanced_summary}")
+                        console_logger.data(f"🛣️  Enhanced {route_type} route: {enhanced_summary}")
         
         # Add straight line for additional comparison
         straight_line = [{
@@ -2878,14 +2879,14 @@ def compare_with_google_maps():
         dest_lng = float(data['dest_lng'])
         algorithm_name = data.get('algorithm', 'Unknown Algorithm')
         
-        print(f"\n🗺️  === GOOGLE MAPS COMPARISON (Dynamic) ===")
-        print(f"   Algorithm: {algorithm_name}")
-        print(f"   Route: ({start_lat}, {start_lng}) → ({dest_lat}, {dest_lng})")
-        print(f"   Using existing route data (no recalculation)")
+        console_logger.processing(f"\n🗺️  === GOOGLE MAPS COMPARISON (Dynamic) ===")
+        console_logger.data(f"Algorithm: {algorithm_name}")
+        console_logger.data(f"Route: ({start_lat}, {start_lng}) → ({dest_lat}, {dest_lng})")
+        console_logger.data(f"Using existing route data (no recalculation)")
         
         # Validate Google Maps service is initialized
         if not gmaps_service:
-            print(f"   ❌ Google Maps service not initialized")
+            console_logger.error(f"Google Maps service not initialized")
             return jsonify({
                 'success': False,
                 'error': 'Google Maps service not initialized. Check API key in .env'
@@ -2894,21 +2895,21 @@ def compare_with_google_maps():
         # ============================================================
         # STEP 1: Extract algorithm route coordinates from passed geometry
         # ============================================================
-        print(f"\n📍 Step 1: Extract current algorithm route coordinates")
+        console_logger.processing(f"Step 1: Extract current algorithm route coordinates")
         
         algorithm_coords = []
         existing_geometry = data.get('existing_route_geometry')
-        print(f"   Received geometry type: {type(existing_geometry)}")
+        console_logger.data(f"   Received geometry type: {type(existing_geometry)}")
         
         if not existing_geometry:
-            print(f"   ❌ No route geometry provided")
+            console_logger.error(f"   ❌ No route geometry provided")
             return jsonify({
                 'success': False,
                 'error': 'No route geometry found. Please calculate a route first.'
             })
         
         # Debug: print raw geometry
-        print(f"   Raw geometry (first 200 chars): {str(existing_geometry)[:200]}")
+        console_logger.data(f"   Raw geometry (first 200 chars): {str(existing_geometry)[:200]}")
         
         # Handle different geometry formats from various routing algorithms
         if isinstance(existing_geometry, list):
@@ -2922,7 +2923,7 @@ def compare_with_google_maps():
                             lng = float(segment['lng'])
                             algorithm_coords.append([lat, lng])
                         except (ValueError, TypeError) as e:
-                            print(f"   ⚠️  Skipping invalid lat/lng dict: {segment} - {e}")
+                            console_logger.warning(f"   ⚠️  Skipping invalid lat/lng dict: {segment} - {e}")
                     # Format 1b: Dict with nested coordinates key
                     elif 'coordinates' in segment:
                         coords_list = segment['coordinates']
@@ -2937,7 +2938,7 @@ def compare_with_google_maps():
                                             lat, lng = lng, lat
                                         algorithm_coords.append([lat, lng])
                                     except (ValueError, IndexError) as e:
-                                        print(f"   ⚠️  Skipping invalid coord: {coord} - {e}")
+                                        console_logger.warning(f"   ⚠️  Skipping invalid coord: {coord} - {e}")
                     # Format 1c: Dict with path key
                     elif 'path' in segment:
                         path = segment['path']
@@ -2965,7 +2966,7 @@ def compare_with_google_maps():
                             lat, lng = lng, lat
                         algorithm_coords.append([lat, lng])
                     except (ValueError, TypeError) as e:
-                        print(f"   ⚠️  Skipping invalid segment: {segment} - {e}")
+                        console_logger.warning(f"   ⚠️  Skipping invalid segment: {segment} - {e}")
         
         # Remove duplicate consecutive points
         if algorithm_coords:
@@ -2974,30 +2975,30 @@ def compare_with_google_maps():
                 if coord != deduplicated[-1]:
                     deduplicated.append(coord)
             algorithm_coords = deduplicated
-            print(f"   ✅ Deduped to {len(algorithm_coords)} unique points")
+            console_logger.success(f"   ✅ Deduped to {len(algorithm_coords)} unique points")
         
         if not algorithm_coords:
-            print(f"   ❌ Could not extract coordinates from geometry")
-            print(f"   Geometry structure: {existing_geometry}")
+            console_logger.error(f"   ❌ Could not extract coordinates from geometry")
+            console_logger.data(f"   Geometry structure: {existing_geometry}")
             return jsonify({
                 'success': False,
                 'error': 'Route geometry format is invalid or empty. Check server logs for details.'
             })
         
-        print(f"   ✅ Extracted {len(algorithm_coords)} unique points from algorithm route")
-        print(f"      Start point: [{algorithm_coords[0][0]:.6f}, {algorithm_coords[0][1]:.6f}]")
-        print(f"      End point: [{algorithm_coords[-1][0]:.6f}, {algorithm_coords[-1][1]:.6f}]")
+        console_logger.success(f"   ✅ Extracted {len(algorithm_coords)} unique points from algorithm route")
+        console_logger.data(f"      Start point: [{algorithm_coords[0][0]:.6f}, {algorithm_coords[0][1]:.6f}]")
+        console_logger.data(f"      End point: [{algorithm_coords[-1][0]:.6f}, {algorithm_coords[-1][1]:.6f}]")
         
         # ============================================================
         # STEP 2: Fetch Google Maps route using same origin/destination
         # ============================================================
-        print(f"\n🌐 Step 2: Fetch Google Maps route")
+        console_logger.processing(f"\n🌐 Step 2: Fetch Google Maps route")
         
         google_route = gmaps_service.get_directions(start_lat, start_lng, dest_lat, dest_lng)
         
         if not google_route or not google_route.get('success'):
             error_msg = google_route.get('error') if google_route else 'Google Maps API call failed'
-            print(f"   ❌ Error: {error_msg}")
+            console_logger.error(f"   ❌ Error: {error_msg}")
             return jsonify({
                 'success': False,
                 'error': f"Failed to fetch Google Maps route: {error_msg}"
@@ -3006,21 +3007,21 @@ def compare_with_google_maps():
         google_coords = google_route.get('coordinates', [])
         
         if not google_coords:
-            print(f"   ❌ Google Maps returned no coordinates")
+            console_logger.error(f"   ❌ Google Maps returned no coordinates")
             return jsonify({
                 'success': False,
                 'error': 'Google Maps route has no coordinates'
             })
         
-        print(f"   ✅ Google Maps route fetched: {len(google_coords)} points")
-        print(f"      Distance: {google_route.get('distance_text', 'N/A')}")
-        print(f"      Duration: {google_route.get('duration_text', 'N/A')}")
-        print(f"      Distance (meters): {google_route.get('distance_meters', 'N/A')}")
+        console_logger.success(f"   ✅ Google Maps route fetched: {len(google_coords)} points")
+        console_logger.data(f"      Distance: {google_route.get('distance_text', 'N/A')}")
+        console_logger.data(f"      Duration: {google_route.get('duration_text', 'N/A')}")
+        console_logger.data(f"      Distance (meters): {google_route.get('distance_meters', 'N/A')}")
         
         # ============================================================
         # STEP 3: Calculate comparison metrics
         # ============================================================
-        print(f"\n📊 Step 3: Calculate comparison metrics")
+        console_logger.processing(f"\n📊 Step 3: Calculate comparison metrics")
         
         # Calculate Fréchet distance (measures max deviation between routes)
         frechet_distance = gmaps_service.compute_frechet_distance(algorithm_coords, google_coords)
@@ -3028,17 +3029,17 @@ def compare_with_google_maps():
         # Calculate segment overlap (percentage of matching points)
         segment_overlap = gmaps_service.compute_segment_overlap(algorithm_coords, google_coords)
         
-        print(f"   ✅ Fréchet distance: {frechet_distance:.2f} meters")
-        print(f"   ✅ Segment overlap: {segment_overlap:.2f}%")
+        console_logger.success(f"   ✅ Fréchet distance: {frechet_distance:.2f} meters")
+        console_logger.success(f"   ✅ Segment overlap: {segment_overlap:.2f}%")
         
         google_distance_meters = google_route.get('distance_meters', 1)
         frechet_ratio = round((frechet_distance / max(google_distance_meters, 1)) * 100, 2)
-        print(f"   ✅ Fréchet/Distance ratio: {frechet_ratio}%")
+        console_logger.success(f"   ✅ Fréchet/Distance ratio: {frechet_ratio}%")
         
         # ============================================================
         # STEP 4: Build response with both routes for map display
         # ============================================================
-        print(f"\n✅ Comparison complete!")
+        console_logger.success(f"\n✅ Comparison complete!")
         
         result = {
             'success': True,
@@ -3073,28 +3074,28 @@ def compare_with_google_maps():
             }
         }
         
-        print(f"   📊 Fréchet Status: {result['comparison']['interpretation']['frechet_status']}")
-        print(f"   📊 Overlap Status: {result['comparison']['interpretation']['overlap_status']}")
+        console_logger.data(f"   📊 Fréchet Status: {result['comparison']['interpretation']['frechet_status']}")
+        console_logger.data(f"   📊 Overlap Status: {result['comparison']['interpretation']['overlap_status']}")
         
         return jsonify(result)
         
     except KeyError as e:
         error_msg = f"Missing required parameter: {str(e)}"
-        print(f"\n❌ {error_msg}")
+        console_logger.error(f"\n❌ {error_msg}")
         return jsonify({
             'success': False,
             'error': error_msg
         })
     except ValueError as e:
         error_msg = f"Invalid parameter value: {str(e)}"
-        print(f"\n❌ {error_msg}")
+        console_logger.error(f"\n❌ {error_msg}")
         return jsonify({
             'success': False,
             'error': error_msg
         })
     except Exception as e:
         import traceback
-        print(f"\n❌ Google Maps comparison error: {str(e)}")
+        console_logger.error(f"\n❌ Google Maps comparison error: {str(e)}")
         traceback.print_exc()
         return jsonify({
             'success': False,
@@ -3126,12 +3127,12 @@ def get_google_maps_route():
         dest_lat = float(data['dest_lat'])
         dest_lng = float(data['dest_lng'])
         
-        print(f"\n🗺️  === FETCHING GOOGLE MAPS ROUTE ===")
-        print(f"   Route: ({start_lat}, {start_lng}) → ({dest_lat}, {dest_lng})")
+        console_logger.processing("Fetching Google Maps route")
+        console_logger.data(f"Route: ({start_lat}, {start_lng}) → ({dest_lat}, {dest_lng})")
         
         # Validate Google Maps service is initialized
         if not gmaps_service:
-            print(f"   ❌ Google Maps service not initialized")
+            console_logger.error("Google Maps service not initialized")
             return jsonify({
                 'success': False,
                 'error': 'Google Maps service not initialized. Check API key in .env'
@@ -3142,7 +3143,7 @@ def get_google_maps_route():
         
         if not google_route or not google_route.get('success'):
             error_msg = google_route.get('error') if google_route else 'Google Maps API call failed'
-            print(f"   ❌ Error: {error_msg}")
+            console_logger.error(f"Error: {error_msg}")
             return jsonify({
                 'success': False,
                 'error': f"Failed to fetch Google Maps route: {error_msg}"
@@ -3151,15 +3152,15 @@ def get_google_maps_route():
         google_coords = google_route.get('coordinates', [])
         
         if not google_coords:
-            print(f"   ❌ Google Maps returned no coordinates")
+            console_logger.error("Google Maps returned no coordinates")
             return jsonify({
                 'success': False,
                 'error': 'Google Maps route has no coordinates'
             })
         
-        print(f"   ✅ Google Maps route fetched: {len(google_coords)} points")
-        print(f"      Distance: {google_route.get('distance_meters', 'N/A')} meters")
-        print(f"      Duration: {google_route.get('duration_seconds', 'N/A')} seconds")
+        console_logger.success(f"Google Maps route fetched: {len(google_coords)} points")
+        console_logger.data(f"Distance: {google_route.get('distance_meters', 'N/A')} meters")
+        console_logger.data(f"Duration: {google_route.get('duration_seconds', 'N/A')} seconds")
         
         # Build response with route data
         result = {
@@ -3183,21 +3184,21 @@ def get_google_maps_route():
         
     except KeyError as e:
         error_msg = f"Missing required parameter: {str(e)}"
-        print(f"\n❌ {error_msg}")
+        console_logger.error(error_msg)
         return jsonify({
             'success': False,
             'error': error_msg
         })
     except ValueError as e:
         error_msg = f"Invalid parameter value: {str(e)}"
-        print(f"\n❌ {error_msg}")
+        console_logger.error(error_msg)
         return jsonify({
             'success': False,
             'error': error_msg
         })
     except Exception as e:
         import traceback
-        print(f"\n❌ Google Maps route fetch error: {str(e)}")
+        console_logger.error(f"Google Maps route fetch error: {str(e)}")
         traceback.print_exc()
         return jsonify({
             'success': False,
@@ -3304,7 +3305,7 @@ def fetch_here_traffic():
         
         # If apply_immediately, the files are already created
         if apply_immediately and total_edges > 0:
-            print(f"✅ Data updated: {total_edges} total edges (flow: {flow_metadata.get('total_edges', 0)}, incidents: {incident_metadata.get('total_edges', 0)})")
+            console_logger.success(f"Data updated: {total_edges} total edges (flow: {flow_metadata.get('total_edges', 0)}, incidents: {incident_metadata.get('total_edges', 0)})")
         
         return jsonify({
             'success': True,
@@ -3348,9 +3349,50 @@ def get_traffic_status():
         })
 
 
+@app.route('/get_settings', methods=['GET'])
+def get_settings():
+    """Get all persistent application settings"""
+    try:
+        settings = get_settings_manager()
+        all_settings = settings.get_all()
+        
+        return jsonify({
+            'success': True,
+            'settings': all_settings,
+            'message': 'Settings loaded successfully'
+        })
+    except Exception as e:
+        console_logger.error(f"Error retrieving settings: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
+
+@app.route('/reset_settings', methods=['POST'])
+def reset_settings():
+    """Reset all settings to defaults"""
+    try:
+        settings = get_settings_manager()
+        settings.reset_to_defaults()
+        console_logger.warning("All settings reset to defaults")
+        
+        return jsonify({
+            'success': True,
+            'settings': settings.get_all(),
+            'message': 'Settings reset to defaults'
+        })
+    except Exception as e:
+        console_logger.error(f"Error resetting settings: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
+
 @app.route('/set_auto_update_interval', methods=['POST'])
 def set_auto_update_interval():
-    """Set the auto-disruption update interval (1-30 minutes)"""
+    """Set the auto-disruption update interval (1-30 minutes) - SAVED PERSISTENTLY"""
     try:
         payload = request.get_json(silent=True) or {}
         requested_minutes = int(payload.get('interval_minutes', 2))
@@ -3361,27 +3403,34 @@ def set_auto_update_interval():
             return jsonify({'success': False, 'error': 'Auto-disruption service not initialized'}), 503
 
         actual_seconds = auto_service.set_update_interval(interval_minutes * 60)
+        console_logger.success(f"Update interval set to {interval_minutes} minutes (saved persistently)")
+        
         return jsonify({
             'success': True,
             'interval_seconds': actual_seconds,
             'interval_minutes': actual_seconds // 60,
-            'message': f'Update interval set to {actual_seconds // 60} minutes'
+            'message': f'Update interval saved: {interval_minutes} minutes (survives page refresh)'
         })
 
     except Exception as e:
+        console_logger.error(f"Error setting update interval: {e}")
         return jsonify({'success': False, 'error': str(e)}), 400
 
 
 if __name__ == '__main__':
-    # Print configuration summary
-    print(Config.get_config_summary())
+    # Print beautiful configuration summary
+    console_logger.config(Config.get_config_summary())
     
-    print("\n" + "="*80)
-    print("🔄 Auto-Disruption Service Status:")
-    print(f"   Update Interval: 120 seconds")
-    print(f"   Monitoring: Dynamic disruption files")
-    print(f"   Auto-recalculation: Enabled for active routes")
-    print("="*80 + "\n")
+    console_logger.info("Auto-Disruption Service")
+    console_logger.data(f"Update Interval: {auto_service.update_interval} seconds ({auto_service.update_interval // 60} minutes)")
+    console_logger.data("Monitoring: Dynamic disruption files (flow + incidents + user_incident)")
+    console_logger.data("Auto-recalculation: Enabled for active routes")
+    console_logger.data("Settings: Persistent (survives page refresh)")
+    
+    console_logger.info("Starting Flask Server")
+    console_logger.data(f"Environment: {Config.FLASK_ENV}")
+    console_logger.data(f"Debug: {Config.FLASK_DEBUG}")
+    console_logger.data(f"Address: http://{Config.FLASK_HOST}:{Config.FLASK_PORT}")
     
     # Start Flask server
     app.run(

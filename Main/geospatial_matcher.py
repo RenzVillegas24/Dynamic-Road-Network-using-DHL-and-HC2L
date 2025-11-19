@@ -8,6 +8,9 @@ import numpy as np
 from typing import Dict, List, Tuple, Optional, Set
 from pathlib import Path
 from dataclasses import dataclass
+from console_formatter import get_logger
+
+logger = get_logger("GeospatialMatcher")
 import math
 
 
@@ -53,7 +56,7 @@ class GeospatialMatcher:
             edges_csv: Path to edges CSV file
             nodes_csv: Path to nodes CSV file
         """
-        print(f"🗺️  Loading road network for geospatial matching...")
+        logger.processing("Loading road network for geospatial matching...")
         
         # Load edges and nodes
         self.edges_df = pd.read_csv(edges_csv)
@@ -79,7 +82,7 @@ class GeospatialMatcher:
         # Enrich edges with start/end coordinates
         self._enrich_edge_coordinates()
         
-        print(f"   ✅ Loaded {len(self.edges_df)} edges and {len(self.nodes_df)} nodes")
+        logger.success(f"Loaded {len(self.edges_df)} edges and {len(self.nodes_df)} nodes")
     
     def _enrich_edge_coordinates(self):
         """Add start/end coordinates to edges dataframe"""
@@ -104,7 +107,7 @@ class GeospatialMatcher:
         after_count = len(self.edges_df)
         
         if before_count > after_count:
-            print(f"   ℹ️  Removed {before_count - after_count} edges with missing coordinates")
+            logger.info(f"Removed {before_count - after_count} edges with missing coordinates")
     
     @staticmethod
     def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -404,18 +407,18 @@ def test_geospatial_matching():
         (14.61797, 121.001701)    # Third node
     ]
     
-    print("\n🧪 Testing geospatial matching...")
-    print(f"   Test coordinates: {len(test_coords)} points")
+    logger.processing("Testing geospatial matching...")
+    logger.info(f"Test coordinates: {len(test_coords)} points")
     
     matches = matcher.match_segment_to_edges(test_coords, max_distance=200.0)
     
-    print(f"\n   ✅ Found {len(matches)} matching edges:")
+    logger.success(f"Found {len(matches)} matching edges:")
     for i, match in enumerate(matches[:5], 1):
-        print(f"      {i}. Edge {match.source}→{match.target}")
-        print(f"         Highway: {match.highway_type}")
-        print(f"         Distance: {match.distance:.1f}m")
-        print(f"         Confidence: {match.confidence:.3f}")
-        print(f"         Length: {match.length:.1f}m")
+        logger.info(f"{i}. Edge {match.source}→{match.target}")
+        logger.info(f"   Highway: {match.highway_type}")
+        logger.info(f"   Distance: {match.distance:.1f}m")
+        logger.info(f"   Confidence: {match.confidence:.3f}")
+        logger.info(f"   Length: {match.length:.1f}m")
 
 
 if __name__ == '__main__':

@@ -25,9 +25,13 @@ from dotenv import load_dotenv
 
 from config import Config
 from incident_matcher import IncidentMatcher
+from console_formatter import get_logger
 
 # Load environment
 load_dotenv()
+
+# Get logger instance
+logger = get_logger("IncidentService")
 
 
 class IncidentService:
@@ -62,10 +66,10 @@ class IncidentService:
         self.output_dir = Config.INCIDENTS_DIR
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
-        print(f"✅ IncidentService initialized")
-        print(f"   API Key: {self.api_key[:10]}...")
-        print(f"   BBox: {self.bbox}")
-        print(f"   Output: {self.output_dir}")
+        logger.success("IncidentService initialized")
+        logger.info(f"API Key: {self.api_key[:10]}...")
+        logger.info(f"BBox: {self.bbox}")
+        logger.info(f"Output: {self.output_dir}")
     
     def fetch_incidents_data(self) -> List[Dict]:
         """Fetch real-time traffic incidents from HERE API"""
@@ -77,18 +81,18 @@ class IncidentService:
         )
         
         try:
-            print(f"🌐 Fetching incidents data from HERE API...")
+            logger.network("Fetching incidents data from HERE API...")
             response = requests.get(incidents_url, timeout=30)
             response.raise_for_status()
             
             data = response.json()
             results = data.get('results', [])
             
-            print(f"   ✅ Received {len(results)} incidents")
+            logger.success(f"Received {len(results)} incidents")
             return results
             
         except requests.RequestException as e:
-            print(f"   ❌ Error fetching incidents: {e}")
+            logger.error(f"Error fetching incidents: {e}")
             return []
     
     def generate_incident_data(self) -> Tuple[pd.DataFrame, Dict]:
@@ -98,9 +102,7 @@ class IncidentService:
         Returns:
             (DataFrame with incident edges, metadata dict)
         """
-        print(f"\n{'='*70}")
-        print(f"Generating Incident Data")
-        print(f"{'='*70}\n")
+        logger.processing("Generating Incident Data")
         
         incident_edges = []
         metadata = {
@@ -115,7 +117,7 @@ class IncidentService:
         metadata['incident_count'] = len(incident_results)
         
         if incident_results:
-            print(f"\n🔍 Matching incident data to OSM edges...")
+            logger.processing("Matching incident data to OSM edges...")
             incident_edges = self.matcher.batch_match_incidents(incident_results)
         
         # Convert to DataFrame
@@ -138,10 +140,10 @@ class IncidentService:
             metadata['total_edges'] = len(df)
             metadata['total_matched'] = len(df)  # Set total_matched to the number of matched edges
             
-            print(f"\n✅ Generated {len(df)} incident edges")
+            logger.success(f"Generated {len(df)} incident edges")
             return df, metadata
         else:
-            print(f"\n⚠️  No incident data matched")
+            logger.warning("No incident data matched")
             return pd.DataFrame(), metadata
     
     def save_incident_csv(self, df: pd.DataFrame) -> Path:
@@ -156,7 +158,7 @@ class IncidentService:
             Path to saved CSV file
         """
         if df.empty:
-            print(f"⚠️  No incident data to save")
+            logger.warning("No incident data to save")
             return None
         
         # Cleanup old files first (keep max 10)
@@ -172,7 +174,7 @@ class IncidentService:
         
         # Save CSV
         df.to_csv(filepath, index=False)
-        print(f"   💾 Saved Incident CSV: {filepath}")
+        logger.data(f"Saved Incident CSV: {filepath}")
         
         return filepath
     
@@ -191,9 +193,9 @@ class IncidentService:
             for old_file in files_to_remove:
                 try:
                     old_file.unlink()
-                    print(f"   🗑️  Removed old incident file: {old_file.name}")
+                    logger.info(f"Removed old incident file: {old_file.name}")
                 except Exception as e:
-                    print(f"   ⚠️  Failed to remove {old_file.name}: {e}")
+                    logger.warning(f"Failed to remove {old_file.name}: {e}")
     
     def fetch_and_save(self) -> Dict:
         """
@@ -210,9 +212,9 @@ class IncidentService:
             csv_path = self.save_incident_csv(df)
             metadata['csv_file'] = str(csv_path) if csv_path else None
             
-            print(f"\n📊 Summary:")
-            print(f"   Incidents: {metadata['incident_count']}")
-            print(f"   Total edges: {metadata['total_edges']}")
+            logger.data("Summary:")
+            logger.info(f"  Incidents: {metadata['incident_count']}")
+            logger.info(f"  Total edges: {metadata['total_edges']}")
         
         return metadata
     
@@ -223,11 +225,9 @@ class IncidentService:
         Args:
             interval: Update interval in seconds
         """
-        print(f"\n{'='*70}")
-        print(f"Starting Continuous Incident Service")
-        print(f"{'='*70}")
-        print(f"Update interval: {interval}s")
-        print(f"Press Ctrl+C to stop\n")
+        logger.processing("Starting Continuous Incident Service")
+        logger.info(f"Update interval: {interval}s")
+        logger.info("Press Ctrl+C to stop")
         
         try:
             while True:
@@ -235,11 +235,11 @@ class IncidentService:
                 self.fetch_and_save()
                 
                 # Wait for next update
-                print(f"\n⏱️  Waiting {interval}s for next update...")
+                logger.processing(f"Waiting {interval}s for next update...")
                 time.sleep(interval)
                 
         except KeyboardInterrupt:
-            print(f"\n\n🛑 Incident Service stopped by user")
+            logger.warning("Incident Service stopped by user")
 
 
 def main():

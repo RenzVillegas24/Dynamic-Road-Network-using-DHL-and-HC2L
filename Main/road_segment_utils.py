@@ -7,6 +7,10 @@ from math import radians, cos, sin, asin, sqrt
 import pandas as pd
 from typing import Tuple, Dict, Optional
 
+from console_formatter import get_logger
+
+logger = get_logger("RoadSegmentUtils")
+
 
 def haversine(lon1: float, lat1: float, lon2: float, lat2: float) -> float:
     """
@@ -206,7 +210,7 @@ def validate_road_connection(point: Tuple[float, float],
 
 # Test the functions
 if __name__ == "__main__":
-    print("Testing road segment utilities...")
+    logger.test("Testing road segment utilities...")
     
     # Test 1: Point between two nodes
     point = (14.6500, 121.0450)
@@ -214,32 +218,32 @@ if __name__ == "__main__":
     seg_end = (14.6502, 121.0455)
     
     projection, distance = project_point_to_segment(point, seg_start, seg_end)
-    print(f"\n✅ Test 1: Point projection")
-    print(f"   Point: {point}")
-    print(f"   Segment: {seg_start} → {seg_end}")
-    print(f"   Projection: {projection}")
-    print(f"   Distance: {distance:.2f}m")
+    logger.success("Test 1: Point projection")
+    logger.data(f"   Point: {point}")
+    logger.data(f"   Segment: {seg_start} → {seg_end}")
+    logger.data(f"   Projection: {projection}")
+    logger.data(f"   Distance: {distance:.2f}m")
     
     # Test 2: Point before segment start (should clamp to start)
     point2 = (14.6495, 121.0440)
     projection2, distance2 = project_point_to_segment(point2, seg_start, seg_end)
-    print(f"\n✅ Test 2: Point before segment (should clamp)")
-    print(f"   Point: {point2}")
-    print(f"   Projection: {projection2}")
-    print(f"   Distance: {distance2:.2f}m")
-    print(f"   Clamped to start: {abs(projection2[0] - seg_start[0]) < 0.0001}")
+    logger.success("Test 2: Point before segment (should clamp)")
+    logger.data(f"   Point: {point2}")
+    logger.data(f"   Projection: {projection2}")
+    logger.data(f"   Distance: {distance2:.2f}m")
+    logger.data(f"   Clamped to start: {abs(projection2[0] - seg_start[0]) < 0.0001}")
     
     # Test 3: Point after segment end (should clamp to end)
     point3 = (14.6505, 121.0460)
     projection3, distance3 = project_point_to_segment(point3, seg_start, seg_end)
-    print(f"\n✅ Test 3: Point after segment (should clamp)")
-    print(f"   Point: {point3}")
-    print(f"   Projection: {projection3}")
-    print(f"   Distance: {distance3:.2f}m")
-    print(f"   Clamped to end: {abs(projection3[0] - seg_end[0]) < 0.0001}")
+    logger.success("Test 3: Point after segment (should clamp)")
+    logger.data(f"   Point: {point3}")
+    logger.data(f"   Projection: {projection3}")
+    logger.data(f"   Distance: {distance3:.2f}m")
+    logger.data(f"   Clamped to end: {abs(projection3[0] - seg_end[0]) < 0.0001}")
     
     # Test 4: Validation tests
-    print(f"\n✅ Test 4: Validation")
+    logger.success("Test 4: Validation")
     test_cases = [
         ((14.6500, 121.0450), (14.6500, 121.0451), "Very close (30m)"),
         ((14.6500, 121.0450), (14.6501, 121.0450), "Close (100m)"),
@@ -249,6 +253,6 @@ if __name__ == "__main__":
     
     for point, road_point, desc in test_cases:
         result = validate_road_connection(point, road_point, max_snap_distance=500)
-        print(f"   {desc}: {result['warning_level']} - {result['message']}")
+        logger.data(f"   {desc}: {result['warning_level']} - {result['message']}")
     
-    print("\n✅ All basic tests complete!")
+    logger.success("All basic tests complete!")

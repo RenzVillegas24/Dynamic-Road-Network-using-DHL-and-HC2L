@@ -10,6 +10,10 @@ import math
 from typing import List, Dict, Tuple
 from dataclasses import dataclass
 
+from console_formatter import get_logger
+
+logger = get_logger("PointMatcher")
+
 
 @dataclass
 class Point:
@@ -155,40 +159,37 @@ def find_matches(flow_points: List[Tuple[Point, str]],
 
 def print_results(results: Dict):
     """Print the matching results in a formatted way"""
-    print("\n" + "="*80)
-    print("POINT MATCHING RESULTS")
-    print("="*80)
+    logger.info("="*80)
+    logger.info("POINT MATCHING RESULTS")
+    logger.info("="*80)
     
-    print(f"\nStatistics:")
-    print(f"  Total flow points: {results['total_flow_points']}")
-    print(f"  Total incident points: {results['total_incident_points']}")
-    print(f"  Matched incident records: {results['matched_incidents']}")
-    print(f"  Total point matches: {results['total_matches']}")
+    logger.data(f"Statistics:")
+    logger.data(f"  Total flow points: {results['total_flow_points']}")
+    logger.data(f"  Total incident points: {results['total_incident_points']}")
+    logger.data(f"  Matched incident records: {results['matched_incidents']}")
+    logger.data(f"  Total point matches: {results['total_matches']}")
     
-    print(f"\n{'-'*80}")
-    print("Detailed Matches:")
-    print(f"{'-'*80}\n")
+    logger.info(f"{'-'*80}")
+    logger.info("Detailed Matches:")
+    logger.info(f"{'-'*80}")
     
     for i, match in enumerate(results['matches'], 1):
-        print(f"Match #{i}:")
-        print(f"  Incident ID: {match['incident_id']}")
-        print(f"  Incident Type: {match['incident_type']}")
-        print(f"  Incident Description: {match['incident_description']}")
-        print(f"  Incident Coordinates: {match['incident_point']}")
-        print(f"  Flow Location: {match['flow_location']}")
-        print(f"  Flow Coordinates: {match['flow_point']}")
-        print(f"  Distance: {match['distance_meters']} meters")
-        print()
+        logger.data(f"Match #{i}:")
+        logger.data(f"  Incident ID: {match['incident_id']}")
+        logger.data(f"  Incident Type: {match['incident_type']}")
+        logger.data(f"  Incident Description: {match['incident_description']}")
+        logger.data(f"  Incident Coordinates: {match['incident_point']}")
+        logger.data(f"  Flow Location: {match['flow_location']}")
+        logger.data(f"  Flow Coordinates: {match['flow_point']}")
+        logger.data(f"  Distance: {match['distance_meters']} meters")
     
-    print(f"{'-'*80}")
-    print("Matches per Incident:")
-    print(f"{'-'*80}")
+    logger.info(f"{'-'*80}")
+    logger.info("Matches per Incident:")
+    logger.info(f"{'-'*80}")
     for incident_id, count in results['incident_matches_count'].items():
-        print(f"  Incident {incident_id}: {count} match(es)")
+        logger.data(f"  Incident {incident_id}: {count} match(es)")
     
-    print("\n" + "="*80)
-    print(f"SUMMARY: {results['total_matches']} total matches found")
-    print("="*80 + "\n")
+    logger.success(f"SUMMARY: {results['total_matches']} total matches found")
 
 
 def main():
@@ -200,34 +201,34 @@ def main():
     
     try:
         # Load JSON files
-        print("Loading flow data...")
+        logger.processing("Loading flow data...")
         with open(flow_file, 'r') as f:
             flow_data = json.load(f)
         
-        print("Loading incident data...")
+        logger.processing("Loading incident data...")
         with open(incident_file, 'r') as f:
             incident_data = json.load(f)
         
         # Extract points
-        print("Extracting flow points...")
+        logger.processing("Extracting flow points...")
         flow_points = extract_flow_points(flow_data)
         
-        print("Extracting incident points...")
+        logger.processing("Extracting incident points...")
         incident_points = extract_incident_points(incident_data)
         
         # Perform matching (distance threshold: 200 meters)
-        print("Matching points (threshold: 5 meters)...")
+        logger.processing("Matching points (threshold: 5 meters)...")
         results = find_matches(flow_points, incident_points, distance_threshold=5.0)
         
         # Print results
         print_results(results)
         
     except FileNotFoundError as e:
-        print(f"Error: File not found - {e}")
+        logger.error(f"File not found - {e}")
     except json.JSONDecodeError as e:
-        print(f"Error: Invalid JSON - {e}")
+        logger.error(f"Invalid JSON - {e}")
     except Exception as e:
-        print(f"Error: {e}")
+        logger.error(f"{e}")
 
 
 if __name__ == "__main__":

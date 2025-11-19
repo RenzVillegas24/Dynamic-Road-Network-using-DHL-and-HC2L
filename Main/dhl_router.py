@@ -30,11 +30,14 @@ ALGORITHM ARCHITECTURE:
 import subprocess
 import json
 import os
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List
 from road_name_mapper import RoadNameMapper
 from road_geometry_loader import RoadGeometryLoader
 from config import Config
-from geometry_utils import enhance_route_geometry
+from console_formatter import get_logger
+
+# Get logger instance
+logger = get_logger("DHLRouter")
 
 class DHLRouter:
     def __init__(self, cpp_executable_path: str = None):
@@ -62,8 +65,8 @@ class DHLRouter:
             mapping_path
         )
         
-        print(f"✅ Using DHL routing executable: {self.cpp_executable}")
-        print(f"✅ Road geometry loader initialized")
+        logger.success(f"Using DHL routing executable: {self.cpp_executable}")
+        logger.success("Road geometry loader initialized")
     
     def compute_route(self, 
                      start_pin_lat: float, start_pin_lng: float,
@@ -101,7 +104,7 @@ class DHLRouter:
             generate_alternatives: Whether to generate alternative routes (default True for backward compatibility)
         """
         try:
-            print(f"Executing DHL JSON API route computation...")
+            logger.processing("Executing DHL JSON API route computation...")
             
             # Build command with DHL argument structure
             # Args: 14 routing params + 3 data files + optional disruption_file + optional tau_threshold + optional generate_alternatives
@@ -134,26 +137,26 @@ class DHLRouter:
                         flow_files = sorted(flow_dir.glob('flow_*.csv'), key=lambda f: f.stat().st_mtime, reverse=True)
                         if flow_files:
                             latest_flow = flow_files[0]
-                            print(f"   ✅ Latest flow file: {latest_flow.name} (mtime: {latest_flow.stat().st_mtime})")
+                            logger.info(f"Latest flow file: {latest_flow.name} (mtime: {latest_flow.stat().st_mtime})")
                     
                     if incident_dir.exists():
                         incident_files = sorted(incident_dir.glob('incident_*.csv'), key=lambda f: f.stat().st_mtime, reverse=True)
                         if incident_files:
                             latest_incident = incident_files[0]
-                            print(f"   ✅ Latest incident file: {latest_incident.name} (mtime: {latest_incident.stat().st_mtime})")
+                            logger.info(f"Latest incident file: {latest_incident.name} (mtime: {latest_incident.stat().st_mtime})")
                 except Exception as e:
-                    print(f"   ⚠️  Could not verify disruption files: {e}")
+                    logger.warning(f"Could not verify disruption files: {e}")
                 
-                print(f"   📂 Adding disruption directory: {disruption_file}")
+                logger.info(f"Adding disruption directory: {disruption_file}")
                 cmd.append(str(disruption_file))
                 cmd.append(str(tau_threshold))
             else:
-                print(f"   ⚠️  No disruption directory passed (disruption_file={repr(disruption_file)})")
+                logger.warning(f"No disruption directory passed (disruption_file={repr(disruption_file)})")
             
             # Add generate_alternatives flag (pass 1 for True, 0 for False)
             cmd.append(str(1 if generate_alternatives else 0))
             
-            print(f"Command: {' '.join(cmd)}")
+            logger.processing(f"Command: {' '.join(cmd)}")
             
             result = subprocess.run(
                 cmd, 
@@ -162,9 +165,9 @@ class DHLRouter:
                 timeout=30
             )
             
-            print(f"DHL executable return code: {result.returncode}")
-            print(f"DHL stdout: {result.stdout[:500] if result.stdout else '(empty)'}")
-            print(f"DHL stderr: {result.stderr[:500] if result.stderr else '(empty)'}")
+            logger.info(f"DHL executable return code: {result.returncode}")
+            logger.info(f"DHL stdout: {result.stdout[:500] if result.stdout else '(empty)'}")
+            logger.info(f"DHL stderr: {result.stderr[:500] if result.stderr else '(empty)'}")
             
             if result.returncode != 0:
                 error_msg = result.stderr if result.stderr else result.stdout
@@ -206,10 +209,10 @@ class DHLRouter:
                 if disruption_analysis:
                     route_disruptions = disruption_analysis.get('route_disruptions', {})
                     time_impact = disruption_analysis.get('time_impact', {})
-                    print(f"🚧 DHL Disruption Analysis:")
-                    print(f"   ⚠️  Total disruptions on route: {route_disruptions.get('total_count', 0)}")
-                    print(f"   🚫 Road closures: {route_disruptions.get('closures', 0)}")
-                    print(f"   ⏱️  Added delay: {time_impact.get('added_delay_seconds', 0):.1f}s ({time_impact.get('percentage_increase', 0):.1f}%)")
+                    logger.warning("DHL Disruption Analysis:")
+                    logger.info(f"Total disruptions on route: {route_disruptions.get('total_count', 0)}")
+                    logger.info(f"Road closures: {route_disruptions.get('closures', 0)}")
+                    logger.info(f"Added delay: {time_impact.get('added_delay_seconds', 0):.1f}s ({time_impact.get('percentage_increase', 0):.1f}%)")
                 
                 # Convert DHL JSON output to our route format
                 parsed_data = self._convert_dhl_to_route_format(dhl_data)
@@ -248,7 +251,7 @@ class DHLRouter:
         coordinates = []
         if api_geometry:
             # Use geometry from C++ API (already includes road curves from CSV)
-            print(f"📍 Using geometry from C++ DHL API: {len(api_geometry)} edge segments")
+            logger.info(f"Using geometry from C++ DHL API: {len(api_geometry)} edge segments")
             
             # Convert C++ API geometry format to coordinate list
             # API format: [{"from": 1, "to": 2, "coordinates": [[lon, lat], ...]}, ...]
@@ -261,7 +264,7 @@ class DHLRouter:
                             'lng': coord_pair[0]   # lon is first
                         })
             
-            print(f"✅ Extracted {len(coordinates)} GPS coordinates from C++ DHL API geometry")
+            logger.success(f"Extracted {len(coordinates)} GPS coordinates from C++ DHL API geometry")
             
             # Get path summary from edges (for statistics)
             if path_nodes and self.geometry_loader:
@@ -275,22 +278,22 @@ class DHLRouter:
                 
         elif path_nodes:
             # Fallback: C++ API didn't provide geometry (old version or error)
-            print(f"⚠️  C++ DHL API didn't provide geometry, using fallback method")
-            print(f"📍 Getting road network coordinates for {len(path_nodes)} DHL nodes")
+            logger.warning("C++ DHL API didn't provide geometry, using fallback method")
+            logger.info(f"Getting road network coordinates for {len(path_nodes)} DHL nodes")
             
             # Get coordinates following actual edges with geometry from CSV
             coordinates = self.geometry_loader.get_path_coordinates(path_nodes, use_osm_geometry=True)
             
-            print(f"📍 DHL route has {len(coordinates)} points following road network (with curves)")
+            logger.info(f"DHL route has {len(coordinates)} points following road network (with curves)")
             
             # Validate the path
             is_valid, validation_message = self.geometry_loader.validate_path(path_nodes)
             if not is_valid:
-                print(f"⚠️  Warning: DHL path validation: {validation_message}")
+                logger.warning(f"DHL path validation: {validation_message}")
             
             # Get path summary
             path_summary = self.geometry_loader.get_path_summary(path_nodes)
-            print(f"📊 DHL path summary: {path_summary['total_distance_m']:.1f}m over {path_summary['num_segments']} segments")
+            logger.data(f"DHL path summary: {path_summary['total_distance_m']:.1f}m over {path_summary['num_segments']} segments")
         
         # Create route data structure with enhanced metrics from API
         # CRITICAL FIX: Pass through ALL C++ fields to preserve labeling_info, dhl_update_info, disruptions_summary, etc.
@@ -320,7 +323,7 @@ class DHLRouter:
         
         # Create polylines from coordinates
         if len(coordinates) >= 2:
-            print(f"📍 DHL route has {len(coordinates)} coordinate points")
+            logger.info(f"DHL route has {len(coordinates)} coordinate points")
             
             # Apply minimal interpolation if needed (only for very long gaps)
             from geometry_utils import enhance_route_geometry
@@ -330,7 +333,7 @@ class DHLRouter:
                 preserve_node_ids=False
             )
             
-            print(f"✅ Final DHL route with {len(interpolated_coordinates)} GPS coordinates")
+            logger.success(f"Final DHL route with {len(interpolated_coordinates)} GPS coordinates")
             
             # Update coordinates with interpolated version
             route_data['route']['coordinates'] = interpolated_coordinates
@@ -397,20 +400,20 @@ class DHLRouter:
                                 'lng': lng
                             })
                         else:
-                            print(f"Warning: Invalid coordinate format in '{entry}': {coord_parts}")
+                            logger.warning(f"Invalid coordinate format in '{entry}': {coord_parts}")
                         
                     except (ValueError, IndexError) as e:
-                        print(f"Warning: Could not parse entry '{entry}': {e}")
+                        logger.warning(f"Could not parse entry '{entry}': {e}")
                         continue
                 else:
-                    print(f"Warning: No coordinates found in entry '{entry}'")
+                    logger.warning(f"No coordinates found in entry '{entry}'")
             
             # Verify we got all the nodes we expected
             if len(coordinates) != len(node_ids):
-                print(f"Warning: Expected {len(node_ids)} nodes but extracted {len(coordinates)} coordinates")
+                logger.warning(f"Expected {len(node_ids)} nodes but extracted {len(coordinates)} coordinates")
             
         except Exception as e:
-            print(f"Error extracting coordinates from trace: {e}")
+            logger.error(f"Error extracting coordinates from trace: {e}")
             coordinates = []
         
         return coordinates
@@ -453,10 +456,10 @@ class DHLRouter:
                             'lng': coord_data[node_id]['lng']
                         })
                     else:
-                        print(f"Warning: Node {node_id} not found in coordinate data")
+                        logger.warning(f"Node {node_id} not found in coordinate data")
             
         except Exception as e:
-            print(f"Error loading coordinates: {e}")
+            logger.error(f"Error loading coordinates: {e}")
         
         return coordinates
     
@@ -496,10 +499,10 @@ class DHLRouter:
             path_nodes = route_data['route']['path_nodes']
             
             if len(path_nodes) < 2:
-                print("⚠️  Warning: Path has less than 2 nodes, cannot generate road names")
+                logger.warning("Path has less than 2 nodes, cannot generate road names")
                 return route_data
             
-            print(f"🛣️  Enhancing DHL route with road names for {len(path_nodes)} nodes...")
+            logger.processing(f"Enhancing DHL route with road names for {len(path_nodes)} nodes...")
             
             # Get road segments with names using RoadNameMapper
             road_segments = self.road_mapper.get_route_with_road_names(path_nodes)
@@ -530,11 +533,11 @@ class DHLRouter:
                             'instruction': road_segments[i]['instruction']
                         })
             
-            print(f"✅ Enhanced DHL route with {len(road_segments)} road segments")
-            print(f"🛣️  Route summary: {route_summary}")
+            logger.success(f"Enhanced DHL route with {len(road_segments)} road segments")
+            logger.info(f"Route summary: {route_summary}")
             
         except Exception as e:
-            print(f"⚠️  Warning: Failed to enhance DHL route with road names: {e}")
+            logger.warning(f"Failed to enhance DHL route with road names: {e}")
         
         return route_data
     
@@ -627,7 +630,7 @@ class DHLRouter:
                 'bytes_per_node': round(metrics.get('labeling_size_bytes', 0) / max(metrics.get('graph_nodes', 1), 1), 2)
             }
         }
-        print(f"📝 DHL route summary: {summary}")
+        logger.data(f"DHL route summary: {summary}")
         return summary
     
     def compare_routes(self, start_lat: float, start_lng: float, 
@@ -635,11 +638,11 @@ class DHLRouter:
         """Compare routes with and without disruptions"""
         try:
             # Compute route without disruptions
-            print("Computing DHL route without disruptions...")
+            logger.processing("Computing DHL route without disruptions...")
             base_route = self.compute_route(start_lat, start_lng, dest_lat, dest_lng, use_disruptions=False)
             
             # Compute route with disruptions
-            print("Computing DHL route with disruptions...")
+            logger.processing("Computing DHL route with disruptions...")
             disrupted_route = self.compute_route(start_lat, start_lng, dest_lat, dest_lng, use_disruptions=True)
             
             if not base_route['success']:
@@ -701,77 +704,77 @@ class DHLRouter:
 # Test function
 if __name__ == "__main__":
     # Test with automatic path detection
-    print("🧪 Testing DHL Router with automatic path detection...")
+    logger.processing("Testing DHL Router with automatic path detection...")
     
     try:
         router = DHLRouter()  # No path specified - will auto-detect
         
-        print("Testing DHL Router with new JSON API...")
+        logger.processing("Testing DHL Router with new JSON API...")
         result = router.compute_route(14.6760, 121.0437, 14.6348, 121.0480, use_disruptions=False)
         
         if result['success']:
-            print("✅ DHL JSON API route computation successful!")
-            print(f"Metrics: {result['metrics']}")
-            print(f"Route nodes: {len(result['route']['path_nodes'])}")
-            print(f"Coordinates: {len(result['route']['coordinates'])}")
+            logger.success("DHL JSON API route computation successful!")
+            logger.info(f"Metrics: {result['metrics']}")
+            logger.info(f"Route nodes: {len(result['route']['path_nodes'])}")
+            logger.info(f"Coordinates: {len(result['route']['coordinates'])}")
             
             # Test polyline generation
             polylines = router.get_route_polylines_for_gmaps(result)
-            print(f"Generated {len(polylines)} polylines for Google Maps")
+            logger.info(f"Generated {len(polylines)} polylines for Google Maps")
             
             # Test summary
             summary = router.get_route_summary(result)
-            print(f"Route summary: {summary}")
+            logger.info(f"Route summary: {summary}")
             
             # Test NEW road name and turn-by-turn direction features
-            print("\n🛣️  Testing road name mapping and turn-by-turn directions...")
+            logger.processing("Testing road name mapping and turn-by-turn directions...")
             
             # Get turn-by-turn directions
             directions = router.get_turn_by_turn_directions(result)
-            print(f"✅ Generated {len(directions)} turn-by-turn directions:")
+            logger.success(f"Generated {len(directions)} turn-by-turn directions:")
             for i, direction in enumerate(directions[:5]):  # Show first 5 directions
-                print(f"   {direction}")
+                logger.info(f"  {direction}")
             if len(directions) > 5:
-                print(f"   ... and {len(directions) - 5} more directions")
+                logger.info(f"  ... and {len(directions) - 5} more directions")
             
             # Get route summary with road names
             route_summary = router.get_route_summary_text(result)
-            print(f"\n🗺️  Route summary with road names:")
-            print(f"   {route_summary}")
+            logger.info("Route summary with road names:")
+            logger.info(f"  {route_summary}")
             
             # Get detailed route information
             detailed_info = router.get_detailed_route_info(result)
             if detailed_info.get('success'):
-                print(f"\n📊 Detailed route information:")
-                print(f"   Total nodes: {detailed_info['total_nodes']}")
-                print(f"   Total road segments: {detailed_info['total_road_segments']}")
-                print(f"   Total instructions: {detailed_info['total_instructions']}")
+                logger.data("Detailed route information:")
+                logger.info(f"  Total nodes: {detailed_info['total_nodes']}")
+                logger.info(f"  Total road segments: {detailed_info['total_road_segments']}")
+                logger.info(f"  Total instructions: {detailed_info['total_instructions']}")
                 
                 # Show some road segments
                 road_segments = detailed_info.get('road_segments', [])
                 if road_segments:
-                    print(f"\n🛣️  Road segments preview:")
+                    logger.info("Road segments preview:")
                     for i, segment in enumerate(road_segments[:3]):  # Show first 3 segments
-                        print(f"   {i+1}. {segment.get('road_name', 'Unknown')} ({segment.get('highway_type', 'unknown')})")
-                        print(f"      {segment.get('instruction', 'No instruction')}")
+                        logger.info(f"  {i+1}. {segment.get('road_name', 'Unknown')} ({segment.get('highway_type', 'unknown')})")
+                        logger.info(f"     {segment.get('instruction', 'No instruction')}")
                     if len(road_segments) > 3:
-                        print(f"   ... and {len(road_segments) - 3} more segments")
+                        logger.info(f"  ... and {len(road_segments) - 3} more segments")
             
             # Test comparison
-            print("\n🔄 Testing route comparison...")
+            logger.processing("Testing route comparison...")
             comparison = router.compare_routes(14.6760, 121.0437, 14.6507, 121.0323)
             if comparison['success']:
-                print("✅ Route comparison successful!")
-                print(f"Comparison metrics: {comparison['comparison_metrics']}")
+                logger.success("Route comparison successful!")
+                logger.info(f"Comparison metrics: {comparison['comparison_metrics']}")
             else:
-                print(f"❌ Route comparison failed: {comparison['error']}")
+                logger.error(f"Route comparison failed: {comparison['error']}")
         else:
-            print("❌ DHL JSON API route computation failed:")
-            print(result['error'])
+            logger.error("DHL JSON API route computation failed:")
+            logger.error(result['error'])
             
     except FileNotFoundError as e:
-        print(f"❌ DHL Router initialization failed: {e}")
-        print("Please build the DHL project first.")
-        print("Build command: cd ../DHL && make dhl_routing_json_api")
+        logger.error(f"DHL Router initialization failed: {e}")
+        logger.info("Please build the DHL project first.")
+        logger.info("Build command: cd ../DHL && make dhl_routing_json_api")
     except Exception as e:
-        print(f"❌ Unexpected error: {e}")
+        logger.error(f"Unexpected error: {e}")

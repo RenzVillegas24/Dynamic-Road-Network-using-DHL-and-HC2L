@@ -30,9 +30,13 @@ sys.path.insert(0, str(MAIN_DIR))
 from config import Config
 from flow_service import FlowService
 from incident_service import IncidentService
+from console_formatter import get_logger
 
 # Load environment
 load_dotenv()
+
+# Get logger instance
+logger = get_logger("UnifiedDataGenerator")
 
 
 def check_and_generate_graph():
@@ -46,27 +50,24 @@ def check_and_generate_graph():
     missing_files = [f for f in required_files if not f.exists()]
     
     if missing_files:
-        print("\n" + "="*70)
-        print("⚠️  OSM GRAPH FILES MISSING")
-        print("="*70)
-        print("\nMissing files:")
+        logger.warning("OSM GRAPH FILES MISSING")
+        logger.info("Missing files:")
         for f in missing_files:
-            print(f"  ❌ {f}")
-        print()
+            logger.error_validation(f"Missing: {f}")
         
         response = input("Would you like to download and generate the OSM graph now? (Y/n): ").strip().lower()
         
         if response in ['', 'y', 'yes']:
-            print("\n🚀 Starting OSM graph generation...")
-            print("This will download OpenStreetMap data for Quezon City.")
-            print("This may take 5-10 minutes depending on your internet connection.\n")
+            logger.processing("Starting OSM graph generation...")
+            logger.info("This will download OpenStreetMap data for Quezon City.")
+            logger.time("This may take 5-10 minutes depending on your internet connection.")
             
             try:
                 # Run osm_graph_generator.py
                 generator_script = SCRIPT_DIR / "osm_graph_generator.py"
                 
                 if not generator_script.exists():
-                    print(f"❌ Error: {generator_script} not found!")
+                    logger.error(f"Generator script not found: {generator_script}")
                     return False
                 
                 # Use conda python if available
@@ -82,24 +83,23 @@ def check_and_generate_graph():
                 )
                 
                 if result.returncode == 0:
-                    print("\n✅ Graph generation completed successfully!")
+                    logger.success("Graph generation completed successfully!")
                     return True
                 else:
-                    print(f"\n❌ Graph generation failed with code {result.returncode}")
+                    logger.error(f"Graph generation failed with code {result.returncode}")
                     return False
                     
             except subprocess.CalledProcessError as e:
-                print(f"\n❌ Error generating graph: {e}")
+                logger.error(f"Error generating graph: {e}")
                 return False
             except Exception as e:
-                print(f"\n❌ Unexpected error: {e}")
+                logger.error(f"Unexpected error: {e}")
                 import traceback
                 traceback.print_exc()
                 return False
         else:
-            print("\n❌ Cannot proceed without OSM graph files.")
-            print("\nTo generate manually, run:")
-            print("  python osm_graph_generator.py")
+            logger.error("Cannot proceed without OSM graph files.")
+            logger.info("To generate manually, run: python osm_graph_generator.py")
             return False
     
     return True
@@ -120,48 +120,44 @@ def main():
     args = parser.parse_args()
     
     # First, check if OSM graph exists
-    print("🔍 Checking for required OSM graph files...")
+    logger.processing("Checking for required OSM graph files...")
     if not check_and_generate_graph():
-        print("\n❌ Exiting: OSM graph files are required")
+        logger.error("Exiting: OSM graph files are required")
         return 1
     
-    print("\n" + "="*70)
-    print("Unified Data Generator - Separated Flow and Incident Services")
-    print("="*70)
-    print(f"Mode: {args.mode}")
-    print(f"Output:")
-    print(f"  - Flow data: {Config.FLOW_DIR}")
-    print(f"  - Incident data: {Config.INCIDENTS_DIR}")
-    print("="*70 + "\n")
+    logger.info(f"Mode: {args.mode}")
+    logger.config(f"Output directories:")
+    logger.info(f"  Flow data: {Config.FLOW_DIR}")
+    logger.info(f"  Incident data: {Config.INCIDENTS_DIR}")
     
     try:
         # Generate flow data if requested
         if args.mode in ['flow', 'both']:
-            print("📊 Generating flow data...")
+            logger.data("Generating flow data...")
             flow_service = FlowService()
             flow_metadata = flow_service.fetch_and_save()
-            print(f"✅ Flow data completed")
-            print(f"   CSV: {flow_metadata.get('csv_file', 'N/A')}")
-            print(f"   Edges: {flow_metadata.get('total_edges', 0)}\n")
+            logger.success("Flow data completed")
+            logger.info(f"   CSV: {flow_metadata.get('csv_file', 'N/A')}")
+            logger.info(f"   Edges: {flow_metadata.get('total_edges', 0)}")
         
         # Generate incident data if requested
         if args.mode in ['incidents', 'both']:
-            print("🚨 Generating incident data...")
+            logger.incident("Generating incident data...")
             incident_service = IncidentService()
             incident_metadata = incident_service.fetch_and_save()
-            print(f"✅ Incident data completed")
-            print(f"   CSV: {incident_metadata.get('csv_file', 'N/A')}")
-            print(f"   Matched: {incident_metadata.get('total_matched', 0)}\n")
+            logger.success("Incident data completed")
+            logger.info(f"   CSV: {incident_metadata.get('csv_file', 'N/A')}")
+            logger.info(f"   Matched: {incident_metadata.get('total_matched', 0)}")
         
-        print(f"✅ Done!")
-        print(f"   Use UI refresh button for updates (no auto-refresh)")
+        logger.success("Data generation completed!")
+        logger.info("Use UI refresh button for updates (no auto-refresh)")
         
     except ValueError as e:
-        print(f"❌ Error: {e}")
-        print("Make sure HERE_API_KEY is set in your .env file")
+        logger.error(f"Configuration error: {e}")
+        logger.info("Make sure HERE_API_KEY is set in your .env file")
         return 1
     except Exception as e:
-        print(f"❌ Unexpected error: {e}")
+        logger.error(f"Unexpected error: {e}")
         import traceback
         traceback.print_exc()
         return 1

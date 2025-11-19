@@ -18,6 +18,11 @@ from math import radians, cos, sin, asin, sqrt
 from typing import Tuple, Optional, Dict, Set, List
 from collections import defaultdict
 
+from console_formatter import get_logger
+
+# Initialize logger
+logger = get_logger("AccessibleNodeFinder")
+
 
 def haversine(lon1: float, lat1: float, lon2: float, lat2: float) -> float:
     """Calculate distance between two points on Earth in meters"""
@@ -49,8 +54,8 @@ class AccessibleNodeFinder:
         # Build adjacency lists for connectivity analysis
         self._build_adjacency_lists()
         
-        print(f"✅ Loaded {len(self.nodes_df)} nodes and {len(self.edges_df)} edges")
-        print(f"   One-way edges: {len(self.edges_df[self.edges_df['oneway'] != 0])}")
+        logger.success(f"Loaded {len(self.nodes_df)} nodes and {len(self.edges_df)} edges")
+        logger.data(f"   One-way edges: {len(self.edges_df[self.edges_df['oneway'] != 0])}")
     
     def _build_adjacency_lists(self):
         """
@@ -310,10 +315,10 @@ class AccessibleNodeFinder:
 
 # Testing
 if __name__ == "__main__":
-    print("=" * 70)
-    print("Testing Accessible Node Finder")
-    print("=" * 70)
-    print()
+    logger.info("=" * 70)
+    logger.info("Testing Accessible Node Finder")
+    logger.info("=" * 70)
+    logger.info("")
     
     # Initialize
     nodes_path = "data/raw/quezon_city_nodes.csv"
@@ -325,45 +330,45 @@ if __name__ == "__main__":
     test_lat = 14.6538
     test_lng = 121.0685
     
-    print()
-    print("Test 1: Finding START node")
-    print("-" * 70)
+    logger.info("")
+    logger.test("Finding START node")
+    logger.info("-" * 70)
     start_id, start_dist, start_meta = finder.find_nearest_accessible_node(
         test_lat, test_lng, is_start_point=True
     )
-    print(f"   Location: ({test_lat}, {test_lng})")
-    print(f"   Selected Node: {start_id}")
-    print(f"   Distance: {start_dist:.1f}m")
-    print(f"   Outgoing edges: {start_meta['outgoing_count']}")
-    print(f"   Incoming edges: {start_meta['incoming_count']}")
-    print(f"   Reason: {start_meta['selection_reason']}")
+    logger.data(f"   Location: ({test_lat}, {test_lng})")
+    logger.data(f"   Selected Node: {start_id}")
+    logger.data(f"   Distance: {start_dist:.1f}m")
+    logger.data(f"   Outgoing edges: {start_meta['outgoing_count']}")
+    logger.data(f"   Incoming edges: {start_meta['incoming_count']}")
+    logger.data(f"   Reason: {start_meta['selection_reason']}")
     
-    print()
-    print("Test 2: Finding DESTINATION node")
-    print("-" * 70)
+    logger.info("")
+    logger.test("Finding DESTINATION node")
+    logger.info("-" * 70)
     dest_id, dest_dist, dest_meta = finder.find_nearest_accessible_node(
         test_lat, test_lng, is_start_point=False
     )
-    print(f"   Location: ({test_lat}, {test_lng})")
-    print(f"   Selected Node: {dest_id}")
-    print(f"   Distance: {dest_dist:.1f}m")
-    print(f"   Outgoing edges: {dest_meta['outgoing_count']}")
-    print(f"   Incoming edges: {dest_meta['incoming_count']}")
-    print(f"   Reason: {dest_meta['selection_reason']}")
+    logger.data(f"   Location: ({test_lat}, {test_lng})")
+    logger.data(f"   Selected Node: {dest_id}")
+    logger.data(f"   Distance: {dest_dist:.1f}m")
+    logger.data(f"   Outgoing edges: {dest_meta['outgoing_count']}")
+    logger.data(f"   Incoming edges: {dest_meta['incoming_count']}")
+    logger.data(f"   Reason: {dest_meta['selection_reason']}")
     
-    print()
-    print("Test 3: Node Information Lookup")
-    print("-" * 70)
+    logger.info("")
+    logger.test("Node Information Lookup")
+    logger.info("-" * 70)
     if start_id:
         info = finder.get_node_info(start_id)
-        print(f"   Node {start_id}:")
-        print(f"   - Can be start: {info['can_be_start']}")
-        print(f"   - Can be destination: {info['can_be_destination']}")
-        print(f"   - Is dead end: {info['is_dead_end']}")
-        print(f"   - Outgoing neighbors: {info['outgoing_neighbors'][:5]}...")
-        print(f"   - Incoming neighbors: {info['incoming_neighbors'][:5]}...")
+        logger.data(f"   Node {start_id}:")
+        logger.data(f"   - Can be start: {info['can_be_start']}")
+        logger.data(f"   - Can be destination: {info['can_be_destination']}")
+        logger.data(f"   - Is dead end: {info['is_dead_end']}")
+        logger.data(f"   - Outgoing neighbors: {info['outgoing_neighbors'][:5]}...")
+        logger.data(f"   - Incoming neighbors: {info['incoming_neighbors'][:5]}...")
     
-    print()
-    print("=" * 70)
-    print("✅ Tests complete!")
-    print("=" * 70)
+    logger.info("")
+    logger.info("=" * 70)
+    logger.success("Tests complete!")
+    logger.info("=" * 70)

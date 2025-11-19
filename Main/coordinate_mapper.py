@@ -6,6 +6,9 @@ import os
 from typing import Optional, Dict, Tuple
 from functools import lru_cache
 from datetime import datetime, timedelta
+from console_formatter import get_logger
+
+logger = get_logger("CoordinateMapper")
 import time
 
 def haversine(lon1, lat1, lon2, lat2):
@@ -38,12 +41,12 @@ class NodeMapper:
             edges_csv_path = nodes_csv_path.replace('nodes.csv', 'edges.csv')
             if os.path.exists(edges_csv_path):
                 self.osm_snapper = OSMRoadSnapper(edges_csv_path, nodes_csv_path)
-                print("✅ OSM road-aware snapping enabled (CSV-based)")
+                logger.success("OSM road-aware snapping enabled (CSV-based)")
             else:
-                print(f"⚠️  Edges CSV file not found at {edges_csv_path}")
+                logger.warning(f"Edges CSV file not found at {edges_csv_path}")
                 self.osm_snapper = None
         except Exception as e:
-            print(f"⚠️  Could not initialize OSM road snapper: {e}")
+            logger.warning(f"Could not initialize OSM road snapper: {e}")
             import traceback
             traceback.print_exc()
             self.osm_snapper = None
@@ -54,12 +57,12 @@ class NodeMapper:
             try:
                 from accessible_node_finder import AccessibleNodeFinder
                 self.accessible_finder = AccessibleNodeFinder(nodes_csv_path, edges_csv_path)
-                print("✅ One-way street aware node finding enabled")
+                logger.success("One-way street aware node finding enabled")
             except Exception as e:
-                print(f"⚠️  Could not initialize one-way aware finder: {e}")
+                logger.warning(f"Could not initialize one-way aware finder: {e}")
                 self.accessible_finder = None
         else:
-            print(f"⚠️  Edges file not found, one-way awareness disabled")
+            logger.warning(f"Edges file not found, one-way awareness disabled")
             self.accessible_finder = None
         
     def find_nearest_node(self, lat, lng, max_distance_m=500, is_start_point=None):
@@ -84,7 +87,7 @@ class NodeMapper:
             )
             
             if not metadata['accessible']:
-                print(f"⚠️  {metadata['selection_reason']}")
+                logger.warning(f"{metadata['selection_reason']}")
             
             return node_id, distance, metadata
         
@@ -146,7 +149,7 @@ class NodeMapper:
             return result
             
         except Exception as e:
-            print(f"Error in snap_to_nearest_road: {e}")
+            logger.error(f"Error in snap_to_nearest_road: {e}")
             import traceback
             traceback.print_exc()
             return None
@@ -175,7 +178,7 @@ class NodeMapper:
             if age_seconds < self.snap_cache_ttl_seconds:
                 self.cache_hits += 1
                 if self.cache_hits % 10 == 0:
-                    print(f"🚀 Snap cache stats: {self.cache_hits} hits, {self.cache_misses} misses")
+                    logger.data(f"Snap cache stats: {self.cache_hits} hits, {self.cache_misses} misses")
                 return result
             else:
                 # Remove expired entry
@@ -203,7 +206,7 @@ class NodeMapper:
             
             for key, _ in entries_by_age[:len(entries_by_age)//4]:
                 del self.snap_cache[key]
-            print(f"🧹 Cleaned snap cache: now {len(self.snap_cache)} entries")
+            logger.info(f"Cleaned snap cache: now {len(self.snap_cache)} entries")
     
     def snap_to_osm_road(
         self, 
@@ -251,7 +254,7 @@ class NodeMapper:
         # CHECK CACHE FIRST - Huge performance improvement!
         cached_result = self._check_snap_cache(lat, lng, max_distance_m)
         if cached_result is not None:
-            print(f"✨ Cache hit: ({lat:.6f}, {lng:.6f}) - saved geometry calculations")
+            logger.data(f"Cache hit: ({lat:.6f}, {lng:.6f}) - saved geometry calculations")
             return cached_result
         
         # Try OSM-based snapping first if available
@@ -283,20 +286,20 @@ class NodeMapper:
                         # Add warning if we had to expand search
                         if search_dist > max_distance_m:
                             result['metadata']['warning'] = f'Expanded search to {search_dist}m to find nearest road'
-                            print(f"⚠️  Expanded search to {search_dist}m to find road: {result['road_name']}")
+                            logger.warning(f"Expanded search to {search_dist}m to find road: {result.get('road_name', 'Unknown')}")
                         
                         # STORE IN CACHE before returning
                         self._store_snap_cache(lat, lng, max_distance_m, result)
                         
                         return result
                 except Exception as e:
-                    print(f"⚠️  OSM snapping failed at {search_dist}m: {e}")
+                    logger.warning(f"OSM snapping failed at {search_dist}m: {e}")
                     continue
             
             # If we still haven't found anything, log error
-            print(f"❌ Critical: Could not find any OSM road even with 1000m radius")
+            logger.error(f"Critical: Could not find any OSM road even with 1000m radius")
         else:
-            print(f"❌ OSM snapper not initialized - cannot perform road-aware snapping")
+            logger.error(f"OSM snapper not initialized - cannot perform road-aware snapping")
         
         return None
     

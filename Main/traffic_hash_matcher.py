@@ -30,6 +30,9 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass
 
+from console_formatter import get_logger
+
+logger = get_logger("TrafficHashMatcher")
 
 @dataclass
 class TrafficEdge:
@@ -119,12 +122,12 @@ class TrafficHashMatcher:
         
         self._load_matched_edges()
         
-        print(f"✅ TrafficHashMatcher initialized: {len(self.hash_to_edges)} unique traffic hashes, "
-              f"{sum(len(edges) for edges in self.hash_to_edges.values())} total edges")
+        logger.success(f"TrafficHashMatcher initialized: {len(self.hash_to_edges)} unique traffic hashes, "
+                      f"{sum(len(edges) for edges in self.hash_to_edges.values())} total edges")
     
     def _load_edge_attributes(self, edges_csv: Path) -> Dict:
         """Load highway_type and road_name from OSM edges CSV"""
-        print(f"📂 Loading OSM edge attributes from {edges_csv}...")
+        logger.file_op(f"Loading OSM edge attributes from {edges_csv}...")
         
         edge_attrs = {}
         try:
@@ -140,13 +143,13 @@ class TrafficHashMatcher:
                     'highway_type': highway,
                     'road_name': str(row.get('road_name', '')).strip()
                 }
-            print(f"   Loaded attributes for {len(edge_attrs)} OSM edges (sequential IDs)")
+            logger.data(f"Loaded attributes for {len(edge_attrs)} OSM edges (sequential IDs)")
             # Debug: show a sample
             if edge_attrs:
                 sample_key = list(edge_attrs.keys())[0]
-                print(f"   Sample: {sample_key} -> {edge_attrs[sample_key]}")
+                logger.data(f"Sample: {sample_key} -> {edge_attrs[sample_key]}")
         except Exception as e:
-            print(f"   ⚠️  Could not load edge attributes: {e}")
+            logger.warning(f"Could not load edge attributes: {e}")
             import traceback
             traceback.print_exc()
         
@@ -159,7 +162,7 @@ class TrafficHashMatcher:
         Returns:
             Dict mapping OSM ID -> Sequential ID
         """
-        print(f"📂 Loading OSM->Sequential ID mapping from {edges_csv}...")
+        logger.file_op(f"Loading OSM->Sequential ID mapping from {edges_csv}...")
         
         osm_to_seq = {}
         try:
@@ -177,14 +180,14 @@ class TrafficHashMatcher:
                     seq_target = int(row['target'])
                     osm_to_seq[osm_target] = seq_target
             
-            print(f"   Loaded {len(osm_to_seq)} OSM->Sequential ID mappings")
+            logger.data(f"Loaded {len(osm_to_seq)} OSM->Sequential ID mappings")
             # Debug: show a sample
             if osm_to_seq:
                 sample_osm = list(osm_to_seq.keys())[0]
-                print(f"   Sample: OSM {sample_osm} -> Sequential {osm_to_seq[sample_osm]}")
+                logger.data(f"Sample: OSM {sample_osm} -> Sequential {osm_to_seq[sample_osm]}")
         except Exception as e:
-            print(f"   ⚠️  Could not load OSM->Sequential mapping: {e}")
-            print(f"   ⚠️  Will use OSM IDs directly (may cause issues in C++ routing)")
+            logger.warning(f"Could not load OSM->Sequential mapping: {e}")
+            logger.warning(f"Will use OSM IDs directly (may cause issues in C++ routing)")
             import traceback
             traceback.print_exc()
         
@@ -196,7 +199,7 @@ class TrafficHashMatcher:
         
         UPDATED: matched_edges.csv now uses Sequential IDs directly (after update_matched_edges.py)
         """
-        print(f"📂 Loading matched edges from {self.matched_edges_csv}...")
+        logger.file_op(f"Loading matched edges from {self.matched_edges_csv}...")
         
         df = pd.read_csv(self.matched_edges_csv)
         
@@ -240,8 +243,8 @@ class TrafficHashMatcher:
             
             self.hash_to_edges[id_hash].append(edge)
         
-        print(f"   Loaded {len(self.hash_to_edges)} unique traffic segments")
-        print(f"   Matched attributes: {found_attrs}/{found_attrs + missing_attrs} edges")
+        logger.data(f"Loaded {len(self.hash_to_edges)} unique traffic segments")
+        logger.data(f"Matched attributes: {found_attrs}/{found_attrs + missing_attrs} edges")
     
     def lookup_edges_by_hash(self, id_hash: str) -> List[Dict]:
         """Return hash-matched edges as dictionaries (used by IncidentMatcher)."""
@@ -561,7 +564,7 @@ class TrafficHashMatcher:
         
         # Log success
         if result_edges:
-            print(f"   [{incident_id}] TIER 1: Fréchet {best_frechet:.1f}m → {len(result_edges)} edge(s)")
+            logger.algorithm(f"[{incident_id}] TIER 1: Fréchet {best_frechet:.1f}m → {len(result_edges)} edge(s)")
         
         return result_edges
         
@@ -715,13 +718,13 @@ class TrafficHashMatcher:
                     
                     # Log success with incident details
                     avg_dist = sum(best_matched_points) / len(best_matched_points) if best_matched_points else 0
-                    print(f"   [{incident_id}] TIER 0: {best_match_count}/{len(incident_points)} pts " +
-                          f"(avg {avg_dist:.1f}m) → {len(result_edges)} edge(s) via hash")
+                    logger.algorithm(f"[{incident_id}] TIER 0: {best_match_count}/{len(incident_points)} pts " +
+                                    f"(avg {avg_dist:.1f}m) → {len(result_edges)} edge(s) via hash")
                     
                     return result_edges
                     
             except Exception as e:
-                print(f"   [{incident_id}] TIER 0 error: {e}")
+                logger.error(f"[{incident_id}] TIER 0 error: {e}")
         
         return []  # No match, try TIER 1
     
@@ -754,7 +757,7 @@ class TrafficHashMatcher:
         
         location = incident_item.get('location')
         if not location:
-            print(f"   [{incident_id}] ❌ No location data")
+            logger.warning(f"[{incident_id}] No location data")
             return []
         
         # Extract all points from incident geometry
@@ -772,7 +775,7 @@ class TrafficHashMatcher:
                                 incident_points.append((lat, lng))
         
         if not incident_points:
-            print(f"   [{incident_id}] ❌ No coordinate points extracted")
+            logger.warning(f"[{incident_id}] No coordinate points extracted")
             return []
         
         # TIER 0: Point matching with flow data (if flow_results available)
@@ -791,7 +794,7 @@ class TrafficHashMatcher:
             return matched_edges
         
         # No match found in any tier
-        print(f"   [{incident_id}] ❌ No edges matched")
+        logger.warning(f"[{incident_id}] No edges matched")
         return []
     
     def batch_match_flow_data(self, flow_results: List[Dict]) -> List[TrafficEdge]:
@@ -813,8 +816,8 @@ class TrafficHashMatcher:
                 matched_count += 1
                 all_edges.extend(edges)
         
-        print(f"   ✅ Matched {matched_count}/{len(flow_results)} flow items "
-              f"-> {len(all_edges)} total edges")
+        logger.success(f"Matched {matched_count}/{len(flow_results)} flow items "
+                       f"-> {len(all_edges)} total edges")
         
         return all_edges
         centroid_lat = sum(p[0] for p in incident_points) / len(incident_points)
@@ -956,7 +959,7 @@ class TrafficHashMatcher:
                     })
         
         if not edge_scores:
-            print(f"   ⚠️  No edges within {threshold_m}m (Fréchet) of incident geometry")
+            logger.warning(f"No edges within {threshold_m}m (Fréchet) of incident geometry")
             return []
         
         # STEP 4: Rank and select best edges
@@ -1052,8 +1055,8 @@ class TrafficHashMatcher:
                 matched_count += 1
                 all_edges.extend(edges)
         
-        print(f"   ✅ Matched {matched_count}/{len(flow_results)} flow items "
-              f"-> {len(all_edges)} total edges")
+        logger.success(f"Matched {matched_count}/{len(flow_results)} flow items "
+                       f"-> {len(all_edges)} total edges")
         
         return all_edges
     
@@ -1082,14 +1085,14 @@ class TrafficHashMatcher:
                 all_edges.extend(edges)
                 incident_details = incident_item.get('incidentDetails', {})
                 incident_type = incident_details.get('type', 'unknown')
-                print(f"   ✅ Incident {i+1}: {incident_type} matched to {len(edges)} edge(s)")
+                logger.success(f"Incident {i+1}: {incident_type} matched to {len(edges)} edge(s)")
             else:
                 incident_details = incident_item.get('incidentDetails', {})
                 incident_type = incident_details.get('type', 'unknown')
-                print(f"   ❌ Incident {i+1}: {incident_type} - no nearby edges found")
+                logger.warning(f"Incident {i+1}: {incident_type} - no nearby edges found")
         
-        print(f"   ✅ Matched {matched_count}/{len(incident_results)} incidents " +
-              f"-> {len(all_edges)} total edge(s)")
+        logger.success(f"Matched {matched_count}/{len(incident_results)} incidents " +
+                       f"-> {len(all_edges)} total edge(s)")
         
         return all_edges
     
@@ -1107,9 +1110,9 @@ def test_traffic_hash_matcher():
     """Test the hash matcher with sample data"""
     from config import Config
     
-    print("\n" + "="*70)
-    print("Testing TrafficHashMatcher")
-    print("="*70 + "\n")
+    logger.info("\n" + "="*70)
+    logger.info("Testing TrafficHashMatcher")
+    logger.info("="*70 + "\n")
     
     # Initialize matcher
     matched_csv = Config.MAIN_DIR / "here_osm" / "matched_edges.csv"
@@ -1117,10 +1120,10 @@ def test_traffic_hash_matcher():
     
     # Show stats
     stats = matcher.get_stats()
-    print(f"\n📊 Matcher Statistics:")
-    print(f"   Unique traffic hashes: {stats['unique_hashes']}")
-    print(f"   Total mapped edges: {stats['total_edges']}")
-    print(f"   Avg edges per hash: {stats['avg_edges_per_hash']:.1f}")
+    logger.data(f"\n📊 Matcher Statistics:")
+    logger.data(f"   Unique traffic hashes: {stats['unique_hashes']}")
+    logger.data(f"   Total mapped edges: {stats['total_edges']}")
+    logger.data(f"   Avg edges per hash: {stats['avg_edges_per_hash']:.1f}")
     
     # Test with sample HERE API data
     sample_location = {
@@ -1142,15 +1145,15 @@ def test_traffic_hash_matcher():
         "freeFlow": {"speed": 50.0}
     }
     
-    print(f"\n🧪 Testing with sample flow data...")
+    logger.test(f"\n🧪 Testing with sample flow data...")
     edges = matcher.match_traffic_flow_item(sample_flow)
     
-    print(f"   Found {len(edges)} matched edges")
+    logger.data(f"   Found {len(edges)} matched edges")
     for edge in edges[:3]:
-        print(f"      {edge.source} -> {edge.target}: "
-              f"{edge.speed_kph:.1f} km/h (jam: {edge.jamFactor:.1f})")
+        logger.data(f"      {edge.source} -> {edge.target}: "
+                    f"{edge.speed_kph:.1f} km/h (jam: {edge.jamFactor:.1f})")
     
-    print("\n" + "="*70)
+    logger.info("\n" + "="*70)
 
 
 if __name__ == '__main__':

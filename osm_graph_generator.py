@@ -24,6 +24,11 @@ SCRIPT_DIR = Path(__file__).parent
 MAIN_DIR = SCRIPT_DIR / "Main"
 sys.path.insert(0, str(MAIN_DIR))
 
+from console_formatter import get_logger
+
+# Initialize logger
+logger = get_logger("OSMGraphGenerator")
+
 try:
     import osmnx as ox
     import networkx as nx
@@ -32,11 +37,11 @@ try:
     from shapely.geometry import LineString, Point
     from shapely import wkt
 except ImportError as e:
-    print(f"❌ Missing required package: {e}")
-    print("\nPlease install required packages:")
-    print("  conda install -c conda-forge osmnx geopandas shapely")
-    print("  or")
-    print("  pip install osmnx geopandas shapely")
+    logger.error(f"Missing required package: {e}")
+    logger.info("\nPlease install required packages:")
+    logger.info("  conda install -c conda-forge osmnx geopandas shapely")
+    logger.info("  or")
+    logger.info("  pip install osmnx geopandas shapely")
     sys.exit(1)
 
 
@@ -46,19 +51,19 @@ PLACE_NAME = "Quezon City, Philippines"
 
 def download_osm_graph():
     """Download road network graph from OpenStreetMap"""
-    print("\n" + "="*70)
-    print("Downloading OSM Graph for Quezon City")
-    print("="*70 + "\n")
+    logger.info("\n" + "="*70)
+    logger.info("Downloading OSM Graph for Quezon City")
+    logger.info("="*70 + "\n")
     
-    print("📍 Location: Quezon City, Philippines")
-    print()
+    logger.location("Location: Quezon City, Philippines")
+    logger.info("")
     
     # Configure OSMnx
     ox.settings.use_cache = True
     ox.settings.log_console = True
     
     try:
-        print("🌐 Downloading from OpenStreetMap (this may take a few minutes)...")
+        logger.download("Downloading from OpenStreetMap (this may take a few minutes)...")
         
         # Download graph for driving network using place name
         # This is more reliable than bbox for well-defined locations
@@ -69,14 +74,14 @@ def download_osm_graph():
             retain_all=False
         )
         
-        print(f"✅ Downloaded OSM graph")
-        print(f"   Nodes: {len(G.nodes())}")
-        print(f"   Edges: {len(G.edges())}")
+        logger.success(f"Downloaded OSM graph")
+        logger.data(f"   Nodes: {len(G.nodes())}")
+        logger.data(f"   Edges: {len(G.edges())}")
         
         return G
         
     except Exception as e:
-        print(f"❌ Error downloading OSM data: {e}")
+        logger.error(f"Error downloading OSM data: {e}")
         import traceback
         traceback.print_exc()
         return None
@@ -84,7 +89,7 @@ def download_osm_graph():
 
 def create_sequential_node_mapping(G):
     """Create mapping from OSM node IDs to sequential IDs (1-based)"""
-    print("\n📋 Creating node ID mapping...")
+    logger.processing("Creating node ID mapping...")
     
     osm_nodes = list(G.nodes())
     osm_nodes.sort()  # Sort for consistency
@@ -93,8 +98,8 @@ def create_sequential_node_mapping(G):
     osm_to_seq = {osm_id: seq_id for seq_id, osm_id in enumerate(osm_nodes, start=1)}
     seq_to_osm = {seq_id: osm_id for osm_id, seq_id in osm_to_seq.items()}
     
-    print(f"   ✅ Created mapping for {len(osm_to_seq)} nodes")
-    print(f"   Sequential IDs: 1 to {len(osm_to_seq)}")
+    logger.success(f"Created mapping for {len(osm_to_seq)} nodes")
+    logger.data(f"   Sequential IDs: 1 to {len(osm_to_seq)}")
     
     return osm_to_seq, seq_to_osm
 
@@ -109,7 +114,7 @@ def generate_edges_csv(G, osm_to_seq, output_path: Path):
     
     The CSV contains BOTH ID types to support both use cases.
     """
-    print(f"\n📄 Generating edges CSV: {output_path}")
+    logger.file_op(f"Generating edges CSV: {output_path}")
     
     edges_data = []
     
@@ -196,17 +201,17 @@ def generate_edges_csv(G, osm_to_seq, output_path: Path):
     df = pd.DataFrame(edges_data)
     df.to_csv(output_path, index=False)
     
-    print(f"   ✅ Wrote {len(df)} edges")
-    print(f"   Columns: {', '.join(df.columns)}")
-    print(f"   ID Format: source/target = sequential (1-{len(osm_to_seq)})")
-    print(f"   ID Format: osm_source/osm_target = OSM IDs (for matching)")
+    logger.success(f"Wrote {len(df)} edges")
+    logger.data(f"   Columns: {', '.join(df.columns)}")
+    logger.data(f"   ID Format: source/target = sequential (1-{len(osm_to_seq)})")
+    logger.data(f"   ID Format: osm_source/osm_target = OSM IDs (for matching)")
     
     return df
 
 
 def generate_nodes_csv(G, osm_to_seq, output_path: Path):
     """Generate nodes CSV with coordinates"""
-    print(f"\n📄 Generating nodes CSV: {output_path}")
+    logger.file_op(f"Generating nodes CSV: {output_path}")
     
     nodes_data = []
     
@@ -225,15 +230,15 @@ def generate_nodes_csv(G, osm_to_seq, output_path: Path):
     df = df.sort_values('node_id')  # Sort by sequential ID
     df.to_csv(output_path, index=False)
     
-    print(f"   ✅ Wrote {len(df)} nodes")
-    print(f"   Columns: {', '.join(df.columns)}")
+    logger.success(f"Wrote {len(df)} nodes")
+    logger.data(f"   Columns: {', '.join(df.columns)}")
     
     return df
 
 
 def generate_node_mapping_csv(osm_to_seq, output_path: Path):
     """Generate node ID mapping CSV"""
-    print(f"\n📄 Generating node mapping CSV: {output_path}")
+    logger.file_op(f"Generating node mapping CSV: {output_path}")
     
     mapping_data = []
     for osm_id, seq_id in sorted(osm_to_seq.items(), key=lambda x: x[1]):
@@ -245,7 +250,7 @@ def generate_node_mapping_csv(osm_to_seq, output_path: Path):
     df = pd.DataFrame(mapping_data)
     df.to_csv(output_path, index=False)
     
-    print(f"   ✅ Wrote {len(df)} mappings")
+    logger.success(f"Wrote {len(df)} mappings")
     
     return df
 
@@ -259,15 +264,15 @@ def generate_graph_file(edges_df, output_path: Path):
         p sp <num_nodes> <num_edges>
         a <source> <target> <weight>
     """
-    print(f"\n📄 Generating graph file: {output_path}")
+    logger.file_op(f"Generating graph file: {output_path}")
     
     # Get unique nodes
     all_nodes = set(edges_df['source'].tolist() + edges_df['target'].tolist())
     num_nodes = max(all_nodes) if all_nodes else 0
     num_edges = len(edges_df)
     
-    print(f"   Nodes: {num_nodes}")
-    print(f"   Edges: {num_edges}")
+    logger.data(f"   Nodes: {num_nodes}")
+    logger.data(f"   Edges: {num_edges}")
     
     with open(output_path, 'w') as f:
         # Header
@@ -283,29 +288,29 @@ def generate_graph_file(edges_df, output_path: Path):
             
             f.write(f"a {source} {target} {weight}\n")
     
-    print(f"   ✅ Graph file created")
+    logger.success("Graph file created")
     
     return output_path
 
 
 def save_graphml(G, output_path: Path):
     """Save graph in GraphML format (for compatibility)"""
-    print(f"\n📄 Saving GraphML: {output_path}")
+    logger.file_op(f"Saving GraphML: {output_path}")
     
     try:
         ox.save_graphml(G, filepath=output_path)
-        print(f"   ✅ GraphML saved")
+        logger.success("GraphML saved")
         return True
     except Exception as e:
-        print(f"   ⚠️  Could not save GraphML: {e}")
+        logger.warning(f"Could not save GraphML: {e}")
         return False
 
 
 def main():
     """Main entry point"""
-    print("\n" + "="*70)
-    print("OSM GRAPH GENERATOR FOR QUEZON CITY")
-    print("="*70)
+    logger.info("\n" + "="*70)
+    logger.info("OSM GRAPH GENERATOR FOR QUEZON CITY")
+    logger.info("="*70)
     
     # Setup directories
     raw_data_dir = MAIN_DIR / "data" / "raw"
@@ -325,7 +330,7 @@ def main():
     # Step 1: Download OSM graph
     G = download_osm_graph()
     if G is None:
-        print("\n❌ Failed to download OSM data")
+        logger.error("Failed to download OSM data")
         return 1
     
     # Step 2: Create node mapping
@@ -343,26 +348,26 @@ def main():
     save_graphml(G, graphml_file)
     
     # Summary
-    print("\n" + "="*70)
-    print("✅ GRAPH GENERATION COMPLETE")
-    print("="*70)
-    print(f"\nGenerated files:")
-    print(f"  📄 {edges_csv}")
-    print(f"  📄 {nodes_csv}")
-    print(f"  📄 {mapping_csv}")
-    print(f"  📄 {graph_file}")
-    print(f"  📄 {graphml_file}")
-    print()
-    print(f"Graph statistics:")
-    print(f"  � Location: {PLACE_NAME}")
-    print(f"  �🔢 Nodes: {len(G.nodes())}")
-    print(f"  🔗 Edges: {len(G.edges())}")
-    print()
-    print("Next steps:")
-    print("  1. Run traffic data generation: python unified_data_generator.py --mode both")
-    print("  2. Build indexes: ./setup.sh --indexes")
-    print("  3. Start server: ./setup.sh --server")
-    print()
+    logger.info("\n" + "="*70)
+    logger.success("GRAPH GENERATION COMPLETE")
+    logger.info("="*70)
+    logger.info(f"\nGenerated files:")
+    logger.file_op(f"  {edges_csv}")
+    logger.file_op(f"  {nodes_csv}")
+    logger.file_op(f"  {mapping_csv}")
+    logger.file_op(f"  {graph_file}")
+    logger.file_op(f"  {graphml_file}")
+    logger.info("")
+    logger.info(f"Graph statistics:")
+    logger.location(f"  Location: {PLACE_NAME}")
+    logger.graph(f"  Nodes: {len(G.nodes())}")
+    logger.graph(f"  Edges: {len(G.edges())}")
+    logger.info("")
+    logger.info("Next steps:")
+    logger.info("  1. Run traffic data generation: python unified_data_generator.py --mode both")
+    logger.info("  2. Build indexes: ./setup.sh --indexes")
+    logger.info("  3. Start server: ./setup.sh --server")
+    logger.info("")
     
     return 0
 

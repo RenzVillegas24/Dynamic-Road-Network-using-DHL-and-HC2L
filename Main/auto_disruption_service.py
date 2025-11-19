@@ -1,8 +1,7 @@
 """
 Automatic Disruption Update Service for Active Routes
 Runs as a background thread to fetch traffic data from HERE API 
-every 60 seconds (1 minute) and triggers route recalculation when 
-changes are detected
+and triggers route recalculation when changes are detected
 """
 
 import threading
@@ -13,11 +12,10 @@ from datetime import datetime
 from typing import Optional, Dict, Any
 import logging
 
-# TODO: User disruptions are now processed in C++ API, not merged in Python
+from settings_manager import get_settings_manager
+from console_formatter import get_logger
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = get_logger("AutoDisruptionService")
 
 
 class AutoDisruptionService:
@@ -27,16 +25,25 @@ class AutoDisruptionService:
     recalculation for active routes
     """
     
-    def __init__(self, app, update_interval: int = 120):
+    def __init__(self, app, update_interval: int = None):
         """
         Initialize the auto-disruption service
         
         Args:
             app: Flask app instance
-            update_interval: Seconds between updates (default: 120 - 2 minutes)
+            update_interval: Seconds between updates (default: loaded from persistent settings)
         """
         self.app = app
+        
+        # Load update interval from persistent settings or use default
+        settings = get_settings_manager()
+        if update_interval is None:
+            # Load from persistent settings (in minutes, convert to seconds)
+            interval_minutes = settings.get('auto_update_interval', 2)
+            update_interval = interval_minutes * 60
+        
         self.update_interval = update_interval
+        self.settings = settings
         self.running = False
         self.thread: Optional[threading.Thread] = None
         
@@ -51,13 +58,13 @@ class AutoDisruptionService:
             from incident_service import IncidentService
             self.flow_service = FlowService()
             self.incident_service = IncidentService()
-            logger.info("✅ Flow and Incident services initialized")
+            logger.success("Flow and Incident services initialized")
         except Exception as e:
-            logger.error(f"❌ Error initializing services: {e}")
+            logger.error(f"Error initializing services: {e}")
             self.flow_service = None
             self.incident_service = None
         
-        logger.info(f"AutoDisruptionService initialized (interval: {update_interval}s) - NO AUTO-FETCH")
+        logger.info(f"AutoDisruptionService initialized (interval: {update_interval}s)")
     
     def start(self):
         """Start the background service"""
@@ -68,7 +75,7 @@ class AutoDisruptionService:
         self.running = True
         self.thread = threading.Thread(target=self._run_loop, daemon=True)
         self.thread.start()
-        logger.info("✅ Auto-disruption service started")
+        logger.success("Auto-disruption service started")
     
     def stop(self):
         """Stop the background service"""
@@ -78,7 +85,7 @@ class AutoDisruptionService:
         self.running = False
         if self.thread:
             self.thread.join(timeout=5)
-        logger.info("🛑 Auto-disruption service stopped")
+        logger.warning("Auto-disruption service stopped")
     
     def register_active_route(self, route_id: str, route_data: Dict[str, Any]):
         """
@@ -93,13 +100,13 @@ class AutoDisruptionService:
             'registered_at': datetime.now().isoformat(),
             'last_update': None
         }
-        logger.info(f"📍 Route registered: {route_id} ({route_data.get('algorithm', 'unknown')})")
+        logger.info(f"Route registered: {route_id} ({route_data.get('algorithm', 'unknown')})")
     
     def unregister_route(self, route_id: str):
         """Remove a route from monitoring"""
         if route_id in self.active_routes:
             del self.active_routes[route_id]
-            logger.info(f"❌ Route unregistered: {route_id}")
+            logger.info(f"Route unregistered: {route_id}")
     
     def clear_all_routes(self):
         """Clear all active routes"""
@@ -107,17 +114,26 @@ class AutoDisruptionService:
         self.active_routes.clear()
         logger.info(f"🗑️  Cleared {count} active route(s)")
     
-    def set_update_interval(self, interval_seconds: int):
+    def set_update_interval(self, interval_seconds: int) -> int:
         """
         Update the fetch interval (must be between 60 and 1800 seconds)
+        Also saves to persistent settings
         
         Args:
             interval_seconds: New interval in seconds (1-30 minutes)
+            
+        Returns:
+            Actual interval set (clamped to valid range)
         """
         # Clamp to 60-1800 seconds (1-30 minutes)
         interval_seconds = max(60, min(1800, interval_seconds))
         self.update_interval = interval_seconds
-        logger.info(f"⏱️  Update interval changed to {interval_seconds}s ({interval_seconds//60} minutes)")
+        
+        # Save to persistent settings (convert to minutes)
+        interval_minutes = interval_seconds // 60
+        self.settings.set('auto_update_interval', interval_minutes)
+        
+        logger.success(f"Update interval changed to {interval_seconds}s ({interval_minutes} minutes)")
         return interval_seconds
     
     def should_fetch_now(self) -> bool:
@@ -179,10 +195,10 @@ class AutoDisruptionService:
             should_fetch = time_since_last_file >= self.update_interval
             
             if should_fetch:
-                logger.debug(f"✅ Fetch allowed: {time_since_last_file:.0f}s since latest file >= {self.update_interval}s")
+                logger.success(f"Fetch allowed: {time_since_last_file:.0f}s since latest file >= {self.update_interval}s")
             else:
                 remaining = self.update_interval - time_since_last_file
-                logger.debug(f"⏳ Fetch blocked: {remaining:.0f}s remaining until next fetch")
+                logger.wait(f"Fetch blocked: {remaining:.0f}s remaining until next fetch")
             
             return should_fetch
             
@@ -357,11 +373,11 @@ class AutoDisruptionService:
                     'route_data': route_info['data']
                 }, broadcast=True, namespace='/')
                 
-                logger.info(f"🔄 Triggered recalculation for route: {route_id}")
+                logger.processing(f"Triggered recalculation for route: {route_id}")
                 
         except ImportError:
             # Fallback: just log if socketio not available
-            logger.info(f"🔄 Disruption change detected for route: {route_id}")
+            logger.processing(f"Disruption change detected for route: {route_id}")
             logger.info("   (Install flask-socketio for real-time updates)")
         except Exception as e:
             logger.error(f"Error triggering recalculation: {e}")
@@ -370,36 +386,35 @@ class AutoDisruptionService:
         """Fetch latest traffic data from both flow and incident services"""
         try:
             if not self.flow_service or not self.incident_service:
-                logger.error("❌ Services not initialized")
+                logger.error("Services not initialized")
                 return False
             
-            logger.info("🌐 Fetching latest traffic data from HERE API...")
+            logger.network("Fetching latest traffic data from HERE API...")
             
             # Fetch and save flow data
             flow_metadata = self.flow_service.fetch_and_save()
-            logger.info(f"✅ Flow data updated: {flow_metadata.get('total_edges', 0)} edges")
+            logger.data(f"Flow data updated: {flow_metadata.get('total_edges', 0)} edges")
             
             # Fetch and save incident data
             incident_metadata = self.incident_service.fetch_and_save()
-            logger.info(f"✅ Incident data updated: {incident_metadata.get('total_matched', 0)} incidents matched")
+            logger.data(f"Incident data updated: {incident_metadata.get('total_matched', 0)} incidents matched")
             
             # TODO: User disruptions are now loaded directly by C++ API
             # No need to merge into flow/incident CSV files
-            logger.info("   ℹ️  User disruptions will be loaded by C++ routing API")
+            logger.info("User disruptions will be loaded by C++ routing API")
             
             return True
             
         except Exception as e:
-            logger.error(f"❌ Error fetching traffic data: {e}")
+            logger.error(f"Error fetching traffic data: {e}")
             import traceback
             traceback.print_exc()
             return False
     
     def _run_loop(self):
         """Main service loop - fetches traffic data only when update_interval has passed since last disruption file"""
-        logger.info("🔄 Auto-disruption service loop started")
-        logger.info(f"   ⏰ Will fetch traffic data every {self.update_interval} seconds")
-        logger.info(f"   � Based on latest disruption file timestamps")
+        logger.processing("Auto-disruption service loop started")
+        logger.info(f"Will fetch traffic data every {self.update_interval} seconds")
         
         while self.running:
             try:
@@ -407,7 +422,6 @@ class AutoDisruptionService:
                 should_fetch = self.should_fetch_now()
                 
                 if should_fetch:
-                    logger.info(f"   ✅ Time to fetch - checking disruption files...")
                     # Fetch latest traffic data from HERE API
                     fetch_success = self._fetch_traffic_data()
                     
@@ -422,7 +436,7 @@ class AutoDisruptionService:
                             
                             if current_hash and current_hash != self.last_disruption_hash:
                                 if self.last_disruption_hash is not None:  # Skip first time
-                                    logger.info(f"🚦 Traffic data changed - triggering route updates")
+                                    logger.data(f"Traffic data changed - triggering route updates")
                                     
                                     # Trigger recalculation for all active routes
                                     for route_id, route_info in list(self.active_routes.items()):
@@ -430,9 +444,6 @@ class AutoDisruptionService:
                                         route_info['last_update'] = datetime.now().isoformat()
                                 
                                 self.last_disruption_hash = current_hash
-                else:
-                    # Log current status occasionally (not every 10 seconds to avoid spam)
-                    pass  # should_fetch_now() already logs debug info
                 
                 # Sleep for a short interval to keep the loop responsive (check every 10 seconds)
                 time.sleep(10)
@@ -443,27 +454,27 @@ class AutoDisruptionService:
                 traceback.print_exc()
                 time.sleep(30)  # Wait before retry
         
-        logger.info("🛑 Auto-disruption service loop stopped")
+        logger.warning("Auto-disruption service loop stopped")
 
 
 # Global service instance
 auto_disruption_service: Optional[AutoDisruptionService] = None
 
 
-def init_auto_disruption_service(app, update_interval: int = 120):
+def init_auto_disruption_service(app, update_interval: int = None):
     """
     Initialize and start the auto-disruption service
     
     Args:
         app: Flask app instance
-        update_interval: Seconds between checks (default: 120 - 2 minutes)
+        update_interval: Seconds between checks (default: load from persistent settings)
     """
     global auto_disruption_service
     
     if auto_disruption_service is None:
         auto_disruption_service = AutoDisruptionService(app, update_interval)
         auto_disruption_service.start()
-        logger.info(f"✅ Auto-disruption service initialized (interval: {update_interval}s)")
+        logger.success(f"Auto-disruption service initialized (interval: {auto_disruption_service.update_interval}s)")
     
     return auto_disruption_service
 
@@ -480,4 +491,4 @@ def shutdown_auto_disruption_service():
     if auto_disruption_service:
         auto_disruption_service.stop()
         auto_disruption_service = None
-        logger.info("🛑 Auto-disruption service shutdown complete")
+        logger.warning("Auto-disruption service shutdown complete")

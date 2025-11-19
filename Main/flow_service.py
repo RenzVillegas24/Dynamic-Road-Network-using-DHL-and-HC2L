@@ -24,9 +24,13 @@ from dotenv import load_dotenv
 
 from config import Config
 from traffic_hash_matcher import TrafficHashMatcher
+from console_formatter import get_logger
 
 # Load environment
 load_dotenv()
+
+# Get logger instance
+logger = get_logger("FlowService")
 
 
 class FlowService:
@@ -55,10 +59,10 @@ class FlowService:
         self.output_dir = Config.FLOW_DIR
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
-        print(f"✅ FlowService initialized")
-        print(f"   API Key: {self.api_key[:10]}...")
-        print(f"   BBox: {self.bbox}")
-        print(f"   Output: {self.output_dir}")
+        logger.success("FlowService initialized")
+        logger.info(f"API Key: {self.api_key[:10]}...")
+        logger.info(f"BBox: {self.bbox}")
+        logger.info(f"Output: {self.output_dir}")
     
     def fetch_flow_data(self) -> List[Dict]:
         """Fetch real-time traffic flow data from HERE API"""
@@ -70,18 +74,18 @@ class FlowService:
         )
         
         try:
-            print(f"🌐 Fetching flow data from HERE API...")
+            logger.network("Fetching flow data from HERE API...")
             response = requests.get(flow_url, timeout=30)
             response.raise_for_status()
             
             data = response.json()
             results = data.get('results', [])
             
-            print(f"   ✅ Received {len(results)} flow segments")
+            logger.success(f"Received {len(results)} flow segments")
             return results
             
         except requests.RequestException as e:
-            print(f"   ❌ Error fetching flow data: {e}")
+            logger.error(f"Error fetching flow data: {e}")
             return []
     
     def generate_flow_data(self) -> Tuple[pd.DataFrame, Dict]:
@@ -91,9 +95,7 @@ class FlowService:
         Returns:
             (DataFrame with flow edges, metadata dict)
         """
-        print(f"\n{'='*70}")
-        print(f"Generating Flow Data")
-        print(f"{'='*70}\n")
+        logger.processing("Generating Flow Data")
         
         flow_edges = []
         metadata = {
@@ -107,7 +109,7 @@ class FlowService:
         metadata['flow_count'] = len(flow_results)
         
         if flow_results:
-            print(f"\n🔍 Matching flow data...")
+            logger.processing("Matching flow data...")
             flow_edges = self.matcher.batch_match_flow_data(flow_results)
         
         # Convert to DataFrame
@@ -128,10 +130,10 @@ class FlowService:
             
             metadata['total_edges'] = len(df)
             
-            print(f"\n✅ Generated {len(df)} flow edges")
+            logger.success(f"Generated {len(df)} flow edges")
             return df, metadata
         else:
-            print(f"\n⚠️  No flow data matched")
+            logger.warning("No flow data matched")
             return pd.DataFrame(), metadata
     
     def save_flow_csv(self, df: pd.DataFrame) -> Path:
@@ -146,7 +148,7 @@ class FlowService:
             Path to saved CSV file
         """
         if df.empty:
-            print(f"⚠️  No flow data to save")
+            logger.warning("No flow data to save")
             return None
         
         # Cleanup old files first (keep max 10)
@@ -162,7 +164,7 @@ class FlowService:
         
         # Save CSV
         df.to_csv(filepath, index=False)
-        print(f"   💾 Saved Flow CSV: {filepath}")
+        logger.data(f"Saved Flow CSV: {filepath}")
         
         return filepath
     
@@ -181,9 +183,9 @@ class FlowService:
             for old_file in files_to_remove:
                 try:
                     old_file.unlink()
-                    print(f"   🗑️  Removed old flow file: {old_file.name}")
+                    logger.info(f"Removed old flow file: {old_file.name}")
                 except Exception as e:
-                    print(f"   ⚠️  Failed to remove {old_file.name}: {e}")
+                    logger.warning(f"Failed to remove {old_file.name}: {e}")
     
     def fetch_and_save(self) -> Dict:
         """
@@ -200,9 +202,9 @@ class FlowService:
             csv_path = self.save_flow_csv(df)
             metadata['csv_file'] = str(csv_path) if csv_path else None
             
-            print(f"\n📊 Summary:")
-            print(f"   Flow segments: {metadata['flow_count']}")
-            print(f"   Total edges: {metadata['total_edges']}")
+            logger.data("Summary:")
+            logger.info(f"Flow segments: {metadata['flow_count']}")
+            logger.info(f"Total edges: {metadata['total_edges']}")
         
         return metadata
     
@@ -213,11 +215,9 @@ class FlowService:
         Args:
             interval: Update interval in seconds
         """
-        print(f"\n{'='*70}")
-        print(f"Starting Continuous Flow Service")
-        print(f"{'='*70}")
-        print(f"Update interval: {interval}s")
-        print(f"Press Ctrl+C to stop\n")
+        logger.processing("Starting Continuous Flow Service")
+        logger.info(f"Update interval: {interval}s")
+        logger.info("Press Ctrl+C to stop")
         
         try:
             while True:
@@ -225,11 +225,11 @@ class FlowService:
                 self.fetch_and_save()
                 
                 # Wait for next update
-                print(f"\n⏱️  Waiting {interval}s for next update...")
+                logger.processing(f"Waiting {interval}s for next update...")
                 time.sleep(interval)
                 
         except KeyboardInterrupt:
-            print(f"\n\n🛑 Flow Service stopped by user")
+            logger.warning("Flow Service stopped by user")
 
 
 def main():

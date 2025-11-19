@@ -14,6 +14,9 @@ from typing import Dict, List, Tuple, Optional
 import numpy as np
 from pathlib import Path
 import pandas as pd
+from console_formatter import get_logger
+
+logger = get_logger("OSMRoadSnapper")
 
 
 class OSMRoadSnapper:
@@ -37,7 +40,7 @@ class OSMRoadSnapper:
         self.nodes_csv = Path(nodes_csv) if nodes_csv else None
         
         # Load edge geometries from CSV
-        print(f"📁 Loading road geometries from {edges_csv}...")
+        logger.processing(f"Loading road geometries from {edges_csv}...")
         self._load_edges_from_csv()
         
         # Build spatial index
@@ -47,7 +50,7 @@ class OSMRoadSnapper:
         self.routing_nodes_df = None
         if self.nodes_csv and self.nodes_csv.exists():
             self.routing_nodes_df = pd.read_csv(self.nodes_csv)
-            print(f"✅ Loaded {len(self.routing_nodes_df)} routing nodes")
+            logger.success(f"Loaded {len(self.routing_nodes_df)} routing nodes")
     
     def _load_edges_from_csv(self):
         """Load edge geometries from CSV file."""
@@ -113,11 +116,11 @@ class OSMRoadSnapper:
                         'geometry': geometry
                     })
         
-        print(f"✅ Loaded {len(self.edges_data)} edges with geometries")
+        logger.success(f"Loaded {len(self.edges_data)} edges with geometries")
     
     def _build_spatial_index(self):
         """Build spatial index from edge geometries."""
-        print("🗺️  Building spatial index from road geometries...")
+        logger.processing("Building spatial index from road geometries...")
         
         self.edge_geometries = []
         self.edge_metadata = []
@@ -143,7 +146,7 @@ class OSMRoadSnapper:
         
         # Build STRtree for fast spatial queries
         self.spatial_index = STRtree(self.edge_geometries)
-        print(f"✅ Built spatial index with {len(self.edge_geometries)} road segments")
+        logger.success(f"Built spatial index with {len(self.edge_geometries)} road segments")
     
     def snap_to_nearest_road(
         self, 
@@ -217,7 +220,7 @@ class OSMRoadSnapper:
                     return None
                     
         except Exception as e:
-            print(f"⚠️  Error querying spatial index: {e}")
+            logger.warning(f"Error querying spatial index: {e}")
             return None
         
         if not nearest_geoms or len(nearest_geoms) == 0:
@@ -230,7 +233,7 @@ class OSMRoadSnapper:
             try:
                 # Ensure geom is a Geometry object
                 if not hasattr(geom, 'distance'):
-                    print(f"⚠️  Invalid geometry object (not a Shapely Geometry)")
+                    logger.warning("Invalid geometry object (not a Shapely Geometry)")
                     continue
                 
                 # Try to find by geometry ID first (more reliable)
@@ -247,7 +250,7 @@ class OSMRoadSnapper:
                     continue
                     
             except Exception as e:
-                print(f"⚠️  Error finding geometry index: {e}")
+                logger.warning(f"Error finding geometry index: {e}")
                 continue
             
             metadata = self.edge_metadata[geom_idx]
@@ -418,7 +421,7 @@ class OSMRoadSnapper:
 if __name__ == "__main__":
     from config import Config
     
-    print("🧪 Testing OSM Road Snapper (CSV-based)...")
+    logger.info("Testing OSM Road Snapper (CSV-based)...")
     
     # Use paths from config
     edges_csv = str(Config.EDGES_CSV)
@@ -435,25 +438,25 @@ if __name__ == "__main__":
         ]
         
         for lat, lng, desc in test_points:
-            print(f"\n📍 Testing: {desc} ({lat}, {lng})")
+            logger.location(f"Testing: {desc} ({lat}, {lng})")
             
             result = snapper.snap_to_nearest_road(lat, lng, max_distance_m=50)
             
             if result:
-                print(f"✅ Snapped successfully!")
-                print(f"   Road: {result['road_name']}")
-                print(f"   Highway type: {result['highway_type']}")
-                print(f"   Distance: {result['distance_m']:.1f}m")
-                print(f"   Snapped to: ({result['snapped_point']['lat']:.6f}, {result['snapped_point']['lng']:.6f})")
-                print(f"   Position on edge: {result['snap_position']:.2%}")
-                print(f"   Edge nodes: {result.get('osm_nodes', [])} or {result.get('edge_nodes', [])}")
-                print(f"   Routing nodes: {result.get('routing_nodes', [])}")
+                logger.success("Snapped successfully!")
+                logger.data(f"  Road: {result['road_name']}")
+                logger.data(f"  Highway type: {result['highway_type']}")
+                logger.data(f"  Distance: {result['distance_m']:.1f}m")
+                logger.data(f"  Snapped to: ({result['snapped_point']['lat']:.6f}, {result['snapped_point']['lng']:.6f})")
+                logger.data(f"  Position on edge: {result['snap_position']:.2%}")
+                logger.data(f"  Edge nodes: {result.get('osm_nodes', [])} or {result.get('edge_nodes', [])}")
+                logger.data(f"  Routing nodes: {result.get('routing_nodes', [])}")
             else:
-                print(f"❌ No road found within 50m")
+                logger.warning("No road found within 50m")
         
-        print("\n✅ Test complete! Road snapping working with CSV geometry")
+        logger.success("Test complete! Road snapping working with CSV geometry")
         
     except Exception as e:
-        print(f"❌ Test failed: {e}")
+        logger.error(f"Test failed: {e}")
         import traceback
         traceback.print_exc()

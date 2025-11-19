@@ -27,6 +27,9 @@ from dotenv import load_dotenv
 
 from config import Config
 from traffic_hash_matcher import TrafficHashMatcher
+from console_formatter import get_logger
+
+logger = get_logger("RealtimeTrafficService")
 
 # Load environment
 load_dotenv()
@@ -58,10 +61,10 @@ class RealtimeTrafficService:
         self.output_dir = Config.DISRUPTIONS_DIR
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
-        print(f"✅ RealtimeTrafficService initialized")
-        print(f"   API Key: {self.api_key[:10]}...")
-        print(f"   BBox: {self.bbox}")
-        print(f"   Output: {self.output_dir}")
+        logger.success("RealtimeTrafficService initialized")
+        logger.config(f"API Key: {self.api_key[:10]}...")
+        logger.config(f"BBox: {self.bbox}")
+        logger.config(f"Output: {self.output_dir}")
     
     def fetch_flow_data(self) -> List[Dict]:
         """Fetch real-time traffic flow data from HERE API"""
@@ -73,18 +76,18 @@ class RealtimeTrafficService:
         )
         
         try:
-            print(f"🌐 Fetching flow data from HERE API...")
+            logger.processing("Fetching flow data from HERE API...")
             response = requests.get(flow_url, timeout=30)
             response.raise_for_status()
             
             data = response.json()
             results = data.get('results', [])
             
-            print(f"   ✅ Received {len(results)} flow segments")
+            logger.success(f"Received {len(results)} flow segments")
             return results
             
         except requests.RequestException as e:
-            print(f"   ❌ Error fetching flow data: {e}")
+            logger.error(f"Error fetching flow data: {e}")
             return []
     
     def fetch_incidents_data(self) -> List[Dict]:
@@ -97,18 +100,18 @@ class RealtimeTrafficService:
         )
         
         try:
-            print(f"🌐 Fetching incidents data from HERE API...")
+            logger.processing("Fetching incidents data from HERE API...")
             response = requests.get(incidents_url, timeout=30)
             response.raise_for_status()
             
             data = response.json()
             results = data.get('results', [])
             
-            print(f"   ✅ Received {len(results)} incidents")
+            logger.success(f"Received {len(results)} incidents")
             return results
             
         except requests.RequestException as e:
-            print(f"   ❌ Error fetching incidents: {e}")
+            logger.error(f"Error fetching incidents: {e}")
             return []
     
     def generate_traffic_data(self, mode: str = 'flow') -> Tuple[pd.DataFrame, Dict]:
@@ -121,9 +124,9 @@ class RealtimeTrafficService:
         Returns:
             (DataFrame with traffic edges, metadata dict)
         """
-        print(f"\n{'='*70}")
-        print(f"Generating Traffic Data - Mode: {mode.upper()}")
-        print(f"{'='*70}\n")
+        logger.info("="*70)
+        logger.info(f"Generating Traffic Data - Mode: {mode.upper()}")
+        logger.info("="*70)
         
         flow_edges = []
         incident_edges = []
@@ -141,7 +144,7 @@ class RealtimeTrafficService:
             metadata['flow_count'] = len(flow_results)
             
             if flow_results:
-                print(f"\n🔍 Matching flow data...")
+                logger.processing("Matching flow data...")
                 flow_edges = self.matcher.batch_match_flow_data(flow_results)
         
         # Fetch and match incident data
@@ -150,7 +153,7 @@ class RealtimeTrafficService:
             metadata['incident_count'] = len(incident_results)
             
             if incident_results:
-                print(f"\n🔍 Matching incident data...")
+                logger.processing("Matching incident data...")
                 # Pass flow_results for Tier 1 (traffic-data) matching if available
                 incident_edges = self.matcher.batch_match_incident_data(incident_results, flow_results)
         
@@ -165,10 +168,10 @@ class RealtimeTrafficService:
             df = pd.DataFrame([edge.to_dict() for edge in all_edges])
             metadata['total_edges'] = len(df)
             
-            print(f"\n✅ Generated {len(df)} traffic edges")
+            logger.success(f"Generated {len(df)} traffic edges")
             return df, metadata
         else:
-            print(f"\n⚠️  No traffic data matched")
+            logger.warning("No traffic data matched")
             return pd.DataFrame(), metadata
     
     def _merge_flow_and_incident_edges(self, flow_edges, incident_edges):
@@ -258,8 +261,8 @@ class RealtimeTrafficService:
             else:
                 merged_edges.append(incident_edge)
         
-        print(f"\n   ✅ Merged {len(flow_dict)} flow + {len(incident_dict)} incident edges")
-        print(f"      -> {len(merged_edges)} unique edges with combined flow+incident data")
+        logger.success(f"Merged {len(flow_dict)} flow + {len(incident_dict)} incident edges")
+        logger.data(f"-> {len(merged_edges)} unique edges with combined flow+incident data")
         
         return merged_edges
     
@@ -276,7 +279,7 @@ class RealtimeTrafficService:
             Path to saved CSV file
         """
         if df.empty:
-            print(f"⚠️  No data to save")
+            logger.warning("No data to save")
             return None
         
         # Cleanup old files first (keep max 10)
@@ -289,7 +292,7 @@ class RealtimeTrafficService:
         
         # Save CSV
         df.to_csv(filepath, index=False)
-        print(f"   💾 Saved CSV: {filepath}")
+        logger.file_op(f"Saved CSV: {filepath}")
         
         # NOTE: No symlink creation - system now uses latest timestamped file
         
@@ -312,9 +315,9 @@ class RealtimeTrafficService:
             for old_file in files_to_remove:
                 try:
                     old_file.unlink()
-                    print(f"   🗑️  Removed old file: {old_file.name}")
+                    logger.file_op(f"Removed old file: {old_file.name}")
                 except Exception as e:
-                    print(f"   ⚠️  Failed to remove {old_file.name}: {e}")
+                    logger.warning(f"Failed to remove {old_file.name}: {e}")
     
     def save_traffic_gr(self, df: pd.DataFrame, mode: str) -> Path:
         """
@@ -347,7 +350,7 @@ class RealtimeTrafficService:
             Path to saved .gr file
         """
         if df.empty:
-            print(f"⚠️  No data to save")
+            logger.warning("No data to save")
             return None
         
         # Generate timestamp filename
@@ -476,14 +479,14 @@ class RealtimeTrafficService:
                        f"{impact_score:.3f} {confidence:.2f} {highway_type} "
                        f"{1 if is_closed else 0} {incident_type}\n")
         
-        print(f"   💾 Saved .gr: {filepath}")
+        logger.file_op(f"Saved .gr: {filepath}")
         
         # Create/update symlink to latest
         symlink = self.output_dir / f"current_traffic_{mode}.gr"
         if symlink.exists():
             symlink.unlink()
         symlink.symlink_to(filepath.name)
-        print(f"   🔗 Symlink: {symlink} -> {filepath.name}")
+        logger.file_op(f"Symlink: {symlink} -> {filepath.name}")
         
         return filepath
     
@@ -505,11 +508,11 @@ class RealtimeTrafficService:
             csv_path = self.save_traffic_csv(df, mode)
             metadata['csv_file'] = str(csv_path) if csv_path else None
             
-            print(f"\n📊 Summary:")
-            print(f"   Flow segments: {metadata['flow_count']}")
-            print(f"   Incidents: {metadata['incident_count']}")
-            print(f"   Total edges: {metadata['total_edges']}")
-            print(f"   📄 CSV only (no .gr files generated)")
+            logger.data("Summary:")
+            logger.data(f"  Flow segments: {metadata['flow_count']}")
+            logger.data(f"  Incidents: {metadata['incident_count']}")
+            logger.data(f"  Total edges: {metadata['total_edges']}")
+            logger.data("  CSV only (no .gr files generated)")
         
         return metadata
     
@@ -521,12 +524,12 @@ class RealtimeTrafficService:
             mode: 'flow', 'incidents', or 'both'
             interval: Update interval in seconds
         """
-        print(f"\n{'='*70}")
-        print(f"Starting Continuous Traffic Service")
-        print(f"{'='*70}")
-        print(f"Mode: {mode}")
-        print(f"Update interval: {interval}s")
-        print(f"Press Ctrl+C to stop\n")
+        logger.info("="*70)
+        logger.info("Starting Continuous Traffic Service")
+        logger.info("="*70)
+        logger.info(f"Mode: {mode}")
+        logger.info(f"Update interval: {interval}s")
+        logger.info("Press Ctrl+C to stop")
         
         try:
             while True:
@@ -534,11 +537,11 @@ class RealtimeTrafficService:
                 self.fetch_and_save(mode)
                 
                 # Wait for next update
-                print(f"\n⏱️  Waiting {interval}s for next update...")
+                logger.processing(f"Waiting {interval}s for next update...")
                 time.sleep(interval)
                 
         except KeyboardInterrupt:
-            print(f"\n\n🛑 Service stopped by user")
+            logger.info("Service stopped by user")
 
 
 def main():

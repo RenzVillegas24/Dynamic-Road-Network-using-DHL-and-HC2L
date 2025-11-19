@@ -10,6 +10,10 @@ import numpy as np
 from typing import Dict, List, Tuple, Optional
 from config import Config
 from scipy.spatial.distance import directed_hausdorff
+from console_formatter import get_logger
+
+# Get logger instance
+logger = get_logger("GoogleMapsService")
 
 
 class GoogleMapsService:
@@ -18,7 +22,7 @@ class GoogleMapsService:
     def __init__(self):
         self.api_key = Config.GOOGLE_MAPS_API_KEY
         if not self.api_key:
-            print("⚠️  Warning: Google Maps API key not set")
+            logger.warning("Google Maps API key not set")
         self.base_url = "https://maps.googleapis.com/maps/api/directions/json"
     
     def get_directions(self, start_lat: float, start_lng: float, 
@@ -45,9 +49,9 @@ class GoogleMapsService:
         }
         
         try:
-            print(f"🗺️  Fetching Google Maps route...")
-            print(f"   Origin: ({start_lat}, {start_lng})")
-            print(f"   Destination: ({dest_lat}, {dest_lng})")
+            logger.network("Fetching Google Maps route...")
+            logger.info(f"Origin: ({start_lat}, {start_lng})")
+            logger.info(f"Destination: ({dest_lat}, {dest_lng})")
             
             response = requests.get(self.base_url, params=params, timeout=10)
             response.raise_for_status()
@@ -56,7 +60,7 @@ class GoogleMapsService:
             
             if data.get('status') != 'OK':
                 error_msg = data.get('error_message', data.get('status'))
-                print(f"❌ Google Maps API error: {error_msg}")
+                logger.error(f"Google Maps API error: {error_msg}")
                 return {
                     'success': False,
                     'error': f"Google Maps API: {error_msg}"
@@ -84,27 +88,27 @@ class GoogleMapsService:
                 'bounds': route['bounds']
             }
             
-            print(f"✅ Google Maps route fetched successfully")
-            print(f"   Distance: {leg['distance']['text']}")
-            print(f"   Duration: {leg['duration']['text']}")
-            print(f"   Coordinates: {len(coordinates)} points")
+            logger.success("Google Maps route fetched successfully")
+            logger.info(f"Distance: {leg['distance']['text']}")
+            logger.info(f"Duration: {leg['duration']['text']}")
+            logger.info(f"Coordinates: {len(coordinates)} points")
             
             return result
             
         except requests.exceptions.Timeout:
-            print("❌ Google Maps API request timed out")
+            logger.error("Google Maps API request timed out")
             return {
                 'success': False,
                 'error': 'Request timeout'
             }
         except requests.exceptions.RequestException as e:
-            print(f"❌ Google Maps API request failed: {e}")
+            logger.error(f"Google Maps API request failed: {e}")
             return {
                 'success': False,
                 'error': str(e)
             }
         except Exception as e:
-            print(f"❌ Error processing Google Maps response: {e}")
+            logger.error(f"Error processing Google Maps response: {e}")
             return {
                 'success': False,
                 'error': str(e)
@@ -148,7 +152,7 @@ class GoogleMapsService:
             return frechet_meters
             
         except Exception as e:
-            print(f"❌ Error computing Fréchet distance: {e}")
+            logger.error(f"Error computing Fréchet distance: {e}")
             return 0.0
     
     def compute_segment_overlap(self, route1_coords: List[List[float]], 
@@ -194,7 +198,7 @@ class GoogleMapsService:
             return overlap_percent
             
         except Exception as e:
-            print(f"❌ Error computing segment overlap: {e}")
+            logger.error(f"Error computing segment overlap: {e}")
             return 0.0
     
     def compare_with_algorithm_route(self, algorithm_coords: List[List[float]], 
@@ -218,9 +222,9 @@ class GoogleMapsService:
         gmaps_coords = gmaps_route['coordinates']
         
         # Compute comparison metrics
-        print(f"\n📊 Computing comparison metrics...")
-        print(f"   Algorithm route: {len(algorithm_coords)} points")
-        print(f"   Google Maps route: {len(gmaps_coords)} points")
+        logger.processing("Computing comparison metrics...")
+        logger.info(f"Algorithm route: {len(algorithm_coords)} points")
+        logger.info(f"Google Maps route: {len(gmaps_coords)} points")
         
         frechet_distance = self.compute_frechet_distance(algorithm_coords, gmaps_coords)
         segment_overlap = self.compute_segment_overlap(algorithm_coords, gmaps_coords)
@@ -239,9 +243,9 @@ class GoogleMapsService:
             }
         }
         
-        print(f"✅ Comparison complete:")
-        print(f"   Fréchet distance: {frechet_distance:.2f} meters")
-        print(f"   Segment overlap: {segment_overlap:.2f}%")
+        logger.success("Comparison complete:")
+        logger.info(f"Fréchet distance: {frechet_distance:.2f} meters")
+        logger.info(f"Segment overlap: {segment_overlap:.2f}%")
         
         return result
 
@@ -249,8 +253,8 @@ class GoogleMapsService:
 # Test function
 def test_google_maps_service():
     """Test Google Maps service with sample coordinates"""
-    print("🧪 Testing Google Maps Service")
-    print("=" * 60)
+    logger.processing("Testing Google Maps Service")
+    logger.info("=" * 60)
     
     service = GoogleMapsService()
     
@@ -262,16 +266,16 @@ def test_google_maps_service():
     result = service.get_directions(start_lat, start_lng, dest_lat, dest_lng)
     
     if result.get('success'):
-        print("\n✅ Test passed!")
-        print(f"   Route distance: {result['distance_meters']} meters")
-        print(f"   Route duration: {result['duration_seconds']} seconds")
-        print(f"   Coordinates: {len(result['coordinates'])} points")
+        logger.success("Test passed!")
+        logger.info(f"Route distance: {result['distance_meters']} meters")
+        logger.info(f"Route duration: {result['duration_seconds']} seconds")
+        logger.info(f"Coordinates: {len(result['coordinates'])} points")
     else:
-        print(f"\n❌ Test failed: {result.get('error')}")
+        logger.error(f"Test failed: {result.get('error')}")
     
     # Test comparison with mock algorithm route
     if result.get('success'):
-        print("\n📊 Testing route comparison...")
+        logger.processing("Testing route comparison...")
         
         # Create mock algorithm route (slightly different from Google)
         algorithm_coords = [[lat + 0.0001, lng - 0.0001] 
@@ -282,11 +286,11 @@ def test_google_maps_service():
         )
         
         if comparison.get('success'):
-            print("\n✅ Comparison test passed!")
-            print(f"   Fréchet distance: {comparison['comparison']['frechet_distance_meters']:.2f}m")
-            print(f"   Segment overlap: {comparison['comparison']['segment_overlap_percent']:.2f}%")
+            logger.success("Comparison test passed!")
+            logger.info(f"Fréchet distance: {comparison['comparison']['frechet_distance_meters']:.2f}m")
+            logger.info(f"Segment overlap: {comparison['comparison']['segment_overlap_percent']:.2f}%")
         else:
-            print(f"\n❌ Comparison test failed: {comparison.get('error')}")
+            logger.error(f"Comparison test failed: {comparison.get('error')}")
 
 
 if __name__ == '__main__':

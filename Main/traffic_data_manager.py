@@ -7,11 +7,14 @@ from typing import Any, Dict, List, Optional, Tuple
 import pandas as pd
 
 from config import Config
+from console_formatter import get_logger
 from user_disruptions import (
     load_user_disruption_rows,
     normalize_incident_type,
     normalize_severity
 )
+
+logger = get_logger("TrafficDataManager")
 
 CRITICALITY_RANK = {
     'critical': 4,
@@ -135,7 +138,7 @@ def _read_csv_safely(csv_path: Path) -> pd.DataFrame:
     try:
         return pd.read_csv(csv_path)
     except Exception as exc:
-        print(f"   ⚠️  Failed to read CSV {csv_path.name}: {exc}")
+        logger.warning(f"Failed to read CSV {csv_path.name}: {exc}")
         return pd.DataFrame()
 
 
@@ -566,7 +569,7 @@ def generate_disruption_gr_file(disruption_type: str, csv_file: str) -> Optional
     """
     try:
         if not csv_file or not Path(csv_file).exists():
-            print(f"   ⚠️  CSV file not found: {csv_file}")
+            logger.warning(f"CSV file not found: {csv_file}")
             return None
         
         csv_path = Path(csv_file)
@@ -579,7 +582,7 @@ def generate_disruption_gr_file(disruption_type: str, csv_file: str) -> Optional
             output_dir = Config.DISRUPTIONS_DIR / 'incidents'
             prefix = 'incident'
         else:
-            print(f"   ⚠️  Unknown disruption type: {disruption_type}")
+            logger.warning(f"Unknown disruption type: {disruption_type}")
             return None
         
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -592,11 +595,11 @@ def generate_disruption_gr_file(disruption_type: str, csv_file: str) -> Optional
         try:
             df = pd.read_csv(csv_file)
         except Exception as e:
-            print(f"   ⚠️  Failed to read CSV: {e}")
+            logger.warning(f"Failed to read CSV: {e}")
             return None
         
         if df.empty:
-            print(f"   ⚠️  CSV file is empty: {csv_file}")
+            logger.warning(f"CSV file is empty: {csv_file}")
             return None
         
         # Write .gr file with disruption data
@@ -630,24 +633,24 @@ def generate_disruption_gr_file(disruption_type: str, csv_file: str) -> Optional
                     f.write(f"{source} {target} {jam_factor:.2f} {speed:.2f} {road_name}\n")
                 
                 except (ValueError, TypeError) as e:
-                    print(f"   ⚠️  Skipping row {idx}: {e}")
+                    logger.warning(f"Skipping row {idx}: {e}")
                     continue
         
-        print(f"   ✅ Generated {disruption_type} .gr file: {output_file.name} ({len(df)} disruptions)")
+        logger.success(f"Generated {disruption_type} .gr file: {output_file.name} ({len(df)} disruptions)")
         
         # Clean up old .gr files (keep only 5 most recent)
         old_files = sorted(output_dir.glob(f'{prefix}_*.gr'), reverse=True)[5:]
         for old_file in old_files:
             try:
                 old_file.unlink()
-                print(f"   🗑️  Removed old {disruption_type} .gr file: {old_file.name}")
+                logger.file_op(f"Removed old {disruption_type} .gr file: {old_file.name}")
             except Exception as e:
-                print(f"   ⚠️  Failed to remove {old_file.name}: {e}")
+                logger.warning(f"Failed to remove {old_file.name}: {e}")
         
         return output_file
         
     except Exception as e:
-        print(f"   ❌ Error generating {disruption_type} .gr file: {e}")
+        logger.error(f"Error generating {disruption_type} .gr file: {e}")
         import traceback
         traceback.print_exc()
         return None

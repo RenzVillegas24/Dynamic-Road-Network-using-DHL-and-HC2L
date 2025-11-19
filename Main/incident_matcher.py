@@ -17,6 +17,10 @@ from typing import Dict, List, Tuple, Optional
 from datetime import datetime
 from traffic_hash_matcher import TrafficHashMatcher
 
+from console_formatter import get_logger
+
+logger = get_logger("IncidentMatcher")
+
 
 class IncidentMatcher:
     """Matches traffic incidents to OSM road network edges"""
@@ -30,32 +34,32 @@ class IncidentMatcher:
             nodes_csv: Path to nodes CSV file with coordinates
             matched_edges_csv: Path to matched_edges.csv for hash-based matching (optional)
         """
-        print(f"🔧 Initializing IncidentMatcher...")
+        logger.processing("Initializing IncidentMatcher...")
         
         # Initialize hash matcher if matched_edges provided
         self.hash_matcher = None
         if matched_edges_csv and matched_edges_csv.exists():
             try:
                 self.hash_matcher = TrafficHashMatcher(matched_edges_csv)
-                print(f"   ✅ Hash-based matching enabled")
+                logger.success("Hash-based matching enabled")
             except Exception as e:
-                print(f"   ⚠️  Hash matching disabled: {e}")
+                logger.warning(f"Hash matching disabled: {e}")
         
         # Load OSM edges for spatial fallback
         self.edges_df = pd.read_csv(edges_csv)
-        print(f"   ✅ Loaded {len(self.edges_df)} OSM edges")
+        logger.success(f"Loaded {len(self.edges_df)} OSM edges")
         
         # Load OSM nodes for coordinate lookup
         self.nodes_df = pd.read_csv(nodes_csv)
         self.node_coords = {}
         for _, row in self.nodes_df.iterrows():
             self.node_coords[row['node_id']] = (row['latitude'], row['longitude'])
-        print(f"   ✅ Loaded {len(self.node_coords)} node coordinates")
+        logger.success(f"Loaded {len(self.node_coords)} node coordinates")
         
         # Precompute edge geometries and midpoints for matching
         self._precompute_edge_data()
         
-        print(f"   ✅ IncidentMatcher ready")
+        logger.success("IncidentMatcher ready")
     
     def _precompute_edge_data(self):
         """Precompute edge midpoints and bounding boxes for efficient matching"""
@@ -90,7 +94,7 @@ class IncidentMatcher:
             })
         
         self.edge_data = pd.DataFrame(edge_data)
-        print(f"   📊 Precomputed {len(self.edge_data)} edge geometries")
+        logger.data(f"Precomputed {len(self.edge_data)} edge geometries")
     
     def _haversine_distance(self, lat1: float, lon1: float, lat2: float, lon2: float) -> float:
         """
@@ -311,7 +315,7 @@ class IncidentMatcher:
         """
         # Validate incident is a dictionary
         if not isinstance(incident, dict):
-            print(f"   ⚠️  Skipping non-dict incident: {type(incident)}")
+            logger.warning(f"Skipping non-dict incident: {type(incident)}")
             return []
         
         try:
@@ -325,13 +329,13 @@ class IncidentMatcher:
                     matched_edges = self.hash_matcher.lookup_edges_by_hash(location_hash)
                     
                     if matched_edges:
-                        print(f"   ✅ Hash match: {len(matched_edges)} edges for hash {location_hash}")
+                        logger.success(f"Hash match: {len(matched_edges)} edges for hash {location_hash}")
                         # Extract incident attributes and apply to matched edges
                         return self._create_incident_edges_from_hash_match(
                             incident, matched_edges
                         )
                 except Exception as e:
-                    print(f"   ⚠️  Hash matching failed: {e}, falling back to spatial")
+                    logger.warning(f"Hash matching failed: {e}, falling back to spatial")
             
             # FALLBACK: SPATIAL MATCHING (original behavior)
             shape = location.get('shape', {})
@@ -412,7 +416,7 @@ class IncidentMatcher:
             return incident_edges
             
         except Exception as e:
-            print(f"   ⚠️  Error matching incident: {e}")
+            logger.warning(f"Error matching incident: {e}")
             return []
     
     def batch_match_incidents(self, incidents: List[Dict]) -> List[Dict]:
@@ -428,7 +432,7 @@ class IncidentMatcher:
         all_edges = []
         matched_count = 0
         
-        print(f"🔍 Matching {len(incidents)} incidents to OSM edges...")
+        logger.processing(f"Matching {len(incidents)} incidents to OSM edges...")
         
         for incident in incidents:
             matched_edges = self.match_incident(incident)
@@ -436,6 +440,6 @@ class IncidentMatcher:
                 all_edges.extend(matched_edges)
                 matched_count += 1
         
-        print(f"   ✅ Matched {matched_count}/{len(incidents)} incidents to {len(all_edges)} edges")
+        logger.success(f"Matched {matched_count}/{len(incidents)} incidents to {len(all_edges)} edges")
         
         return all_edges

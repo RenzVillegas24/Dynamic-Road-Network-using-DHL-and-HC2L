@@ -29,6 +29,11 @@ from dotenv import load_dotenv
 env_path = Path(__file__).parent / '.env'
 load_dotenv(dotenv_path=env_path)
 
+from console_formatter import get_logger
+
+# Initialize logger
+logger = get_logger("Config")
+
 
 class Config:
     """Centralized configuration for the Dynamic Road Network application"""
@@ -287,6 +292,7 @@ class Config:
             Formatted string with configuration summary
         """
         summary = []
+        summary.append("\n")
         summary.append("=" * 60)
         summary.append("Dynamic Road Network - Configuration Summary")
         summary.append("=" * 60)
@@ -346,17 +352,17 @@ Config.ensure_directories()
 
 if __name__ == '__main__':
     # Print configuration summary when run directly
-    print(Config.get_config_summary())
+    logger.config(Config.get_config_summary())
     
     # Validate data files
-    print("\nData File Validation:")
+    logger.info("\nData File Validation:")
     validation = Config.validate_data_files()
     for key, value in validation.items():
         if key != 'all_valid':
             status = '✓' if value else '✗'
-            print(f"  {key}: {status}")
+            logger.data(f"  {key}: {status}")
     
     if validation['all_valid']:
-        print("\n✓ All data files are present")
+        logger.success("\n✓ All data files are present")
     else:
-        print("\n✗ Some data files are missing")
+        logger.warning("\n✗ Some data files are missing")

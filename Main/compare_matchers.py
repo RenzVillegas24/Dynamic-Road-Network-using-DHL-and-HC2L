@@ -21,6 +21,10 @@ import math
 import time
 from typing import List, Dict, Tuple
 from pathlib import Path
+from console_formatter import get_logger
+
+# Get logger instance
+logger = get_logger("MatcherComparison")
 
 
 class PointMatcherReference:
@@ -262,33 +266,29 @@ def compare_algorithms(flow_file: str, incident_file: str, distance_threshold: f
     Compare point_matcher.py vs TIER 0 traffic_hash_matcher.py
     """
     
-    print("\n" + "="*90)
-    print("POINT MATCHER COMPARISON TEST")
-    print("="*90)
+    logger.test("POINT MATCHER COMPARISON TEST")
     
     # Load data
-    print("\n📂 Loading sample data...")
+    logger.file_op("Loading sample data...")
     with open(flow_file, 'r') as f:
         flow_data = json.load(f)
     
     with open(incident_file, 'r') as f:
         incident_data = json.load(f)
     
-    print(f"   ✅ Flow results: {len(flow_data.get('results', []))} items")
-    print(f"   ✅ Incident results: {len(incident_data.get('results', []))} items")
+    logger.success(f"Flow results: {len(flow_data.get('results', []))} items")
+    logger.success(f"Incident results: {len(incident_data.get('results', []))} items")
     
     # ========== REFERENCE: point_matcher.py ==========
-    print("\n" + "-"*90)
-    print("REFERENCE: point_matcher.py Logic")
-    print("-"*90)
+    logger.algorithm("REFERENCE: point_matcher.py Logic")
     
     start_time = time.time()
     
     flow_points_ref = PointMatcherReference.extract_flow_points(flow_data)
     incident_points_ref = PointMatcherReference.extract_incident_points(incident_data)
     
-    print(f"   Extracted {len(flow_points_ref)} flow points")
-    print(f"   Extracted {len(incident_points_ref)} incident points")
+    logger.data(f"Extracted {len(flow_points_ref)} flow points")
+    logger.data(f"Extracted {len(incident_points_ref)} incident points")
     
     ref_results = PointMatcherReference.find_matches(
         flow_points_ref, incident_points_ref, distance_threshold
@@ -296,19 +296,17 @@ def compare_algorithms(flow_file: str, incident_file: str, distance_threshold: f
     
     ref_time = time.time() - start_time
     
-    print(f"\n   📊 Results:")
-    print(f"      Matched point pairs: {ref_results['total_matches']}")
-    print(f"      Matched incidents: {ref_results['matched_incidents']}/{len(incident_data.get('results', []))}")
-    print(f"      Time: {ref_time*1000:.2f}ms")
+    logger.data("Reference Results:")
+    logger.info(f"Matched point pairs: {ref_results['total_matches']}")
+    logger.info(f"Matched incidents: {ref_results['matched_incidents']}/{len(incident_data.get('results', []))}")
+    logger.time(f"Time: {ref_time*1000:.2f}ms")
     
     # Get unique incidents matched
     ref_matched_incidents = set(ref_results['incident_matches_count'].keys())
-    print(f"      Unique incident IDs: {len(ref_matched_incidents)}")
+    logger.info(f"Unique incident IDs: {len(ref_matched_incidents)}")
     
     # ========== TIER 0: traffic_hash_matcher.py ==========
-    print("\n" + "-"*90)
-    print("TIER 0: traffic_hash_matcher.py Logic")
-    print("-"*90)
+    logger.algorithm("TIER 0: traffic_hash_matcher.py Logic")
     
     start_time = time.time()
     
@@ -330,102 +328,94 @@ def compare_algorithms(flow_file: str, incident_file: str, distance_threshold: f
     tier0_successful = sum(1 for m in tier0_matches if m['matched'])
     tier0_total_points_matched = sum(m['matched_points'] for m in tier0_matches if m['matched'])
     
-    print(f"\n   📊 Results:")
-    print(f"      Matched incidents: {tier0_successful}/{len(incident_results)}")
-    print(f"      Total points inside flows: {tier0_total_points_matched}")
-    print(f"      Time: {tier0_time*1000:.2f}ms")
-    print(f"      Unique incident IDs: {len(tier0_matched_incidents)}")
+    logger.data("TIER 0 Results:")
+    logger.info(f"Matched incidents: {tier0_successful}/{len(incident_results)}")
+    logger.info(f"Total points inside flows: {tier0_total_points_matched}")
+    logger.time(f"Time: {tier0_time*1000:.2f}ms")
+    logger.info(f"Unique incident IDs: {len(tier0_matched_incidents)}")
     
     # ========== COMPARISON ==========
-    print("\n" + "="*90)
-    print("COMPARISON ANALYSIS")
-    print("="*90)
+    logger.test("COMPARISON ANALYSIS")
     
-    print(f"\nAlgorithm Differences:")
-    print(f"  point_matcher.py:")
-    print(f"    - For each incident point: find BEST flow point")
-    print(f"    - Count if best distance < {distance_threshold}m")
-    print(f"    - Group by incident ID")
-    print(f"    - Result: {ref_results['total_matches']} individual point matches")
+    logger.algorithm("Algorithm Differences:")
+    logger.info(f"point_matcher.py:")
+    logger.info(f"- For each incident point: find BEST flow point")
+    logger.info(f"- Count if best distance < {distance_threshold}m")
+    logger.info(f"- Group by incident ID")
+    logger.info(f"- Result: {ref_results['total_matches']} individual point matches")
     
-    print(f"\n  TIER 0 (traffic_hash_matcher.py):")
-    print(f"    - For each incident: find flow with 2+ points inside")
-    print(f"    - For each incident point: find ANY flow point < {distance_threshold}m")
-    print(f"    - Greedy: pick flow with most matched points")
-    print(f"    - Result: {tier0_successful} incidents matched")
+    logger.info(f"TIER 0 (traffic_hash_matcher.py):")
+    logger.info(f"- For each incident: find flow with 2+ points inside")
+    logger.info(f"- For each incident point: find ANY flow point < {distance_threshold}m")
+    logger.info(f"- Greedy: pick flow with most matched points")
+    logger.info(f"- Result: {tier0_successful} incidents matched")
     
     # Calculate overlap
     overlap = ref_matched_incidents & tier0_matched_incidents
     only_in_ref = ref_matched_incidents - tier0_matched_incidents
     only_in_tier0 = tier0_matched_incidents - ref_matched_incidents
     
-    print(f"\nIncident Overlap Analysis:")
-    print(f"  Reference matched incidents: {len(ref_matched_incidents)}")
-    print(f"  TIER 0 matched incidents: {len(tier0_matched_incidents)}")
-    print(f"  Overlap (both matched): {len(overlap)}")
-    print(f"  Only in reference: {len(only_in_ref)}")
-    print(f"  Only in TIER 0: {len(only_in_tier0)}")
-    print(f"  Overlap %: {len(overlap) / max(len(ref_matched_incidents), 1) * 100:.1f}%")
+    logger.data("Incident Overlap Analysis:")
+    logger.info(f"Reference matched incidents: {len(ref_matched_incidents)}")
+    logger.info(f"TIER 0 matched incidents: {len(tier0_matched_incidents)}")
+    logger.info(f"Overlap (both matched): {len(overlap)}")
+    logger.info(f"Only in reference: {len(only_in_ref)}")
+    logger.info(f"Only in TIER 0: {len(only_in_tier0)}")
+    logger.info(f"Overlap %: {len(overlap) / max(len(ref_matched_incidents), 1) * 100:.1f}%")
     
     # Performance comparison
-    print(f"\nPerformance:")
-    print(f"  Reference time: {ref_time*1000:.2f}ms")
-    print(f"  TIER 0 time: {tier0_time*1000:.2f}ms")
-    print(f"  Speedup: {ref_time/tier0_time:.2f}x")
+    logger.performance("Performance:")
+    logger.time(f"Reference time: {ref_time*1000:.2f}ms")
+    logger.time(f"TIER 0 time: {tier0_time*1000:.2f}ms")
+    logger.info(f"Speedup: {ref_time/tier0_time:.2f}x")
     
     # Coverage
-    print(f"\nCoverage Analysis:")
+    logger.data("Coverage Analysis:")
     ref_coverage = len(ref_matched_incidents) / len(incident_results) * 100
     tier0_coverage = tier0_successful / len(incident_results) * 100
-    print(f"  Reference coverage: {ref_coverage:.1f}% ({len(ref_matched_incidents)}/{len(incident_results)})")
-    print(f"  TIER 0 coverage: {tier0_coverage:.1f}% ({tier0_successful}/{len(incident_results)})")
-    print(f"  Difference: {abs(tier0_coverage - ref_coverage):.1f}%")
+    logger.info(f"Reference coverage: {ref_coverage:.1f}% ({len(ref_matched_incidents)}/{len(incident_results)})")
+    logger.info(f"TIER 0 coverage: {tier0_coverage:.1f}% ({tier0_successful}/{len(incident_results)})")
+    logger.info(f"Difference: {abs(tier0_coverage - ref_coverage):.1f}%")
     
     # Detailed comparison
-    print(f"\n" + "-"*90)
-    print("SAMPLE DETAILED MATCHES")
-    print("-"*90)
+    logger.test("SAMPLE DETAILED MATCHES")
     
-    print(f"\n✅ Matched by Both Algorithms:")
+    logger.success("Matched by Both Algorithms:")
     sample_both = list(overlap)[:3]
     for incident_id in sample_both:
         ref_match = next((m for m in ref_results['incident_matches_count'].items() if m[0] == incident_id), None)
         tier0_match = next((m for m in tier0_matches if m['incident_id'] == incident_id), None)
         if ref_match and tier0_match:
-            print(f"  Incident {incident_id}:")
-            print(f"    - Reference: {ref_match[1]} point matches")
-            print(f"    - TIER 0: {tier0_match['matched_points']}/{tier0_match['incident_point_count']} pts ({tier0_match['match_percentage']:.0f}%)")
+            logger.info(f"Incident {incident_id}:")
+            logger.info(f"- Reference: {ref_match[1]} point matches")
+            logger.info(f"- TIER 0: {tier0_match['matched_points']}/{tier0_match['incident_point_count']} pts ({tier0_match['match_percentage']:.0f}%)")
     
     if only_in_ref:
-        print(f"\n❌ Matched ONLY by Reference (point_matcher.py):")
+        logger.warning("Matched ONLY by Reference (point_matcher.py):")
         for incident_id in list(only_in_ref)[:3]:
             ref_match = next((m for m in ref_results['incident_matches_count'].items() if m[0] == incident_id), None)
             if ref_match:
-                print(f"  Incident {incident_id}: {ref_match[1]} point matches")
+                logger.info(f"Incident {incident_id}: {ref_match[1]} point matches")
     
     if only_in_tier0:
-        print(f"\n⚠️  Matched ONLY by TIER 0 (traffic_hash_matcher.py):")
+        logger.warning("Matched ONLY by TIER 0 (traffic_hash_matcher.py):")
         for incident_id in list(only_in_tier0)[:3]:
             tier0_match = next((m for m in tier0_matches if m['incident_id'] == incident_id), None)
             if tier0_match:
-                print(f"  Incident {incident_id}: {tier0_match['matched_points']}/{tier0_match['incident_point_count']} pts")
+                logger.info(f"Incident {incident_id}: {tier0_match['matched_points']}/{tier0_match['incident_point_count']} pts")
     
     # Validation verdict
-    print(f"\n" + "="*90)
-    print("VALIDATION VERDICT")
-    print("="*90)
+    logger.test("VALIDATION VERDICT")
     
     if len(overlap) / max(len(ref_matched_incidents), 1) > 0.8:
-        print(f"\n✅ TIER 0 IMPLEMENTATION IS VALID")
-        print(f"   - High overlap with reference implementation ({len(overlap)}/{len(ref_matched_incidents)})")
-        print(f"   - Coverage is comparable ({tier0_coverage:.1f}% vs {ref_coverage:.1f}%)")
-        print(f"   - TIER 0 uses different but equivalent algorithm")
+        logger.success("TIER 0 IMPLEMENTATION IS VALID")
+        logger.info(f"- High overlap with reference implementation ({len(overlap)}/{len(ref_matched_incidents)})")
+        logger.info(f"- Coverage is comparable ({tier0_coverage:.1f}% vs {ref_coverage:.1f}%)")
+        logger.info(f"- TIER 0 uses different but equivalent algorithm")
     else:
-        print(f"\n⚠️  TIER 0 NEEDS ADJUSTMENT")
-        print(f"   - Low overlap with reference ({len(overlap)}/{len(ref_matched_incidents)})")
-        print(f"   - Possible issues: threshold mismatch, extraction differences")
-    
-    print("\n" + "="*90)
+        logger.warning("TIER 0 NEEDS ADJUSTMENT")
+        logger.info(f" - Low overlap with reference ({len(overlap)}/{len(ref_matched_incidents)})")
+        logger.info(f" - Possible issues: threshold mismatch, extraction differences")
 
 
 if __name__ == "__main__":
@@ -436,11 +426,11 @@ if __name__ == "__main__":
     try:
         compare_algorithms(flow_file, incident_file, distance_threshold=100.0)
     except FileNotFoundError as e:
-        print(f"❌ Error: {e}")
-        print(f"   Make sure sample JSON files exist at:")
-        print(f"   - {flow_file}")
-        print(f"   - {incident_file}")
+        logger.error(f"File not found: {e}")
+        logger.info("Make sure sample JSON files exist at:")
+        logger.info(f"- {flow_file}")
+        logger.info(f"- {incident_file}")
     except Exception as e:
-        print(f"❌ Error: {e}")
+        logger.error(f"Unexpected error: {e}")
         import traceback
         traceback.print_exc()

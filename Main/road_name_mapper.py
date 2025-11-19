@@ -3,6 +3,10 @@ import csv
 import os
 from typing import Dict, List, Tuple, Optional
 
+from console_formatter import get_logger
+
+logger = get_logger("RoadNameMapper")
+
 class RoadNameMapper:
     """
     Maps node-to-node transitions to road names using the edges CSV data
@@ -19,7 +23,7 @@ class RoadNameMapper:
         """Load road name mapping from edges CSV"""
         try:
             if not os.path.exists(self.edges_csv_path):
-                print(f"⚠️  Warning: Edges file not found at {self.edges_csv_path}")
+                logger.warning(f"Edges file not found at {self.edges_csv_path}")
                 return
             
             edge_count = 0
@@ -60,11 +64,11 @@ class RoadNameMapper:
                     
                     edge_count += 1
             
-            print(f"✅ Loaded {edge_count} road segments with names")
-            print(f"📍 Total mapped edges: {len(self.edge_to_road)}")
+            logger.success(f"Loaded {edge_count} road segments with names")
+            logger.location(f"Total mapped edges: {len(self.edge_to_road)}")
             
         except Exception as e:
-            print(f"❌ Error loading road mapping: {e}")
+            logger.error(f"Error loading road mapping: {e}")
             self.edge_to_road = {}
             self.node_connections = {}
     
@@ -142,7 +146,7 @@ class RoadNameMapper:
                     return max(named_roads, key=len)
                     
         except Exception as e:
-            print(f"⚠️  Error finding road through connections: {e}")
+            logger.warning(f"Error finding road through connections: {e}")
         
         return 'Unnamed Road'
     

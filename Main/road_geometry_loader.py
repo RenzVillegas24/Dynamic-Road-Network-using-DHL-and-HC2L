@@ -11,6 +11,10 @@ import os
 from typing import Dict, List, Tuple, Optional
 from pathlib import Path
 
+from console_formatter import get_logger
+
+logger = get_logger("RoadGeometryLoader")
+
 
 class RoadGeometryLoader:
     """
@@ -60,7 +64,7 @@ class RoadGeometryLoader:
                     self.node_id_to_osm[seq_id] = osm_id
                     self.osm_id_to_node[osm_id] = seq_id
             
-            print(f"✅ Loaded {len(self.node_id_to_osm)} node ID mappings")
+            logger.data(f"Loaded {len(self.node_id_to_osm)} node ID mappings")
         
         # Load node coordinates
         if os.path.exists(self.nodes_csv_path):
@@ -72,9 +76,9 @@ class RoadGeometryLoader:
                     lng = float(row['longitude'])
                     self.node_coords[node_id] = (lat, lng)
             
-            print(f"✅ Loaded {len(self.node_coords)} node coordinates")
+            logger.data(f"Loaded {len(self.node_coords)} node coordinates")
         else:
-            print(f"❌ Nodes file not found: {self.nodes_csv_path}")
+            logger.error(f"Nodes file not found: {self.nodes_csv_path}")
             return
         
         # Load edges
@@ -117,9 +121,9 @@ class RoadGeometryLoader:
                         self.adj_list[source] = []
                     self.adj_list[source].append((target, length, edge_data))
             
-            print(f"✅ Loaded {len(self.edges)} edges with geometry data")
+            logger.data(f"Loaded {len(self.edges)} edges with geometry data")
         else:
-            print(f"❌ Edges file not found: {self.edges_csv_path}")
+            logger.error(f"Edges file not found: {self.edges_csv_path}")
     
     def get_node_coords(self, node_id: int) -> Optional[Tuple[float, float]]:
         """
@@ -321,7 +325,7 @@ class RoadGeometryLoader:
 if __name__ == "__main__":
     from config import Config
     
-    print("🧪 Testing Road Geometry Loader...")
+    logger.test("Testing Road Geometry Loader...")
     
     # Get node mapping path
     mapping_path = str(Config.NODES_CSV).replace('quezon_city_nodes.csv', 'node_id_mapping.csv')
@@ -335,28 +339,28 @@ if __name__ == "__main__":
     # Test with a simple path
     test_path = [1, 2, 3]
     
-    print(f"\n📍 Testing path: {test_path}")
+    logger.location(f"Testing path: {test_path}")
     
     # Get coordinates WITHOUT detailed geometry
     coords_simple = loader.get_path_coordinates(test_path, use_osm_geometry=False)
-    print(f"✅ Simple mode (nodes only): {len(coords_simple)} coordinates")
+    logger.success(f"Simple mode (nodes only): {len(coords_simple)} coordinates")
     
     # Get coordinates WITH detailed geometry from CSV
     coords_with_geometry = loader.get_path_coordinates(test_path, use_osm_geometry=True)
-    print(f"✅ With CSV geometry (road curves): {len(coords_with_geometry)} coordinates")
+    logger.success(f"With CSV geometry (road curves): {len(coords_with_geometry)} coordinates")
     if len(coords_with_geometry) > len(coords_simple):
-        print(f"   Improvement: {len(coords_with_geometry) - len(coords_simple)} additional curve points from CSV")
+        logger.data(f"Improvement: {len(coords_with_geometry) - len(coords_simple)} additional curve points from CSV")
     
     # Validate path
     is_valid, message = loader.validate_path(test_path)
     if is_valid:
-        print(f"✅ Path is valid: {message}")
+        logger.success(f"Path is valid: {message}")
     else:
-        print(f"⚠️  Path validation: {message}")
+        logger.warning(f"Path validation: {message}")
     
     # Get summary
     summary = loader.get_path_summary(test_path)
-    print(f"\n📊 Path summary:")
-    print(f"   Total distance: {summary['total_distance_m']:.2f} m")
-    print(f"   Segments: {summary['num_segments']}")
-    print(f"   Nodes: {summary['num_nodes']}")
+    logger.data(f"\nPath summary:")
+    logger.data(f"   Total distance: {summary['total_distance_m']:.2f} m")
+    logger.data(f"   Segments: {summary['num_segments']}")
+    logger.data(f"   Nodes: {summary['num_nodes']}")
