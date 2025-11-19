@@ -470,13 +470,24 @@ function showAllDisruptionsOnMap(disruptionData) {
         const centerLng = (disruption.source_lng + disruption.target_lng) / 2;
         
         // Get fields with compatibility layer
-        const severity = getDisruptionField(disruption, 'severity');
+        let severity = getDisruptionField(disruption, 'severity');
         const incidentType = getDisruptionField(disruption, 'incident_type');
         const roadName = disruption.road_name || 'Unknown Road';
         const speedKph = getDisruptionField(disruption, 'current_speed') || 0;
         const slowdownRatio = disruption.slowdown_ratio || (speedKph > 0 ? speedKph / 50 : 0.5);
         
         // Get color based on severity
+        // For user-reported incidents, map criticality to severity (case-insensitive)
+        if (disruption.incident_criticality) {
+          const criticality = disruption.incident_criticality.toLowerCase();
+          const criticalityMap = {
+            'critical': 'Heavy',
+            'major': 'Medium',
+            'minor': 'Light'
+          };
+          severity = criticalityMap[criticality] || 'Medium';
+        }
+        
         const markerColor = severity === 'Heavy' ? '#ef4444' : 
                            severity === 'Medium' ? '#f59e0b' : '#10b981';
         
@@ -513,14 +524,41 @@ function showAllDisruptionsOnMap(disruptionData) {
         }).addTo(map);
         
         // Add popup with info
-        const popupContent = `
-          <div class="p-2">
-            <h3 class="font-bold text-sm">${roadName}</h3>
-            <p class="text-xs text-gray-600">${incidentType}</p>
-            <p class="text-xs">Severity: <span class="font-semibold" style="color: ${markerColor}">${severity}</span></p>
-            <p class="text-xs">Speed: ${speedKph.toFixed(1)} km/h (${Math.round(slowdownRatio * 100)}% of normal)</p>
-          </div>
-        `;
+        const getIncidentInfo = () => {
+          // For user-reported incidents (incident_criticality exists)
+          if (disruption.incident_criticality) {
+            // Use PopupStyles for consistent popup formatting
+            return PopupStyles.createIncidentPopup({
+              road_name: disruption.road_name || 'Unknown Road',
+              incident_type: disruption.incident_type || 'Incident',
+              incident_criticality: disruption.incident_criticality,
+              incident_road_closed: disruption.incident_road_closed || false,
+              incident_description: disruption.incident_description || '',
+              incident_start_time: disruption.incident_start_time || '',
+              incident_end_time: disruption.incident_end_time || '',
+              highway_type: disruption.highway_type || ''
+            });
+          }
+          
+          // For HERE traffic data (severity exists)
+          const severity = getDisruptionField(disruption, 'severity');
+          const speedKph = getDisruptionField(disruption, 'current_speed') || getDisruptionField(disruption, 'speed_kph') || 0;
+          const freeFlowKph = getDisruptionField(disruption, 'free_flow_kph') || 50;
+          const slowdownRatio = disruption.slowdown_ratio || (speedKph > 0 ? (speedKph / freeFlowKph) : 0.5);
+          
+          // Use PopupStyles for consistent popup formatting
+          return PopupStyles.createTrafficPopup({
+            road_name: disruption.road_name || 'Unknown Road',
+            incident_type: disruption.incident_type || 'Traffic',
+            severity: severity,
+            speed_kph: speedKph,
+            free_flow_kph: freeFlowKph,
+            jam_factor: getDisruptionField(disruption, 'jam_factor') || 0,
+            is_closed: false
+          });
+        };
+        
+        const popupContent = getIncidentInfo();
         
         marker.bindPopup(popupContent);
         

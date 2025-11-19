@@ -41,15 +41,14 @@ function loadOSMGraph() {
             opacity: 0.4
           });
           
-          // Add popup with edge info
-          polyline.bindPopup(`
-            <div class="p-2">
-              <p class="font-bold">${edge.name}</p>
-              <p class="text-xs">Type: ${edge.highway}</p>
-              <p class="text-xs">Length: ${edge.length.toFixed(0)}m</p>
-              ${edge.oneway ? '<p class="text-xs text-orange-600">One-way</p>' : ''}
-            </div>
-          `);
+          // Add popup with edge info using modern style
+          const edgePopup = PopupStyles.createEdgePopup({
+            name: edge.name,
+            highway: edge.highway,
+            length: edge.length,
+            oneway: edge.oneway
+          });
+          polyline.bindPopup(edgePopup);
           
           trafficVisualization.osmGraphLayer.addLayer(polyline);
         });
@@ -85,7 +84,24 @@ function loadActiveIncidents() {
   console.log('Loading Active Incidents (excluding flow data)...');
   
   fetch('/get_active_disruptions')
-    .then(response => response.json())
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      return response.text().then(text => {
+        console.log('Raw response length:', text.length, 'bytes');
+        if (text.length < 500) {
+          console.log('Raw response:', text);
+        }
+        try {
+          return JSON.parse(text);
+        } catch (error) {
+          console.error('JSON parse error:', error.message);
+          console.error('Response preview:', text.substring(0, 200));
+          throw error;
+        }
+      });
+    })
     .then(data => {
       if (data.success) {
         // Create layer group if it doesn't exist
@@ -96,32 +112,14 @@ function loadActiveIncidents() {
         // Clear existing layers
         trafficVisualization.incidentsLayer.clearLayers();
         
-        // Get icon for incident type
-        const getIncidentIcon = (type, severity) => {
-          const colors = {
-            'Heavy': '#ef4444',
-            'Medium': '#f59e0b',
-            'Light': '#10b981'
-          };
-          
-          const icons = {
-            'Accident': '🚗',
-            'Road Closure': '🚧',
-            'Construction': '🏗️',
-            'Congestion': '🚦',
-            'Weather': '🌧️',
-            'Road Hazard': '⚠️',
-            'Disabled Vehicle': '🚙',
-            'Mass Transit Event': '🚇',
-            'Planned Event': '📅',
-            'Lane Restriction': '⚠️'
-          };
-          
-          return {
-            color: colors[severity] || '#6b7280',
-            icon: icons[type] || '📍'
-          };
-        };
+        let severityColor = '#10b981'; // green
+        if (incident.severity === 'low') {
+          severityColor = '#10b981'; // green
+        } else if (incident.severity === 'critical') {
+          severityColor = '#dc2626'; // dark red
+        } else if (incident.severity === 'medium') {
+          severityColor = '#f59e0b'; // amber
+        }
         
         // Filter to show ONLY true incidents (exclude Congestion which is flow data)
         const incidentTypes = ['Accident', 'Road Closure', 'Construction', 'Weather', 
@@ -142,39 +140,27 @@ function loadActiveIncidents() {
             const midLat = (incident.source_lat + incident.target_lat) / 2;
             const midLng = (incident.source_lng + incident.target_lng) / 2;
             
-            const { color, icon } = getIncidentIcon(incidentType, incident.severity);
-            
             // Create custom marker
             const marker = L.circleMarker([midLat, midLng], {
               radius: 8,
-              fillColor: color,
+              fillColor: severityColor,
               color: '#fff',
               weight: 2,
               opacity: 1,
               fillOpacity: 0.8
             });
             
-            // Add popup
-            marker.bindPopup(`
-              <div class="p-3">
-                <div class="flex items-center mb-2">
-                  <span class="text-2xl mr-2">${icon}</span>
-                  <h3 class="font-bold text-lg">${incidentType}</h3>
-                </div>
-                <div class="space-y-1 text-sm">
-                  <p><span class="font-semibold">Road:</span> ${incident.road_name}</p>
-                  <p><span class="font-semibold">Severity:</span> 
-                    <span class="px-2 py-1 rounded" style="background-color: ${color}; color: white;">
-                      ${incident.severity}
-                    </span>
-                  </p>
-                  <p><span class="font-semibold">Speed:</span> ${incident.speed_kph.toFixed(1)} km/h 
-                    (Normal: ${incident.free_flow_kph.toFixed(1)} km/h)</p>
-                  <p><span class="font-semibold">Jam Factor:</span> ${incident.jam_factor.toFixed(1)}/10</p>
-                  ${incident.is_closed ? '<p class="text-red-600 font-bold">⛔ Road Closed</p>' : ''}
-                </div>
-              </div>
-            `);
+            // Add popup using modern style
+            const incidentPopup = PopupStyles.createTrafficPopup({
+              road_name: incident.road_name,
+              incident_type: incidentType,
+              severity: incident.severity,
+              speed_kph: incident.speed_kph,
+              free_flow_kph: incident.free_flow_kph,
+              jam_factor: incident.jam_factor,
+              is_closed: incident.is_closed,
+            });
+            marker.bindPopup(incidentPopup);
             
             trafficVisualization.incidentsLayer.addLayer(marker);
             totalIncidents++;
@@ -375,31 +361,18 @@ function renderTrafficSegments(segments, mode, routeOnly) {
       });
 
       const icon = incidentIcons[segment.incident_type] || '📍';
-      const popup = `
-        <div class="p-3 min-w-[250px]">
-          <div class="flex items-center mb-2">
-            <span class="text-2xl mr-2">${icon}</span>
-            <h3 class="font-bold text-lg">${segment.incident_type}</h3>
-          </div>
-          <div class="space-y-1 text-sm">
-            <p><span class="font-semibold">Road:</span> ${segment.road_name}</p>
-            <p><span class="font-semibold">Type:</span> ${segment.highway_type}</p>
-            <p><span class="font-semibold">Severity:</span> 
-              <span class="px-2 py-1 rounded text-white" style="background-color: ${color};">
-                ${segment.severity}
-              </span>
-            </p>
-            <p><span class="font-semibold">Speed:</span> ${(segment.speed_kph || 0).toFixed(1)} km/h 
-              <span class="text-gray-500">(Free flow: ${(segment.free_flow_kph || 0).toFixed(1)} km/h)</span>
-            </p>
-            <p><span class="font-semibold">Jam Factor:</span> ${(segment.jam_factor || 0).toFixed(1)}/10</p>
-            <p><span class="font-semibold">Length:</span> ${segment.length ? segment.length.toFixed(0) : 0}m</p>
-            ${segment.is_closed ? '<p class="text-red-600 font-bold mt-2">⛔ ROAD CLOSED</p>' : ''}
-            ${segment.description ? `<p class="text-xs text-gray-600 mt-2">${segment.description}</p>` : ''}
-            <p class="text-xs text-teal-600 mt-2">✅ Matched to OSM network with geometry</p>
-          </div>
-        </div>
-      `;
+      const popup = PopupStyles.createTrafficOverlayPopup({
+        incident_type: segment.incident_type,
+        road_name: segment.road_name,
+        highway_type: segment.highway_type,
+        severity: segment.severity,
+        speed_kph: segment.speed_kph || 0,
+        free_flow_kph: segment.free_flow_kph || 0,
+        jam_factor: segment.jam_factor || 0,
+        length: segment.length,
+        is_closed: segment.is_closed,
+        description: segment.description
+      });
 
       polyline.bindPopup(popup);
       polyline.on('mouseover', function() {

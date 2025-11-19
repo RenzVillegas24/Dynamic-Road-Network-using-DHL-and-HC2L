@@ -1,3 +1,70 @@
+// ============================================================
+// GLOBAL FUNCTIONS - Available for form submission and other handlers
+// ============================================================
+
+/**
+ * Update Road Closure UI state based on selected incident type
+ * Disables/enables controls based on whether Road Closure is selected
+ */
+function updateRoadClosureUI() {
+  const disruptionTypeSelect = document.getElementById('disruption-type');
+  if (!disruptionTypeSelect) return;
+  
+  const selectedType = disruptionTypeSelect.value;
+  
+  if (selectedType === 'road-closure') {
+    // Automatically set criticality to "critical" for Road Closure
+    const criticalRadio = document.querySelector('input[name="criticality"][value="critical"]');
+    if (criticalRadio) {
+      criticalRadio.checked = true;
+      // Trigger change event to update UI
+      criticalRadio.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    
+    // Automatically check "Road is Completely Closed"
+    const roadClosedCheckbox = document.getElementById('incident-road-closed');
+    if (roadClosedCheckbox) {
+      roadClosedCheckbox.checked = true;
+      roadClosedCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    
+    // Disable all criticality radio buttons except critical
+    const criticalityRadios = document.querySelectorAll('input[name="criticality"]');
+    criticalityRadios.forEach(radio => {
+      if (radio.value !== 'critical') {
+        radio.disabled = true;
+        radio.parentElement.style.opacity = '0.5';
+        radio.parentElement.style.pointerEvents = 'none';
+      }
+    });
+    
+    // Disable the road closed checkbox
+    if (roadClosedCheckbox) {
+      roadClosedCheckbox.disabled = true;
+      roadClosedCheckbox.parentElement.style.opacity = '0.5';
+      roadClosedCheckbox.parentElement.style.pointerEvents = 'none';
+    }
+    
+    showUpdateToast("Road Closure: Criticality set to Critical, Road marked as Closed", 'info');
+  } else {
+    // Re-enable all criticality radio buttons
+    const criticalityRadios = document.querySelectorAll('input[name="criticality"]');
+    criticalityRadios.forEach(radio => {
+      radio.disabled = false;
+      radio.parentElement.style.opacity = '1';
+      radio.parentElement.style.pointerEvents = 'auto';
+    });
+    
+    // Re-enable the road closed checkbox
+    const roadClosedCheckbox = document.getElementById('incident-road-closed');
+    if (roadClosedCheckbox) {
+      roadClosedCheckbox.disabled = false;
+      roadClosedCheckbox.parentElement.style.opacity = '1';
+      roadClosedCheckbox.parentElement.style.pointerEvents = 'auto';
+    }
+  }
+}
+
 // Initialize all event handlers when DOM is ready
 function initializeEventHandlers() {
     console.log('🎯 Initializing event handlers...');
@@ -432,40 +499,53 @@ function initializeEventHandlers() {
     disruptions.forEach((disruption) => {
       const card = document.createElement('div');
       card.className = 'bg-white border border-purple-100 rounded-2xl p-4 shadow-sm hover:shadow-md transition';
-      const severityBadge = disruption.severity || 'Custom';
+      
       const roadName = disruption.road_name || 'Pinned Location';
       const incidentType = disruption.incident_type || 'User Incident';
-      const speed = typeof disruption.speed_kph === 'number' ? `${disruption.speed_kph.toFixed(1)} km/h` : '--';
-      const jamFactor = typeof disruption.jam_factor === 'number' ? disruption.jam_factor.toFixed(1) : '--';
-      const timestamp = disruption.timestamp ? new Date(disruption.timestamp).toLocaleString() : 'Just now';
+      const criticality = disruption.incident_criticality || 'Unknown';
+      const roadClosed = disruption.incident_road_closed ? 'Yes' : 'No';
+      const description = disruption.incident_description || 'No description';
+      const startTime = disruption.incident_start_time ? new Date(disruption.incident_start_time).toLocaleString() : '--';
+      const endTime = disruption.incident_end_time ? new Date(disruption.incident_end_time).toLocaleString() : '--';
+      const highwayType = disruption.highway_type || 'Unknown';
 
       card.innerHTML = `
         <div class="flex items-start justify-between gap-3">
           <div>
             <p class="text-xs font-semibold text-purple-500 uppercase tracking-wide">${incidentType}</p>
             <h4 class="font-bold text-slate-900 text-base">${roadName}</h4>
-            <p class="text-xs text-slate-500">${timestamp}</p>
+            <p class="text-xs text-slate-500">${description}</p>
           </div>
-          <span class="text-xs font-bold px-2 py-1 rounded-full bg-purple-100 text-purple-700">${severityBadge}</span>
+          <span class="text-xs font-bold px-2 py-1 rounded-full bg-purple-100 text-purple-700">${criticality.toUpperCase()}</span>
         </div>
         <div class="grid grid-cols-2 gap-3 mt-3 text-xs text-slate-600">
           <div>
-            <p class="font-semibold text-slate-800">Speed</p>
-            <p>${speed}</p>
+            <p class="font-semibold text-slate-800">Road Closed</p>
+            <p>${roadClosed}</p>
           </div>
           <div>
-            <p class="font-semibold text-slate-800">Jam Factor</p>
-            <p>${jamFactor}</p>
+            <p class="font-semibold text-slate-800">Highway Type</p>
+            <p>${highwayType}</p>
           </div>
         </div>
-        <button type="button" class="mt-4 w-full bg-red-50 hover:bg-red-100 text-red-700 font-semibold text-sm py-2 rounded-xl transition delete-user-disruption" data-report-id="${disruption.report_id}">
+        <div class="grid grid-cols-2 gap-3 mt-2 text-xs text-slate-600">
+          <div>
+            <p class="font-semibold text-slate-800">Start Time</p>
+            <p>${startTime}</p>
+          </div>
+          <div>
+            <p class="font-semibold text-slate-800">End Time</p>
+            <p>${endTime}</p>
+          </div>
+        </div>
+        <button type="button" class="mt-4 w-full bg-red-50 hover:bg-red-100 text-red-700 font-semibold text-sm py-2 rounded-xl transition delete-user-disruption" data-incident-id="${disruption.incident_id}">
           Remove Incident
         </button>
       `;
 
       const removeButton = card.querySelector('.delete-user-disruption');
       if (removeButton) {
-        removeButton.onclick = () => handleRemoveUserDisruption(disruption.report_id, removeButton);
+        removeButton.onclick = () => handleRemoveUserDisruption(disruption.incident_id, removeButton);
       }
 
       listElement.appendChild(card);
@@ -516,6 +596,16 @@ function initializeEventHandlers() {
     refreshUserDisruptionsBtn.onclick = () => refreshUserDisruptionsUI(true);
   }
 
+  // Handle Road Closure type automatic criticality and road closed setting
+  const disruptionTypeSelect = document.getElementById('disruption-type');
+  if (disruptionTypeSelect) {
+    // Add event listener for changes
+    disruptionTypeSelect.addEventListener('change', updateRoadClosureUI);
+    
+    // Initialize state on page load
+    updateRoadClosureUI();
+  }
+
   const reportForm = document.getElementById('report-form');
     if (reportForm) {
         reportForm.onsubmit = async (e) => {
@@ -533,18 +623,18 @@ function initializeEventHandlers() {
       return;
     }
     
-    const severity = document.querySelector('input[name="traffic"]:checked')?.value;
-    if (!severity) {
-      showUpdateToast("Please select traffic severity", 'warning');
+    const criticality = document.querySelector('input[name="criticality"]:checked')?.value;
+    if (!criticality) {
+      showUpdateToast("Please select incident criticality", 'warning');
       return;
     }
     
-    const customSpeedSlider = document.getElementById('custom-speed-slider');
-    const customSpeed = customSpeedSlider ? parseInt(customSpeedSlider.value) : 0;
-    
-    const isRoadClosed = document.getElementById('road-closure-toggle')?.checked || false;
+    const isRoadClosed = document.getElementById('incident-road-closed')?.checked || false;
     
     const description = document.getElementById('disruption-description')?.value || '';
+    const roadName = window.reportLocation.road_name || 'Custom Report';
+    const startTime = document.getElementById('incident-start-time')?.value || '';
+    const endTime = document.getElementById('incident-end-time')?.value || '';
     
     // Disable submit button to prevent multiple submissions
     const submitButton = reportForm.querySelector('button[type="submit"]');
@@ -553,7 +643,7 @@ function initializeEventHandlers() {
     submitButton.disabled = true;
     
     try {
-      // Save the custom disruption
+      // Save the custom incident
       const response = await fetch('/save_custom_disruption', {
         method: 'POST',
         headers: {
@@ -566,12 +656,18 @@ function initializeEventHandlers() {
           snapped_lng: window.reportLocation.snapped_lng,
           source_id: window.reportLocation.source_id || 0,
           target_id: window.reportLocation.target_id || 0,
-          road_name: window.reportLocation.road_name || 'Custom Report',
+          source_lat: window.reportLocation.snapped_lat || window.reportLocation.lat,
+          source_lng: window.reportLocation.snapped_lng || window.reportLocation.lng,
+          target_lat: window.reportLocation.snapped_lat || window.reportLocation.lat,
+          target_lng: window.reportLocation.snapped_lng || window.reportLocation.lng,
+          road_name: roadName,
           incident_type: incidentType,
-          severity: severity,
-          custom_speed_kph: customSpeed,
-          is_road_closed: isRoadClosed,
-          description: description
+          incident_criticality: criticality,
+          incident_road_closed: isRoadClosed,
+          incident_description: description,
+          incident_start_time: startTime,
+          incident_end_time: endTime,
+          highway_type: window.reportLocation.highway_type || 'residential'
         })
       });
       
@@ -582,11 +678,14 @@ function initializeEventHandlers() {
       const data = await response.json();
       
       if (data.success) {
-        // Success: disruption saved
-        showUpdateToast(`✅ Disruption saved: ${data.road_name} (${data.incident_type})`, 'success');
+        // Success: incident saved
+        showUpdateToast(`✅ Incident saved: ${data.road_name} (${data.incident_type})`, 'success');
         
         // Reset form
         document.getElementById('report-form').reset();
+        
+        // Reset Road Closure UI state (re-enable all controls)
+        updateRoadClosureUI();
         
         // Clear all map markers and UI elements
         clearReportMarkers();
@@ -606,11 +705,11 @@ function initializeEventHandlers() {
           reportPanel.classList.add('translate-x-full');
         }
       } else {
-        throw new Error(data.error || 'Failed to save disruption');
+        throw new Error(data.error || 'Failed to save incident');
       }
       
     } catch (error) {
-      console.error('Error saving disruption:', error);
+      console.error('Error saving incident:', error);
       showUpdateToast(`Error: ${error.message}`, 'warning');
     } finally {
       submitButton.innerHTML = originalText;

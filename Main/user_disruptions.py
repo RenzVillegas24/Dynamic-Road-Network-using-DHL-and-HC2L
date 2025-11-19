@@ -8,22 +8,21 @@ from typing import Dict, List, Optional
 from config import Config
 
 USER_DISRUPTION_FIELDNAMES = [
-    'report_id',
-    'timestamp',
     'source',
     'target',
-    'lat',
-    'lng',
-    'snapped_lat',
-    'snapped_lng',
-    'road_name',
+    'source_lat',
+    'source_lon',
+    'target_lat',
+    'target_lon',
+    'incident_id',
     'incident_type',
-    'severity',
-    'speed_kph',
-    'freeFlow_kph',
-    'jamFactor',
-    'isClosed',
-    'description'
+    'incident_criticality',
+    'incident_description',
+    'incident_road_closed',
+    'incident_start_time',
+    'incident_end_time',
+    'highway_type',
+    'road_name'
 ]
 
 
@@ -40,8 +39,31 @@ def get_user_disruptions_file() -> Path:
     except Exception:
         pass
     
-    # No files exist - return path for backward compatibility
-    return Config.DISRUPTIONS_DIR / 'user_reported_disruptions.csv'
+    # No files exist - return path for new file
+    from datetime import datetime
+    timestamp_str = datetime.now().strftime("%Y%m%dT%H%M%S%f")[:17]
+    return user_incident_dir / f"user_incident_{timestamp_str}.csv"
+
+
+def cleanup_old_user_incidents(max_files: int = 10):
+    """Remove old user_incident files, keeping only the latest N files"""
+    user_incident_dir = Config.DISRUPTIONS_DIR / 'user_incident'
+    if not user_incident_dir.exists():
+        return
+    
+    try:
+        user_files = sorted(user_incident_dir.glob("user_incident_*.csv"), reverse=True)
+        
+        # Keep only the latest max_files
+        if len(user_files) > max_files:
+            files_to_remove = user_files[max_files:]
+            for old_file in files_to_remove:
+                try:
+                    old_file.unlink()
+                except Exception:
+                    pass
+    except Exception:
+        pass
 
 
 def ensure_user_disruption_fieldnames(fieldnames: Optional[List[str]] = None) -> List[str]:
@@ -64,23 +86,8 @@ def normalize_incident_type(raw_type: str) -> str:
         return 'User Incident'
     return label.title()
 
-
-def normalize_severity(raw_severity: str) -> str:
-    """Convert raw severity hints into standardized labels."""
-    mapping = {
-        'heavy': 'Heavy',
-        'medium': 'Medium',
-        'moderate': 'Medium',
-        'light': 'Light',
-        'minor': 'Light'
-    }
-    if not raw_severity:
-        return 'Medium'
-    return mapping.get(str(raw_severity).lower(), 'Medium')
-
-
 def load_user_disruption_rows() -> List[Dict[str, str]]:
-    """Load (and self-heal) all user-reported disruption rows from latest timestamped file."""
+    """Load all user-reported disruption rows from latest timestamped file."""
     file_path = get_user_disruptions_file()
     
     if not file_path.exists():
@@ -94,10 +101,11 @@ def load_user_disruption_rows() -> List[Dict[str, str]]:
     except Exception:
         return []
 
+    # Generate incident_id if missing
     updated = False
     for row in rows:
-        if not row.get('report_id'):
-            row['report_id'] = str(uuid.uuid4())
+        if not row.get('incident_id'):
+            row['incident_id'] = str(uuid.uuid4())[:8]
             updated = True
 
     if updated:
@@ -113,7 +121,7 @@ def load_user_disruption_rows() -> List[Dict[str, str]]:
 
 
 def format_user_disruption_row(row: Dict[str, str]) -> Dict:
-    """Convert a CSV row into the disruption payload expected by the frontend."""
+    """Convert a CSV row into the disruption payload expected by the frontend (incident format only)."""
     def to_float(value, default=0.0):
         try:
             return float(value)
@@ -126,39 +134,45 @@ def format_user_disruption_row(row: Dict[str, str]) -> Dict:
         except (TypeError, ValueError):
             return default
 
-    lat = to_float(row.get('snapped_lat') or row.get('lat'))
-    lng = to_float(row.get('snapped_lng') or row.get('lng'))
-    severity = normalize_severity(row.get('severity'))
-    speed_kph = to_float(row.get('speed_kph'), 0.0)
-    free_flow_kph = to_float(row.get('freeFlow_kph'), 50.0)
-    jam_factor = to_float(row.get('jamFactor'), 0.0)
-    slowdown_ratio = 0.0
-    if free_flow_kph > 0:
-        slowdown_ratio = max(0.0, min(1.0, speed_kph / free_flow_kph))
+    def to_bool(value):
+        """Convert string to boolean."""
+        return str(value).lower() in ('true', '1', 'yes')
 
-    source_lat = to_float(row.get('source_lat'), lat)
-    source_lng = to_float(row.get('source_lon'), lng)
-    target_lat = to_float(row.get('target_lat'), lat)
-    target_lng = to_float(row.get('target_lon'), lng)
-
-    report_id = row.get('report_id') or f"legacy-{row.get('timestamp', '')}-{row.get('source', '')}-{row.get('target', '')}"
+    source_lat = to_float(row.get('source_lat'))
+    source_lon = to_float(row.get('source_lon'))
+    target_lat = to_float(row.get('target_lat'))
+    target_lon = to_float(row.get('target_lon'))
+    
+    incident_id = row.get('incident_id') or f"user-{row.get('source', '')}-{row.get('target', '')}"
+    criticality = row.get('incident_criticality', 'minor').lower()
+    is_closed = to_bool(row.get('incident_road_closed', 'false'))
+    
+    # Map criticality to severity for display
+    severity_map = {
+        'critical': 'Heavy',
+        'major': 'Heavy',
+        'high': 'Medium',
+        'medium': 'Medium',
+        'minor': 'Light',
+        'low': 'Light'
+    }
+    severity = severity_map.get(criticality, 'Light')
 
     return {
+        'incident_id': incident_id,
         'source_id': to_int(row.get('source')),
         'target_id': to_int(row.get('target')),
-        'source_lat': source_lat or lat,
-        'source_lng': source_lng or lng,
-        'target_lat': target_lat or lat,
-        'target_lng': target_lng or lng,
+        'source_lat': source_lat,
+        'source_lng': source_lon,
+        'target_lat': target_lat,
+        'target_lng': target_lon,
         'road_name': row.get('road_name', 'Custom Report'),
         'incident_type': normalize_incident_type(row.get('incident_type')),
-        'severity': severity,
-        'speed_kph': speed_kph,
-        'free_flow_kph': free_flow_kph,
-        'jam_factor': jam_factor,
-        'slowdown_ratio': slowdown_ratio,
-        'is_closed': bool(int(row.get('isClosed', 0))) if row.get('isClosed') not in (None, '') else False,
-        'description': row.get('description', 'User provided disruption'),
-        'timestamp': row.get('timestamp', '')
+        'incident_criticality': criticality,
+        'incident_description': row.get('incident_description', ''),
+        'incident_road_closed': is_closed,
+        'incident_start_time': row.get('incident_start_time', ''),
+        'incident_end_time': row.get('incident_end_time', ''),
+        'highway_type': row.get('highway_type', 'unknown')
     }
 

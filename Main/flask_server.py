@@ -38,7 +38,12 @@ from flow_service import FlowService
 from incident_service import IncidentService
 
 # Import user disruptions utilities for loading user-reported disruptions
-from user_disruptions import load_user_disruption_rows
+from user_disruptions import (
+    load_user_disruption_rows,
+    format_user_disruption_row,
+    ensure_user_disruption_fieldnames,
+    cleanup_old_user_incidents
+)
 
 # Get logger instance
 console_logger = get_logger("FlaskServer")
@@ -150,159 +155,12 @@ atexit.register(shutdown_auto_disruption_service)
 # ============================================================================
 # USER-REPORTED DISRUPTIONS HELPERS
 # ============================================================================
-
-USER_DISRUPTION_FIELDNAMES = [
-    'report_id',
-    'timestamp',
-    'source',
-    'target',
-    'lat',
-    'lng',
-    'snapped_lat',
-    'snapped_lng',
-    'road_name',
-    'incident_type',
-    'severity',
-    'speed_kph',
-    'freeFlow_kph',
-    'jamFactor',
-    'isClosed',
-    'description'
-]
-
-
-def get_user_disruptions_file() -> Path:
-    """Return the LATEST timestamped user_incident CSV file (or path for new one)."""
-    user_incident_dir = Config.DISRUPTIONS_DIR / 'user_incident'
-    user_incident_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Find latest user_incident_*.csv file
-    try:
-        user_files = sorted(user_incident_dir.glob("user_incident_*.csv"), reverse=True)
-        if user_files:
-            return user_files[0]  # Return latest
-    except Exception:
-        pass
-    
-    # No files exist - return path for backward compatibility
-    return Config.DISRUPTIONS_DIR / 'user_reported_disruptions.csv'
-
-
-def ensure_user_disruption_fieldnames(fieldnames=None):
-    """Ensure the CSV fieldnames include all required columns."""
-    if not fieldnames:
-        return list(USER_DISRUPTION_FIELDNAMES)
-    updated = list(fieldnames)
-    for field in USER_DISRUPTION_FIELDNAMES:
-        if field not in updated:
-            updated.append(field)
-    return updated
-
-
-def normalize_incident_type(raw_type: str) -> str:
-    if not raw_type:
-        return 'User Incident'
-    label = str(raw_type).replace('-', ' ').replace('_', ' ').strip()
-    if not label:
-        return 'User Incident'
-    return label.title()
-
-
-def normalize_severity(raw_severity: str) -> str:
-    mapping = {
-        'heavy': 'Heavy',
-        'medium': 'Medium',
-        'moderate': 'Medium',
-        'light': 'Light',
-        'minor': 'Light'
-    }
-    if not raw_severity:
-        return 'Medium'
-    return mapping.get(str(raw_severity).lower(), 'Medium')
-
-
-def load_user_disruption_rows() -> list:
-    """Load (and self-heal) user-reported disruptions from CSV."""
-    file_path = get_user_disruptions_file()
-    if not file_path.exists():
-        return []
-
-    with open(file_path, newline='') as csvfile:
-        reader = csv.DictReader(csvfile)
-        fieldnames = ensure_user_disruption_fieldnames(reader.fieldnames)
-        rows = list(reader)
-
-    updated = False
-    for row in rows:
-        if not row.get('report_id'):
-            row['report_id'] = str(uuid.uuid4())
-            updated = True
-
-    if updated:
-        with open(file_path, 'w', newline='') as csvfile:
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(rows)
-
-    return rows
-
-
-def format_user_disruption_row(row: dict) -> dict:
-    """Convert a CSV row into the disruption structure used on the map."""
-    def to_float(value, default=0.0):
-        try:
-            return float(value)
-        except (TypeError, ValueError):
-            return default
-
-    def to_int(value, default=0):
-        try:
-            return int(float(value))
-        except (TypeError, ValueError):
-            return default
-
-    lat = to_float(row.get('snapped_lat') or row.get('lat'))
-    lng = to_float(row.get('snapped_lng') or row.get('lng'))
-    severity = normalize_severity(row.get('severity'))
-    speed_kph = to_float(row.get('speed_kph'), 0.0)
-    free_flow_kph = to_float(row.get('freeFlow_kph'), 50.0)
-    jam_factor = to_float(row.get('jamFactor'), 0.0)
-    slowdown_ratio = 0.0
-    if free_flow_kph > 0:
-        slowdown_ratio = max(0.0, min(1.0, speed_kph / free_flow_kph))
-
-    source_lat = to_float(row.get('source_lat'), lat)
-    source_lng = to_float(row.get('source_lon'), lng)
-    target_lat = to_float(row.get('target_lat'), lat)
-    target_lng = to_float(row.get('target_lon'), lng)
-
-    report_id = row.get('report_id') or f"legacy-{row.get('timestamp', '')}-{row.get('source', '')}-{row.get('target', '')}"
-
-    return {
-        'source_id': to_int(row.get('source')),
-        'target_id': to_int(row.get('target')),
-        'source_lat': source_lat or lat,
-        'source_lng': source_lng or lng,
-        'target_lat': target_lat or lat,
-        'target_lng': target_lng or lng,
-        'road_name': row.get('road_name') or 'User Reported Location',
-        'incident_type': normalize_incident_type(row.get('incident_type')),
-        'severity': severity,
-        'speed_kph': speed_kph,
-        'free_flow_kph': free_flow_kph,
-        'jam_factor': jam_factor,
-        'is_closed': str(row.get('isClosed', '0')) in ('1', 'true', 'True'),
-        'slowdown_ratio': slowdown_ratio,
-        'criticality': severity.lower(),
-        'here_type': 'user_report',
-        'description': row.get('description', ''),
-        'report_id': report_id,
-        'timestamp': row.get('timestamp'),
-        'is_user_reported': True
-    }
-
+# NOTE: All user disruption handling is now centralized in user_disruptions.py
+# This includes: CSV field definitions, formatting, loading, and cleanup.
+# Import functions from user_disruptions module as needed.
 
 def get_user_disruptions_for_api() -> list:
+    """Load and format user-reported disruptions for API response."""
     rows = load_user_disruption_rows()
     return [format_user_disruption_row(row) for row in rows]
 
@@ -935,16 +793,15 @@ def request_new_dataset():
 @app.route('/save_custom_disruption', methods=['POST'])
 def save_custom_disruption():
     """
-    Save a custom user-reported disruption to CSV and trigger route updates
+    Save a custom user-reported incident to CSV and trigger route updates
     
     This endpoint:
-    1. Validates all form data (location, type, severity, custom speed, etc.)
-    2. Saves the disruption to user_reported_disruptions.csv
-    3. Merges user disruptions with traffic data
-    4. Triggers auto-disruption service to recalculate active routes
+    1. Validates incident data (location, type, criticality, description, etc.)
+    2. Saves the incident to timestamped user_incident CSV
+    3. Triggers auto-disruption service to recalculate active routes
     """
     data = request.json
-    console_logger.info("=== SAVING CUSTOM DISRUPTION ===")
+    console_logger.info("=== SAVING CUSTOM INCIDENT ===")
     console_logger.data(f"Received data keys: {list(data.keys())}")
     
     try:
@@ -955,75 +812,67 @@ def save_custom_disruption():
         lng = float(data.get('lng', 0))
         snapped_lat = float(data.get('snapped_lat', lat))
         snapped_lng = float(data.get('snapped_lng', lng))
+        source_lat = float(data.get('source_lat', snapped_lat))
+        source_lng = float(data.get('source_lng', snapped_lng))
+        target_lat = float(data.get('target_lat', snapped_lat))
+        target_lng = float(data.get('target_lng', snapped_lng))
         source_id = int(data.get('source_id', 0))
         target_id = int(data.get('target_id', 0))
         road_name = str(data.get('road_name', 'Custom Report'))
+        highway_type = str(data.get('highway_type', 'unknown'))
         
         # Extract incident details
         incident_type = data.get('incident_type', 'user-incident').lower()
-        severity = data.get('severity', 'medium').lower()
-        description = data.get('description', '')
+        incident_criticality = data.get('incident_criticality', 'minor').lower()
+        incident_description = data.get('incident_description', '')
+        incident_road_closed = data.get('incident_road_closed', False)
+        incident_start_time = data.get('incident_start_time', datetime.now().isoformat())
+        incident_end_time = data.get('incident_end_time', '')
         
-        # Extract custom speed and road closure settings
-        is_closed = data.get('is_road_closed', False)
-        if isinstance(is_closed, str):
-            is_closed = is_closed.lower() in ('true', '1', 'yes')
+        # Ensure road_closed is boolean string
+        if isinstance(incident_road_closed, str):
+            incident_road_closed = incident_road_closed.lower() in ('true', '1', 'yes')
+        road_closed_str = 'true' if incident_road_closed else 'false'
         
-        custom_speed_kph = float(data.get('custom_speed_kph', 0))
-        
-        # Calculate jam factor based on speed and closure
-        if is_closed:
-            jam_factor = 10.0
-            effective_speed = 0
-        elif custom_speed_kph > 0:
-            # jam_factor = 10 * (1 - speed/50)
-            jam_factor = max(0, 10 * (1 - custom_speed_kph / 50.0))
-            effective_speed = custom_speed_kph
-        else:
-            jam_factor = 4.0  # Default moderate
-            effective_speed = 30.0
-        
-        console_logger.success(f"Parsed incident: {incident_type} ({severity})")
+        console_logger.success(f"Parsed incident: {incident_type} ({incident_criticality})")
         console_logger.data(f"Location: ({lat:.4f}, {lng:.4f}) → snap: ({snapped_lat:.4f}, {snapped_lng:.4f})")
         console_logger.data(f"Road: {road_name} (Edge: {source_id}→{target_id})")
-        console_logger.data(f"Speed: {effective_speed} km/h, Jam Factor: {jam_factor:.1f}, Closed: {is_closed}")
+        console_logger.data(f"Closed: {road_closed_str}")
         
-        # Create disruption record
-        report_id = str(uuid.uuid4())[:8]
-        timestamp = datetime.now().isoformat()
+        # Create incident record with standardized format (15 fields)
+        incident_id = str(uuid.uuid4())[:8]
         
-        disruption_record = {
-            'report_id': report_id,
-            'timestamp': timestamp,
+        incident_record = {
             'source': source_id,
             'target': target_id,
-            'lat': lat,
-            'lng': lng,
-            'snapped_lat': snapped_lat,
-            'snapped_lng': snapped_lng,
-            'road_name': road_name,
+            'source_lat': source_lat,
+            'source_lon': source_lng,
+            'target_lat': target_lat,
+            'target_lon': target_lng,
+            'incident_id': incident_id,
             'incident_type': incident_type,
-            'severity': severity,
-            'speed_kph': effective_speed,
-            'freeFlow_kph': 50,  # Standard free flow for QC
-            'jamFactor': jam_factor,
-            'isClosed': '1' if is_closed else '0',
-            'description': description
+            'incident_criticality': incident_criticality,
+            'incident_description': incident_description,
+            'incident_road_closed': road_closed_str,
+            'incident_start_time': incident_start_time,
+            'incident_end_time': incident_end_time,
+            'highway_type': highway_type,
+            'road_name': road_name
         }
         
-        # Save to timestamped user incident CSV (similar to flow/incident files)
+        # Save to timestamped user incident CSV
         console_logger.processing("Saving to timestamped user_incident CSV...")
-        from user_disruptions import ensure_user_disruption_fieldnames, load_user_disruption_rows
+        from user_disruptions import ensure_user_disruption_fieldnames, load_user_disruption_rows, cleanup_old_user_incidents
         
         # Create timestamped filename
-        timestamp_str = datetime.now().strftime("%Y%m%dT%H%M%S%f")[:17]  # YYYYMMDDTHHMMSSCC
+        timestamp_str = datetime.now().strftime("%Y%m%dT%H%M%S%f")[:17]
         user_incident_dir = Config.DISRUPTIONS_DIR / "user_incident"
         user_incident_dir.mkdir(parents=True, exist_ok=True)
         csv_path = user_incident_dir / f"user_incident_{timestamp_str}.csv"
         
         # Load existing user disruptions from latest file (if any)
         rows = load_user_disruption_rows()
-        rows.append(disruption_record)
+        rows.append(incident_record)
         
         # Write to new timestamped file
         fieldnames = ensure_user_disruption_fieldnames()
@@ -1032,17 +881,20 @@ def save_custom_disruption():
             writer.writeheader()
             writer.writerows(rows)
         
+        # Cleanup old files (keep max 10)
+        cleanup_old_user_incidents(max_files=10)
+        
         console_logger.success(f"Saved to: {csv_path.name}")
-        console_logger.success("User disruption saved - will be loaded by C++ routing API")
+        console_logger.success("User incident saved - will be loaded by C++ routing API")
         
         return jsonify({
             'success': True,
-            'message': f'Custom disruption saved: {road_name}',
-            'report_id': report_id,
-            'timestamp': timestamp,
+            'message': f'Custom incident saved: {road_name}',
+            'incident_id': incident_id,
+            'timestamp': incident_start_time,
             'road_name': road_name,
             'incident_type': incident_type,
-            'severity': severity
+            'criticality': incident_criticality
         })
         
     except ValueError as e:
@@ -1052,12 +904,12 @@ def save_custom_disruption():
             'error': f'Invalid data format: {str(e)}'
         }), 400
     except Exception as e:
-        console_logger.error(f"Error saving disruption: {e}")
+        console_logger.error(f"Error saving incident: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({
             'success': False,
-            'error': f'Error saving disruption: {str(e)}'
+            'error': f'Error saving incident: {str(e)}'
         }), 500
 
 
@@ -1179,25 +1031,25 @@ def get_user_disruptions():
         return jsonify({'success': False, 'error': str(e), 'disruptions': []})
 
 
-@app.route('/user_disruptions/<report_id>', methods=['DELETE'])
-def delete_user_disruption(report_id):
+@app.route('/user_disruptions/<incident_id>', methods=['DELETE'])
+def delete_user_disruption(incident_id):
     """
-    Delete a user-reported disruption by report_id.
+    Delete a user-reported incident by incident_id.
     
-    Creates a NEW timestamped user_incident file without the deleted disruption.
+    Creates a NEW timestamped user_incident file without the deleted incident.
     This triggers route recalculation when C++ API detects the new file.
     """
-    from user_disruptions import ensure_user_disruption_fieldnames, load_user_disruption_rows
+    from user_disruptions import ensure_user_disruption_fieldnames, load_user_disruption_rows, cleanup_old_user_incidents
     
     rows = load_user_disruption_rows()
     initial_count = len(rows)
-    rows_to_keep = [row for row in rows if row.get('report_id') != report_id]
+    rows_to_keep = [row for row in rows if row.get('incident_id') != incident_id]
 
     if len(rows_to_keep) == initial_count:
         return jsonify({'success': False, 'error': 'Custom incident not found'}), 404
 
-    # Create NEW timestamped file with remaining disruptions
-    timestamp_str = datetime.now().strftime("%Y%m%dT%H%M%S%f")[:17]  # YYYYMMDDTHHMMSSCC
+    # Create NEW timestamped file with remaining incidents
+    timestamp_str = datetime.now().strftime("%Y%m%dT%H%M%S%f")[:17]
     user_incident_dir = Config.DISRUPTIONS_DIR / "user_incident"
     user_incident_dir.mkdir(parents=True, exist_ok=True)
     csv_path = user_incident_dir / f"user_incident_{timestamp_str}.csv"
@@ -1209,15 +1061,18 @@ def delete_user_disruption(report_id):
         writer.writeheader()
         writer.writerows(rows_to_keep)
 
-        console_logger.info("=== DELETING CUSTOM DISRUPTION ===")
-        console_logger.data(f"Deleted report_id: {report_id}")
-        console_logger.data(f"Remaining disruptions: {len(rows_to_keep)}")
+        console_logger.info("=== DELETING CUSTOM INCIDENT ===")
+        console_logger.data(f"Deleted incident_id: {incident_id}")
+        console_logger.data(f"Remaining incidents: {len(rows_to_keep)}")
         console_logger.success(f"Created new timestamped file: {csv_path.name}")
-        console_logger.success("C++ API will reload updated user disruptions")
+        console_logger.success("C++ API will reload updated user incidents")
+
+    # Cleanup old files (keep max 10)
+    cleanup_old_user_incidents(max_files=10)
 
     return jsonify({
         'success': True, 
-        'deleted': report_id, 
+        'deleted': incident_id, 
         'remaining': len(rows_to_keep)
     })
 
@@ -2037,6 +1892,15 @@ def get_active_disruptions():
                         return value
             return default
 
+        def escape_string(value):
+            """Ensure a value is a properly escaped string for JSON."""
+            if value is None:
+                return ''
+            s = str(value)
+            # Remove control characters that might break JSON parsing
+            s = ''.join(char if ord(char) >= 32 or char in '\t\n\r' else '' for char in s)
+            return s
+
         # Use the separated flow and incident services
         from config import Config
         
@@ -2180,24 +2044,27 @@ def get_active_disruptions():
                         is_closed_value = edge_value(edge, 'isClosed', aliases=['incident_road_closed'], default=False)
 
                         disruption = {
-                            'source_id': edge_value(edge, 'source', default=0),
-                            'target_id': edge_value(edge, 'target', default=0),
-                            'source_lat': edge_value(edge, 'source_lat', default=0),
-                            'source_lng': edge_value(edge, 'source_lon', default=0),
-                            'target_lat': edge_value(edge, 'target_lat', default=0),
-                            'target_lng': edge_value(edge, 'target_lon', default=0),
-                            'road_name': road_name,  # Use the variable extracted from either CSV or API
-                            'incident_type': display_type,
-                            'severity': severity,
-                            'speed_kph': speed_kph or 0,
-                            'free_flow_kph': free_flow_kph or 0,
-                            'jam_factor': jam_factor_value or 0,
+                            'source_id': int(edge_value(edge, 'source', default=0)),
+                            'target_id': int(edge_value(edge, 'target', default=0)),
+                            'source_lat': float(edge_value(edge, 'source_lat', default=0)),
+                            'source_lng': float(edge_value(edge, 'source_lon', default=0)),
+                            'target_lat': float(edge_value(edge, 'target_lat', default=0)),
+                            'target_lng': float(edge_value(edge, 'target_lon', default=0)),
+                            'road_name': escape_string(road_name or 'Unknown Road'),
+                            'incident_type': escape_string(display_type or 'Other'),
+                            'incident_criticality': escape_string(criticality.title() if criticality else 'Low'),
+                            'incident_description': escape_string(description or ''),
+                            'incident_road_closed': bool(road_closed),
+                            'incident_start_time': escape_string(incident.get('incident_start_time', '') if is_from_csv else incident_details.get('startTime', '')),
+                            'incident_end_time': escape_string(incident.get('incident_end_time', '') if is_from_csv else incident_details.get('endTime', '')),
+                            'highway_type': escape_string(incident.get('highway_type', '') if is_from_csv else ''),
+                            'here_type': escape_string(incident_type or 'other'),
+                            'severity': escape_string(severity or 'Light'),
+                            'speed_kph': float(speed_kph or 0),
+                            'free_flow_kph': float(free_flow_kph or 0),
+                            'jam_factor': float(jam_factor_value or 0),
                             'is_closed': bool(is_closed_value),
-                            'slowdown_ratio': round(1.0 - speed_reduction, 3),
-                            'criticality': criticality,
-                            'here_type': incident_type,
-                            'start_time': incident_details.get('startTime', '') if not is_from_csv else incident.get('timestamp', ''),
-                            'end_time': incident_details.get('endTime', '') if not is_from_csv else ''
+                            'slowdown_ratio': float(round(1.0 - speed_reduction, 3))
                         }
                         
                         # Group by incident type
@@ -2267,21 +2134,21 @@ def get_active_disruptions():
                     for edge in matched_edges:
                         # Create disruption entry for flow
                         disruption = {
-                            'source_id': edge.source,
-                            'target_id': edge.target,
-                            'source_lat': edge.source_lat,
-                            'source_lng': edge.source_lon,
-                            'target_lat': edge.target_lat,
-                            'target_lng': edge.target_lon,
-                            'road_name': flow.get('location', {}).get('description', 'Traffic Congestion'),
+                            'source_id': int(edge.source),
+                            'target_id': int(edge.target),
+                            'source_lat': float(edge.source_lat),
+                            'source_lng': float(edge.source_lon),
+                            'target_lat': float(edge.target_lat),
+                            'target_lng': float(edge.target_lon),
+                            'road_name': escape_string(flow.get('location', {}).get('description', 'Traffic Congestion')),
                             'incident_type': 'Congestion',
-                            'severity': severity,
-                            'speed_kph': edge.speed_kph,
-                            'free_flow_kph': edge.freeFlow_kph,
-                            'jam_factor': edge.jamFactor,
-                            'is_closed': edge.isClosed,
-                            'slowdown_ratio': round(max(0, 1.0 - (speed / free_flow_speed if free_flow_speed > 0 else 1)), 3),
-                            'confidence': confidence,
+                            'severity': escape_string(severity or 'Light'),
+                            'speed_kph': float(edge.speed_kph or 0),
+                            'free_flow_kph': float(edge.freeFlow_kph or 0),
+                            'jam_factor': float(edge.jamFactor or 0),
+                            'is_closed': bool(edge.isClosed),
+                            'slowdown_ratio': float(round(max(0, 1.0 - (speed / free_flow_speed if free_flow_speed > 0 else 1)), 3)),
+                            'confidence': float(confidence or 0),
                             'here_type': 'flow'
                         }
                         
@@ -2308,9 +2175,28 @@ def get_active_disruptions():
         type_counts = {incident_type: len(disruptions) for incident_type, disruptions in disruptions_by_type.items()}
         severity_counts = {'Heavy': 0, 'Medium': 0, 'Light': 0}
         
+        # Map criticality to severity for statistics
+        criticality_to_severity = {
+            'critical': 'Heavy',
+            'major': 'Heavy',
+            'high': 'Medium',
+            'medium': 'Medium',
+            'minor': 'Light',
+            'low': 'Light'
+        }
+        
         for disruptions in disruptions_by_type.values():
             for disruption in disruptions:
-                severity_counts[disruption['severity']] += 1
+                # Get severity from either 'severity' field (HERE data) or map from 'incident_criticality' (user incidents)
+                if 'severity' in disruption:
+                    severity = disruption['severity']
+                elif 'incident_criticality' in disruption:
+                    severity = criticality_to_severity.get(str(disruption.get('incident_criticality', 'low')).lower(), 'Light')
+                else:
+                    severity = 'Light'
+                
+                if severity in severity_counts:
+                    severity_counts[severity] += 1
         
         console_logger.info("Summary:")
         console_logger.data(f"Total disruptions: {total_disruptions}")
@@ -2318,7 +2204,9 @@ def get_active_disruptions():
         console_logger.data(f"By type: {type_counts}")
         console_logger.data(f"By severity: {severity_counts}")
         
-        return jsonify({
+        # Ensure all string values are properly encoded for JSON
+        import json
+        response_data = {
             'success': True,
             'total_disruptions': total_disruptions,
             'matched_edges_count': matched_edges_count,
@@ -2328,7 +2216,27 @@ def get_active_disruptions():
             'timestamp': time.time(),
             'note': 'Using HERE API with hash-based edge matching - pre-matched edges from CSV',
             'user_reported_total': len(user_disruptions)
-        })
+        }
+        
+        # Validate JSON serialization
+        try:
+            json.dumps(response_data)
+        except Exception as e:
+            console_logger.error(f"Error serializing response to JSON: {e}")
+            # Sanitize strings to prevent JSON errors
+            def sanitize_for_json(obj):
+                if isinstance(obj, dict):
+                    return {k: sanitize_for_json(v) for k, v in obj.items()}
+                elif isinstance(obj, list):
+                    return [sanitize_for_json(item) for item in obj]
+                elif isinstance(obj, str):
+                    # Remove control characters that might break JSON
+                    return ''.join(char if ord(char) >= 32 or char in '\t\n\r' else '' for char in obj)
+                else:
+                    return obj
+            response_data = sanitize_for_json(response_data)
+        
+        return jsonify(response_data)
         
     except Exception as e:
         console_logger.error(f"Error in get_active_disruptions: {e}")

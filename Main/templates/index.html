@@ -7,188 +7,13 @@
   <title>Dynamic Navigator - OpenStreetMap</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/popup-styles.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <!-- <script src="https://cdn.tailwindcss.com"></script> -->
+  <script src="https://unpkg.com/tailwindcss-cdn@3.4.10/tailwindcss.js"></script>
 
-<script src="https://unpkg.com/tailwindcss-cdn@3.4.10/tailwindcss.js"></script>
-
-  <style>
-    @keyframes float {
-
-      0%,
-      100% {
-        transform: translateY(0px);
-      }
-
-      50% {
-        transform: translateY(-10px);
-      }
-    }
-
-    .float-animation {
-      animation: float 3s ease-in-out infinite;
-    }
-
-    @keyframes pulse-ring {
-      0% {
-        transform: scale(0.8);
-        opacity: 1;
-      }
-
-      100% {
-        transform: scale(1.4);
-        opacity: 0;
-      }
-    }
-
-    .pulse-ring {
-      animation: pulse-ring 2s ease-out infinite;
-    }
-
-    .glass-effect {
-      background: rgba(255, 255, 255, 0.95);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border-color: #e2e8f0;
-      box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
-      overflow: hidden;
-    }
-
-    .severity-heavy {
-      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-    }
-
-    .severity-medium {
-      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-    }
-
-    .severity-light {
-      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    }
-
-    /* Ensure Leaflet controls and popups are above the map */
-    .leaflet-control {
-      z-index: 10 !important;
-    }
-
-    .leaflet-popup {
-      z-index: 10 !important;
-    }
-
-    .leaflet-tooltip {
-      z-index: 10 !important;
-    }
-
-    /* Beautiful popup styling */
-    .leaflet-popup-content-wrapper {
-      border-radius: 12px !important;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15) !important;
-      padding: 0 !important;
-      overflow: hidden !important;
-    }
-
-    .leaflet-popup-content {
-      margin: 0 !important;
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
-    }
-
-    .leaflet-popup-tip {
-      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1) !important;
-    }
-
-    /* Hide Leaflet attribution watermark */
-    .leaflet-control-attribution {
-      display: none !important;
-    }
-
-    /* Route segment styling */
-    .route-segment-clickable {
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-
-    .route-segment-clickable:hover {
-      filter: brightness(1.2);
-      stroke-width: 8px !important;
-    }
-
-    .route-segment-popup .leaflet-popup-content-wrapper {
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    }
-
-    .route-segment-popup .leaflet-popup-content {
-      font-size: 13px;
-      line-height: 1.5;
-    }
-
-    /* Walking distance label styling */
-    .walking-distance-label {
-      background: rgba(117, 117, 117, 0.95) !important;
-      color: white !important;
-      border: 2px solid white !important;
-      border-radius: 8px !important;
-      padding: 4px 10px !important;
-      font-weight: 600 !important;
-      font-size: 12px !important;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3) !important;
-    }
-
-    .walking-distance-label::before {
-      border-top-color: rgba(117, 117, 117, 0.95) !important;
-    }
-
-    /* Toggle Checkbox Styling */
-    .toggle-checkbox {
-      appearance: none;
-      width: 44px;
-      height: 24px;
-      background: #cbd5e1;
-      border-radius: 12px;
-      position: relative;
-      cursor: pointer;
-      transition: background 0.3s ease;
-    }
-
-    .toggle-checkbox::before {
-      content: '';
-      position: absolute;
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      background: white;
-      top: 2px;
-      left: 2px;
-      transition: transform 0.3s ease;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-    }
-
-    .toggle-checkbox:checked {
-      background: #8b5cf6;
-    }
-
-    .toggle-checkbox:checked::before {
-      transform: translateX(20px);
-    }
-
-    .toggle-checkbox:focus {
-      outline: none;
-      box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.3);
-    }
-
-    /* Radio Button Selection Highlighting */
-    input[type="radio"]:checked + span {
-      font-weight: 700;
-      color: #1e293b;
-    }
-    
-    label:has(input[type="radio"]:checked) {
-      background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%) !important;
-      border-left: 4px solid #3b82f6;
-      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
-    }
-  </style>
 </head>
 
 <body class="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
@@ -580,74 +405,70 @@
           </div>
 
           <div>
-            <label class="block text-sm font-bold text-slate-700 mb-3">Traffic Severity</label>
+            <label class="block text-sm font-bold text-slate-700 mb-3">Incident Criticality</label>
             <div class="space-y-3">
               <label
-                class="flex items-center severity-heavy text-white p-4 rounded-2xl cursor-pointer hover:shadow-lg transition-all duration-300 transform hover:scale-102">
-                <input type="radio" name="traffic" value="heavy" class="mr-4 w-5 h-5">
+                class="flex items-center text-white p-4 rounded-2xl cursor-pointer hover:shadow-lg transition-all duration-300 transform hover:scale-102 bg-gradient-to-r from-green-500 to-emerald-600">
+                <input type="radio" name="criticality" value="low" class="mr-4 w-5 h-5">
                 <div class="flex-1">
-                  <span class="font-bold text-lg">Heavy Traffic</span>
-                  <p class="text-sm text-red-100 mt-0.5">Severe delays, barely moving</p>
+                  <span class="font-bold text-lg">Low Impact</span>
+                  <p class="text-sm text-green-100 mt-0.5">Minor disruption</p>
                 </div>
               </label>
               <label
-                class="flex items-center severity-medium text-white p-4 rounded-2xl cursor-pointer hover:shadow-lg transition-all duration-300 transform hover:scale-102">
-                <input type="radio" name="traffic" value="medium" class="mr-4 w-5 h-5">
+                class="flex items-center text-white p-4 rounded-2xl cursor-pointer hover:shadow-lg transition-all duration-300 transform hover:scale-102 bg-gradient-to-r from-amber-500 to-orange-600">
+                <input type="radio" name="criticality" value="minor" class="mr-4 w-5 h-5" checked>
                 <div class="flex-1">
-                  <span class="font-bold text-lg">Moderate Traffic</span>
-                  <p class="text-sm text-orange-100 mt-0.5">Slower than usual</p>
+                  <span class="font-bold text-lg">Minor Impact</span>
+                  <p class="text-sm text-amber-100 mt-0.5">Moderate slowdown</p>
                 </div>
               </label>
               <label
-                class="flex items-center severity-light text-white p-4 rounded-2xl cursor-pointer hover:shadow-lg transition-all duration-300 transform hover:scale-102">
-                <input type="radio" name="traffic" value="light" class="mr-4 w-5 h-5">
+                class="flex items-center text-white p-4 rounded-2xl cursor-pointer hover:shadow-lg transition-all duration-300 transform hover:scale-102 bg-gradient-to-r from-orange-600 to-red-600">
+                <input type="radio" name="criticality" value="major" class="mr-4 w-5 h-5">
                 <div class="flex-1">
-                  <span class="font-bold text-lg">Light Impact</span>
-                  <p class="text-sm text-green-100 mt-0.5">Minor slowdown</p>
+                  <span class="font-bold text-lg">Major Impact</span>
+                  <p class="text-sm text-orange-100 mt-0.5">Significant delays</p>
+                </div>
+              </label>
+              <label
+                class="flex items-center text-white p-4 rounded-2xl cursor-pointer hover:shadow-lg transition-all duration-300 transform hover:scale-102 severity-heavy">
+                <input type="radio" name="criticality" value="critical" class="mr-4 w-5 h-5">
+                <div class="flex-1">
+                  <span class="font-bold text-lg">Critical Impact</span>
+                  <p class="text-sm text-red-100 mt-0.5">Severe disruption or closure</p>
                 </div>
               </label>
             </div>
           </div>
 
-          <!-- Custom Flow Control Section -->
+          <!-- Road Closure Section -->
           <div class="border-t-2 border-purple-200 pt-5">
-            <label class="block text-sm font-bold text-slate-700 mb-3">Custom Traffic Flow</label>
-            
-            <!-- Road Closure Toggle -->
-            <label class="flex items-center justify-between p-4 bg-red-50 border-2 border-red-300 rounded-2xl cursor-pointer hover:bg-red-100 transition-all mb-4">
+            <label class="flex items-center justify-between p-4 bg-red-50 border-2 border-red-300 rounded-2xl cursor-pointer hover:bg-red-100 transition-all">
               <div class="flex items-center">
                 <svg class="w-6 h-6 text-red-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L5.636 5.636"/>
                 </svg>
                 <div>
-                  <span class="font-bold text-slate-900">Block Road Completely</span>
+                  <span class="font-bold text-slate-900">Road is Completely Closed</span>
                   <p class="text-xs text-slate-600">Mark as impassable</p>
                 </div>
               </div>
-              <input type="checkbox" id="road-closure-toggle" class="toggle-checkbox">
+              <input type="checkbox" id="incident-road-closed" class="toggle-checkbox">
             </label>
+          </div>
 
-            <!-- Custom Speed Control (disabled if road blocked) -->
-            <div id="custom-speed-section" class="transition-all">
-              <label class="block text-sm font-semibold text-slate-700 mb-2">Custom Speed (km/h)</label>
-              <div class="flex items-center gap-3 mb-2">
-                <input type="range" id="custom-speed-slider" 
-                  min="0" max="100" value="30" step="5"
-                  class="flex-1 h-3 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-purple-600">
-                <input type="number" id="custom-speed-input" 
-                  min="0" max="100" value="30" step="5"
-                  class="w-20 px-3 py-2 bg-slate-50 border-2 border-slate-300 rounded-xl text-center font-bold text-slate-700 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none">
-              </div>
-              <p class="text-xs text-slate-500 italic">Normal city speed: ~50 km/h</p>
+          <!-- Time Range Section -->
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-bold text-slate-700 mb-2">Start Time (Optional)</label>
+              <input type="datetime-local" id="incident-start-time"
+                class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-300 rounded-2xl focus:border-purple-500 focus:ring-4 focus:ring-purple-200 outline-none font-medium text-slate-700 transition-all">
             </div>
-
-            <!-- Jam Factor Display -->
-            <div class="mt-4 p-3 bg-gradient-to-r from-purple-50 to-violet-50 border border-purple-200 rounded-xl">
-              <div class="flex items-center justify-between">
-                <span class="text-sm font-semibold text-slate-700">Jam Factor:</span>
-                <span id="jam-factor-display" class="text-lg font-bold text-purple-600">4.0</span>
-              </div>
-              <p class="text-xs text-slate-600 mt-1">Based on speed reduction from 50 km/h</p>
+            <div>
+              <label class="block text-sm font-bold text-slate-700 mb-2">End Time (Optional)</label>
+              <input type="datetime-local" id="incident-end-time"
+                class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-300 rounded-2xl focus:border-purple-500 focus:ring-4 focus:ring-purple-200 outline-none font-medium text-slate-700 transition-all">
             </div>
           </div>
 
@@ -762,13 +583,21 @@
 
           <!-- Algorithm Choice -->
           <div class="mb-4">
-            <label class="flex items-center mb-2 cursor-pointer hover:bg-white p-2 rounded transition">
-              <input type="radio" name="algorithm" value="hc2l" class="mr-3 w-4 h-4 text-purple-600" checked>
-              <span class="text-sm font-medium">HC2L (Hierarchical Cut 2-Hop Labeling)</span>
+            <label
+              class="flex items-center text-white p-4 rounded-2xl cursor-pointer hover:shadow-lg transition-all duration-300 transform hover:scale-102 bg-gradient-to-r from-purple-500 to-indigo-600 mb-3">
+              <input type="radio" name="algorithm" value="hc2l" class="mr-4 w-5 h-5" checked>
+              <div class="flex-1">
+                <span class="font-bold text-base">HC2L (Hierarchical Cut 2-Hop Labeling)</span>
+                <p class="text-sm text-purple-100 mt-0.5">Advanced lazy update algorithm</p>
+              </div>
             </label>
-            <label class="flex items-center mb-2 cursor-pointer hover:bg-white p-2 rounded transition">
-              <input type="radio" name="algorithm" value="dhl" class="mr-3 w-4 h-4 text-blue-600">
-              <span class="text-sm font-medium">DHL (Dual-Hierarchy Labeling)</span>
+            <label
+              class="flex items-center text-white p-4 rounded-2xl cursor-pointer hover:shadow-lg transition-all duration-300 transform hover:scale-102 bg-gradient-to-r from-blue-500 to-cyan-600">
+              <input type="radio" name="algorithm" value="dhl" class="mr-4 w-5 h-5">
+              <div class="flex-1">
+                <span class="font-bold text-base">DHL (Dual-Hierarchy Labeling)</span>
+                <p class="text-sm text-blue-100 mt-0.5">Traditional dual-hierarchy approach</p>
+              </div>
             </label>
           </div>
 
@@ -776,18 +605,18 @@
           <div class="mt-4 pt-4 border-t border-slate-300">
             <label class="block text-sm font-bold text-slate-700 mb-3">Dataset Selection</label>
             
-            <label class="flex items-center mb-3 cursor-pointer hover:bg-white p-3 rounded-lg transition border-2 border-transparent hover:border-gray-300">
-              <input type="radio" name="dataset" value="none" class="mr-3 w-5 h-5 text-gray-600" checked>
-              <div>
-                <span class="text-sm font-semibold">🚫 None</span>
-                <p class="text-xs text-gray-600 mt-1">No traffic data (shortest path only)</p>
+            <label class="flex items-center text-white p-4 rounded-2xl cursor-pointer hover:shadow-lg transition-all duration-300 transform hover:scale-102 bg-gradient-to-r from-gray-500 to-slate-600 mb-3">
+              <input type="radio" name="dataset" value="none" class="mr-4 w-5 h-5" checked>
+              <div class="flex-1">
+                <span class="font-bold text-base">🚫 None</span>
+                <p class="text-sm text-gray-100 mt-0.5">No traffic data (shortest path only)</p>
               </div>
             </label>
-            <label class="flex items-center cursor-pointer hover:bg-white p-3 rounded-lg transition border-2 border-transparent hover:border-purple-300">
-              <input type="radio" name="dataset" value="both" class="mr-3 w-5 h-5 text-purple-600">
-              <div>
-                <span class="text-sm font-semibold">🚦 With Traffic</span>
-                <p class="text-xs text-gray-600 mt-1">Real-time traffic from HERE API (flow + incidents)</p>
+            <label class="flex items-center text-white p-4 rounded-2xl cursor-pointer hover:shadow-lg transition-all duration-300 transform hover:scale-102 bg-gradient-to-r from-red-500 to-pink-600">
+              <input type="radio" name="dataset" value="both" class="mr-4 w-5 h-5">
+              <div class="flex-1">
+                <span class="font-bold text-base">🚦 With Traffic</span>
+                <p class="text-sm text-red-100 mt-0.5">Real-time traffic from HERE API (flow + incidents)</p>
               </div>
             </label>
           </div>
@@ -2101,6 +1930,7 @@
 
   <!-- Javascripts -->
   <script src="{{ url_for('static', filename='js/variables.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/popup-styles.js') }}"></script>
   <script src="{{ url_for('static', filename='js/functions.js') }}"></script>
   <script src="{{ url_for('static', filename='js/disruptions.js') }}"></script>
   <script src="{{ url_for('static', filename='js/metrics.js') }}"></script>
@@ -2198,112 +2028,6 @@
         window.populateDisruptionsPanel(routeData);
       } else {
         console.warn('⚠️ populateDisruptionsPanel not loaded from panel-population.js');
-      }
-    }
-
-    // Focus on a specific edge on the map
-    function focusOnEdge(fromNode, toNode) {
-      console.log(`🎯 Focusing on edge: ${fromNode} → ${toNode}`);
-      
-      // Find the edge coordinates from current route geometry
-      if (window.currentRouteGeometry) {
-        const edge = window.currentRouteGeometry.find(e => e.from === fromNode && e.to === toNode);
-        
-        if (edge && edge.coordinates && edge.coordinates.length > 0) {
-          // Get the midpoint of the edge
-          const midIndex = Math.floor(edge.coordinates.length / 2);
-          const midCoord = edge.coordinates[midIndex];
-          
-          // Pan and zoom to the edge
-          if (window.map) {
-            window.map.setView([midCoord[1], midCoord[0]], 17, {
-              animate: true,
-              duration: 0.5
-            });
-            
-            // ENHANCED: Create a prominent highlight for the disrupted edge
-            if (!window.highlightedEdgeLayer) {
-              window.highlightedEdgeLayer = L.polyline([], {
-                color: '#ff0000',
-                weight: 10,
-                opacity: 0.9,
-                dashArray: '5, 5',
-                lineCap: 'round',
-                lineJoin: 'round',
-                zIndex: 1000
-              }).addTo(window.map);
-            }
-            
-            // Update the highlighted layer with this edge's coordinates
-            const latlngs = edge.coordinates.map(coord => [coord[1], coord[0]]);
-            window.highlightedEdgeLayer.setLatLngs(latlngs);
-            
-            // Add a popup with detailed disruption information
-            if (window.highlightedEdgePopup) {
-              window.map.removeLayer(window.highlightedEdgePopup);
-            }
-            
-            const popupContent = `
-              <div class="bg-white rounded-lg p-3 shadow-lg min-w-48">
-                <div class="font-bold text-red-600 mb-2">⚠️ Disrupted Edge</div>
-                <div class="text-sm space-y-2 text-slate-700">
-                  <div><strong>Edge:</strong> ${fromNode} → ${toNode}</div>
-                  <div><strong>Road:</strong> ${edge.road_name || 'Unknown'}</div>
-                  <div><strong>Type:</strong> ${edge.highway_type || 'unknown'}</div>
-                  ${edge.disruption ? `
-                    <div class="border-t pt-2 mt-2">
-                      <div><strong>Disruption Type:</strong> ${edge.disruption.type || 'unknown'}</div>
-                      <div><strong>Severity:</strong> <span class="font-bold text-red-600">${edge.disruption.severity_level || 'unknown'}</span></div>
-                      ${edge.disruption.is_closed ? '<div class="text-red-600 font-bold">🚫 ROAD CLOSED</div>' : ''}
-                      <div><strong>Confidence:</strong> ${(edge.disruption.confidence * 100).toFixed(0)}%</div>
-                      ${edge.disruption.description ? `<div class="italic text-slate-600">"${edge.disruption.description}"</div>` : ''}
-                    </div>
-                  ` : ''}
-                  ${edge.speed_kmh !== undefined ? `
-                    <div class="border-t pt-2 mt-2">
-                      <div><strong>Current Speed:</strong> ${edge.speed_kmh.toFixed(0)} km/h</div>
-                      <div><strong>Free Flow:</strong> ${edge.free_flow_speed_kmh.toFixed(0)} km/h</div>
-                      <div><strong>Duration:</strong> ${edge.duration_seconds.toFixed(0)}s</div>
-                    </div>
-                  ` : ''}
-                </div>
-              </div>
-            `;
-            
-            window.highlightedEdgePopup = L.popup({
-              closeButton: true,
-              autoClose: false,
-              maxWidth: 350
-            })
-              .setLatLng([midCoord[1], midCoord[0]])
-              .setContent(popupContent)
-              .openOn(window.map);
-            
-            // Flash effect on the route
-            if (window.activeRoutePolyline) {
-              let flashCount = 0;
-              const flashInterval = setInterval(() => {
-                window.activeRoutePolyline.setStyle({
-                  weight: flashCount % 2 === 0 ? 8 : 5,
-                  opacity: flashCount % 2 === 0 ? 1 : 0.7
-                });
-                flashCount++;
-                if (flashCount > 6) {
-                  clearInterval(flashInterval);
-                  window.activeRoutePolyline.setStyle({
-                    weight: 5,
-                    opacity: 0.8
-                  });
-                }
-              }, 200);
-            }
-            
-            showUpdateToast(`Focused on ${edge.road_name || 'road segment'} - ${edge.disruption?.type || 'disruption'}`, 'info');
-          }
-        } else {
-          console.warn(`Edge ${fromNode}→${toNode} not found in geometry`);
-          showUpdateToast('Edge not found on current route', 'error');
-        }
       }
     }
 
@@ -3751,75 +3475,6 @@
           }
         });
       }
-
-      // Wire up Custom Flow Controls in Report Panel
-      const roadClosureToggle = document.getElementById('road-closure-toggle');
-      const customSpeedSection = document.getElementById('custom-speed-section');
-      const customSpeedSlider = document.getElementById('custom-speed-slider');
-      const customSpeedInput = document.getElementById('custom-speed-input');
-      const jamFactorDisplay = document.getElementById('jam-factor-display');
-
-      // Calculate jam factor based on speed reduction
-      function updateJamFactor() {
-        const isClosed = roadClosureToggle?.checked || false;
-        const customSpeed = parseFloat(customSpeedInput?.value || 50);
-        const freeFlowSpeed = 50; // Normal city speed
-
-        let jamFactor;
-        if (isClosed) {
-          jamFactor = 10.0; // Maximum jam factor for blocked road
-          if (customSpeedSection) {
-            customSpeedSection.style.opacity = '0.4';
-            customSpeedSection.style.pointerEvents = 'none';
-          }
-        } else {
-          // Jam factor formula: 10 * (1 - current_speed / free_flow_speed)
-          jamFactor = Math.max(0, Math.min(10, 10 * (1 - customSpeed / freeFlowSpeed)));
-          if (customSpeedSection) {
-            customSpeedSection.style.opacity = '1';
-            customSpeedSection.style.pointerEvents = 'auto';
-          }
-        }
-
-        if (jamFactorDisplay) {
-          jamFactorDisplay.textContent = jamFactor.toFixed(1);
-          // Color code the jam factor
-          if (jamFactor >= 8) {
-            jamFactorDisplay.className = 'text-lg font-bold text-red-600';
-          } else if (jamFactor >= 4) {
-            jamFactorDisplay.className = 'text-lg font-bold text-orange-600';
-          } else {
-            jamFactorDisplay.className = 'text-lg font-bold text-green-600';
-          }
-        }
-
-        return jamFactor;
-      }
-
-  refreshAutoIntervalStatus();
-
-      // Sync slider and input
-      if (customSpeedSlider && customSpeedInput) {
-        customSpeedSlider.addEventListener('input', (e) => {
-          customSpeedInput.value = e.target.value;
-          updateJamFactor();
-        });
-
-        customSpeedInput.addEventListener('input', (e) => {
-          let value = parseInt(e.target.value) || 0;
-          value = Math.max(0, Math.min(100, value));
-          e.target.value = value;
-          customSpeedSlider.value = value;
-          updateJamFactor();
-        });
-      }
-
-      if (roadClosureToggle) {
-        roadClosureToggle.addEventListener('change', updateJamFactor);
-      }
-
-      // Initialize jam factor
-      updateJamFactor();
 
       // Wire up Algorithm & Dataset Selection
       const algorithmRadios = document.querySelectorAll('input[name="algorithm"]');

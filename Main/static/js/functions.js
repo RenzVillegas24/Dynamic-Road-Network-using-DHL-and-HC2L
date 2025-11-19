@@ -91,37 +91,6 @@ function clearRoutes() {
         console.log('Cleared destination marker');
     }
 
-    // DO NOT clear OSM snap markers - they should remain visible to show user's selected points
-    // and the walking distance from pin to snapped road location
-    // if (window.startSnapMarker && map) {
-    //     map.removeLayer(window.startSnapMarker);
-    //     window.startSnapMarker = null;
-    //     console.log('Cleared start snap marker');
-    // }
-
-    // if (window.destSnapMarker && map) {
-    //     map.removeLayer(window.destSnapMarker);
-    //     window.destSnapMarker = null;
-    //     console.log('Cleared dest snap marker');
-    // }
-
-    // if (window.startConnectorLine && map) {
-    //     map.removeLayer(window.startConnectorLine);
-    //     window.startConnectorLine = null;
-    //     console.log('Cleared start connector line');
-    // }
-
-    // if (window.destConnectorLine && map) {
-    //     map.removeLayer(window.destConnectorLine);
-    //     window.destConnectorLine = null;
-    //     console.log('Cleared dest connector line');
-    // }
-
-    // DO NOT clear OSM snap markers - keep them visible to show user's selections
-    // if (typeof clearAllOSMSnapMarkers === 'function') {
-    //     clearAllOSMSnapMarkers();
-    // }
-
     // Clear report marker if exists (Leaflet)
     if (reportMarker && map) {
         map.removeLayer(reportMarker);
@@ -281,318 +250,6 @@ function updateAlternativeRouteUI() {
     }
 }
 
-// function triggerImmediateUpdate() {
-//     updateModeBadge.textContent = "Immediate Update";
-//     updateModeBadge.className = "px-4 py-2 bg-orange-500 text-white rounded-xl text-sm font-bold shadow-md";
-//     alertBanner.classList.remove("hidden");
-    
-//     document.getElementById("incident-type").textContent = "Accident";
-//     document.getElementById("severity-level").textContent = "Heavy";
-//     document.getElementById("incident-location").textContent = "EDSA";
-//     document.getElementById("eta-time").textContent = "22 min";
-//     document.getElementById("eta-delay").textContent = "(+4 min)";
-// }
-  
-// function triggerLazyUpdate() {
-//     updateModeBadge.textContent = "Lazy Update";
-//     updateModeBadge.className = "px-4 py-2 bg-emerald-500 text-white rounded-xl text-sm font-bold shadow-md";
-//     alertBanner.classList.add("hidden");
-// }
-
-  
-function updateDisruptionsPanel(disruptionData) {
-    // Find the disruptions content container
-    const disruptionsContainer = document.querySelector('#disruptions-panel .p-6.space-y-4');
-    if (!disruptionsContainer) return;
-
-    // Clear existing content
-    disruptionsContainer.innerHTML = '';
-
-    // Add summary stats
-    const summaryDiv = document.createElement('div');
-    summaryDiv.className = 'bg-gradient-to-br from-slate-50 to-gray-50 border border-slate-200 rounded-2xl p-4 mb-4';
-    summaryDiv.innerHTML = `
-        <h3 class="font-bold text-slate-900 text-lg mb-3">Disruption Summary</h3>
-        <div class="grid grid-cols-2 gap-3">
-        <div class="text-center">
-            <div class="text-2xl font-bold text-red-600">${disruptionData.total_disruptions}</div>
-            <div class="text-xs text-slate-600">Total Active</div>
-        </div>
-        <div class="text-center">
-            <div class="text-lg font-semibold text-slate-700">
-            <span class="text-red-600">${disruptionData.severity_counts.Heavy}</span> / 
-            <span class="text-orange-600">${disruptionData.severity_counts.Medium}</span> / 
-            <span class="text-green-600">${disruptionData.severity_counts.Light}</span>
-            </div>
-            <div class="text-xs text-slate-600">Heavy / Medium / Light</div>
-        </div>
-        </div>
-    `;
-    disruptionsContainer.appendChild(summaryDiv);
-
-    // Group and display disruptions by type
-    const disruptionsByType = disruptionData.disruptions_by_type;
-
-    for (const [incidentType, disruptions] of Object.entries(disruptionsByType)) {
-        // Create type header
-        const typeHeader = document.createElement('div');
-        typeHeader.className = 'flex items-center justify-between py-2 border-b border-slate-200';
-        typeHeader.innerHTML = `
-        <h4 class="font-bold text-slate-800">${incidentType}</h4>
-        <span class="px-2 py-1 bg-slate-200 text-slate-700 rounded-lg text-xs font-bold">${disruptions.length}</span>
-        `;
-        disruptionsContainer.appendChild(typeHeader);
-        
-        // Display first few disruptions of this type (limit to avoid overwhelming UI)
-        const displayLimit = 3;
-        const disruptionsToShow = disruptions.slice(0, displayLimit);
-        
-        disruptionsToShow.forEach(disruption => {
-        const disruptionElement = createDisruptionElement(disruption);
-        disruptionsContainer.appendChild(disruptionElement);
-        });
-        
-        // Show "and X more" if there are more disruptions
-        if (disruptions.length > displayLimit) {
-        const moreDiv = document.createElement('div');
-        moreDiv.className = 'text-center py-2 text-sm text-slate-600 italic';
-        moreDiv.textContent = `... and ${disruptions.length - displayLimit} more ${incidentType.toLowerCase()} disruptions`;
-        disruptionsContainer.appendChild(moreDiv);
-        }
-    }   
-}
-  
-function createDisruptionElement(disruption) {
-    const severityColors = {
-      'Heavy': { bg: 'from-red-50 to-rose-50', border: 'border-red-500', icon: 'from-red-500 to-rose-600', badge: 'bg-red-500', text: 'text-red-700' },
-      'Medium': { bg: 'from-orange-50 to-amber-50', border: 'border-orange-500', icon: 'from-orange-400 to-red-500', badge: 'bg-orange-500', text: 'text-orange-700' },
-      'Light': { bg: 'from-green-50 to-emerald-50', border: 'border-green-500', icon: 'from-green-400 to-emerald-500', badge: 'bg-green-500', text: 'text-green-700' }
-    };
-    
-    // Get severity with compatibility layer and map to old format for colors
-    const severity = getDisruptionField(disruption, 'severity');
-    const colors = severityColors[severity] || severityColors['Medium'];
-    
-    // Get other fields with compatibility layer
-    const incidentType = getDisruptionField(disruption, 'incident_type');
-    const speedKph = getDisruptionField(disruption, 'current_speed') || 0;
-    const jamFactor = getDisruptionField(disruption, 'jam_factor') || 0;
-    const roadName = disruption.road_name || 'Unknown Road';
-    
-    // Calculate delay estimation
-    const slowdownRatio = disruption.slowdown_ratio || (speedKph > 0 ? speedKph / 50 : 0.5); // rough estimate
-    const delayMinutes = Math.round((1 - slowdownRatio) * 15); // Rough estimate
-    
-    const disruptionDiv = document.createElement('div');
-    disruptionDiv.className = `bg-gradient-to-br ${colors.bg} border-l-4 ${colors.border} rounded-2xl p-4 hover:shadow-lg transition-all duration-300 mb-3`;
-    
-    // Get appropriate icon based on incident type
-    const getIncidentIcon = (type) => {
-      const icons = {
-        'Road Closure': '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L5.636 5.636"/>',
-        'Accident': '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.268 16.5c-.77.833.192 2.5 1.732 2.5z"/>',
-        'Construction': '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/>',
-        'Congestion': '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>',
-        'Default': '<path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>'
-      };
-      return icons[type] || icons['Default'];
-    };
-    
-    disruptionDiv.innerHTML = `
-      <div class="flex items-start">
-        <div class="bg-gradient-to-br ${colors.icon} rounded-xl p-3 mr-4 shadow-md">
-          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            ${getIncidentIcon(incidentType)}
-          </svg>
-        </div>
-        <div class="flex-1">
-          <h3 class="font-bold text-slate-900 text-lg mb-1">${roadName}</h3>
-          <p class="text-sm ${colors.text} font-semibold mb-2">${incidentType} • ~${delayMinutes} min delay</p>
-          <div class="flex items-center justify-between">
-            <div class="text-xs text-slate-600">
-              <div>Speed: ${speedKph.toFixed(1)} km/h (${Math.round(slowdownRatio * 100)}% of normal)</div>
-              <div>Jam Factor: ${jamFactor.toFixed(1)}</div>
-            </div>
-            <span class="px-3 py-1 ${colors.badge} text-white rounded-lg text-xs font-bold">${severity}</span>
-          </div>
-        </div>
-      </div>
-    `;
-    
-    // Add click handler to show location on map
-    disruptionDiv.addEventListener('click', () => {
-      showDisruptionOnMap(disruption);
-    });
-    disruptionDiv.style.cursor = 'pointer';
-    
-    return disruptionDiv;
-}
-  
-function showDisruptionOnMap(disruption) {
-    if (!map) {
-      showUpdateToast("Map not available", 'warning');
-      return;
-    }
-    if (!disruption) {
-      showUpdateToast('No disruption details supplied', 'warning');
-      return;
-    }
-    
-    const latLng = window.getDisruptionLatLng?.(disruption);
-    if (!latLng) {
-      showUpdateToast('Unable to locate disruption on current route', 'warning');
-      return;
-    }
-    
-    const severity = getDisruptionField(disruption, 'severity') || 'Medium';
-    const incidentType = getDisruptionField(disruption, 'incident_type') || 'Incident';
-    const roadName = disruption.road_name || 'Unknown Road';
-    const jamFactor = getDisruptionField(disruption, 'jam_factor');
-    const currentSpeed = getDisruptionField(disruption, 'current_speed');
-    const timeImpact = getDisruptionField(disruption, 'time_impact_seconds');
-    const flowStatus = getDisruptionField(disruption, 'flow_status') || 'default';
-    
-    const severityColors = {
-      'Heavy': '#ef4444',
-      'Medium': '#f97316',
-      'Light': '#10b981'
-    };
-    const severityColor = severityColors[severity] || '#f97316';
-    const flowIcons = {
-      'blocked': '🚫',
-      'heavy': '🔴',
-      'moderate': '🟡',
-      'light': '🟢',
-      'free_flow': '✓',
-      'default': '!'
-    };
-    const flowIcon = flowIcons[flowStatus] || flowIcons.default;
-    
-    map.setView([latLng.lat, latLng.lng], 16);
-    
-    const svgIcon = L.divIcon({
-      html: `<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="16" cy="16" r="12" fill="${severityColor}" stroke="white" stroke-width="2"/>
-              <text x="16" y="21" text-anchor="middle" fill="white" font-size="14" font-weight="bold">${flowIcon}</text>
-            </svg>`,
-      className: 'custom-disruption-marker',
-      iconSize: [32, 32],
-      iconAnchor: [16, 16]
-    });
-    
-    const marker = L.marker([latLng.lat, latLng.lng], {
-      icon: svgIcon,
-      title: `${incidentType} on ${roadName}`
-    }).addTo(map);
-    
-    const popupContent = `
-      <div class="p-2 min-w-[220px]">
-        <div class="font-bold text-sm mb-1">${incidentType}</div>
-        <div class="text-xs text-slate-600">${roadName}</div>
-        ${typeof currentSpeed === 'number' ? `<div class="text-xs mt-1">Speed: <strong>${currentSpeed.toFixed(1)} km/h</strong></div>` : ''}
-        ${typeof jamFactor === 'number' ? `<div class="text-xs">Jam Factor: <strong>${jamFactor.toFixed(2)}</strong></div>` : ''}
-        ${typeof timeImpact === 'number' ? `<div class="text-xs">Impact: <strong>+${timeImpact.toFixed(0)}s</strong></div>` : ''}
-        <div class="text-xs mt-1">Status: <strong>${flowStatus.replace(/_/g, ' ')}</strong></div>
-      </div>
-    `;
-    marker.bindPopup(popupContent).openPopup();
-    
-    setTimeout(() => {
-      if (map.hasLayer(marker)) {
-        map.removeLayer(marker);
-      }
-    }, 5000);
-    
-    disruptionsPanel.classList.add("translate-x-full");
-    showUpdateToast(`Showing ${incidentType} on ${roadName}`, 'info');
-}
-  
-function showAllDisruptionsOnMap(disruptionData) {
-    if (!map) return;
-    
-    // Clear existing disruption markers
-    clearDisruptionMarkers();
-    
-    // Add markers for each disruption type using Leaflet
-    for (const [incidentType, disruptions] of Object.entries(disruptionData.disruptions_by_type)) {
-      // Limit markers to prevent performance issues (show max 50 per type)
-      const markersToShow = disruptions.slice(0, 50);
-      
-      markersToShow.forEach(disruption => {
-        const centerLat = (disruption.source_lat + disruption.target_lat) / 2;
-        const centerLng = (disruption.source_lng + disruption.target_lng) / 2;
-        
-        // Get fields with compatibility layer
-        const severity = getDisruptionField(disruption, 'severity');
-        const incidentType = getDisruptionField(disruption, 'incident_type');
-        const roadName = disruption.road_name || 'Unknown Road';
-        const isUserReported = !!disruption.is_user_reported;
-        
-        // Get color based on severity
-        const baseColor = severity === 'Heavy' ? '#ef4444' : 
-                           severity === 'Medium' ? '#f59e0b' : '#10b981';
-        const markerColor = isUserReported ? '#7c3aed' : baseColor;
-        const markerBorder = isUserReported ? '#c4b5fd' : '#ffffff';
-        
-        // Get icon based on incident type
-        const getMarkerSymbol = (type) => {
-          const symbols = {
-            'Road Closure': '✖',
-            'Accident': '⚠',
-            'Construction': '🚧',
-            'Congestion': '🚗',
-            'Disabled Vehicle': '🔧',
-            'Mass Transit Event': '🚌',
-            'Planned Event': '📅',
-            'Road Hazard': '⚠',
-            'Lane Restriction': '🚧',
-            'Weather': '🌧'
-          };
-          return symbols[type] || '!';
-        };
-        const markerSymbol = isUserReported ? '★' : getMarkerSymbol(incidentType);
-        
-        // Create Leaflet marker with custom SVG icon
-        const svgIcon = L.divIcon({
-          html: `<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="12" cy="12" r="10" fill="${markerColor}" stroke="${markerBorder}" stroke-width="2"/>
-                  <text x="12" y="16" text-anchor="middle" fill="white" font-size="10" font-weight="bold">${markerSymbol}</text>
-                </svg>`,
-          className: isUserReported ? 'custom-disruption-marker user-reported-marker' : 'custom-disruption-marker',
-          iconSize: [24, 24],
-          iconAnchor: [12, 12]
-        });
-        
-        const marker = L.marker([centerLat, centerLng], { 
-          icon: svgIcon,
-          title: `${incidentType} on ${roadName}`
-        }).addTo(map);
-
-        if (isUserReported && disruption.report_id) {
-          marker.reportId = disruption.report_id;
-          marker._isUserReported = true;
-        }
-        
-        // Add popup (Leaflet's equivalent of info window)
-        const speedKph = getDisruptionField(disruption, 'current_speed') || 0;
-        const slowdownRatio = disruption.slowdown_ratio || (speedKph > 0 ? speedKph / 50 : 0.5);
-        
-        const popupContent = `
-          <div class="p-2">
-            <h3 class="font-bold text-sm">${roadName}</h3>
-            <p class="text-xs text-gray-600">${incidentType}</p>
-            <p class="text-xs">Severity: <span class="font-semibold" style="color: ${markerColor}">${severity}${isUserReported ? ' • User Reported' : ''}</span></p>
-            <p class="text-xs">Speed: ${speedKph.toFixed(1)} km/h (${Math.round(slowdownRatio * 100)}% of normal)</p>
-          </div>
-        `;
-        marker.bindPopup(popupContent);
-        
-        disruptionMarkers.push(marker);
-      });
-    }
-    
-    console.log(`Added ${disruptionMarkers.length} disruption markers to map`);
-}
 
 // ------------------------------------------------------------------
 // Node display utilities — show / hide all graph nodes on the map
@@ -1225,80 +882,24 @@ function displayDHLRoute(routeData) {
           statusColor = '#fbbf24'; // yellow
         }
         
-        const popupContent = `
-          <div class="p-2" style="min-width: 280px;">
-            <div class="font-bold text-base mb-2 border-b pb-2">
-              🛣️ DHL Segment ${index + 1} of ${route.geometry.length}
-            </div>
-            
-            <div class="space-y-2 text-sm">
-              <div class="flex justify-between items-center">
-                <span class="text-gray-600">Road Name:</span>
-                <span class="font-semibold text-indigo-700">${segment.road_name || segment.name || 'Unknown Road'}</span>
-              </div>
-              
-              <div class="flex justify-between items-center">
-                <span class="text-gray-600">Edge:</span>
-                <span class="font-mono font-semibold">${segment.from} → ${segment.to}</span>
-              </div>
-              
-              <div class="flex justify-between items-center">
-                <span class="text-gray-600">Distance:</span>
-                <span class="font-bold text-blue-600">${distance_km} km (${distance_m.toFixed(0)}m)</span>
-              </div>
-              
-              <div class="flex justify-between items-center">
-                <span class="text-gray-600">Highway Type:</span>
-                <span class="px-2 py-0.5 bg-slate-100 rounded text-xs font-semibold">${highway_type}</span>
-              </div>
-              
-              <div class="flex justify-between items-center">
-                <span class="text-gray-600">Traffic Status:</span>
-                <span class="px-2 py-0.5 rounded text-xs font-semibold text-white" style="background-color: ${statusColor}">
-                  ${flow_status.toUpperCase()}
-                </span>
-              </div>
-              
-              ${!is_closed ? `
-              <div class="flex justify-between items-center">
-                <span class="text-gray-600">Current Speed:</span>
-                <span class="font-semibold">${current_speed.toFixed(1)} km/h</span>
-              </div>
-              
-              <div class="flex justify-between items-center">
-                <span class="text-gray-600">Free Flow Speed:</span>
-                <span class="text-gray-500">${free_flow_speed.toFixed(1)} km/h</span>
-              </div>
-              
-              <div class="flex justify-between items-center">
-                <span class="text-gray-600">Jam Factor:</span>
-                <span class="${jam_factor > 5 ? 'text-red-600 font-bold' : 'text-green-600'}">${jam_factor.toFixed(1)}</span>
-              </div>
-              ` : ''}
-              
-              ${is_closed ? `
-              <div class="mt-2 p-2 bg-red-50 border border-red-200 rounded">
-                <div class="flex items-center gap-2">
-                  <span class="text-red-600 font-bold">🚫 ROAD CLOSED</span>
-                </div>
-                <div class="text-xs text-red-600 mt-1">
-                  Incident: ${incident_type}<br>
-                  Confidence: ${(incident_confidence * 100).toFixed(0)}%
-                </div>
-              </div>
-              ` : ''}
-              
-              ${incident_type !== 'none' && !is_closed ? `
-              <div class="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
-                <div class="text-xs">
-                  <span class="font-semibold text-yellow-800">⚠️ ${incident_type}</span><br>
-                  Confidence: ${(incident_confidence * 100).toFixed(0)}%
-                </div>
-              </div>
-              ` : ''}
-            </div>
-          </div>
-        `;
+        // Use PopupStyles for consistent route segment popup formatting
+        const popupContent = PopupStyles.createRouteSegmentPopup({
+          road_name: segment.road_name || segment.name || 'Unknown Road',
+          from: segment.from,
+          to: segment.to,
+          distance_km: distance_km,
+          highway_type: highway_type,
+          flow_status: flow_status,
+          current_speed: current_speed,
+          free_flow_speed: free_flow_speed,
+          jam_factor: jam_factor,
+          is_closed: is_closed,
+          incident_type: incident_type,
+          incident_confidence: incident_confidence,
+          segment_index: index,
+          total_segments: route.geometry.length,
+          route_type: 'DHL'
+        });
         
         polyline.bindPopup(popupContent, {
           maxWidth: 320,
@@ -1536,80 +1137,24 @@ function displayDHC2LRoute(routeData) {
           statusColor = '#fbbf24'; // yellow
         }
         
-        const popupContent = `
-          <div class="p-2" style="min-width: 280px;">
-            <div class="font-bold text-base mb-2 border-b pb-2">
-              🛣️ HC2L Segment ${index + 1} of ${route.geometry.length}
-            </div>
-            
-            <div class="space-y-2 text-sm">
-              <div class="flex justify-between items-center">
-                <span class="text-gray-600">Road Name:</span>
-                <span class="font-semibold text-blue-700">${segment.road_name || segment.name || 'Unknown Road'}</span>
-              </div>
-              
-              <div class="flex justify-between items-center">
-                <span class="text-gray-600">Edge:</span>
-                <span class="font-mono font-semibold">${segment.from} → ${segment.to}</span>
-              </div>
-              
-              <div class="flex justify-between items-center">
-                <span class="text-gray-600">Distance:</span>
-                <span class="font-bold text-blue-600">${distance_km} km (${distance_m.toFixed(0)}m)</span>
-              </div>
-              
-              <div class="flex justify-between items-center">
-                <span class="text-gray-600">Highway Type:</span>
-                <span class="px-2 py-0.5 bg-slate-100 rounded text-xs font-semibold">${highway_type}</span>
-              </div>
-              
-              <div class="flex justify-between items-center">
-                <span class="text-gray-600">Traffic Status:</span>
-                <span class="px-2 py-0.5 rounded text-xs font-semibold text-white" style="background-color: ${statusColor}">
-                  ${flow_status.toUpperCase()}
-                </span>
-              </div>
-              
-              ${!is_closed ? `
-              <div class="flex justify-between items-center">
-                <span class="text-gray-600">Current Speed:</span>
-                <span class="font-semibold">${current_speed.toFixed(1)} km/h</span>
-              </div>
-              
-              <div class="flex justify-between items-center">
-                <span class="text-gray-600">Free Flow Speed:</span>
-                <span class="text-gray-500">${free_flow_speed.toFixed(1)} km/h</span>
-              </div>
-              
-              <div class="flex justify-between items-center">
-                <span class="text-gray-600">Jam Factor:</span>
-                <span class="${jam_factor > 5 ? 'text-red-600 font-bold' : 'text-green-600'}">${jam_factor.toFixed(1)}</span>
-              </div>
-              ` : ''}
-              
-              ${is_closed ? `
-              <div class="mt-2 p-2 bg-red-50 border border-red-200 rounded">
-                <div class="flex items-center gap-2">
-                  <span class="text-red-600 font-bold">🚫 ROAD CLOSED</span>
-                </div>
-                <div class="text-xs text-red-600 mt-1">
-                  Incident: ${incident_type}<br>
-                  Confidence: ${(incident_confidence * 100).toFixed(0)}%
-                </div>
-              </div>
-              ` : ''}
-              
-              ${incident_type !== 'none' && !is_closed ? `
-              <div class="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
-                <div class="text-xs">
-                  <span class="font-semibold text-yellow-800">⚠️ ${incident_type}</span><br>
-                  Confidence: ${(incident_confidence * 100).toFixed(0)}%
-                </div>
-              </div>
-              ` : ''}
-            </div>
-          </div>
-        `;
+        // Use PopupStyles for consistent route segment popup formatting
+        const popupContent = PopupStyles.createRouteSegmentPopup({
+          road_name: segment.road_name || segment.name || 'Unknown Road',
+          from: segment.from,
+          to: segment.to,
+          distance_km: distance_km,
+          highway_type: highway_type,
+          flow_status: flow_status,
+          current_speed: current_speed,
+          free_flow_speed: free_flow_speed,
+          jam_factor: jam_factor,
+          is_closed: is_closed,
+          incident_type: incident_type,
+          incident_confidence: incident_confidence,
+          segment_index: index,
+          total_segments: route.geometry.length,
+          route_type: 'HC2L'
+        });
         
         polyline.bindPopup(popupContent, {
           maxWidth: 320,

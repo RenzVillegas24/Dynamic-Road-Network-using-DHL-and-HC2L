@@ -214,7 +214,7 @@ class ConsoleFormatter:
         return f"{ConsoleFormatter.timestamp()} {ConsoleFormatter._colored(prefix, Colors.YELLOW)} {message}"
     
     @staticmethod
-    def time(message: str,                  prefix: str = "⏱️ TIME              ") -> str:
+    def time(message: str,                  prefix: str = "⏱️  TIME              ") -> str:
         """Format timing message"""
         return f"{ConsoleFormatter.timestamp()} {ConsoleFormatter._colored(prefix, Colors.GREEN)} {message}"
     
@@ -239,7 +239,7 @@ class ConsoleFormatter:
         return f"{ConsoleFormatter.timestamp()} {ConsoleFormatter._colored(prefix, Colors.BLUE)} {message}"
     
     @staticmethod
-    def traffic(message: str,               prefix: str = "🚦 TRAFFIC           ") -> str:
+    def traffic(message: str,               prefix: str = "🚦  TRAFFIC           ") -> str:
         """Format traffic message"""
         return f"{ConsoleFormatter.timestamp()} {ConsoleFormatter._colored(prefix, Colors.RED)} {message}"
     
@@ -264,7 +264,7 @@ class ConsoleFormatter:
         return f"{ConsoleFormatter.timestamp()} {ConsoleFormatter._colored(prefix, Colors.CYAN)} {message}"
     
     @staticmethod
-    def osm(message: str, prefix: str = "🗺️  OSM") -> str:
+    def osm(message: str,                   prefix: str = "🗺️  OSM               ") -> str:
         """Format OSM/OpenStreetMap message"""
         return f"{ConsoleFormatter.timestamp()} {ConsoleFormatter._colored(prefix, Colors.GREEN)} {message}"
     
@@ -279,7 +279,7 @@ class ConsoleFormatter:
         return f"{ConsoleFormatter.timestamp()} {ConsoleFormatter._colored(prefix, Colors.BLUE)} {message}"
     
     @staticmethod
-    def server(message: str,                prefix: str = "🖥️ SERVER            ") -> str:
+    def server(message: str,                prefix: str = "🖥️  SERVER            ") -> str:
         """Format server message"""
         return f"{ConsoleFormatter.timestamp()} {ConsoleFormatter._colored(prefix, Colors.GREEN)} {message}"
     
@@ -314,7 +314,7 @@ class ConsoleFormatter:
         return f"{ConsoleFormatter.timestamp()} {ConsoleFormatter._colored(prefix, Colors.YELLOW)} {message}"
     
     @staticmethod
-    def search(message: str,                prefix: str = "🔍 SEARCH            ") -> str:
+    def search(message: str,                prefix: str = "🔍  SEARCH            ") -> str:
         """Format search message"""
         return f"{ConsoleFormatter.timestamp()} {ConsoleFormatter._colored(prefix, Colors.BLUE)} {message}"
 

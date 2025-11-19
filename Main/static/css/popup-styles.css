@@ -1,0 +1,429 @@
+/**
+ * Centralized Popup Styling
+ * All popup GUI styles in one place for consistent appearance
+ */
+
+/* ============================================================================
+   SEVERITY BADGE STYLES - Applied to status badges in popups
+   ========================================================================== */
+
+.popup-severity-badge {
+  padding: 4px 10px;
+  border-radius: 6px;
+  display: inline-block;
+  font-size: 10px;
+  color: white;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.popup-severity-badge.critical,
+.popup-severity-badge.heavy {
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 50%, #991b1b 100%);
+  background-color: #dc2626;
+}
+
+.popup-severity-badge.major,
+.popup-severity-badge.medium {
+  background: linear-gradient(135deg, #d97706 0%, #b45309 50%, #92400e 100%);
+  background-color: #d97706;
+}
+
+.popup-severity-badge.minor,
+.popup-severity-badge.light {
+  background: linear-gradient(135deg, #059669 0%, #047857 50%, #065f46 100%);
+  background-color: #059669;
+}
+
+/* ============================================================================
+   CONTAINER SIZE VARIANTS
+   ========================================================================== */
+
+.popup-container-small {
+  min-width: 240px;
+}
+
+.popup-container-medium {
+  min-width: 280px;
+}
+
+.popup-container-large {
+  min-width: 320px;
+}
+
+/* ============================================================================
+   ICON BADGE VARIANTS - Background gradients for different popup types
+   ========================================================================== */
+
+.popup-icon-badge-edge {
+  background: linear-gradient(135deg, #6366f1 0%, #3b82f6 100%);
+}
+
+.popup-icon-badge-dhl {
+  background: linear-gradient(135deg, #6366f1 0%, #3b82f6 100%);
+}
+
+.popup-icon-badge-hc2l {
+  background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+}
+
+.popup-icon-badge-start {
+  background: linear-gradient(135deg, #10b981 0%, #10b98199 100%);
+}
+
+.popup-icon-badge-dest {
+  background: linear-gradient(135deg, #ef4444 0%, #ef4444dd 100%);
+}
+
+.popup-icon-badge-info {
+  background: linear-gradient(135deg, #6366f1 0%, #6366f1dd 100%);
+}
+
+/* ============================================================================
+   CONDITION-BASED STYLES (Severity levels)
+   ========================================================================== */
+
+.popup-status-high,
+.popup-status-critical {
+  color: #dc2626;
+  font-weight: bold;
+}
+
+.popup-status-medium {
+  color: #f59e0b;
+  font-weight: bold;
+}
+
+.popup-status-low,
+.popup-status-light {
+  color: #059669;
+  font-weight: bold;
+}
+
+.popup-status-closed {
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  color: white;
+  padding: 4px 10px;
+  border-radius: 6px;
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* ============================================================================
+   TEXT VARIANTS
+   ========================================================================== */
+
+.popup-text-muted {
+  font-size: 11px;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.5;
+  font-weight: 500;
+}
+
+.popup-text-success {
+  font-size: 11px;
+  color: #059669;
+  margin: 0;
+  text-align: center;
+  font-weight: 600;
+  padding: 8px 0;
+}
+
+.popup-text-warning {
+  font-size: 11px;
+  color: #d97706;
+  margin: 0;
+  line-height: 1.5;
+  font-weight: 600;
+}
+
+.popup-text-danger {
+  font-size: 11px;
+  color: #dc2626;
+  margin: 0;
+  line-height: 1.5;
+  font-weight: 600;
+}
+
+/* ============================================================================
+   SECTION TITLES WITH COLORS
+   ========================================================================== */
+
+.popup-section-title-danger {
+  color: #dc2626;
+}
+
+.popup-section-title-warning {
+  color: #d97706;
+}
+
+.popup-section-title-info {
+  color: #0ea5e9;
+}
+
+.popup-section-title-success {
+  color: #10b981;
+}
+
+/* ============================================================================
+   SPECIAL VALUE STYLES
+   ========================================================================== */
+
+.popup-value-oneway {
+  color: #f59e0b;
+  font-weight: bold;
+}
+
+.popup-value-jam-high {
+  color: #dc2626;
+  font-weight: bold;
+}
+
+.popup-value-jam-low {
+  color: #059669;
+  font-weight: bold;
+}
+
+.popup-value-monospace {
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Consolas', 'Courier New', monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+
+/* ============================================================================
+   RESPONSIVE ADJUSTMENTS
+   ========================================================================== */
+
+@media (max-width: 768px) {
+
+  .popup-container-small,
+  .popup-container-medium,
+  .popup-container-large {
+    min-width: 200px;
+  }
+
+  .popup-header-title h3 {
+    font-size: 12px;
+  }
+
+  .popup-item {
+    font-size: 11px;
+  }
+}
+
+
+.leaflet-popup {
+  z-index: 10 !important;
+}
+
+/* Ensure Leaflet controls and popups are above the map */
+.leaflet-control {
+  z-index: 10 !important;
+}
+
+
+.leaflet-tooltip {
+  z-index: 10 !important;
+}
+
+/* Beautiful popup styling with blur effect */
+.leaflet-popup-content-wrapper {
+  border-radius: 16px !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25), 0 0 1px rgba(0, 0, 0, 0.1) !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  background: rgba(255, 255, 255, 0.7) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.8) !important;
+}
+
+.leaflet-popup-content {
+  margin: 0 !important;
+  padding: 0 !important;
+  min-width: 250px !important;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+}
+
+.leaflet-popup-content p {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+
+.leaflet-popup-close-button {
+  top: 8px !important;
+  right: 8px !important;
+  width: 24px !important;
+  height: 24px !important;
+  background: rgba(255, 255, 255, 0.6) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+  font-size: 16px !important;
+  line-height: 24px !important;
+  color: #475569 !important;
+  text-align: center !important;
+  opacity: 1 !important;
+  transition: background 0.3s ease, color 0.3s ease !important;
+}
+
+.leaflet-popup-close-button:hover {
+  background: rgba(255, 176, 176, 0.8) !important;
+  color: #1e293b !important;
+}
+
+.leaflet-popup-tip {
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1) !important;
+  background: rgba(255, 255, 255, 0.7) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+}
+
+/* Modern popup container */
+.popup-container {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  gap: 4px;
+}
+
+/* Popup divider */
+.popup-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(148, 163, 184, 0.3) 20%, rgba(148, 163, 184, 0.3) 80%, transparent 100%);
+  margin: 8px 0;
+  border: none;
+}
+
+/* Header with icon and road name */
+.popup-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.popup-icon-badge {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: bold;
+  color: white;
+  flex-shrink: 0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2), 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  transition: all 0.2s ease;
+}
+
+.popup-icon-badge:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25), 0 3px 10px rgba(0, 0, 0, 0.15);
+}
+
+.popup-header-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.popup-header-title h3 {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.popup-header-title p {
+  font-size: 11px;
+  color: #64748b;
+  margin: 0;
+  font-weight: 500;
+}
+
+/* Content sections */
+.popup-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.popup-section-title {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #64748b;
+  margin: 0 0 8px 0;
+  padding-bottom: 4px;
+  border-bottom: 2px solid transparent;
+  background: linear-gradient(90deg, #64748b 0%, transparent 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.popup-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  gap: 4px;
+  padding: 6px 0;
+  border-radius: 6px;
+  transition: background-color 0.15s ease;
+}
+
+.popup-item:hover {
+  background-color: rgba(148, 163, 184, 0.05);
+}
+
+.popup-item-label {
+  font-weight: 600;
+  color: #475569;
+  flex-shrink: 0;
+  min-width: 80px;
+}
+
+.popup-item-value {
+  font-weight: 700;
+  color: #1e293b;
+  text-align: right;
+  flex: 1;
+  word-break: break-word;
+}
+
+/* Severity badges should not fill width, center their content */
+.popup-item-value.popup-severity-badge {
+  flex: none;
+  text-align: center;
+  margin-left: auto;
+  color: white;
+}
+
+.popup-item-value.severity-critical {
+  color: #dc2626;
+}
+
+.popup-item-value.severity-major {
+  color: #d97706;
+}
+
+.popup-item-value.severity-minor {
+  color: #059669;
+}

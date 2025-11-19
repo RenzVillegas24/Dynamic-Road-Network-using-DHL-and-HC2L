@@ -1474,9 +1474,12 @@ inline int load_user_reported_disruptions(
     
     string line;
     int source_col = -1, target_col = -1;
-    int speed_col = -1, freeflow_col = -1, jam_col = -1;
-    int is_closed_col = -1, incident_type_col = -1, severity_col = -1;
-    int description_col = -1, report_id_col = -1, road_name_col = -1;
+    int source_lat_col = -1, source_lon_col = -1;
+    int target_lat_col = -1, target_lon_col = -1;
+    int incident_id_col = -1, incident_type_col = -1, incident_criticality_col = -1;
+    int incident_description_col = -1, incident_road_closed_col = -1;
+    int incident_start_time_col = -1, incident_end_time_col = -1;
+    int highway_type_col = -1, road_name_col = -1;
     
     // Parse CSV header
     if (getline(file, line)) {
@@ -1489,14 +1492,18 @@ inline int load_user_reported_disruptions(
             
             if (h == "source") source_col = i;
             else if (h == "target") target_col = i;
-            else if (h == "speed_kph") speed_col = i;
-            else if (h == "freeFlow_kph") freeflow_col = i;
-            else if (h == "jamFactor") jam_col = i;
-            else if (h == "isClosed") is_closed_col = i;
+            else if (h == "source_lat") source_lat_col = i;
+            else if (h == "source_lon") source_lon_col = i;
+            else if (h == "target_lat") target_lat_col = i;
+            else if (h == "target_lon") target_lon_col = i;
+            else if (h == "incident_id") incident_id_col = i;
             else if (h == "incident_type") incident_type_col = i;
-            else if (h == "severity") severity_col = i;
-            else if (h == "description") description_col = i;
-            else if (h == "report_id") report_id_col = i;
+            else if (h == "incident_criticality") incident_criticality_col = i;
+            else if (h == "incident_description") incident_description_col = i;
+            else if (h == "incident_road_closed") incident_road_closed_col = i;
+            else if (h == "incident_start_time") incident_start_time_col = i;
+            else if (h == "incident_end_time") incident_end_time_col = i;
+            else if (h == "highway_type") highway_type_col = i;
             else if (h == "road_name") road_name_col = i;
         }
     }
@@ -1524,51 +1531,39 @@ inline int load_user_reported_disruptions(
             
             auto edge_key = make_pair(source, target);
             
-            // Extract flow data if available
-            double speed_kph = (speed_col >= 0 && speed_col < (int)fields.size()) 
-                ? stod(fields[speed_col]) : 0.0;
-            double freeflow_kph = (freeflow_col >= 0 && freeflow_col < (int)fields.size()) 
-                ? stod(fields[freeflow_col]) : 50.0;
-            double jam_factor = (jam_col >= 0 && jam_col < (int)fields.size()) 
-                ? stod(fields[jam_col]) : 0.0;
-            
-            // Extract incident data if available
+            // Extract incident data from user report
             bool is_closed = false;
-            if (is_closed_col >= 0 && is_closed_col < (int)fields.size()) {
-                string closed_str = fields[is_closed_col];
-                is_closed = (closed_str == "1" || closed_str == "true" || closed_str == "True");
+            if (incident_road_closed_col >= 0 && incident_road_closed_col < (int)fields.size()) {
+                string closed_str = fields[incident_road_closed_col];
+                is_closed = (closed_str == "true" || closed_str == "True" || closed_str == "1");
             }
             
             string incident_type = (incident_type_col >= 0 && incident_type_col < (int)fields.size()) 
-                ? fields[incident_type_col] : "congestion";
-            string severity = (severity_col >= 0 && severity_col < (int)fields.size()) 
-                ? fields[severity_col] : "minor";
-            string description = (description_col >= 0 && description_col < (int)fields.size()) 
-                ? fields[description_col] : "User reported disruption";
-            string report_id = (report_id_col >= 0 && report_id_col < (int)fields.size()) 
-                ? fields[report_id_col] : "";
+                ? fields[incident_type_col] : "user-incident";
+            string criticality = (incident_criticality_col >= 0 && incident_criticality_col < (int)fields.size()) 
+                ? fields[incident_criticality_col] : "minor";
+            string description = (incident_description_col >= 0 && incident_description_col < (int)fields.size()) 
+                ? fields[incident_description_col] : "User reported incident";
+            string incident_id = (incident_id_col >= 0 && incident_id_col < (int)fields.size()) 
+                ? fields[incident_id_col] : "";
             string road_name = (road_name_col >= 0 && road_name_col < (int)fields.size()) 
                 ? fields[road_name_col] : "Unknown Road";
+            string start_time = (incident_start_time_col >= 0 && incident_start_time_col < (int)fields.size()) 
+                ? fields[incident_start_time_col] : "";
+            string end_time = (incident_end_time_col >= 0 && incident_end_time_col < (int)fields.size()) 
+                ? fields[incident_end_time_col] : "";
             
-            // Create flow data for this user disruption
-            TrafficFlowData flow = get_flow_color(jam_factor, speed_kph, freeflow_kph);
-            flow.confidence = 0.95; // User reports have high confidence
-            flow.traversability = is_closed ? "closed" : "open";
-            
-            // Merge with existing flow data (user disruptions override API data)
-            flow_out[edge_key] = flow;
-            
-            // Create incident info for this user disruption
+            // Create incident info for this user incident
             IncidentInfo incident;
-            incident.id = "user_" + report_id;
+            incident.id = incident_id;
             incident.type = incident_type;
-            incident.criticality = severity;
+            incident.criticality = criticality;
             incident.description = description;
             incident.road_closed = is_closed;
-            incident.start_time = "";
-            incident.end_time = "";
+            incident.start_time = start_time;
+            incident.end_time = end_time;
             
-            // Merge with existing incident data (user disruptions override API data)
+            // Store incident
             incident_out[edge_key] = incident;
             
             loaded_count++;

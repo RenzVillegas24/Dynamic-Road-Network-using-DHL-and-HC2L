@@ -1,0 +1,193 @@
+ @keyframes float {
+
+   0%,
+   100% {
+     transform: translateY(0px);
+   }
+
+   50% {
+     transform: translateY(-10px);
+   }
+ }
+
+ .float-animation {
+   animation: float 3s ease-in-out infinite;
+ }
+
+ @keyframes pulse-ring {
+   0% {
+     transform: scale(0.8);
+     opacity: 1;
+   }
+
+   100% {
+     transform: scale(1.4);
+     opacity: 0;
+   }
+ }
+
+ .pulse-ring {
+   animation: pulse-ring 2s ease-out infinite;
+ }
+
+ .glass-effect {
+   background: rgba(255, 255, 255, 0.95);
+   backdrop-filter: blur(12px);
+   -webkit-backdrop-filter: blur(12px);
+   border-color: #e2e8f0;
+   box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
+   overflow: hidden;
+ }
+
+ .severity-heavy {
+   background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+ }
+
+ .severity-medium {
+   background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+ }
+
+ .severity-light {
+   background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+ }
+
+
+ /* Icon-colored badge variants */
+ .icon-badge-critical {
+   background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+ }
+
+ .icon-badge-major {
+   background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+ }
+
+ .icon-badge-minor {
+   background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+ }
+
+ .icon-badge-heavy {
+   background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+ }
+
+ .icon-badge-medium {
+   background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+ }
+
+ .icon-badge-light {
+   background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+ }
+
+ .popup-divider {
+   height: 1px;
+   background: linear-gradient(to right, transparent, #e2e8f0, transparent);
+   margin: 4px 0;
+ }
+
+ /* Hide Leaflet attribution watermark */
+ .leaflet-control-attribution {
+   display: none !important;
+ }
+
+ /* Route segment styling */
+ .route-segment-clickable {
+   cursor: pointer;
+   transition: all 0.2s ease;
+ }
+
+ .route-segment-clickable:hover {
+   filter: brightness(1.2);
+   stroke-width: 8px !important;
+ }
+
+ .route-segment-popup .leaflet-popup-content-wrapper {
+   border-radius: 8px;
+   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+ }
+
+ .route-segment-popup .leaflet-popup-content {
+   font-size: 13px;
+   line-height: 1.5;
+ }
+
+ /* Walking distance label styling */
+ .walking-distance-label {
+   background: rgba(117, 117, 117, 0.95) !important;
+   color: white !important;
+   border: 2px solid white !important;
+   border-radius: 8px !important;
+   padding: 4px 10px !important;
+   font-weight: 600 !important;
+   font-size: 12px !important;
+   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3) !important;
+ }
+
+ .walking-distance-label::before {
+   border-top-color: rgba(117, 117, 117, 0.95) !important;
+ }
+
+ /* Toggle Checkbox Styling */
+ .toggle-checkbox {
+   appearance: none;
+   width: 44px;
+   height: 24px;
+   background: #cbd5e1;
+   border-radius: 12px;
+   position: relative;
+   cursor: pointer;
+   transition: background 0.3s ease;
+ }
+
+ .toggle-checkbox::before {
+   content: '';
+   position: absolute;
+   width: 20px;
+   height: 20px;
+   border-radius: 50%;
+   background: white;
+   top: 2px;
+   left: 2px;
+   transition: transform 0.3s ease;
+   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+ }
+
+ .toggle-checkbox:checked {
+   background: #8b5cf6;
+ }
+
+ .toggle-checkbox:checked::before {
+   transform: translateX(20px);
+ }
+
+ .toggle-checkbox:focus {
+   outline: none;
+   box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.3);
+ }
+
+ /* Radio Button Selection Highlighting */
+ input[type="radio"]:checked+span {
+   font-weight: 700;
+   color: #ffffff;
+ }
+
+ label:has(input[type="radio"]:checked) {
+   transform: scale(1.02) !important;
+   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25) !important;
+   border: 2px solid rgba(255, 255, 255, 0.5) !important;
+ }
+
+ label:has(input[type="radio"]:checked)>.flex-1>span {
+   font-weight: 800 !important;
+ }
+
+ /* Disabled state styling for Road Closure */
+ input[type="radio"]:disabled {
+   cursor: not-allowed !important;
+ }
+
+ input[type="checkbox"]:disabled {
+   cursor: not-allowed !important;
+ }
+
+ label:has(input:disabled) {
+   cursor: not-allowed !important;
+ }
