@@ -593,10 +593,11 @@ def merge_user_disruptions_with_traffic(flow_csv: Optional[str] = None, incident
         # of the last user disruption should still trigger route updates
         
         # Use microseconds to ensure unique timestamps even for rapid operations
-        # Format: YYYYMMDDTHHMMSS (includes microseconds for uniqueness)
+        # Format: YYYYMMDDTHHMMSSCC (includes centiseconds for uniqueness)
+        # CC = centiseconds (00-99) derived from microseconds
         now = datetime.now()
-        # Add microseconds to timestamp to ensure uniqueness
-        timestamp = now.strftime('%Y%m%dT%H%M%S') + str(now.microsecond // 10000).zfill(2)
+        centiseconds = str(now.microsecond // 10000).zfill(2)
+        timestamp = now.strftime('%Y%m%dT%H%M%S') + centiseconds
         
         # Process flow CSV if available or requested
         if flow_csv or (not incident_csv):
@@ -613,7 +614,7 @@ def merge_user_disruptions_with_traffic(flow_csv: Optional[str] = None, incident
                         # But still create a new timestamped file to trigger updates
                         merged_flow_df = flow_df.copy()
                     
-                    # Create NEW timestamped file
+                    # Create NEW timestamped file with standardized format
                     new_flow_file = Config.FLOW_DIR / f'flow_{timestamp}.csv'
                     merged_flow_df.to_csv(new_flow_file, index=False)
                     
@@ -638,7 +639,7 @@ def merge_user_disruptions_with_traffic(flow_csv: Optional[str] = None, incident
                         # But still create a new timestamped file to trigger updates
                         merged_incident_df = incident_df.copy()
                     
-                    # Create NEW timestamped file
+                    # Create NEW timestamped file with standardized format
                     new_incident_file = Config.INCIDENTS_DIR / f'incident_{timestamp}.csv'
                     merged_incident_df.to_csv(new_incident_file, index=False)
                     

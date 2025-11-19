@@ -152,8 +152,11 @@ class FlowService:
         # Cleanup old files first (keep max 10)
         self._cleanup_old_files(max_files=10)
         
-        # Generate timestamp filename
-        timestamp = datetime.now().strftime("%Y%m%dT%H%M%S")
+        # Generate timestamp filename with centiseconds for uniqueness
+        # Format: YYYYMMDDTHHMMSSCC (CC = centiseconds, 00-99)
+        now = datetime.now()
+        centiseconds = str(now.microsecond // 10000).zfill(2)
+        timestamp = now.strftime("%Y%m%dT%H%M%S") + centiseconds
         filename = f"flow_{timestamp}.csv"
         filepath = self.output_dir / filename
         

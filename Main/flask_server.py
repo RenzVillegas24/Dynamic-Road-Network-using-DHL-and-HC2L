@@ -1189,9 +1189,14 @@ def get_user_disruptions():
 @app.route('/user_disruptions/<report_id>', methods=['DELETE'])
 def delete_user_disruption(report_id):
     """
-    Delete a user-reported disruption by report_id and create new timestamped CSV files.
+    Delete a user-reported disruption by report_id and regenerate clean disruption CSV files.
     
-    This ensures the auto-disruption service detects the change and triggers route updates.
+    CRITICAL FIX: To properly remove the deleted disruption from data:
+    1. Update user_reported_disruptions.csv with remaining entries
+    2. Rebuild flow and incident CSVs from HERE API data WITHOUT user disruptions
+    3. Then re-merge the UPDATED user disruptions list
+    
+    This ensures the deleted disruption is not carried forward in the data.
     """
     file_path = get_user_disruptions_file()
     if not file_path.exists():
@@ -1204,7 +1209,7 @@ def delete_user_disruption(report_id):
     if len(rows_to_keep) == initial_count:
         return jsonify({'success': False, 'error': 'Custom incident not found'}), 404
 
-    # Save updated user disruptions CSV
+    # Save updated user disruptions CSV (without the deleted one)
     fieldnames = ensure_user_disruption_fieldnames()
     with open(file_path, 'w', newline='') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
@@ -1215,35 +1220,76 @@ def delete_user_disruption(report_id):
     print(f"   Deleted report_id: {report_id}")
     print(f"   Remaining disruptions: {len(rows_to_keep)}")
     
-    # Create new timestamped CSV files to trigger auto-disruption service updates
-    print(f"   🔀 Creating new timestamped disruption files...")
-    from config import Config
+    # CRITICAL: Rebuild from clean traffic data to remove the old user disruption
+    print(f"   🔀 Rebuilding clean disruption files from HERE API data...")
     
-    # Get latest flow and incident files
-    flow_files = sorted(Config.FLOW_DIR.glob("flow_*.csv"), reverse=True)
-    incident_files = sorted(Config.INCIDENTS_DIR.glob("incident_*.csv"), reverse=True)
-    
-    latest_flow = flow_files[0].name if flow_files else None
-    latest_incident = incident_files[0].name if incident_files else None
-    
-    merge_metadata = {'success': False}
-    if latest_flow and latest_incident:
-        latest_flow_path = str(Config.FLOW_DIR / latest_flow)
-        latest_incident_path = str(Config.INCIDENTS_DIR / latest_incident)
+    try:
+        from config import Config
+        from traffic_data_manager import (
+            get_latest_flow_csv,
+            get_latest_incident_csv,
+            _read_csv_safely,
+            build_user_disruption_dataframe,
+            merge_user_disruptions_dataframe
+        )
         
-        # Create new timestamped files with updated user disruptions
-        merge_metadata = merge_user_disruptions_with_traffic(latest_flow_path, latest_incident_path)
+        # Step 1: Load CLEAN HERE API data (without any user disruptions)
+        # by reading the original CSV files before user merge
+        clean_flow_df = pd.DataFrame()
+        clean_incident_df = pd.DataFrame()
         
-        if merge_metadata['success']:
-            print(f"   ✅ Created new timestamped disruption files:")
-            if merge_metadata.get('flow_file'):
-                print(f"      Flow: {Path(merge_metadata['flow_file']).name} ({merge_metadata['flow_records']} records)")
-            if merge_metadata.get('incident_file'):
-                print(f"      Incident: {Path(merge_metadata['incident_file']).name} ({merge_metadata['incident_records']} records)")
+        latest_flow_path = get_latest_flow_csv()
+        latest_incident_path = get_latest_incident_csv()
+        
+        if latest_flow_path and latest_flow_path.exists():
+            clean_flow_df = _read_csv_safely(latest_flow_path)
+            print(f"   ✅ Loaded clean flow data: {len(clean_flow_df)} records")
+        
+        if latest_incident_path and latest_incident_path.exists():
+            clean_incident_df = _read_csv_safely(latest_incident_path)
+            print(f"   ✅ Loaded clean incident data: {len(clean_incident_df)} records")
+        
+        # Step 2: Merge UPDATED user disruptions (after deletion)
+        if rows_to_keep:
+            print(f"   🔀 Re-merging remaining user disruptions ({len(rows_to_keep)} entries)...")
+            merged_flow_df = merge_user_disruptions_dataframe(clean_flow_df, rows_to_keep, target_type='flow')
+            merged_incident_df = merge_user_disruptions_dataframe(clean_incident_df, rows_to_keep, target_type='incident')
         else:
-            print(f"   ⚠️  Merge completed but no new files created")
-    else:
-        print(f"   ⚠️  No traffic files found to merge with")
+            print(f"   🔀 No remaining user disruptions - using clean data only")
+            merged_flow_df = clean_flow_df.copy() if not clean_flow_df.empty else pd.DataFrame()
+            merged_incident_df = clean_incident_df.copy() if not clean_incident_df.empty else pd.DataFrame()
+        
+        # Step 3: Create new timestamped files
+        now = datetime.now()
+        centiseconds = str(now.microsecond // 10000).zfill(2)
+        timestamp = now.strftime('%Y%m%dT%H%M%S') + centiseconds
+        
+        new_flow_file = None
+        new_incident_file = None
+        
+        if not merged_flow_df.empty:
+            new_flow_file = Config.FLOW_DIR / f'flow_{timestamp}.csv'
+            merged_flow_df.to_csv(new_flow_file, index=False)
+            print(f"   ✅ Created clean flow CSV: {new_flow_file.name} ({len(merged_flow_df)} records)")
+        
+        if not merged_incident_df.empty:
+            new_incident_file = Config.INCIDENTS_DIR / f'incident_{timestamp}.csv'
+            merged_incident_df.to_csv(new_incident_file, index=False)
+            print(f"   ✅ Created clean incident CSV: {new_incident_file.name} ({len(merged_incident_df)} records)")
+        
+        merge_metadata = {
+            'success': new_flow_file is not None or new_incident_file is not None,
+            'flow_file': str(new_flow_file) if new_flow_file else None,
+            'incident_file': str(new_incident_file) if new_incident_file else None,
+            'flow_records': len(merged_flow_df),
+            'incident_records': len(merged_incident_df)
+        }
+        
+    except Exception as e:
+        print(f"   ❌ Error rebuilding disruption files: {e}")
+        import traceback
+        traceback.print_exc()
+        merge_metadata = {'success': False}
     
     # Trigger auto-disruption service to detect new files
     auto_service = get_auto_disruption_service()
