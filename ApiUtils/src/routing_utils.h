@@ -21,6 +21,7 @@
 #include <exception>
 #include <iostream>
 #include <sys/stat.h>
+#include <dirent.h>
 #include "shared_routing_structures.h"
 #include "base_road_network.h"
 
@@ -1382,6 +1383,211 @@ vector<AlternativeRoute> generate_alternative_routes(
     }
     
     return alternatives;
+}
+
+
+// ============================================================
+// USER-REPORTED DISRUPTIONS LOADER
+// ============================================================
+
+/**
+ * Load user-reported disruptions from CSV file
+ * 
+ * This function loads custom disruptions created by users via the UI.
+ * User disruptions are stored in timestamped files (user_incident_YYYYMMDDTHHMMSS.csv)
+ * in the disruptions/user_incident/ folder, similar to flow and incident files.
+ * 
+ * The function automatically finds and loads the LATEST user_incident_*.csv file.
+ * 
+ * CSV Format (from Main/data/disruptions/user_incident/user_incident_*.csv):
+ * source,target,lat,lng,snapped_lat,snapped_lng,target_lat,target_lon,
+ * road_name,highway_type,speed_kph,freeFlow_kph,jamFactor,isClosed,
+ * incident_type,severity,description,report_id,timestamp
+ * 
+ * @param disruption_dir - Path to disruptions directory (contains user_incident/ subfolder)
+ * @param flow_out - Output map for flow data (will be merged)
+ * @param incident_out - Output map for incident data (will be merged)
+ * @return Number of user disruptions loaded
+ */
+inline int load_user_reported_disruptions(
+    const string& disruption_dir,
+    map<pair<NodeID, NodeID>, TrafficFlowData>& flow_out,
+    map<pair<NodeID, NodeID>, IncidentInfo>& incident_out) {
+    
+    if (disruption_dir.empty()) {
+        cerr << "   ℹ️  No disruption directory specified" << endl;
+        return 0;
+    }
+    
+    // Find latest user_incident_*.csv file in user_incident subfolder
+    string user_incident_dir = disruption_dir + "/user_incident";
+    
+    // Check if user_incident directory exists
+    struct stat dir_stat;
+    if (stat(user_incident_dir.c_str(), &dir_stat) != 0 || !S_ISDIR(dir_stat.st_mode)) {
+        cerr << "   ℹ️  User incident directory not found: " << user_incident_dir << endl;
+        return 0;
+    }
+    
+    // Find all user_incident_*.csv files and get the latest one
+    string latest_file = "";
+    time_t latest_time = 0;
+    
+    DIR* dir = opendir(user_incident_dir.c_str());
+    if (dir != nullptr) {
+        struct dirent* entry;
+        while ((entry = readdir(dir)) != nullptr) {
+            string filename = entry->d_name;
+            if (filename.find("user_incident_") == 0 && filename.find(".csv") != string::npos) {
+                string full_path = user_incident_dir + "/" + filename;
+                struct stat file_stat;
+                if (stat(full_path.c_str(), &file_stat) == 0) {
+                    if (file_stat.st_mtime > latest_time) {
+                        latest_time = file_stat.st_mtime;
+                        latest_file = full_path;
+                    }
+                }
+            }
+        }
+        closedir(dir);
+    }
+    
+    if (latest_file.empty()) {
+        cerr << "   ℹ️  No user_incident files found in: " << user_incident_dir << endl;
+        return 0;
+    }
+    
+    // Check if file exists
+    struct stat buffer;
+    if (stat(latest_file.c_str(), &buffer) != 0) {
+        cerr << "   ⚠️  User disruption file not found: " << latest_file << endl;
+        return 0;
+    }
+    
+    ifstream file(latest_file);
+    if (!file.is_open()) {
+        cerr << "   ⚠️  Cannot open user disruption file: " << latest_file << endl;
+        return 0;
+    }
+    
+    cerr << "👤 Loading user-reported disruptions from: " << latest_file << endl;
+    
+    string line;
+    int source_col = -1, target_col = -1;
+    int speed_col = -1, freeflow_col = -1, jam_col = -1;
+    int is_closed_col = -1, incident_type_col = -1, severity_col = -1;
+    int description_col = -1, report_id_col = -1, road_name_col = -1;
+    
+    // Parse CSV header
+    if (getline(file, line)) {
+        vector<string> headers = parse_csv_line(line);
+        for (size_t i = 0; i < headers.size(); i++) {
+            string h = headers[i];
+            // Trim whitespace
+            h.erase(0, h.find_first_not_of(" \t\n\r"));
+            h.erase(h.find_last_not_of(" \t\n\r") + 1);
+            
+            if (h == "source") source_col = i;
+            else if (h == "target") target_col = i;
+            else if (h == "speed_kph") speed_col = i;
+            else if (h == "freeFlow_kph") freeflow_col = i;
+            else if (h == "jamFactor") jam_col = i;
+            else if (h == "isClosed") is_closed_col = i;
+            else if (h == "incident_type") incident_type_col = i;
+            else if (h == "severity") severity_col = i;
+            else if (h == "description") description_col = i;
+            else if (h == "report_id") report_id_col = i;
+            else if (h == "road_name") road_name_col = i;
+        }
+    }
+    
+    if (source_col < 0 || target_col < 0) {
+        cerr << "   ❌ Invalid user disruption CSV: missing 'source' or 'target' columns" << endl;
+        file.close();
+        return 0;
+    }
+    
+    int loaded_count = 0;
+    
+    // Parse data rows
+    while (getline(file, line)) {
+        if (line.empty()) continue;
+        
+        vector<string> fields = parse_csv_line(line);
+        if ((int)fields.size() <= max(source_col, target_col)) continue;
+        
+        try {
+            NodeID source = stoul(fields[source_col]);
+            NodeID target = stoul(fields[target_col]);
+            
+            if (source == 0 || target == 0) continue; // Skip invalid edges
+            
+            auto edge_key = make_pair(source, target);
+            
+            // Extract flow data if available
+            double speed_kph = (speed_col >= 0 && speed_col < (int)fields.size()) 
+                ? stod(fields[speed_col]) : 0.0;
+            double freeflow_kph = (freeflow_col >= 0 && freeflow_col < (int)fields.size()) 
+                ? stod(fields[freeflow_col]) : 50.0;
+            double jam_factor = (jam_col >= 0 && jam_col < (int)fields.size()) 
+                ? stod(fields[jam_col]) : 0.0;
+            
+            // Extract incident data if available
+            bool is_closed = false;
+            if (is_closed_col >= 0 && is_closed_col < (int)fields.size()) {
+                string closed_str = fields[is_closed_col];
+                is_closed = (closed_str == "1" || closed_str == "true" || closed_str == "True");
+            }
+            
+            string incident_type = (incident_type_col >= 0 && incident_type_col < (int)fields.size()) 
+                ? fields[incident_type_col] : "congestion";
+            string severity = (severity_col >= 0 && severity_col < (int)fields.size()) 
+                ? fields[severity_col] : "minor";
+            string description = (description_col >= 0 && description_col < (int)fields.size()) 
+                ? fields[description_col] : "User reported disruption";
+            string report_id = (report_id_col >= 0 && report_id_col < (int)fields.size()) 
+                ? fields[report_id_col] : "";
+            string road_name = (road_name_col >= 0 && road_name_col < (int)fields.size()) 
+                ? fields[road_name_col] : "Unknown Road";
+            
+            // Create flow data for this user disruption
+            TrafficFlowData flow = get_flow_color(jam_factor, speed_kph, freeflow_kph);
+            flow.confidence = 0.95; // User reports have high confidence
+            flow.traversability = is_closed ? "closed" : "open";
+            
+            // Merge with existing flow data (user disruptions override API data)
+            flow_out[edge_key] = flow;
+            
+            // Create incident info for this user disruption
+            IncidentInfo incident;
+            incident.id = "user_" + report_id;
+            incident.type = incident_type;
+            incident.criticality = severity;
+            incident.description = description;
+            incident.road_closed = is_closed;
+            incident.start_time = "";
+            incident.end_time = "";
+            
+            // Merge with existing incident data (user disruptions override API data)
+            incident_out[edge_key] = incident;
+            
+            loaded_count++;
+            
+        } catch (const exception& e) {
+            cerr << "   ⚠️  Skipping invalid user disruption row: " << e.what() << endl;
+            continue;
+        }
+    }
+    
+    file.close();
+    
+    if (loaded_count > 0) {
+        cerr << "   ✅ Loaded " << loaded_count << " user-reported disruptions" << endl;
+    } else {
+        cerr << "   ℹ️  No user disruptions found in file" << endl;
+    }
+    
+    return loaded_count;
 }
 
 

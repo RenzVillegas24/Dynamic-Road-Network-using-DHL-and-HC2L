@@ -13,9 +13,7 @@ from datetime import datetime
 from typing import Optional, Dict, Any
 import logging
 
-from traffic_data_manager import (
-    merge_user_disruptions_with_traffic
-)
+# TODO: User disruptions are now processed in C++ API, not merged in Python
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -286,14 +284,15 @@ class AutoDisruptionService:
             return None
     
     def _get_disruption_hash(self) -> Optional[str]:
-        """Get hash of current traffic files to detect changes"""
+        """Get hash of current traffic files to detect changes (includes user_incident files)"""
         try:
             from config import Config
             import hashlib
             
-            # Check flow and incident directories for latest files
+            # Check flow, incident, and user_incident directories for latest files
             flow_dir = Config.FLOW_DIR
             incidents_dir = Config.INCIDENTS_DIR
+            user_incident_dir = Config.DISRUPTIONS_DIR / "user_incident"
             
             combined_content = ""
             
@@ -320,6 +319,18 @@ class AutoDisruptionService:
                         combined_content += f"incident:{mtime}:"
                 except Exception as e:
                     logger.debug(f"Error reading incidents directory: {e}")
+            
+            # Check user_incident directory
+            if user_incident_dir.exists():
+                try:
+                    # Get the most recent user_incident file
+                    user_incident_files = sorted(user_incident_dir.glob("user_incident_*.csv"))
+                    if user_incident_files:
+                        latest_user_incident = user_incident_files[-1]
+                        mtime = latest_user_incident.stat().st_mtime
+                        combined_content += f"user_incident:{mtime}:"
+                except Exception as e:
+                    logger.debug(f"Error reading user_incident directory: {e}")
             
             if combined_content:
                 return hashlib.md5(combined_content.encode()).hexdigest()
@@ -372,11 +383,9 @@ class AutoDisruptionService:
             incident_metadata = self.incident_service.fetch_and_save()
             logger.info(f"✅ Incident data updated: {incident_metadata.get('total_matched', 0)} incidents matched")
             
-            # Merge user disruptions into both CSV sources
-            merge_user_disruptions_with_traffic(
-                flow_metadata.get('csv_file'),
-                incident_metadata.get('csv_file')
-            )
+            # TODO: User disruptions are now loaded directly by C++ API
+            # No need to merge into flow/incident CSV files
+            logger.info("   ℹ️  User disruptions will be loaded by C++ routing API")
             
             return True
             

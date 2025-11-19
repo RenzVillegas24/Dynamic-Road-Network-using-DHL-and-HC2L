@@ -29,8 +29,10 @@ from flow_service import FlowService
 from incident_service import IncidentService
 
 # Import traffic data manager for merging disruptions
-from traffic_data_manager import merge_user_disruptions_with_traffic
+# TODO: User disruptions are now processed in C++ API, not merged into CSV files
 
+# Import user disruptions utilities for loading user-reported disruptions
+from user_disruptions import load_user_disruption_rows
 
 app = Flask(__name__)
 
@@ -157,6 +159,19 @@ USER_DISRUPTION_FIELDNAMES = [
 
 
 def get_user_disruptions_file() -> Path:
+    """Return the LATEST timestamped user_incident CSV file (or path for new one)."""
+    user_incident_dir = Config.DISRUPTIONS_DIR / 'user_incident'
+    user_incident_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Find latest user_incident_*.csv file
+    try:
+        user_files = sorted(user_incident_dir.glob("user_incident_*.csv"), reverse=True)
+        if user_files:
+            return user_files[0]  # Return latest
+    except Exception:
+        pass
+    
+    # No files exist - return path for backward compatibility
     return Config.DISRUPTIONS_DIR / 'user_reported_disruptions.csv'
 
 
@@ -984,14 +999,21 @@ def save_custom_disruption():
             'description': description
         }
         
-        # Save to user disruptions CSV
-        print(f"   💾 Saving to CSV...")
-        from user_disruptions import get_user_disruptions_file, ensure_user_disruption_fieldnames, load_user_disruption_rows
+        # Save to timestamped user incident CSV (similar to flow/incident files)
+        print(f"   💾 Saving to timestamped user_incident CSV...")
+        from user_disruptions import ensure_user_disruption_fieldnames, load_user_disruption_rows
         
-        csv_path = get_user_disruptions_file()
+        # Create timestamped filename
+        timestamp_str = datetime.now().strftime("%Y%m%dT%H%M%S%f")[:17]  # YYYYMMDDTHHMMSSCC
+        user_incident_dir = Config.DISRUPTIONS_DIR / "user_incident"
+        user_incident_dir.mkdir(parents=True, exist_ok=True)
+        csv_path = user_incident_dir / f"user_incident_{timestamp_str}.csv"
+        
+        # Load existing user disruptions from latest file (if any)
         rows = load_user_disruption_rows()
         rows.append(disruption_record)
         
+        # Write to new timestamped file
         fieldnames = ensure_user_disruption_fieldnames()
         with open(csv_path, 'w', newline='') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
@@ -999,48 +1021,7 @@ def save_custom_disruption():
             writer.writerows(rows)
         
         print(f"   ✅ Saved to: {csv_path.name}")
-        
-        # Merge user disruptions with traffic data - creates NEW timestamped CSV files
-        print(f"   🔀 Merging user disruptions with traffic data...")
-        from config import Config
-        
-        # Get latest flow and incident files
-        flow_files = sorted(Config.FLOW_DIR.glob("flow_*.csv"), reverse=True)
-        incident_files = sorted(Config.INCIDENTS_DIR.glob("incident_*.csv"), reverse=True)
-        
-        latest_flow = flow_files[0].name if flow_files else None
-        latest_incident = incident_files[0].name if incident_files else None
-        
-        merge_metadata = {'success': False}
-        if latest_flow and latest_incident:
-            latest_flow_path = str(Config.FLOW_DIR / latest_flow)
-            latest_incident_path = str(Config.INCIDENTS_DIR / latest_incident)
-            
-            # merge_user_disruptions_with_traffic now CREATES new timestamped files
-            merge_metadata = merge_user_disruptions_with_traffic(latest_flow_path, latest_incident_path)
-            
-            if merge_metadata['success']:
-                print(f"   ✅ Created new timestamped disruption files:")
-                if merge_metadata.get('flow_file'):
-                    print(f"      Flow: {Path(merge_metadata['flow_file']).name} ({merge_metadata['flow_records']} records)")
-                if merge_metadata.get('incident_file'):
-                    print(f"      Incident: {Path(merge_metadata['incident_file']).name} ({merge_metadata['incident_records']} records)")
-            else:
-                print(f"   ⚠️  Merge completed but no new files created")
-        else:
-            print(f"   ⚠️  No traffic files found to merge with")
-        
-        # Signal auto-disruption service to recalculate routes
-        # The new timestamped files will be automatically detected by the auto-disruption service
-        print(f"   📊 Triggering route recalculation...")
-        auto_service = get_auto_disruption_service()
-        if auto_service:
-            # Force a recalculation by clearing the disruption hash
-            # This ensures the new files are detected immediately
-            auto_service.last_disruption_hash = None
-            print(f"   ✅ Route recalculation triggered (new files will be detected)")
-        else:
-            print(f"   ⚠️  Auto-disruption service not available")
+        print(f"   ✅ User disruption saved - will be loaded by C++ routing API")
         
         return jsonify({
             'success': True,
@@ -1189,19 +1170,13 @@ def get_user_disruptions():
 @app.route('/user_disruptions/<report_id>', methods=['DELETE'])
 def delete_user_disruption(report_id):
     """
-    Delete a user-reported disruption by report_id and regenerate clean disruption CSV files.
+    Delete a user-reported disruption by report_id.
     
-    CRITICAL FIX: To properly remove the deleted disruption from data:
-    1. Update user_reported_disruptions.csv with remaining entries
-    2. Rebuild flow and incident CSVs from HERE API data WITHOUT user disruptions
-    3. Then re-merge the UPDATED user disruptions list
-    
-    This ensures the deleted disruption is not carried forward in the data.
+    Creates a NEW timestamped user_incident file without the deleted disruption.
+    This triggers route recalculation when C++ API detects the new file.
     """
-    file_path = get_user_disruptions_file()
-    if not file_path.exists():
-        return jsonify({'success': False, 'error': 'No user disruptions recorded yet'}), 404
-
+    from user_disruptions import ensure_user_disruption_fieldnames, load_user_disruption_rows
+    
     rows = load_user_disruption_rows()
     initial_count = len(rows)
     rows_to_keep = [row for row in rows if row.get('report_id') != report_id]
@@ -1209,9 +1184,15 @@ def delete_user_disruption(report_id):
     if len(rows_to_keep) == initial_count:
         return jsonify({'success': False, 'error': 'Custom incident not found'}), 404
 
-    # Save updated user disruptions CSV (without the deleted one)
+    # Create NEW timestamped file with remaining disruptions
+    timestamp_str = datetime.now().strftime("%Y%m%dT%H%M%S%f")[:17]  # YYYYMMDDTHHMMSSCC
+    user_incident_dir = Config.DISRUPTIONS_DIR / "user_incident"
+    user_incident_dir.mkdir(parents=True, exist_ok=True)
+    csv_path = user_incident_dir / f"user_incident_{timestamp_str}.csv"
+    
+    # Write to new timestamped file
     fieldnames = ensure_user_disruption_fieldnames()
-    with open(file_path, 'w', newline='') as csvfile:
+    with open(csv_path, 'w', newline='') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows_to_keep)
@@ -1219,91 +1200,13 @@ def delete_user_disruption(report_id):
     print(f"\n🗑️  === DELETING CUSTOM DISRUPTION ===")
     print(f"   Deleted report_id: {report_id}")
     print(f"   Remaining disruptions: {len(rows_to_keep)}")
-    
-    # CRITICAL: Rebuild from clean traffic data to remove the old user disruption
-    print(f"   🔀 Rebuilding clean disruption files from HERE API data...")
-    
-    try:
-        from config import Config
-        from traffic_data_manager import (
-            get_latest_flow_csv,
-            get_latest_incident_csv,
-            _read_csv_safely,
-            build_user_disruption_dataframe,
-            merge_user_disruptions_dataframe
-        )
-        
-        # Step 1: Load CLEAN HERE API data (without any user disruptions)
-        # by reading the original CSV files before user merge
-        clean_flow_df = pd.DataFrame()
-        clean_incident_df = pd.DataFrame()
-        
-        latest_flow_path = get_latest_flow_csv()
-        latest_incident_path = get_latest_incident_csv()
-        
-        if latest_flow_path and latest_flow_path.exists():
-            clean_flow_df = _read_csv_safely(latest_flow_path)
-            print(f"   ✅ Loaded clean flow data: {len(clean_flow_df)} records")
-        
-        if latest_incident_path and latest_incident_path.exists():
-            clean_incident_df = _read_csv_safely(latest_incident_path)
-            print(f"   ✅ Loaded clean incident data: {len(clean_incident_df)} records")
-        
-        # Step 2: Merge UPDATED user disruptions (after deletion)
-        if rows_to_keep:
-            print(f"   🔀 Re-merging remaining user disruptions ({len(rows_to_keep)} entries)...")
-            merged_flow_df = merge_user_disruptions_dataframe(clean_flow_df, rows_to_keep, target_type='flow')
-            merged_incident_df = merge_user_disruptions_dataframe(clean_incident_df, rows_to_keep, target_type='incident')
-        else:
-            print(f"   🔀 No remaining user disruptions - using clean data only")
-            merged_flow_df = clean_flow_df.copy() if not clean_flow_df.empty else pd.DataFrame()
-            merged_incident_df = clean_incident_df.copy() if not clean_incident_df.empty else pd.DataFrame()
-        
-        # Step 3: Create new timestamped files
-        now = datetime.now()
-        centiseconds = str(now.microsecond // 10000).zfill(2)
-        timestamp = now.strftime('%Y%m%dT%H%M%S') + centiseconds
-        
-        new_flow_file = None
-        new_incident_file = None
-        
-        if not merged_flow_df.empty:
-            new_flow_file = Config.FLOW_DIR / f'flow_{timestamp}.csv'
-            merged_flow_df.to_csv(new_flow_file, index=False)
-            print(f"   ✅ Created clean flow CSV: {new_flow_file.name} ({len(merged_flow_df)} records)")
-        
-        if not merged_incident_df.empty:
-            new_incident_file = Config.INCIDENTS_DIR / f'incident_{timestamp}.csv'
-            merged_incident_df.to_csv(new_incident_file, index=False)
-            print(f"   ✅ Created clean incident CSV: {new_incident_file.name} ({len(merged_incident_df)} records)")
-        
-        merge_metadata = {
-            'success': new_flow_file is not None or new_incident_file is not None,
-            'flow_file': str(new_flow_file) if new_flow_file else None,
-            'incident_file': str(new_incident_file) if new_incident_file else None,
-            'flow_records': len(merged_flow_df),
-            'incident_records': len(merged_incident_df)
-        }
-        
-    except Exception as e:
-        print(f"   ❌ Error rebuilding disruption files: {e}")
-        import traceback
-        traceback.print_exc()
-        merge_metadata = {'success': False}
-    
-    # Trigger auto-disruption service to detect new files
-    auto_service = get_auto_disruption_service()
-    if auto_service:
-        auto_service.last_disruption_hash = None
-        print(f"   ✅ Route recalculation triggered (new files will be detected)")
-    else:
-        print(f"   ⚠️  Auto-disruption service not available")
+    print(f"   ✅ Created new timestamped file: {csv_path.name}")
+    print(f"   ✅ C++ API will reload updated user disruptions")
 
     return jsonify({
         'success': True, 
         'deleted': report_id, 
-        'remaining': len(rows_to_keep),
-        'new_files_created': merge_metadata['success']
+        'remaining': len(rows_to_keep)
     })
 
 @app.route('/search_location', methods=['POST'])
@@ -2182,14 +2085,39 @@ def get_active_disruptions():
             
             for incident in incidents:
                 try:
-                    # Extract HERE API fields directly
-                    incident_details = incident.get('incidentDetails', {})
-                    incident_type = incident_details.get('type', 'other')
-                    criticality = incident_details.get('criticality', 'low')
-                    road_closed = incident_details.get('roadClosed', False)
+                    # Handle both API format (nested) and CSV format (flat)
+                    # Check if this is from CSV or from HERE API
+                    is_from_csv = 'incident_id' in incident and 'source' in incident
                     
-                    # Match incident to edges using incident matcher
-                    matched_edges = incident_service.matcher.match_incident(incident)
+                    if is_from_csv:
+                        # CSV format - flat structure
+                        incident_type = incident.get('incident_type', 'other').lower()
+                        criticality = incident.get('incident_criticality', 'low').lower()
+                        road_closed = str(incident.get('incident_road_closed', 'False')).lower() in ('true', '1', 'yes')
+                        road_name = incident.get('road_name', 'Unknown Road')
+                        description = incident.get('incident_description', '')
+                        
+                        # For CSV data, create simple edge list instead of re-matching
+                        # CSV already has source and target nodes
+                        matched_edges = [{
+                            'source': int(incident.get('source', 0)),
+                            'target': int(incident.get('target', 0)),
+                            'source_lat': float(incident.get('source_lat', 0)),
+                            'source_lon': float(incident.get('source_lon', 0)),
+                            'target_lat': float(incident.get('target_lat', 0)),
+                            'target_lon': float(incident.get('target_lon', 0))
+                        }]
+                    else:
+                        # HERE API format - nested structure
+                        incident_details = incident.get('incidentDetails', {})
+                        incident_type = incident_details.get('type', 'other').lower()
+                        criticality = incident_details.get('criticality', 'low').lower()
+                        road_closed = incident_details.get('roadClosed', False)
+                        road_name = incident_details.get('description', {}).get('value', 'Unknown Road')
+                        description = incident_details.get('description', {}).get('value', '')
+                        
+                        # Match incident to edges using incident matcher
+                        matched_edges = incident_service.matcher.match_incident(incident)
                     
                     if not matched_edges:
                         print(f"   ⚠️  No edges matched for incident: {incident_type}")
@@ -2202,13 +2130,13 @@ def get_active_disruptions():
                         'accident': 'Accident',
                         'construction': 'Construction',
                         'congestion': 'Congestion',
-                        'disabledVehicle': 'Disabled Vehicle',
-                        'massTransit': 'Mass Transit Event',
-                        'plannedEvent': 'Planned Event',
-                        'roadHazard': 'Road Hazard',
-                        'roadClosure': 'Road Closure',
+                        'disabledvehicle': 'Disabled Vehicle',
+                        'masstransit': 'Mass Transit Event',
+                        'plannedevent': 'Planned Event',
+                        'roadhazard': 'Road Hazard',
+                        'roadclosure': 'Road Closure',
                         'weather': 'Weather',
-                        'laneRestriction': 'Lane Restriction',
+                        'lanerestriction': 'Lane Restriction',
                         'other': 'Other'
                     }
                     
@@ -2224,7 +2152,7 @@ def get_active_disruptions():
                     severity = criticality_map.get(criticality, 'Light')
                     
                     # Calculate jam factor based on HERE data
-                    if road_closed or incident_type == 'roadClosure':
+                    if road_closed or incident_type == 'roadclosure':
                         jam_factor = 10.0
                     elif criticality == 'critical':
                         jam_factor = 8.0
@@ -2257,7 +2185,7 @@ def get_active_disruptions():
                             'source_lng': edge_value(edge, 'source_lon', default=0),
                             'target_lat': edge_value(edge, 'target_lat', default=0),
                             'target_lng': edge_value(edge, 'target_lon', default=0),
-                            'road_name': incident_details.get('description', {}).get('value', 'Unknown Road'),
+                            'road_name': road_name,  # Use the variable extracted from either CSV or API
                             'incident_type': display_type,
                             'severity': severity,
                             'speed_kph': speed_kph or 0,
@@ -2267,8 +2195,8 @@ def get_active_disruptions():
                             'slowdown_ratio': round(1.0 - speed_reduction, 3),
                             'criticality': criticality,
                             'here_type': incident_type,
-                            'start_time': incident_details.get('startTime', ''),
-                            'end_time': incident_details.get('endTime', '')
+                            'start_time': incident_details.get('startTime', '') if not is_from_csv else incident.get('timestamp', ''),
+                            'end_time': incident_details.get('endTime', '') if not is_from_csv else ''
                         }
                         
                         # Group by incident type

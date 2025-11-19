@@ -120,6 +120,30 @@ class DHLRouter:
             
             # Add optional disruption parameters if provided
             if disruption_file and disruption_file not in ['', 'null', 'NULL']:
+                # CRITICAL: Verify the disruption directory contains BOTH latest flow and incident files
+                # This ensures C++ receives the most recent disruption data
+                try:
+                    from pathlib import Path as PathlibPath
+                    disruption_path = PathlibPath(disruption_file)
+                    
+                    # Check for latest flow and incident CSV files
+                    flow_dir = disruption_path / 'flow'
+                    incident_dir = disruption_path / 'incidents'
+                    
+                    if flow_dir.exists():
+                        flow_files = sorted(flow_dir.glob('flow_*.csv'), key=lambda f: f.stat().st_mtime, reverse=True)
+                        if flow_files:
+                            latest_flow = flow_files[0]
+                            print(f"   ✅ Latest flow file: {latest_flow.name} (mtime: {latest_flow.stat().st_mtime})")
+                    
+                    if incident_dir.exists():
+                        incident_files = sorted(incident_dir.glob('incident_*.csv'), key=lambda f: f.stat().st_mtime, reverse=True)
+                        if incident_files:
+                            latest_incident = incident_files[0]
+                            print(f"   ✅ Latest incident file: {latest_incident.name} (mtime: {latest_incident.stat().st_mtime})")
+                except Exception as e:
+                    print(f"   ⚠️  Could not verify disruption files: {e}")
+                
                 print(f"   📂 Adding disruption directory: {disruption_file}")
                 cmd.append(str(disruption_file))
                 cmd.append(str(tau_threshold))

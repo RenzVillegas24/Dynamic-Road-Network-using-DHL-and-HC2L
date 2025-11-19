@@ -1508,7 +1508,7 @@ int main(int argc, char* argv[]) {
             cerr << "🔧 Processing disruptions from: " << disruption_file << endl;
             cerr << "   Tau threshold: " << tau_threshold << endl;
             
-            // *** USE CACHED DISRUPTION LOADER ***
+            // *** LOAD HERE API DISRUPTION DATA (flow and incidents) ***
             bool load_success = load_disruptions_with_cache(
                 disruption_file, incident_data, flow_data, adj_list, edge_geometries
             );
@@ -1517,6 +1517,17 @@ int main(int argc, char* argv[]) {
                 cerr << "⚠️  Failed to load disruptions" << endl;
                 use_disruptions = false;
             } else {
+                // *** LOAD USER-REPORTED DISRUPTIONS ***
+                // User disruptions are stored in timestamped files in disruptions/user_incident/
+                // Function will find and load the latest user_incident_*.csv file
+                int user_count = load_user_reported_disruptions(
+                    disruption_file, flow_data, incident_data
+                );
+                
+                if (user_count > 0) {
+                    cerr << "   ✅ Merged " << user_count << " user-reported disruptions into routing data" << endl;
+                }
+                
                 // Process union of incident + flow edges so that traffic-only rows still affect routing
                 set<pair<NodeID, NodeID>> disruption_edges;
                 for (const auto& [edge_key, _] : incident_data) {

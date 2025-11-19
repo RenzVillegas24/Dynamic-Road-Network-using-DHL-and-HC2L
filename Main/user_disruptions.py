@@ -28,7 +28,19 @@ USER_DISRUPTION_FIELDNAMES = [
 
 
 def get_user_disruptions_file() -> Path:
-    """Return the CSV path that stores user disruption reports."""
+    """Return the LATEST timestamped user_incident CSV file (or path for new one)."""
+    user_incident_dir = Config.DISRUPTIONS_DIR / 'user_incident'
+    user_incident_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Find latest user_incident_*.csv file
+    try:
+        user_files = sorted(user_incident_dir.glob("user_incident_*.csv"), reverse=True)
+        if user_files:
+            return user_files[0]  # Return latest
+    except Exception:
+        pass
+    
+    # No files exist - return path for backward compatibility
     return Config.DISRUPTIONS_DIR / 'user_reported_disruptions.csv'
 
 
@@ -68,15 +80,19 @@ def normalize_severity(raw_severity: str) -> str:
 
 
 def load_user_disruption_rows() -> List[Dict[str, str]]:
-    """Load (and self-heal) all user-reported disruption rows."""
+    """Load (and self-heal) all user-reported disruption rows from latest timestamped file."""
     file_path = get_user_disruptions_file()
+    
     if not file_path.exists():
         return []
 
-    with open(file_path, newline='') as csvfile:
-        reader = csv.DictReader(csvfile)
-        fieldnames = ensure_user_disruption_fieldnames(reader.fieldnames)
-        rows = list(reader)
+    try:
+        with open(file_path, newline='') as csvfile:
+            reader = csv.DictReader(csvfile)
+            fieldnames = ensure_user_disruption_fieldnames(reader.fieldnames)
+            rows = list(reader)
+    except Exception:
+        return []
 
     updated = False
     for row in rows:
@@ -85,10 +101,13 @@ def load_user_disruption_rows() -> List[Dict[str, str]]:
             updated = True
 
     if updated:
-        with open(file_path, 'w', newline='') as csvfile:
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(rows)
+        try:
+            with open(file_path, 'w', newline='') as csvfile:
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(rows)
+        except Exception:
+            pass
 
     return rows
 

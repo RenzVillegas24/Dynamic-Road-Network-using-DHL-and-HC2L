@@ -106,7 +106,8 @@ class IncidentService:
         metadata = {
             'timestamp': datetime.now().isoformat(),
             'incident_count': 0,
-            'total_edges': 0
+            'total_edges': 0,
+            'total_matched': 0  # Add this for auto_disruption_service
         }
         
         # Fetch and match incident data
@@ -135,6 +136,7 @@ class IncidentService:
             df = df[existing_columns]
             
             metadata['total_edges'] = len(df)
+            metadata['total_matched'] = len(df)  # Set total_matched to the number of matched edges
             
             print(f"\n✅ Generated {len(df)} incident edges")
             return df, metadata
