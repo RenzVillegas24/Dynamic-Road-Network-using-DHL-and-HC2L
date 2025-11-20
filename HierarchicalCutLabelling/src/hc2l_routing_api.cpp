@@ -102,50 +102,8 @@ map<pair<NodeID, NodeID>, string> g_highway_types;
 // This function is now defined in routing_utils.h and should be used from there
 // (keeping the declaration here for reference, but implementation is in header)
 
-
-
-// Calculate disruption-aware weight for an edge for HC2L path finding
-// This weight is applied to adjacency list when processing disruptions
-distance_t calculate_disruption_weight(
-    NodeID from, NodeID to,
-    distance_t base_distance,
-    const TrafficFlowData* flow,
-    const IncidentInfo* incident,
-    const string& highway_type,
-    double tau_threshold) {
-    
-    // PRIORITY 0: Closed roads
-    if (incident && incident->road_closed) {
-        return infinity;  // Effectively impassable
-    }
-    
-    // Start with base distance
-    double weight = base_distance;
-    
-    // Calculate flow-based penalty
-    if (flow) {
-        // jam_factor: 0.0 = free, 10.0 = blocked
-        double jam_factor_normalized = flow->jam_factor / 10.0;  // 0.0 to 1.0
-        double flow_multiplier = 1.0 + (jam_factor_normalized * 4.0);  // 1.0x to 5.0x
-        weight *= flow_multiplier;
-    }
-    
-    // Calculate incident penalty
-    if (incident && incident->has_incident()) {
-        double severity = get_incident_severity(incident->type);
-        weight *= severity;
-    }
-    
-    // Apply tau threshold as sensitivity multiplier (HC2L only)
-    // tau = 0.0: Use only base distance (ignore traffic)
-    // tau = 1.0: Use full traffic-adjusted weight
-    if (tau_threshold < 1.0) {
-        double adjustment = base_distance + (weight - base_distance) * tau_threshold;
-        weight = adjustment;
-    }
-    
-    return static_cast<distance_t>(weight);
-}
+// calculate_disruption_weight() is now defined in routing_utils.h
+// It handles both HC2L (with tau_threshold) and DHL routing
 
 
 // ============================================================
@@ -1595,13 +1553,30 @@ int main(int argc, char* argv[]) {
                         cerr << endl;
                         closed_roads_count++;
                         
+                        // Block ALL occurrences of the primary direction (handle duplicates)
+                        int blocked_count = 0;
                         if (adj_list.count(source)) {
                             for (auto& neighbor : adj_list[source]) {
                                 if (neighbor.node == target) {
                                     neighbor.distance = infinity;
-                                    break;
+                                    blocked_count++;
                                 }
                             }
+                        }
+                        cerr << "   🚫 Blocked: " << source << " → " << target << " (" << blocked_count << " occurrence(s), weight=infinity)" << endl;
+                        
+                        // IMPORTANT: Also block ALL occurrences of reverse direction for road closures!
+                        int blocked_reverse_count = 0;
+                        if (adj_list.count(target)) {
+                            for (auto& neighbor : adj_list[target]) {
+                                if (neighbor.node == source) {
+                                    neighbor.distance = infinity;
+                                    blocked_reverse_count++;
+                                }
+                            }
+                        }
+                        if (blocked_reverse_count > 0) {
+                            cerr << "   🚫 Blocked (reverse): " << target << " → " << source << " (" << blocked_reverse_count << " occurrence(s), weight=infinity)" << endl;
                         }
                         
                         disruption_impact_score = 1.0;
@@ -1614,11 +1589,13 @@ int main(int argc, char* argv[]) {
                         
                         double jam_factor_val = flow_ptr ? flow_ptr->jam_factor : 0.0;
                         
+                        // Update ALL occurrences of this edge (handle duplicates)
+                        int updated_count = 0;
                         if (adj_list.count(source)) {
                             for (auto& neighbor : adj_list[source]) {
                                 if (neighbor.node == target) {
                                     neighbor.distance = new_weight;
-                                    break;
+                                    updated_count++;
                                 }
                             }
                         }

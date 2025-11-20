@@ -87,43 +87,8 @@ vector<string> parse_csv_line(const string& line);
 // DISRUPTION METRICS COMPUTATION
 // ============================================================
 // Routing-specific implementations now rely on the shared
-// compute_disruption_metrics defined in ApiUtils/src/routing_utils.h
-
-
-// Calculate disruption-aware weight for an edge for DHL path finding
-// DHL uses immediate update strategy - applies full weights
-distance_t calculate_disruption_weight(
-    NodeID from, NodeID to,
-    distance_t base_distance,
-    const TrafficFlowData* flow,
-    const IncidentInfo* incident,
-    const string& highway_type) {
-    
-    // PRIORITY 0: Closed roads
-    if (incident && incident->road_closed) {
-        return infinity;  // Effectively impassable
-    }
-    
-    // Start with base distance
-    double weight = base_distance;
-    
-    // Calculate flow-based penalty
-    if (flow) {
-        // jam_factor: 0.0 = free, 10.0 = blocked
-        double jam_factor_normalized = flow->jam_factor / 10.0;  // 0.0 to 1.0
-        double flow_multiplier = 1.0 + (jam_factor_normalized * 4.0);  // 1.0x to 5.0x
-        weight *= flow_multiplier;
-    }
-    
-    // Calculate incident penalty
-    if (incident && incident->has_incident()) {
-        double severity = get_incident_severity(incident->type);
-        weight *= severity;
-    }
-    
-    // DHL: No tau threshold - apply full weight
-    return static_cast<distance_t>(weight);
-}
+// compute_disruption_metrics and calculate_disruption_weight
+// defined in ApiUtils/src/routing_utils.h
 
 // ============================================================
 // DISRUPTION CACHE MANAGEMENT
@@ -1196,12 +1161,12 @@ void output_json_response(bool success, const string& error_message = "",
         
         // Generate alternative routes (k-shortest paths) with disruption awareness
         vector<AlternativeRoute> alternatives;
-        if (generate_alternatives && use_disruptions && !path.empty() && path.size() >= 2 && !adj_list.empty() && (!flow_data.empty() || !incident_data.empty())) {
+        if (generate_alternatives && use_disruptions && !path.empty() && path.size() >= 2 && !adj_list.empty() && (!flow_data.empty() || !disruption_map.empty())) {
             cerr << "\n🔀 Generating alternative routes with disruption awareness (Flow + Incidents)..." << endl;
             NodeID route_start = path.front();
             NodeID route_dest = path.back();
             alternatives = generate_alternative_routes(
-                route_start, route_dest, adj_list, flow_data, incident_data, coordinates, 3
+                route_start, route_dest, adj_list, flow_data, disruption_map, coordinates, 3
             );
         }
         
@@ -1510,21 +1475,41 @@ int main(int argc, char* argv[]) {
                         cerr << endl;
                         closed_roads_count++;
                         
+                        // Block ALL occurrences of the primary direction (handle duplicates)
+                        int blocked_count = 0;
                         if (adj_list.count(source)) {
                             for (auto& neighbor : adj_list[source]) {
                                 if (neighbor.node == target) {
                                     neighbor.distance = infinity;
-                                    break;
+                                    blocked_count++;
                                 }
                             }
                         }
+                        cerr << "   🚫 Blocked: " << source << " → " << target << " (" << blocked_count << " occurrence(s), weight=infinity)" << endl;
+                        
+                        // IMPORTANT: Also block ALL occurrences of reverse direction for road closures!
+                        int blocked_reverse_count = 0;
+                        if (adj_list.count(target)) {
+                            for (auto& neighbor : adj_list[target]) {
+                                if (neighbor.node == source) {
+                                    neighbor.distance = infinity;
+                                    blocked_reverse_count++;
+                                }
+                            }
+                        }
+                        if (blocked_reverse_count > 0) {
+                            cerr << "   🚫 Blocked (reverse): " << target << " → " << source << " (" << blocked_reverse_count << " occurrence(s), weight=infinity)" << endl;
+                        }
+                        
                         disruption_impact_score = 1.0;
                     } else {
+                        // Update ALL occurrences of this edge (handle duplicates)
+                        int updated_count = 0;
                         if (adj_list.count(source)) {
                             for (auto& neighbor : adj_list[source]) {
                                 if (neighbor.node == target) {
                                     neighbor.distance = new_weight;
-                                    break;
+                                    updated_count++;
                                 }
                             }
                         }

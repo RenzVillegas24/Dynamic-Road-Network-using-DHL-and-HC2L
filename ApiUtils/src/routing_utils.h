@@ -839,30 +839,31 @@ inline EdgeDisruptionMetrics compute_disruption_metrics(
         string criticality = incident->criticality;
         
         if (incident->road_closed) {
+            // Road closure - effectively block this edge
             metrics.severity_level = "critical";
             metrics.severity_score = 1.0;
-            metrics.weight_multiplier = 100.0;  // Effectively block the edge
+            metrics.weight_multiplier = 10000.0;  // Extremely high weight to prevent routing through
         } else if (criticality == "critical") {
             metrics.severity_level = "critical";
             metrics.severity_score = 1.0;
-            metrics.weight_multiplier = 10.0;
+            metrics.weight_multiplier = 100.0;  // Very high weight - strongly avoid
         } else if (criticality == "severe") {
             metrics.severity_level = "high";
             metrics.severity_score = 0.75;
-            metrics.weight_multiplier = 5.0;
+            metrics.weight_multiplier = 10.0;
         } else if (criticality == "major") {
             metrics.severity_level = "medium";
             metrics.severity_score = 0.5;
-            metrics.weight_multiplier = 3.0;
+            metrics.weight_multiplier = 5.0;
         } else if (criticality == "minor") {
             metrics.severity_level = "low";
             metrics.severity_score = 0.25;
-            metrics.weight_multiplier = 1.5;
+            metrics.weight_multiplier = 2.0;
         } else {
             // Unknown criticality - use conservative medium severity
             metrics.severity_level = "medium";
             metrics.severity_score = 0.5;
-            metrics.weight_multiplier = 2.0;
+            metrics.weight_multiplier = 3.0;
         }
         
         // If flow data also available, adjust severity based on jam_factor
@@ -1288,6 +1289,79 @@ inline double calculate_eta_with_disruption(
 
 
 // ============================================================
+// DISRUPTION WEIGHT CALCULATION
+// ============================================================
+
+/**
+ * Calculate disruption-aware weight for routing algorithms
+ * Combines traffic flow and incident data to compute edge cost
+ * 
+ * @param from Source node ID
+ * @param to Target node ID
+ * @param base_distance Base edge distance/weight
+ * @param flow Traffic flow data (optional)
+ * @param incident Incident data (optional)
+ * @param highway_type Highway classification
+ * @param tau_threshold Sensitivity threshold (0.0-1.0, default 1.0)
+ *                      1.0 = full weight, <1.0 = reduced impact
+ * @return Adjusted edge weight considering disruptions
+ */
+inline distance_t calculate_disruption_weight(
+    NodeID from, NodeID to,
+    distance_t base_distance,
+    const TrafficFlowData* flow,
+    const IncidentInfo* incident,
+    const string& highway_type,
+    double tau_threshold = 1.0) {
+    
+    // PRIORITY 0: Closed roads - return infinity to block routing
+    if (incident && incident->road_closed) {
+        return road_network::infinity;
+    }
+    
+    // Start with base distance
+    double weight = static_cast<double>(base_distance);
+    
+    // PRIORITY 1: Check incident severity - critical incidents should be heavily penalized
+    if (incident && incident->has_incident()) {
+        // Use compute_disruption_metrics for proper severity calculation
+        EdgeDisruptionMetrics metrics = compute_disruption_metrics(
+            incident, flow, highway_type, base_distance
+        );
+        
+        // For critical severity or very high weight multipliers, return near-infinity
+        if (metrics.severity_level == "critical" || metrics.weight_multiplier >= 100.0) {
+            return road_network::infinity;
+        }
+        
+        // Apply the computed weight multiplier
+        weight = static_cast<double>(metrics.new_weight);
+        
+    } else if (flow && flow->jam_factor > 0.0) {
+        // PRIORITY 2: Flow-only penalty (no incident)
+        // jam_factor: 0.0 = free, 10.0 = blocked
+        double jam_factor_normalized = flow->jam_factor / 10.0;  // 0.0 to 1.0
+        double flow_multiplier = 1.0 + (jam_factor_normalized * 4.0);  // 1.0x to 5.0x
+        weight *= flow_multiplier;
+    }
+    
+    // Apply tau threshold as sensitivity multiplier (for HC2L adaptive routing)
+    // tau = 0.0: Use only base distance (ignore traffic)
+    // tau = 1.0: Use full traffic-adjusted weight
+    if (tau_threshold < 1.0) {
+        double adjustment = base_distance + (weight - base_distance) * tau_threshold;
+        weight = adjustment;
+    }
+    
+    // Ensure weight doesn't exceed infinity
+    if (weight >= road_network::infinity) {
+        return road_network::infinity;
+    }
+    
+    return static_cast<distance_t>(weight);
+}
+
+// ============================================================
 // ALTERNATIVE ROUTE GENERATION
 // ============================================================
 
@@ -1625,8 +1699,46 @@ inline int load_user_reported_disruptions(
             incident.start_time = start_time;
             incident.end_time = end_time;
             
-            // Store incident
-            incident_out[edge_key] = incident;
+            // MERGE STRATEGY: If an incident already exists for this edge (from HERE API),
+            // keep the MORE CRITICAL one or merge them
+            if (incident_out.count(edge_key)) {
+                IncidentInfo& existing = incident_out[edge_key];
+                
+                // Priority 1: Road closure always takes precedence
+                if (is_closed || existing.road_closed) {
+                    incident.road_closed = true;
+                }
+                
+                // Priority 2: Keep higher criticality
+                map<string, int> criticality_rank = {
+                    {"critical", 4}, {"severe", 3}, {"major", 2}, {"minor", 1}, {"", 0}
+                };
+                int existing_rank = criticality_rank.count(existing.criticality) 
+                    ? criticality_rank[existing.criticality] : 0;
+                int new_rank = criticality_rank.count(criticality) 
+                    ? criticality_rank[criticality] : 0;
+                
+                if (new_rank > existing_rank) {
+                    // User incident is more critical - use it but keep existing ID if present
+                    if (existing.id.empty()) {
+                        existing.id = incident.id;
+                    }
+                    existing.type = incident.type;
+                    existing.criticality = incident.criticality;
+                    existing.description = incident.description;
+                    existing.road_closed = incident.road_closed;
+                } else if (new_rank == existing_rank) {
+                    // Same criticality - combine descriptions
+                    if (!incident.description.empty() && existing.description.find(incident.description) == string::npos) {
+                        existing.description += " | " + incident.description;
+                    }
+                    existing.road_closed = existing.road_closed || incident.road_closed;
+                }
+                // If new_rank < existing_rank, keep existing (more critical)
+            } else {
+                // No existing incident - add this one
+                incident_out[edge_key] = incident;
+            }
             
             loaded_count++;
             if (is_closed) {
