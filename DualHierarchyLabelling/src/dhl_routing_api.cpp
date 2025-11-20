@@ -247,15 +247,27 @@ vector<pair<double, double>> clip_geometry_at_snap(
     if (clip_start) {
         // STRICTLY start at snap point, then keep rest of geometry
         clipped.push_back({snap_lng, snap_lat});
-        for (size_t i = closest_idx + 1; i < coords.size(); i++) {
+        // Always include at least one more point for visualization, even if we're near the end
+        size_t start_from = (closest_idx + 1 < coords.size()) ? closest_idx + 1 : closest_idx;
+        for (size_t i = start_from; i < coords.size(); i++) {
             clipped.push_back(coords[i]);
+        }
+        // If we only have the snap point, add the closest original coordinate for context
+        if (clipped.size() == 1 && closest_idx < coords.size()) {
+            clipped.push_back(coords[closest_idx]);
         }
     } else {
         // Keep geometry up to closest point, then STRICTLY end at snap point
-        for (size_t i = 0; i < closest_idx; i++) {
+        // Include points before closest
+        size_t end_at = (closest_idx > 0) ? closest_idx : 0;
+        for (size_t i = 0; i <= end_at && i < coords.size(); i++) {
             clipped.push_back(coords[i]);
         }
         clipped.push_back({snap_lng, snap_lat});
+        // If we only have snap point, include a previous point for context
+        if (clipped.size() == 2 && closest_idx < coords.size()) {
+            clipped.insert(clipped.end() - 1, coords[closest_idx]);
+        }
     }
     
     // Ensure we always have at least the snap point
@@ -733,15 +745,25 @@ void output_json_response(bool success, const string& error_message = "",
             if (edge_geometries.count(edge_key)) {
                 coords_to_output = edge_geometries.at(edge_key).coords;
                 
-                // Clip at snap points
+                // Clip at snap points - CRITICAL: For same edge cases, always include intermediate geometry
                 if (same_edge && can_meet_on_same_edge) {
-                    // Clip both ends - use the new function for same-edge clipping
-                    coords_to_output = clip_geometry_between_snaps(coords_to_output, 
+                    // Same edge, can travel directly between snaps - clip both ends to show path
+                    // IMPORTANT: Ensure we preserve the actual edge geometry, not collapse it
+                    vector<pair<double, double>> full_geom = coords_to_output;
+                    coords_to_output = clip_geometry_between_snaps(full_geom, 
                                                                    start_snap_lat, start_snap_lng,
                                                                    dest_snap_lat, dest_snap_lng);
-                } else if (is_first_edge && !(same_edge && !can_meet_on_same_edge)) {
+                    
+                    // If clipping resulted in too few points, use original geometry
+                    // This handles cases where snaps are very close together
+                    if (coords_to_output.size() < 2) {
+                        coords_to_output = full_geom;
+                    }
+                } else if (is_first_edge) {
+                    // First edge of multi-edge path: clip from snap point to edge end
                     coords_to_output = clip_geometry_at_snap(coords_to_output, start_snap_lat, start_snap_lng, true);
-                } else if (is_last_edge && !(same_edge && !can_meet_on_same_edge)) {
+                } else if (is_last_edge) {
+                    // Last edge of multi-edge path: clip from edge start to snap point
                     coords_to_output = clip_geometry_at_snap(coords_to_output, dest_snap_lat, dest_snap_lng, false);
                 }
             }
@@ -1683,10 +1705,23 @@ int main(int argc, char* argv[]) {
         
         if (same_edge && can_meet_on_same_edge) {
             // Same edge case where they CAN meet directly
-            // Set path to just the edge endpoints
+            // CRITICAL: Respect one-way direction when setting path
             path.clear();
-            path.push_back(start_edge_source);
-            path.push_back(start_edge_target);
+            
+            // For one-way edges, only allow travel in valid direction
+            if (start_edge_oneway == 1) {
+                // Forward only: must be source→target
+                path.push_back(start_edge_source);
+                path.push_back(start_edge_target);
+            } else if (start_edge_oneway == -1) {
+                // Reverse only: must be target→source (reverse direction)
+                path.push_back(start_edge_target);
+                path.push_back(start_edge_source);
+            } else {
+                // Bidirectional: prefer logical direction (start→dest in edge order)
+                path.push_back(start_edge_source);
+                path.push_back(start_edge_target);
+            }
         } else if (same_edge && !can_meet_on_same_edge) {
             // Same edge but CANNOT meet directly (wrong direction on one-way)
             // The path from Dijkstra will find the route through the network
@@ -1753,7 +1788,7 @@ int main(int argc, char* argv[]) {
                            path, coordinates,
                            edge_geometries, use_disruptions, tau_threshold,
                            disruption_file, disruption_impact_score,
-                           update_strategy, update_reason, nodes_updated, flow_data, incident_data, &ci, adj_list);
+                           update_strategy, update_reason, nodes_updated, flow_data, incident_data, &ci, adj_list, generate_alternatives);
         
         return 0;
         
