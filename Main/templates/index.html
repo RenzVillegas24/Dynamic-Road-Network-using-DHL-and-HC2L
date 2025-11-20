@@ -1385,6 +1385,28 @@
           </div>
         </div>
 
+        <!-- API Console Section -->
+        <div id="metrics-console-section" class="border-t border-slate-200 pt-4 mt-4">
+          <h3 class="font-bold text-slate-800 mb-3 flex items-center gap-2">
+            <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+            </svg>
+            Raw API Response Console
+          </h3>
+
+          <div id="api-console-container" class="rounded-lg overflow-hidden border border-slate-300">
+            <div id="api-console-header">
+              <h4>API Console Output</h4>
+              <div id="api-console-controls">
+                <button id="api-console-clear" class="api-console-btn" title="Clear console">🗑️ Clear</button>
+                <button id="api-console-copy" class="api-console-btn" title="Copy to clipboard">📋 Copy</button>
+                <button id="api-console-toggle-view" class="api-console-btn" title="Toggle view mode">Show Raw JSON</button>
+              </div>
+            </div>
+            <div id="api-console-output" class="bg-slate-900"></div>
+          </div>
+        </div>
+
         <!-- Alternative Routes Section -->
         <div id="metrics-alternative-routes-section" class="border-t border-slate-200 pt-4 mt-4 hidden">
           <h3 class="font-bold text-slate-800 mb-3 flex items-center gap-2">
@@ -1934,6 +1956,7 @@
   <script src="{{ url_for('static', filename='js/functions.js') }}"></script>
   <script src="{{ url_for('static', filename='js/disruptions.js') }}"></script>
   <script src="{{ url_for('static', filename='js/metrics.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/api-console.js') }}"></script>
   <script src="{{ url_for('static', filename='js/panel-population.js') }}"></script>
   <script src="{{ url_for('static', filename='js/osm-snapping.js') }}"></script>
   <script src="{{ url_for('static', filename='js/event-handlers.js') }}"></script>
@@ -3136,6 +3159,11 @@
         const routeData = await response.json();
         console.log('Received DHL route data:', routeData);
 
+        // Log to API Console
+        if (typeof apiConsole !== 'undefined' && apiConsole) {
+          apiConsole.parseAPIResponse(routeData, 'DHL Algorithm');
+        }
+
         if (routeData.success) {
           showUpdateToast("DHL route calculated successfully", 'success');
           return routeData;
@@ -3217,6 +3245,11 @@
 
         const routeData = await response.json();
         console.log('Received D-HC2L route data:', routeData);
+
+        // Log to API Console
+        if (typeof apiConsole !== 'undefined' && apiConsole) {
+          apiConsole.parseAPIResponse(routeData, 'D-HC2L Algorithm (τ=' + selections.threshold + ')');
+        }
 
         if (routeData.success) {
           showUpdateToast("D-HC2L route calculated successfully", 'success');
