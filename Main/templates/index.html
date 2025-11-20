@@ -3439,48 +3439,12 @@
       const showAlternativeRoutes = document.getElementById('show-alternative-routes');
       if (showAlternativeRoutes) {
         showAlternativeRoutes.addEventListener('change', (e) => {
-          if (e.target.checked) {
-            // Show alternative routes - trigger route recalculation
-            if (window.currentRouteData) {
-              // Trigger recalculation with new generate_alternatives flag
-              setTimeout(() => {
-                if (typeof triggerAutoRouteRecalculation === 'function') {
-                  triggerAutoRouteRecalculation();
-                }
-              }, 100);
-            } else {
-              // No active route, just show available routes
-              if (window.alternativeRoutePolylines && window.alternativeRoutePolylines.length > 0) {
-                window.alternativeRoutePolylines.forEach(polyline => {
-                  if (polyline && map) {
-                    polyline.addTo(map);
-                  }
-                });
-                showUpdateToast('Alternative routes displayed', 'info');
-              } else {
-                showUpdateToast('No alternative routes available', 'warning');
-              }
-            }
+          // Use the same routing function as the Go button to properly refresh the route
+          // This ensures alternative routes are properly shown/hidden based on the toggle state
+          if (window.startLocation && window.destLocation) {
+            computeRouteBasedOnSelection(false);
           } else {
-            // Hide alternative routes - trigger route recalculation
-            if (window.currentRouteData) {
-              // Trigger recalculation with generate_alternatives=false
-              setTimeout(() => {
-                if (typeof triggerAutoRouteRecalculation === 'function') {
-                  triggerAutoRouteRecalculation();
-                }
-              }, 100);
-            } else {
-              // No active route, just hide the polylines
-              if (window.alternativeRoutePolylines && window.alternativeRoutePolylines.length > 0) {
-                window.alternativeRoutePolylines.forEach(polyline => {
-                  if (polyline && map) {
-                    map.removeLayer(polyline);
-                  }
-                });
-                showUpdateToast('Alternative routes hidden', 'info');
-              }
-            }
+            showUpdateToast('Please set start and destination locations first', 'warning');
           }
         });
       }

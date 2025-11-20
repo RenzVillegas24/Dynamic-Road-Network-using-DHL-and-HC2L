@@ -1939,12 +1939,12 @@ int main(int argc, char* argv[]) {
         // ============================================================
         vector<AlternativeRoute> alternatives;
         
-        if (generate_alternatives && use_disruptions && !flow_data.empty()) {
-            cerr << "\n🔀 Generating alternative routes with ETA comparison..." << endl;
+        if (generate_alternatives && use_disruptions && (!flow_data.empty() || !incident_data.empty())) {
+            cerr << "\n🔀 Generating alternative routes with disruption awareness (Flow + Incidents)..." << endl;
             
             // Generate up to 3 alternative routes
             alternatives = generate_alternative_routes(
-                best_start, best_dest, adj_list, flow_data, coordinates, 3
+                best_start, best_dest, adj_list, flow_data, incident_data, coordinates, 3
             );
             
             if (!alternatives.empty()) {
@@ -1958,9 +1958,10 @@ int main(int argc, char* argv[]) {
                 }
                 
                 // Update main path to best alternative if better ETA found
-                if (alternatives[0].eta_seconds < calculate_eta_with_disruption(path, flow_data, coordinates)) {
+                double current_eta = calculate_eta_with_disruption(path, flow_data, incident_data, coordinates);
+                if (alternatives[0].eta_seconds < current_eta) {
                     cerr << "🚀 Switching to faster alternative route (saving " 
-                         << format_eta_time(calculate_eta_with_disruption(path, flow_data, coordinates) - alternatives[0].eta_seconds)
+                         << format_eta_time(current_eta - alternatives[0].eta_seconds)
                          << ")" << endl;
                     path = alternatives[0].path;
                     best_distance = alternatives[0].distance;

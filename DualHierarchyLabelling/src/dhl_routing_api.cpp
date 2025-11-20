@@ -1194,13 +1194,14 @@ void output_json_response(bool success, const string& error_message = "",
         
         cout << "  }," << endl;
         
-        // Generate alternative routes (k-shortest paths)
+        // Generate alternative routes (k-shortest paths) with disruption awareness
         vector<AlternativeRoute> alternatives;
-        if (generate_alternatives && !path.empty() && path.size() >= 2 && !adj_list.empty()) {
+        if (generate_alternatives && use_disruptions && !path.empty() && path.size() >= 2 && !adj_list.empty() && (!flow_data.empty() || !incident_data.empty())) {
+            cerr << "\n🔀 Generating alternative routes with disruption awareness (Flow + Incidents)..." << endl;
             NodeID route_start = path.front();
             NodeID route_dest = path.back();
             alternatives = generate_alternative_routes(
-                route_start, route_dest, adj_list, flow_data, coordinates, 3
+                route_start, route_dest, adj_list, flow_data, incident_data, coordinates, 3
             );
         }
         

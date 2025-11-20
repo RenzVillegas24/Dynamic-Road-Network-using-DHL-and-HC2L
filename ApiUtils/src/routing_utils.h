@@ -1203,8 +1203,9 @@ inline bool load_disruptions_with_cache(
 
 // Calculate ETA in seconds using actual traffic flow data from edges
 double calculate_eta_with_disruption(
-   const vector<NodeID>& path,
+    const vector<NodeID>& path,
     const map<pair<NodeID, NodeID>, TrafficFlowData>& flow_data,
+    const map<pair<NodeID, NodeID>, IncidentInfo>& incident_data,
     const map<NodeID, GPSCoordinate>& coordinates,
     int hour_of_day = -1) {
     
@@ -1229,6 +1230,16 @@ double calculate_eta_with_disruption(
         }
         
         if (edge_distance <= 0) continue;
+        
+        // Check if edge is closed by incident (impassable = infinite time)
+        if (incident_data.count(edge_key)) {
+            const auto& incident = incident_data.at(edge_key);
+            if (incident.road_closed) {
+                // Edge is closed, add extreme penalty
+                total_eta += 999999.0; // Very large time to discourage route
+                continue;
+            }
+        }
         
         // CRITICAL FIX: Use actual speed from flow data if available
         double current_speed_kmh = 0.0;
@@ -1263,6 +1274,18 @@ double calculate_eta_with_disruption(
     return total_eta;
 }
 
+// Overload for backward compatibility (without incident_data)
+inline double calculate_eta_with_disruption(
+   const vector<NodeID>& path,
+    const map<pair<NodeID, NodeID>, TrafficFlowData>& flow_data,
+    const map<NodeID, GPSCoordinate>& coordinates,
+    int hour_of_day = -1) {
+    
+    // Create empty incident_data map for backward compatibility
+    map<pair<NodeID, NodeID>, IncidentInfo> empty_incident_data;
+    return calculate_eta_with_disruption(path, flow_data, empty_incident_data, coordinates, hour_of_day);
+}
+
 
 // ============================================================
 // ALTERNATIVE ROUTE GENERATION
@@ -1275,6 +1298,7 @@ vector<AlternativeRoute> generate_alternative_routes(
     NodeID start, NodeID dest,
     const map<NodeID, vector<Neighbor>>& adj_list,
     const map<pair<NodeID, NodeID>, TrafficFlowData>& flow_data,
+    const map<pair<NodeID, NodeID>, IncidentInfo>& incident_data,
     const map<NodeID, GPSCoordinate>& coordinates,
     int K = 3) {
     
@@ -1310,8 +1334,34 @@ vector<AlternativeRoute> generate_alternative_routes(
                     NodeID v = neighbor.node;
                     distance_t edge_cost = neighbor.distance;
                     
-                    // Apply penalty to used edges
+                    // *** APPLY DISRUPTION WEIGHTS (FLOW + INCIDENTS) ***
                     auto edge_key = make_pair(u, v);
+                    const TrafficFlowData* flow_ptr = nullptr;
+                    const IncidentInfo* incident_ptr = nullptr;
+                    
+                    if (flow_data.count(edge_key)) {
+                        flow_ptr = &flow_data.at(edge_key);
+                    }
+                    if (incident_data.count(edge_key)) {
+                        incident_ptr = &incident_data.at(edge_key);
+                    }
+                    
+                    // Apply disruption weight (accounts for both flow and incidents)
+                    if (flow_ptr || incident_ptr) {
+                        string highway_type = "unknown";
+                        if (g_highway_types.count(edge_key)) {
+                            highway_type = g_highway_types.at(edge_key);
+                        }
+                        edge_cost = calculate_disruption_weight(
+                            u, v,
+                            neighbor.distance,
+                            flow_ptr,
+                            incident_ptr,
+                            highway_type
+                        );
+                    }
+                    
+                    // Apply penalty to used edges (encourages diverse alternatives)
                     if (used_edges.count(edge_key)) {
                         edge_cost *= 2; // 2x penalty for used edges
                     }
@@ -1346,9 +1396,9 @@ vector<AlternativeRoute> generate_alternative_routes(
         AlternativeRoute route;
         route.path = path;
         route.distance = dist.count(dest) ? dist[dest] : 0;
-        route.eta_seconds = calculate_eta_with_disruption(path, flow_data, coordinates);
+        route.eta_seconds = calculate_eta_with_disruption(path, flow_data, incident_data, coordinates);
         
-        // Calculate average jam factor
+        // Calculate average jam factor (only from flow data)
         double total_jam = 0.0;
         int edge_count = 0;
         for (size_t i = 0; i < path.size() - 1; i++) {
