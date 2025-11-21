@@ -40,6 +40,9 @@ static const uint16_t MAX_CUT_LEVEL = 58; // maximum height of decomposition tre
 
 // progress of 0 resets counter
 static bool log_progress_on = false;
+
+// Remove thread_local s_data and t_data since they're not used
+// thread_local Node MultiThreadNodeData::s_data(NO_SUBGRAPH), MultiThreadNodeData::t_data(NO_SUBGRAPH);
 void log_progress(size_t p, ostream &os = cout)
 {
     static const size_t P_DIFF = 1000000L;
@@ -764,7 +767,7 @@ SubgraphID next_subgraph_id(bool reset)
 //--------------------------- Graph ---------------------------------
 
 // definition of static members
-thread_local Node MultiThreadNodeData::s_data(NO_SUBGRAPH), MultiThreadNodeData::t_data(NO_SUBGRAPH);
+// thread_local s_data and t_data removed - not used in current implementation
 #ifdef MULTI_THREAD
 MultiThreadNodeData Graph::node_data;
 size_t Graph::thread_threshold;

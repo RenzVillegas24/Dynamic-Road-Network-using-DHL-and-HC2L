@@ -103,15 +103,15 @@ std::ostream& operator<<(std::ostream& os, const Node &n);
 
 /**
  * Multi-threading support for node data
- * Handles thread-local s & t nodes for parallel processing
+ * Inherits from std::vector<Node> to store all node data
  */
 class MultiThreadNodeData : public std::vector<Node>
 {
-    thread_local static Node s_data, t_data;
 public:
-    Node& operator[](size_type pos);
-    const Node& operator[](size_type pos) const;
-    void normalize();
+    void normalize()
+    {
+        // No special normalization needed
+    }
 };
 
 /**

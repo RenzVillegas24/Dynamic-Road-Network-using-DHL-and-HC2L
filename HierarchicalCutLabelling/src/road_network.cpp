@@ -807,7 +807,7 @@ SubgraphID next_subgraph_id(bool reset)
 // moved to ApiUtils/src/base_road_network.cpp
 
 // definition of static members
-thread_local Node MultiThreadNodeData::s_data(NO_SUBGRAPH), MultiThreadNodeData::t_data(NO_SUBGRAPH);
+// Note: thread_local s_data and t_data removed - not used in current implementation
 #ifdef MULTI_THREAD
 MultiThreadNodeData Graph::node_data;
 size_t Graph::thread_threshold;

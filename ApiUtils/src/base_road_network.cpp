@@ -112,37 +112,8 @@ std::ostream& operator<<(std::ostream& os, const Node &n)
 // MULTI-THREADED NODE DATA
 // ============================================================
 
-Node& MultiThreadNodeData::operator[](size_type pos)
-{
-    // This assumes Graph has static members s and t
-    // For now, use fixed values 0 and 1 as placeholders
-    // In actual usage, this will be properly initialized
-    if (pos == 0)  // Graph::s
-        return s_data;
-    if (pos == 1)  // Graph::t
-        return t_data;
-    return std::vector<Node>::operator[](pos);
-}
-
-const Node& MultiThreadNodeData::operator[](size_type pos) const
-{
-    if (pos == 0)  // Graph::s
-        return s_data;
-    if (pos == 1)  // Graph::t
-        return t_data;
-    return std::vector<Node>::operator[](pos);
-}
-
-void MultiThreadNodeData::normalize()
-{
-    // Copy thread-local data back to vector if needed
-    if (size() > 0) {
-        std::vector<Node>::operator[](0) = s_data;
-        if (size() > 1) {
-            std::vector<Node>::operator[](1) = t_data;
-        }
-    }
-}
+// thread_local static members are defined in algorithm-specific implementations
+// MultiThreadNodeData uses vector's default operator[] implementation
 
 // ============================================================
 // PARTITION STRUCTURE
@@ -261,11 +232,14 @@ size_t BaseGraph::degree(NodeID v) const
 
 /**
  * Get a single neighbor of a node
- * Returns NO_NODE if degree != 1, or if node has 0 or >1 neighbors
+ * Returns NO_NODE if degree != 1, or if node has 0 or >1 neighbors in the subgraph
  */
 Neighbor BaseGraph::single_neighbor(NodeID v) const
 {
-    assert(contains(v));
+    // If node is not in the subgraph, return NO_NODE
+    if (!contains(v))
+        return Neighbor(NO_NODE, 0);
+    
     Neighbor neighbor(NO_NODE, 0);
     for (const Neighbor &n : get_node_data()[v].neighbors)
         if (contains(n.node))
