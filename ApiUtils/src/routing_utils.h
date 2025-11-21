@@ -54,6 +54,62 @@ inline double haversine_distance(double lat1, double lon1, double lat2, double l
 }
 
 /**
+ * Calculate distance of a geometry segment clipped at a snap point
+ * CRITICAL FIX: For start/destination edges, we need to calculate distance
+ * from snap point to edge endpoint, not the full edge distance
+ * 
+ * @param coords - Vector of (lon, lat) coordinate pairs
+ * @param snap_lat, snap_lng - Snap point coordinates  
+ * @param from_start - If true, measure from snap to end; if false, from start to snap
+ * @return Distance in meters of the clipped portion
+ */
+inline double calculate_clipped_segment_distance(
+    const vector<pair<double, double>>& coords,
+    double snap_lat, double snap_lng,
+    bool from_start) {
+    
+    if (coords.size() < 2) {
+        return 0.0;
+    }
+    
+    // Find closest point on geometry to snap
+    double min_dist = numeric_limits<double>::max();
+    size_t closest_idx = 0;
+    
+    for (size_t i = 0; i < coords.size(); i++) {
+        double dist = haversine_distance(snap_lat, snap_lng, coords[i].second, coords[i].first);
+        if (dist < min_dist) {
+            min_dist = dist;
+            closest_idx = i;
+        }
+    }
+    
+    double clipped_distance = 0.0;
+    
+    if (from_start) {
+        // Measure from snap point to end of geometry
+        clipped_distance += min_dist; // Distance to closest point
+        for (size_t i = closest_idx + 1; i < coords.size(); i++) {
+            clipped_distance += haversine_distance(
+                coords[i - 1].second, coords[i - 1].first,
+                coords[i].second, coords[i].first
+            );
+        }
+    } else {
+        // Measure from start of geometry to snap point
+        for (size_t i = 0; i < closest_idx; i++) {
+            clipped_distance += haversine_distance(
+                coords[i].second, coords[i].first,
+                coords[i + 1].second, coords[i + 1].first
+            );
+        }
+        clipped_distance += min_dist; // Distance from closest point to snap
+    }
+    
+    return clipped_distance;
+}
+
+/**
  * Calculate total route distance from path nodes using coordinates
  * @param path - Vector of node IDs in the path
  * @param coordinates - Map of node coordinates
@@ -285,6 +341,28 @@ inline string get_severity_level(double jam_factor, const string& incident_type,
     if (jam_factor >= 5.0) return "medium";
     if (jam_factor >= 2.0) return "low";
     return "none";
+}
+
+/**
+ * Get severity level in Flow Overlay format (Heavy/Medium/Light)
+ * This matches the frontend visualization logic exactly
+ */
+inline string get_flow_overlay_severity(double jam_factor, bool is_closed) {
+    if (is_closed) return "Heavy";  // Closed roads are heavy disruption
+    if (jam_factor >= 8.0) return "Heavy";
+    if (jam_factor >= 5.0) return "Medium";
+    return "Light";
+}
+
+/**
+ * Get color code based on jam_factor and closed status
+ * This matches the frontend visualization colors
+ */
+inline string get_flow_color_code(double jam_factor, bool is_closed) {
+    if (is_closed) return "#000000";  // Black for closed roads
+    if (jam_factor >= 8.0) return "#ef4444";  // Red for Heavy
+    if (jam_factor >= 5.0) return "#f59e0b";  // Orange for Medium
+    return "#10b981";  // Green for Light
 }
 
 // ============================================================
@@ -884,6 +962,7 @@ inline EdgeDisruptionMetrics compute_disruption_metrics(
         
     } else if (flow && flow->jam_factor > 0.0) {
         // === FLOW-ONLY SEVERITY (no incident) ===
+        // Use flow jam_factor directly as the severity indicator
         double jam_factor = flow->jam_factor;
         
         if (jam_factor >= 8.0) {
@@ -908,6 +987,27 @@ inline EdgeDisruptionMetrics compute_disruption_metrics(
         metrics.severity_level = "none";
         metrics.severity_score = 0.0;
         metrics.weight_multiplier = 1.0;
+    }
+    
+    // CRITICAL FIX: Store the effective jam_factor for output
+    // This is used to ensure flow overlay and C++ API show consistent jam_factor values
+    if (flow && flow->jam_factor > 0.0) {
+        // Use actual flow jam_factor
+        metrics.effective_jam_factor = flow->jam_factor;
+    } else if (incident && incident->road_closed) {
+        // Road closure = full blockage = jam_factor 10.0
+        metrics.effective_jam_factor = 10.0;
+    } else if (incident) {
+        // Map incident criticality to jam_factor for consistency with flow data
+        // critical -> 9.0, severe -> 7.0, major -> 5.0, minor -> 2.0
+        string incident_type = incident->criticality;
+        if (incident_type == "critical") metrics.effective_jam_factor = 9.0;
+        else if (incident_type == "severe") metrics.effective_jam_factor = 7.0;
+        else if (incident_type == "major") metrics.effective_jam_factor = 5.0;
+        else if (incident_type == "minor") metrics.effective_jam_factor = 2.0;
+        else metrics.effective_jam_factor = 0.0;
+    } else {
+        metrics.effective_jam_factor = 0.0;
     }
     
     // Compute impact metrics

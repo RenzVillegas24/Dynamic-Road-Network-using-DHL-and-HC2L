@@ -128,11 +128,14 @@ struct EdgeDisruptionMetrics {
     double time_impact_seconds;     // Extra time added in seconds
     distance_t old_weight;          // Original edge weight
     distance_t new_weight;          // Updated weight with disruption
+    double effective_jam_factor;    // CRITICAL: Actual jam_factor for consistency with Flow Overlay
+                                    // 0.0-10.0 scale: 0.0=free flow, 10.0=blocked
     
     EdgeDisruptionMetrics() 
         : severity_score(0.0), severity_level("none"),
           weight_multiplier(1.0), impact_score(0.0),
-          time_impact_seconds(0.0), old_weight(0), new_weight(0) {}
+          time_impact_seconds(0.0), old_weight(0), new_weight(0),
+          effective_jam_factor(0.0) {}
 };
 
 // ============================================================

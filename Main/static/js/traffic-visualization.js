@@ -307,6 +307,12 @@ function renderTrafficSegments(segments, mode, routeOnly) {
       if (mode === 'incidents' && !isIncident) return;
       if (mode === 'flow' && !isFlow) return;
 
+      // Filter: Only show meaningful disruptions (jam_factor >= 2.0 or is_closed or has severity beyond 'Light')
+      if (isFlow && !segment.is_closed && segment.jam_factor < 2.0) {
+        console.debug(`   ⊘ Skipping non-disruptive flow (jam_factor=${segment.jam_factor})`);
+        return;
+      }
+
       if (routeOnly && trafficVisualization.currentRoute) {
         const onRoute = isSegmentOnRoute(
           segment.source,

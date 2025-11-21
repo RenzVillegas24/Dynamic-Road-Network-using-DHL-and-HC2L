@@ -833,25 +833,73 @@ void output_json_response(bool success, const string& error_message = "",
             
             bool is_closed = incident_ptr ? incident_ptr->road_closed : false;
             
-            // 6. Calculate edge duration based on traffic conditions
+            // CRITICAL FIX: Calculate actual distance for clipped edges BEFORE computing duration
+            // For first/last edges, use clipped distance instead of full edge distance
+            double actual_distance = edge_distance;  // Default to full distance
+            bool edge_is_clipped = false;
+            
+            if (is_first_edge && !same_edge) {
+                // First edge: clipped from start snap to edge end
+                if (edge_geometries.count(edge_key)) {
+                    actual_distance = calculate_clipped_segment_distance(
+                        edge_geometries.at(edge_key).coords,
+                        start_snap_lat, start_snap_lng,
+                        true  // from_start = true: measure from snap to end
+                    );
+                    edge_is_clipped = true;
+                }
+            } else if (is_last_edge && !same_edge) {
+                // Last edge: clipped from edge start to dest snap
+                if (edge_geometries.count(edge_key)) {
+                    actual_distance = calculate_clipped_segment_distance(
+                        edge_geometries.at(edge_key).coords,
+                        dest_snap_lat, dest_snap_lng,
+                        false  // from_start = false: measure from start to snap
+                    );
+                    edge_is_clipped = true;
+                }
+            } else if (same_edge && can_meet_on_same_edge) {
+                // Same edge case: clipped from start snap to dest snap
+                if (edge_geometries.count(edge_key)) {
+                    // For same-edge, measure the distance between two snaps
+                    // We need to calculate distance of the segment between the two snap points
+                    double snap_start_dist = calculate_clipped_segment_distance(
+                        edge_geometries.at(edge_key).coords,
+                        start_snap_lat, start_snap_lng,
+                        true
+                    );
+                    double snap_end_dist = calculate_clipped_segment_distance(
+                        edge_geometries.at(edge_key).coords,
+                        dest_snap_lat, dest_snap_lng,
+                        false
+                    );
+                    // The actual distance between snaps is full_edge - (distance_to_start + distance_from_end)
+                    actual_distance = edge_distance - (edge_distance - snap_start_dist) - (edge_distance - snap_end_dist);
+                    actual_distance = max(0.0, actual_distance);
+                    edge_is_clipped = true;
+                }
+            }
+            
+            // 6. Calculate edge duration based on traffic conditions using ACTUAL (clipped) distance
             double current_speed_kmh = 0.0;
             double edge_duration_seconds = 0.0;
             
             if (flow_ptr) {
                 current_speed_kmh = flow_ptr->current_speed;
-                edge_duration_seconds = calculate_edge_duration(edge_distance, current_speed_kmh, free_flow_speed, is_closed);
+                edge_duration_seconds = calculate_edge_duration(actual_distance, current_speed_kmh, free_flow_speed, is_closed);
             } else {
                 // Default values when no flow data available - use free-flow speed
                 current_speed_kmh = free_flow_speed;
-                edge_duration_seconds = calculate_edge_duration(edge_distance, 0.0, free_flow_speed, is_closed);
+                edge_duration_seconds = calculate_edge_duration(actual_distance, 0.0, free_flow_speed, is_closed);
             }
             
-            // Add duration field (CRITICAL FIX: now includes flow-based travel time)
+            // Add duration field (CRITICAL FIX: now includes flow-based travel time with clipped distance)
             cout << "        \"duration_seconds\": " << fixed << setprecision(1) << sanitize_json_number(edge_duration_seconds) << "," << endl;
             
             // 7. Add edge metadata
             cout << "        \"road_name\": \"" << escape_json_string(edge_road_name) << "\"," << endl;
-            cout << "        \"distance_meters\": " << fixed << setprecision(1) << edge_distance << "," << endl;
+            // CRITICAL FIX: Output actual (clipped) distance for first/last edges instead of full edge distance
+            cout << "        \"distance_meters\": " << fixed << setprecision(1) << actual_distance << "," << endl;
             cout << "        \"highway_type\": \"" << edge_highway_type << "\"," << endl;
             
             // 8. Output separated incident data (pure CSV data)
@@ -878,34 +926,47 @@ void output_json_response(bool success, const string& error_message = "",
             // 9. Output separated traffic flow data (pure CSV data)
             cout << "        \"flow\": {" << endl;
             if (flow_ptr) {
+                // CRITICAL FIX: Use Flow Overlay logic - jam_factor determines severity and color
+                string flow_severity = get_flow_overlay_severity(flow_ptr->jam_factor, is_closed);
+                string flow_color = get_flow_color_code(flow_ptr->jam_factor, is_closed);
+                
                 cout << "          \"speed_kph\": " << fixed << setprecision(1) << sanitize_json_number(flow_ptr->current_speed) << "," << endl;
                 cout << "          \"free_flow_kph\": " << fixed << setprecision(1) << sanitize_json_number(flow_ptr->free_flow_speed) << "," << endl;
                 cout << "          \"jam_factor\": " << fixed << setprecision(2) << sanitize_json_number(flow_ptr->jam_factor) << "," << endl;
                 cout << "          \"confidence\": " << fixed << setprecision(3) << sanitize_json_number(flow_ptr->confidence) << "," << endl;
                 cout << "          \"traversability\": \"" << escape_json_string(flow_ptr->traversability) << "\"," << endl;
                 cout << "          \"status\": \"" << escape_json_string(flow_ptr->flow_status) << "\"," << endl;
-                cout << "          \"color\": \"" << escape_json_string(flow_ptr->color_code) << "\"" << endl;
+                // CRITICAL FIX: Output severity matching Flow Overlay format (Heavy/Medium/Light)
+                cout << "          \"severity\": \"" << flow_severity << "\"," << endl;
+                // CRITICAL FIX: Output color based on jam_factor, not on computed metrics
+                cout << "          \"color\": \"" << flow_color << "\"" << endl;
             } else {
-                cout << "          \"speed_kph\": " << fixed << setprecision(1) << sanitize_json_number(free_flow_speed) << "," << endl;
-                cout << "          \"free_flow_kph\": " << fixed << setprecision(1) << sanitize_json_number(free_flow_speed) << "," << endl;
+                // Default flow data - use free-flow values when no meaningful disruption
+                cout << "          \"speed_kph\": " << fixed << setprecision(1) << free_flow_speed << "," << endl;
+                cout << "          \"free_flow_kph\": " << fixed << setprecision(1) << free_flow_speed << "," << endl;
                 cout << "          \"jam_factor\": 0.0," << endl;
-                cout << "          \"confidence\": 0.0," << endl;
+                cout << "          \"confidence\": 0.99," << endl;
                 cout << "          \"traversability\": \"open\"," << endl;
                 cout << "          \"status\": \"default\"," << endl;
                 cout << "          \"color\": \"#8b5cf6\"" << endl;
             }
             cout << "        }," << endl;
             
-            // 10. Output computed disruption metrics
-            cout << "        \"disruption_metrics\": {" << endl;
-            cout << "          \"severity_level\": \"" << metrics.severity_level << "\"," << endl;
-            cout << "          \"severity_score\": " << fixed << setprecision(2) << sanitize_json_number(metrics.severity_score) << "," << endl;
-            cout << "          \"weight_multiplier\": " << fixed << setprecision(2) << sanitize_json_number(metrics.weight_multiplier) << "," << endl;
-            cout << "          \"impact_score\": " << fixed << setprecision(2) << sanitize_json_number(metrics.impact_score) << "," << endl;
-            cout << "          \"time_impact_seconds\": " << fixed << setprecision(1) << sanitize_json_number(metrics.time_impact_seconds) << "," << endl;
-            cout << "          \"old_weight\": " << metrics.old_weight << "," << endl;
-            cout << "          \"new_weight\": " << metrics.new_weight << endl;
-            cout << "        }" << endl;
+            // 10. Output computed disruption metrics (ONLY for edges with meaningful disruption)
+            // FIX: Don't output disruption_metrics for non-disrupted edges (severity_score < 0.1)
+            if (metrics.severity_score > 0) {
+                cout << "        \"disruption_metrics\": {" << endl;
+                cout << "          \"severity_level\": \"" << metrics.severity_level << "\"," << endl;
+                cout << "          \"severity_score\": " << fixed << setprecision(2) << sanitize_json_number(metrics.severity_score) << "," << endl;
+                cout << "          \"weight_multiplier\": " << fixed << setprecision(2) << sanitize_json_number(metrics.weight_multiplier) << "," << endl;
+                cout << "          \"impact_score\": " << fixed << setprecision(2) << sanitize_json_number(metrics.impact_score) << "," << endl;
+                cout << "          \"time_impact_seconds\": " << fixed << setprecision(1) << sanitize_json_number(metrics.time_impact_seconds) << "," << endl;
+                cout << "          \"old_weight\": " << metrics.old_weight << "," << endl;
+                cout << "          \"new_weight\": " << metrics.new_weight << endl;
+                cout << "        }" << endl;
+            } else {
+                cout << "        \"disruption_metrics\": {}" << endl;
+            }
             
             cout << "      }";
             if (i < edge_loop_end - 1 || (same_edge && !can_meet_on_same_edge)) cout << ",";
