@@ -48,6 +48,9 @@ from user_disruptions import (
 # Import route recalculation endpoint
 import route_recalculation_endpoint
 
+# Import experiment automation API
+from experiment_api import experiment_bp
+
 # Get logger instance
 console_logger = get_logger("FlaskServer")
 
@@ -56,6 +59,9 @@ app = Flask(__name__)
 # Configure Flask from config file
 app.config['DEBUG'] = Config.FLASK_DEBUG
 app.config['ENV'] = Config.FLASK_ENV
+
+# Register experiment automation API blueprint
+app.register_blueprint(experiment_bp)
 
 # Initialize settings manager (persistent storage)
 settings_manager = init_settings_manager()

@@ -574,6 +574,15 @@
               </svg>
               Network Disruptions
             </button>
+            <button id="open-experiment-wizard-btn" onclick="openExperimentWizard()"
+              class="col-span-2 px-4 py-3 bg-gradient-to-br from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl font-bold shadow-md hover:shadow-lg transition-all duration-300 flex items-center justify-center">
+              <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                  d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z">
+                </path>
+              </svg>
+              🧪 Experiment Automation
+            </button>
           </div>
         </div>
 
@@ -862,7 +871,7 @@
             </button>
 
             <!-- Run Demo Button -->
-            <button id="run-demo-btn"
+            <button id="run-demo-btn" onclick="openDemoRunner()"
               class="w-full flex items-center space-x-3 px-3 py-3 glass-effect hover:shadow-md rounded-2xl transition-all duration-300 border-2 border-amber-400 bg-gradient-to-r from-amber-50 to-yellow-50">
               <div class="bg-gradient-to-br from-amber-600 to-yellow-600 rounded-xl p-2 shadow-sm">
                 <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -877,7 +886,7 @@
             </button>
 
             <!-- Create Custom Demo Button -->
-            <button id="custom-demo-btn" onclick="openDemoCreator()"
+            <button id="custom-demo-btn" onclick="openDemoCreatorV2()"
               class="w-full flex items-center space-x-3 px-3 py-3 glass-effect hover:shadow-md rounded-2xl transition-all duration-300 border-2 border-purple-400 bg-gradient-to-r from-purple-50 to-indigo-50">
               <div class="bg-gradient-to-br from-purple-600 to-indigo-600 rounded-xl p-2 shadow-sm">
                 <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1592,6 +1601,476 @@
       </div>
     </div>
 
+    <!-- ============================================================ -->
+    <!-- DEMO RUNNER PANEL - Run Demo, Load Config, Random Demo -->
+    <!-- ============================================================ -->
+    <div id="demo-runner-panel"
+      class="fixed top-0 right-0 w-[28rem] h-full glass-effect shadow-2xl transform translate-x-full transition-transform duration-300 overflow-y-auto z-50 border-l border-slate-200/50">
+      
+      <!-- Header -->
+      <div class="p-5 bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 text-white flex justify-between items-center sticky top-0 z-10">
+        <div>
+          <h2 class="font-bold text-xl mb-0.5">🎬 Demo Runner</h2>
+          <p class="text-amber-100 text-sm">Run, load, or create demos</p>
+        </div>
+        <button onclick="closeDemoRunner()" class="hover:bg-white/20 rounded-xl p-2 transition-all">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div class="p-5">
+        <!-- Main Tab -->
+        <div id="demo-runner-tab-main" class="space-y-4">
+          <!-- Quick Actions -->
+          <div class="grid grid-cols-2 gap-3">
+            <button onclick="DemoRunner.openRandomSettings()"
+                    class="p-4 bg-gradient-to-br from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-xl font-bold shadow-lg transition-all text-center">
+              <span class="text-2xl block mb-1">🎲</span>
+              Random Demo
+            </button>
+            <button onclick="openDemoCreatorV2()"
+                    class="p-4 bg-gradient-to-br from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white rounded-xl font-bold shadow-lg transition-all text-center">
+              <span class="text-2xl block mb-1">✨</span>
+              Custom Demo
+            </button>
+          </div>
+
+          <!-- Saved Configurations -->
+          <div class="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
+            <h3 class="font-bold text-gray-800 mb-3 flex items-center">
+              <span class="mr-2">💾</span> Saved Configurations
+            </h3>
+            <div id="saved-configs-list" class="space-y-3 max-h-64 overflow-y-auto">
+              <!-- Configs will be rendered here -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Random Settings Tab -->
+        <div id="demo-runner-tab-random-settings" class="hidden space-y-4">
+          <button onclick="DemoRunner.showTab('main')" class="flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+            </svg>
+            Back
+          </button>
+
+          <h3 class="font-bold text-lg text-gray-800">🎲 Random Demo Settings</h3>
+
+          <!-- Number of Trials -->
+          <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200">
+            <label class="block text-sm font-medium text-blue-800 mb-2">🔄 Number of Trials</label>
+            <input type="number" id="random-trials-count" value="1" min="1" max="100"
+                   class="w-full px-4 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+            <p class="text-xs text-blue-500 mt-1">Times to repeat the entire demo</p>
+          </div>
+
+          <!-- Route Count -->
+          <div class="bg-white rounded-xl p-4 border border-gray-200">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Number of Routes</label>
+            <input type="number" id="random-route-count" value="1" min="1" max="10"
+                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500">
+          </div>
+
+          <!-- Algorithm -->
+          <div class="bg-white rounded-xl p-4 border border-gray-200">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Algorithm</label>
+            <select id="random-algorithm" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500">
+              <option value="both">Both (HC2L & DHL)</option>
+              <option value="hc2l">HC2L Only</option>
+              <option value="dhl">DHL Only</option>
+            </select>
+          </div>
+
+          <!-- TAU Mode -->
+          <div class="bg-white rounded-xl p-4 border border-gray-200">
+            <label class="block text-sm font-medium text-gray-700 mb-2">TAU (τ) Mode</label>
+            <select id="random-tau-mode" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 mb-3">
+              <option value="fixed">Fixed Value</option>
+              <option value="random">Random</option>
+              <option value="sequence">Test Sequence</option>
+            </select>
+            
+            <div id="tau-fixed-container">
+              <input type="number" id="random-tau-fixed" value="0.5" min="0" max="1" step="0.1"
+                     class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+            </div>
+            <div id="tau-random-container" class="hidden grid grid-cols-2 gap-2">
+              <input type="number" id="random-tau-min" value="0.1" min="0" max="1" step="0.1" placeholder="Min"
+                     class="px-4 py-2 border border-gray-300 rounded-lg">
+              <input type="number" id="random-tau-max" value="0.9" min="0" max="1" step="0.1" placeholder="Max"
+                     class="px-4 py-2 border border-gray-300 rounded-lg">
+            </div>
+            <div id="tau-sequence-container" class="hidden">
+              <input type="text" id="random-tau-sequence" value="0.1, 0.3, 0.5, 0.7, 0.9"
+                     class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="0.1, 0.3, 0.5...">
+            </div>
+          </div>
+
+          <!-- Disruptions -->
+          <div class="bg-white rounded-xl p-4 border border-gray-200">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Disruptions</label>
+            <select id="random-disruption-mode" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500">
+              <option value="both">Flow + Incidents</option>
+              <option value="flow">Flow Only</option>
+              <option value="incidents">Incidents Only</option>
+              <option value="none">No Disruptions</option>
+            </select>
+          </div>
+
+          <!-- Step Delay -->
+          <div class="bg-white rounded-xl p-4 border border-gray-200">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Step Delay (ms)</label>
+            <input type="number" id="random-step-delay" value="2000" min="500" max="10000" step="500"
+                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500">
+          </div>
+
+          <!-- Start Button -->
+          <button onclick="DemoRunner.startRandomDemo()"
+                  class="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-bold rounded-xl shadow-lg transition-all text-lg">
+            🚀 Start Random Demo
+          </button>
+        </div>
+
+        <!-- Running Tab -->
+        <div id="demo-runner-tab-running" class="hidden space-y-4">
+          <h3 class="font-bold text-lg text-gray-800">▶️ Demo Running</h3>
+
+          <!-- Progress -->
+          <div class="bg-white rounded-xl p-4 border border-gray-200">
+            <div class="flex justify-between mb-2">
+              <span class="text-sm font-medium text-gray-600">Progress</span>
+              <span id="demo-running-progress" class="text-sm font-bold text-amber-600">0 / 0</span>
+            </div>
+            <div class="h-3 bg-gray-200 rounded-full overflow-hidden">
+              <div id="demo-running-bar" class="h-full bg-gradient-to-r from-amber-500 to-orange-500 transition-all duration-300" style="width: 0%"></div>
+            </div>
+          </div>
+
+          <!-- Status -->
+          <div class="bg-gray-50 rounded-xl p-4 border border-gray-200">
+            <p id="demo-running-status" class="text-sm text-gray-700 text-center">Initializing...</p>
+          </div>
+
+          <!-- Controls -->
+          <div class="flex gap-3">
+            <button onclick="DemoRunner.pauseDemo()"
+                    class="flex-1 py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-bold rounded-xl transition-all">
+              ⏸️ Pause
+            </button>
+            <button onclick="DemoRunner.stopDemo()"
+                    class="flex-1 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl transition-all">
+              ⏹️ Stop
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- DEMO CREATOR V2 PANEL - Reimagined Custom Demo Creation -->
+    <!-- ============================================================ -->
+    <div id="demo-creator-v2-panel"
+      class="fixed top-0 right-0 w-[42rem] h-full glass-effect shadow-2xl transform translate-x-full transition-transform duration-300 overflow-y-auto z-50 border-l border-slate-200/50">
+      
+      <!-- Header -->
+      <div class="p-5 bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600 text-white flex justify-between items-center sticky top-0 z-10">
+        <div>
+          <h2 class="font-bold text-xl mb-0.5">✨ Custom Demo Creator</h2>
+          <p class="text-purple-100 text-sm">Build your custom demo scenario</p>
+        </div>
+        <button onclick="closeDemoCreatorV2()" class="hover:bg-white/20 rounded-xl p-2 transition-all">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Step Indicators -->
+      <div class="p-4 bg-gray-50 border-b border-gray-200 sticky top-[68px] z-10">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <div id="demo-v2-indicator-1" class="w-9 h-9 rounded-full bg-purple-600 text-white flex items-center justify-center font-bold text-sm">1</div>
+            <span class="text-xs font-semibold">Routes</span>
+          </div>
+          <div class="flex-1 h-0.5 bg-gray-300 mx-2"></div>
+          <div class="flex items-center gap-2">
+            <div id="demo-v2-indicator-2" class="w-9 h-9 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center font-bold text-sm">2</div>
+            <span class="text-xs font-semibold">Disruptions</span>
+          </div>
+          <div class="flex-1 h-0.5 bg-gray-300 mx-2"></div>
+          <div class="flex items-center gap-2">
+            <div id="demo-v2-indicator-3" class="w-9 h-9 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center font-bold text-sm">3</div>
+            <span class="text-xs font-semibold">Sequence</span>
+          </div>
+          <div class="flex-1 h-0.5 bg-gray-300 mx-2"></div>
+          <div class="flex items-center gap-2">
+            <div id="demo-v2-indicator-4" class="w-9 h-9 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center font-bold text-sm">4</div>
+            <span class="text-xs font-semibold">Review</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-5">
+        <!-- Step 1: Routes -->
+        <div id="demo-v2-step-1" class="space-y-4">
+          <h3 class="font-bold text-lg text-gray-800">📍 Configure Routes</h3>
+
+          <!-- Add Route Section -->
+          <div class="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
+            <h4 class="font-semibold text-gray-700 mb-3">Add Route</h4>
+            
+            <!-- Start Location -->
+            <div class="mb-3 relative">
+              <label class="block text-sm font-medium text-gray-600 mb-1">Start Location</label>
+              <div class="flex gap-2">
+                <input type="text" id="demo-start-search" 
+                       class="flex-1 px-4 py-2 border border-emerald-300 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-emerald-50"
+                       placeholder="🟢 Search for start location...">
+              </div>
+              <div id="demo-start-dropdown" class="hidden absolute z-20 w-full mt-1 bg-white rounded-xl shadow-xl border border-gray-200 max-h-48 overflow-y-auto"></div>
+            </div>
+
+            <!-- End Location -->
+            <div class="mb-3 relative">
+              <label class="block text-sm font-medium text-gray-600 mb-1">Destination</label>
+              <div class="flex gap-2">
+                <input type="text" id="demo-end-search" 
+                       class="flex-1 px-4 py-2 border border-rose-300 rounded-lg focus:ring-2 focus:ring-rose-500 bg-rose-50"
+                       placeholder="🔴 Search for destination...">
+              </div>
+              <div id="demo-end-dropdown" class="hidden absolute z-20 w-full mt-1 bg-white rounded-xl shadow-xl border border-gray-200 max-h-48 overflow-y-auto"></div>
+            </div>
+
+            <button id="demo-add-route-btn" onclick="DemoCreatorV2.addRouteFromInputs()"
+                    class="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-all opacity-50 cursor-not-allowed">
+              ➕ Add Route
+            </button>
+          </div>
+
+          <!-- Random Routes Section -->
+          <div class="bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl p-4 border border-amber-200">
+            <h4 class="font-semibold text-amber-800 mb-3">🎲 Generate Random Routes</h4>
+            <div class="flex gap-3">
+              <input type="number" id="demo-random-count" value="3" min="1" max="10"
+                     class="w-24 px-3 py-2 border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500">
+              <button onclick="DemoCreatorV2.generateRandomRoutes()"
+                      class="flex-1 py-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-lg transition-all">
+                Generate Routes
+              </button>
+            </div>
+          </div>
+
+          <!-- Routes List -->
+          <div class="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
+            <div class="flex justify-between items-center mb-3">
+              <h4 class="font-semibold text-gray-700">Routes</h4>
+              <button onclick="DemoCreatorV2.clearAllRoutes()" class="text-xs text-red-500 hover:text-red-700 font-medium">Clear All</button>
+            </div>
+            <div id="demo-routes-list" class="space-y-3 max-h-48 overflow-y-auto">
+              <!-- Routes will be rendered here -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 2: Disruptions -->
+        <div id="demo-v2-step-2" class="hidden space-y-4">
+          <h3 class="font-bold text-lg text-gray-800">🚦 Disruption Configuration</h3>
+
+          <div class="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Disruption Mode</label>
+            <select id="demo-disruption-mode" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+              <option value="none">No Disruptions</option>
+              <option value="random-flow">Random Traffic Flow</option>
+              <option value="random-incidents">Random Incidents</option>
+              <option value="random-both" selected>Random Flow + Incidents</option>
+              <option value="custom">Custom Disruptions</option>
+            </select>
+          </div>
+
+          <!-- Random Settings -->
+          <div id="disruption-random-settings" class="bg-orange-50 rounded-xl p-4 border border-orange-200 space-y-3">
+            <h4 class="font-semibold text-orange-800">Random Disruption Settings</h4>
+            <div id="disruption-flow-count-row" class="flex items-center justify-between">
+              <span class="text-sm text-orange-700">Traffic Flow Count</span>
+              <input type="number" id="random-flow-count" value="5" min="0" max="20"
+                     class="w-20 px-3 py-1 border border-orange-300 rounded-lg text-center">
+            </div>
+            <div id="disruption-incident-count-row" class="flex items-center justify-between">
+              <span class="text-sm text-orange-700">Incident Count</span>
+              <input type="number" id="random-incident-count" value="3" min="0" max="10"
+                     class="w-20 px-3 py-1 border border-orange-300 rounded-lg text-center">
+            </div>
+            <div class="border-t border-orange-200 pt-3 mt-3">
+              <h5 class="text-sm font-semibold text-orange-800 mb-2">Severity Range</h5>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs text-orange-600 mb-1">Min Severity</label>
+                  <div class="flex items-center gap-2">
+                    <input type="range" id="random-severity-min" min="0.1" max="0.9" step="0.1" value="0.3"
+                           oninput="document.getElementById('random-severity-min-display').textContent = this.value"
+                           class="flex-1">
+                    <span id="random-severity-min-display" class="text-sm font-bold text-orange-700 w-8">0.3</span>
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-xs text-orange-600 mb-1">Max Severity</label>
+                  <div class="flex items-center gap-2">
+                    <input type="range" id="random-severity-max" min="0.2" max="1" step="0.1" value="0.9"
+                           oninput="document.getElementById('random-severity-max-display').textContent = this.value"
+                           class="flex-1">
+                    <span id="random-severity-max-display" class="text-sm font-bold text-orange-700 w-8">0.9</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Custom Disruptions -->
+          <div id="disruption-custom-settings" class="hidden space-y-3">
+            <div class="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
+              <h4 class="font-semibold text-gray-700 mb-3">Add Custom Disruption</h4>
+              <div class="grid grid-cols-2 gap-3 mb-3">
+                <div>
+                  <label class="block text-xs text-gray-600 mb-1">Type</label>
+                  <select id="custom-disruption-type" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    <option value="incident">🚨 Incident</option>
+                    <option value="traffic">🚦 Traffic</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-600 mb-1">Severity</label>
+                  <div class="flex items-center gap-2">
+                    <input type="range" id="custom-disruption-severity" min="0.1" max="1" step="0.1" value="0.5"
+                           oninput="document.getElementById('custom-severity-display').value = this.value"
+                           class="flex-1">
+                    <input type="number" id="custom-severity-display" min="0.1" max="1" step="0.1" value="0.5"
+                           oninput="document.getElementById('custom-disruption-severity').value = this.value"
+                           class="w-16 px-2 py-1 text-sm border border-gray-300 rounded-lg text-center">
+                  </div>
+                </div>
+              </div>
+              <button onclick="DemoCreatorV2.addCustomDisruption()"
+                      class="w-full py-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-lg transition-all">
+                📍 Click Map to Add Disruption
+              </button>
+            </div>
+
+            <div class="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
+              <div class="flex justify-between items-center mb-2">
+                <h4 class="font-semibold text-gray-700">Custom Disruptions</h4>
+                <button onclick="DemoCreatorV2.clearAllDisruptions()" class="text-xs text-red-500 hover:text-red-700 font-medium">Clear</button>
+              </div>
+              <div id="demo-disruptions-list" class="space-y-2 max-h-32 overflow-y-auto">
+                <!-- Disruptions list -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3: Sequence -->
+        <div id="demo-v2-step-3" class="hidden space-y-4">
+          <h3 class="font-bold text-lg text-gray-800">⚙️ Sequence Configuration</h3>
+
+          <div class="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Algorithm</label>
+            <select id="demo-algorithm-select" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+              <option value="both" selected>Both (HC2L & DHL Comparison)</option>
+              <option value="hc2l">HC2L Only</option>
+              <option value="dhl">DHL Only</option>
+            </select>
+          </div>
+
+          <div class="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
+            <label class="block text-sm font-medium text-gray-700 mb-2">TAU (τ) Configuration</label>
+            <select id="demo-tau-mode" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 mb-3">
+              <option value="sequence" selected>Test Sequence</option>
+              <option value="fixed">Fixed Value</option>
+              <option value="random">Random</option>
+            </select>
+
+            <div id="tau-fixed-setting" class="hidden">
+              <input type="number" id="demo-tau-fixed" value="0.5" min="0" max="1" step="0.1"
+                     class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+            </div>
+            <div id="tau-random-setting" class="hidden grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs text-gray-600 mb-1">Min</label>
+                <input type="number" id="demo-tau-random-min" value="0.1" min="0" max="1" step="0.1"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+              </div>
+              <div>
+                <label class="block text-xs text-gray-600 mb-1">Max</label>
+                <input type="number" id="demo-tau-random-max" value="0.9" min="0" max="1" step="0.1"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+              </div>
+            </div>
+            <div id="tau-sequence-setting">
+              <input type="text" id="demo-tau-sequence" value="0.1, 0.3, 0.5, 0.7, 0.9"
+                     class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="0.1, 0.3, 0.5, 0.7, 0.9">
+              <p class="text-xs text-gray-500 mt-1">Comma-separated τ values to test</p>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Step Delay (ms)</label>
+            <input type="number" id="demo-step-delay" value="2000" min="500" max="10000" step="500"
+                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+            <p class="text-xs text-gray-500 mt-1">Time between demo steps</p>
+          </div>
+        </div>
+
+        <!-- Step 4: Review -->
+        <div id="demo-v2-step-4" class="hidden space-y-4">
+          <h3 class="font-bold text-lg text-gray-800">📋 Review & Run</h3>
+
+          <div class="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Demo Name</label>
+            <input type="text" id="demo-v2-name" placeholder="My Custom Demo"
+                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+          </div>
+
+          <!-- Number of Trials -->
+          <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200 shadow-sm">
+            <label class="block text-sm font-medium text-blue-800 mb-2">🔄 Number of Trials</label>
+            <div class="flex items-center gap-3">
+              <input type="number" id="demo-trials-count" value="1" min="1" max="100"
+                     class="flex-1 px-4 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+              <span class="text-sm text-blue-600">times to repeat</span>
+            </div>
+            <p class="text-xs text-blue-500 mt-2">Each route will be tested this many times with the same configuration</p>
+          </div>
+
+          <div id="demo-v2-review-summary" class="space-y-3">
+            <!-- Summary will be rendered here -->
+          </div>
+
+          <label class="flex items-center gap-3 p-4 bg-gray-50 rounded-xl cursor-pointer">
+            <input type="checkbox" id="demo-v2-save-config" class="w-5 h-5 text-purple-600 rounded">
+            <span class="font-medium text-gray-700">Save configuration for later</span>
+          </label>
+        </div>
+
+        <!-- Navigation -->
+        <div class="flex gap-3 mt-6 pt-6 border-t border-gray-200">
+          <button id="demo-v2-prev-btn" onclick="DemoCreatorV2.prevStep()"
+                  class="hidden flex-1 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded-xl transition-all">
+            ← Previous
+          </button>
+          <button id="demo-v2-next-btn" onclick="DemoCreatorV2.nextStep()"
+                  class="flex-1 py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl transition-all">
+            Next →
+          </button>
+          <button id="demo-v2-run-btn" onclick="DemoCreatorV2.saveAndRun()"
+                  class="hidden flex-1 py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold rounded-xl shadow-lg transition-all">
+            🚀 Run Demo
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Developer View Panel (Logging) -->
     <div id="developer-view-panel"
       class="fixed top-0 right-0 w-[45rem] h-full glass-effect shadow-2xl transform translate-x-full transition-transform duration-300 z-50 border-l border-slate-200/50 flex flex-col">
@@ -1949,6 +2428,341 @@
 
   </div>
 
+  <!-- ============================================================ -->
+  <!-- EXPERIMENT AUTOMATION WIZARD PANEL -->
+  <!-- ============================================================ -->
+  <div id="experiment-wizard-panel"
+    class="fixed top-0 right-0 w-[42rem] h-full glass-effect shadow-2xl transform translate-x-full transition-transform duration-300 overflow-y-auto z-50 border-l border-slate-200/50">
+    
+    <!-- Header -->
+    <div class="p-6 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white flex justify-between items-center sticky top-0 z-10">
+      <div>
+        <h2 class="font-bold text-2xl mb-1">🧪 Experiment Automation</h2>
+        <p class="text-emerald-100 text-sm">Configure and run automated benchmarks</p>
+      </div>
+      <button data-close-experiment-wizard class="hover:bg-white/20 rounded-xl p-2 transition-all">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Step Indicators -->
+    <div class="p-4 bg-slate-50 border-b border-slate-200">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2 cursor-pointer" data-experiment-step="1">
+          <div class="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm">1</div>
+          <span class="text-sm font-semibold">Locations</span>
+        </div>
+        <div class="flex-1 h-0.5 bg-gray-300 mx-2"></div>
+        <div class="flex items-center gap-2 cursor-pointer" data-experiment-step="2">
+          <div class="w-10 h-10 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center font-bold text-sm">2</div>
+          <span class="text-sm font-semibold">Traffic</span>
+        </div>
+        <div class="flex-1 h-0.5 bg-gray-300 mx-2"></div>
+        <div class="flex items-center gap-2 cursor-pointer" data-experiment-step="3">
+          <div class="w-10 h-10 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center font-bold text-sm">3</div>
+          <span class="text-sm font-semibold">Sequence</span>
+        </div>
+        <div class="flex-1 h-0.5 bg-gray-300 mx-2"></div>
+        <div class="flex items-center gap-2 cursor-pointer" data-experiment-step="4">
+          <div class="w-10 h-10 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center font-bold text-sm">4</div>
+          <span class="text-sm font-semibold">Review</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="p-6">
+      <!-- Step 1: Locations -->
+      <div id="experiment-step-1" class="space-y-5">
+        <h3 class="font-bold text-lg text-slate-800 mb-4">📍 Configure Locations</h3>
+        
+        <!-- Location Mode Selection -->
+        <div class="space-y-3">
+          <label class="block text-sm font-medium text-gray-700">Location Source</label>
+          <select id="exp-location-mode" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 bg-white">
+            <option value="preset">Use Preset Locations (Quezon City)</option>
+            <option value="custom">Custom Start/Destination</option>
+          </select>
+        </div>
+
+        <!-- Preset Inputs -->
+        <div id="exp-preset-inputs" class="space-y-3">
+          <div class="bg-emerald-50 p-4 rounded-xl">
+            <p class="text-sm text-emerald-700">
+              <strong>Preset Mode:</strong> Random location pairs will be selected from Quezon City landmarks for each trial.
+            </p>
+          </div>
+          <select id="exp-preset-name" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 bg-white">
+            <option value="quezon_city_presets">Quezon City Presets</option>
+            <option value="manila_presets">Manila Presets</option>
+          </select>
+        </div>
+
+        <!-- Custom Inputs (hidden by default) -->
+        <div id="exp-custom-inputs" class="hidden space-y-3">
+          <div class="bg-blue-50 p-4 rounded-xl">
+            <label class="block text-sm font-medium text-blue-800 mb-2">Start Location</label>
+            <input type="text" id="exp-start-location" 
+                   class="w-full px-3 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                   placeholder="Click on map or enter coordinates">
+          </div>
+          <div class="bg-red-50 p-4 rounded-xl">
+            <label class="block text-sm font-medium text-red-800 mb-2">Destination</label>
+            <input type="text" id="exp-dest-location" 
+                   class="w-full px-3 py-2 border border-red-200 rounded-lg focus:ring-2 focus:ring-red-500"
+                   placeholder="Click on map or enter coordinates">
+          </div>
+        </div>
+
+        <!-- Saved Configurations -->
+        <div class="bg-gray-50 p-4 rounded-xl">
+          <h4 class="font-semibold text-gray-700 mb-3">💾 Saved Configurations</h4>
+          <div id="exp-saved-configs" class="space-y-2 max-h-32 overflow-y-auto">
+            <p class="text-gray-500 text-sm italic">Loading...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2: Traffic -->
+      <div id="experiment-step-2" class="hidden space-y-5">
+        <h3 class="font-bold text-lg text-slate-800 mb-4">🚦 Traffic Configuration</h3>
+        
+        <!-- Traffic Mode -->
+        <div class="space-y-3">
+          <label class="block text-sm font-medium text-gray-700">Traffic Data Mode</label>
+          <select id="exp-traffic-mode" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 bg-white">
+            <option value="none">No Traffic Data (Baseline)</option>
+            <option value="flow">Traffic Flow Only</option>
+            <option value="incidents">Incidents Only</option>
+            <option value="both" selected>Flow + Incidents (Recommended)</option>
+          </select>
+        </div>
+
+        <!-- Disruption Settings -->
+        <div class="bg-orange-50 p-4 rounded-xl space-y-4">
+          <h4 class="font-semibold text-orange-800">Disruption Generation</h4>
+          
+          <div>
+            <label class="block text-sm text-orange-700 mb-1">Disruptions per Trial</label>
+            <input type="number" id="exp-disruption-count" 
+                   class="w-full px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-500"
+                   value="3" min="0" max="20">
+          </div>
+
+          <div>
+            <label class="block text-sm text-orange-700 mb-1">Severity Range</label>
+            <div class="flex gap-2 items-center">
+              <input type="number" id="exp-severity-min" 
+                     class="w-24 px-3 py-2 border border-orange-200 rounded-lg"
+                     value="0.1" min="0" max="1" step="0.1">
+              <span class="text-orange-600">to</span>
+              <input type="number" id="exp-severity-max" 
+                     class="w-24 px-3 py-2 border border-orange-200 rounded-lg"
+                     value="1.0" min="0" max="1" step="0.1">
+            </div>
+          </div>
+
+          <label class="flex items-center gap-2">
+            <input type="checkbox" id="exp-dynamic-disruptions" checked class="w-4 h-4 text-orange-600">
+            <span class="text-sm text-orange-700">Generate dynamic disruptions during trials</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Step 3: Sequence -->
+      <div id="experiment-step-3" class="hidden space-y-5">
+        <h3 class="font-bold text-lg text-slate-800 mb-4">🔢 Experiment Sequence</h3>
+        
+        <!-- Batch Configuration -->
+        <div class="bg-purple-50 p-4 rounded-xl space-y-4">
+          <h4 class="font-semibold text-purple-800">Batch Configuration</h4>
+          
+          <div>
+            <label class="block text-sm text-purple-700 mb-1">Number of Batches (X)</label>
+            <input type="number" id="exp-num-batches" 
+                   class="w-full px-3 py-2 border border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-500"
+                   value="3" min="1" max="10">
+          </div>
+
+          <div>
+            <label class="block text-sm text-purple-700 mb-2">Disruptions per Batch (Y)</label>
+            <div id="exp-disruptions-per-batch" class="space-y-2">
+              <!-- Dynamic inputs will be inserted here -->
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm text-purple-700 mb-1">Trials per Disruption (Z)</label>
+            <input type="number" id="exp-trials-per-disruption" 
+                   class="w-full px-3 py-2 border border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-500"
+                   value="5" min="1" max="100">
+          </div>
+        </div>
+
+        <!-- TAU Values -->
+        <div class="bg-cyan-50 p-4 rounded-xl space-y-3">
+          <h4 class="font-semibold text-cyan-800">TAU (τ) Threshold Values</h4>
+          <div class="flex flex-wrap gap-2">
+            <label class="flex items-center gap-1 bg-white px-3 py-1 rounded-lg border border-cyan-200">
+              <input type="checkbox" value="0.1" checked class="exp-tau-value"> 0.1
+            </label>
+            <label class="flex items-center gap-1 bg-white px-3 py-1 rounded-lg border border-cyan-200">
+              <input type="checkbox" value="0.3" checked class="exp-tau-value"> 0.3
+            </label>
+            <label class="flex items-center gap-1 bg-white px-3 py-1 rounded-lg border border-cyan-200">
+              <input type="checkbox" value="0.5" checked class="exp-tau-value"> 0.5
+            </label>
+            <label class="flex items-center gap-1 bg-white px-3 py-1 rounded-lg border border-cyan-200">
+              <input type="checkbox" value="0.7" checked class="exp-tau-value"> 0.7
+            </label>
+            <label class="flex items-center gap-1 bg-white px-3 py-1 rounded-lg border border-cyan-200">
+              <input type="checkbox" value="0.9" checked class="exp-tau-value"> 0.9
+            </label>
+          </div>
+        </div>
+
+        <!-- Algorithms -->
+        <div class="bg-indigo-50 p-4 rounded-xl space-y-3">
+          <h4 class="font-semibold text-indigo-800">Algorithms to Compare</h4>
+          <div class="flex gap-4">
+            <label class="flex items-center gap-2">
+              <input type="checkbox" value="hc2l" checked class="exp-algorithm w-5 h-5 text-cyan-600">
+              <span class="font-medium text-cyan-700">HC2L</span>
+            </label>
+            <label class="flex items-center gap-2">
+              <input type="checkbox" value="dhl" checked class="exp-algorithm w-5 h-5 text-purple-600">
+              <span class="font-medium text-purple-700">DHL</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Total Calculation -->
+        <div id="exp-total-calculation" class="bg-slate-100 p-4 rounded-xl text-center">
+          <!-- Calculated totals will appear here -->
+        </div>
+      </div>
+
+      <!-- Step 4: Review -->
+      <div id="experiment-step-4" class="hidden space-y-5">
+        <h3 class="font-bold text-lg text-slate-800 mb-4">📋 Review & Launch</h3>
+        <div id="exp-review-summary">
+          <!-- Summary will be populated by JavaScript -->
+        </div>
+      </div>
+
+      <!-- Navigation Buttons -->
+      <div class="flex justify-between mt-8 pt-4 border-t border-gray-200">
+        <button id="experiment-prev-btn" 
+                class="hidden px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-bold transition-all">
+          ← Previous
+        </button>
+        <div class="flex-1"></div>
+        <button id="experiment-next-btn" 
+                class="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all shadow-lg">
+          Next →
+        </button>
+        <button id="experiment-start-btn" 
+                class="hidden px-8 py-3 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-white rounded-xl font-bold transition-all shadow-lg">
+          🚀 Start Experiment
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- EXPERIMENT PROGRESS PANEL (Right side, shows during experiment) -->
+  <!-- ============================================================ -->
+  <div id="experiment-progress-panel"
+    class="fixed top-0 right-0 w-[28rem] h-full glass-effect shadow-2xl transform translate-x-full transition-transform duration-300 overflow-y-auto z-50 border-l border-slate-200/50">
+    
+    <!-- Header -->
+    <div class="p-4 bg-gradient-to-r from-emerald-600 to-cyan-600 text-white flex justify-between items-center sticky top-0 z-10">
+      <div>
+        <h2 class="font-bold text-xl">🧪 Experiment Running</h2>
+        <p id="exp-status" class="text-emerald-100 text-sm">Initializing...</p>
+      </div>
+      <button onclick="ExperimentWizard.closeProgressPanel()" class="hover:bg-white/20 rounded-xl p-2 transition-all">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+
+    <div class="p-4 space-y-4">
+      <!-- Progress Bar -->
+      <div class="bg-gray-200 rounded-full h-4 overflow-hidden">
+        <div id="exp-progress-bar" class="bg-gradient-to-r from-emerald-500 to-cyan-500 h-full transition-all duration-300" style="width: 0%"></div>
+      </div>
+      <div class="text-center">
+        <span id="exp-progress-text" class="text-2xl font-bold text-emerald-600">0%</span>
+      </div>
+
+      <!-- Counters -->
+      <div class="grid grid-cols-3 gap-2 text-center">
+        <div class="bg-purple-50 p-3 rounded-xl">
+          <div id="exp-batch-counter" class="font-bold text-purple-700">Batch 0/0</div>
+          <div class="text-xs text-purple-500">Batches</div>
+        </div>
+        <div class="bg-orange-50 p-3 rounded-xl">
+          <div id="exp-disruption-counter" class="font-bold text-orange-700">0/0</div>
+          <div class="text-xs text-orange-500">Disruptions</div>
+        </div>
+        <div class="bg-blue-50 p-3 rounded-xl">
+          <div id="exp-trial-counter" class="font-bold text-blue-700">0/0</div>
+          <div class="text-xs text-blue-500">Trials</div>
+        </div>
+      </div>
+
+      <!-- Current Algorithm -->
+      <div class="bg-slate-100 p-3 rounded-xl text-center">
+        <span class="text-sm text-gray-600">Current Algorithm: </span>
+        <span id="exp-current-algorithm" class="font-bold text-cyan-600">--</span>
+      </div>
+
+      <!-- Live Metrics -->
+      <div id="exp-live-metrics" class="bg-white border border-gray-200 rounded-xl p-3">
+        <div class="text-center text-gray-400 text-sm">Waiting for data...</div>
+      </div>
+
+      <!-- Control Buttons -->
+      <div class="flex gap-2">
+        <button id="exp-pause-btn" onclick="pauseExperiment()"
+                class="flex-1 px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-semibold transition-all">
+          ⏸️ Pause
+        </button>
+        <button id="exp-resume-btn" onclick="resumeExperiment()"
+                class="flex-1 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg font-semibold transition-all hidden">
+          ▶️ Resume
+        </button>
+        <button onclick="stopExperiment()"
+                class="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg font-semibold transition-all">
+          ⏹️ Stop
+        </button>
+      </div>
+
+      <!-- Export Buttons (disabled until complete) -->
+      <div class="flex gap-2">
+        <button id="exp-export-csv-btn" onclick="exportExperimentCSV()" disabled
+                class="flex-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+          📊 Export CSV
+        </button>
+        <button id="exp-export-appendix-btn" onclick="exportExperimentAppendix()" disabled
+                class="flex-1 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+          📑 Appendix
+        </button>
+      </div>
+
+      <!-- Log Window -->
+      <div class="bg-gray-900 rounded-xl p-3 h-48 overflow-y-auto">
+        <div class="text-xs text-gray-400 mb-2 font-semibold">Experiment Log</div>
+        <div id="exp-log" class="text-green-400 font-mono text-xs space-y-1">
+          <div class="text-gray-500">Waiting for experiment to start...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
 
   <!-- Javascripts -->
   <script src="{{ url_for('static', filename='js/variables.js') }}"></script>
@@ -1973,6 +2787,9 @@
   <script src="{{ url_for('static', filename='js/demo-automation.js') }}"></script>
   <script src="{{ url_for('static', filename='js/logging-system.js') }}"></script>
   <script src="{{ url_for('static', filename='js/custom-demo-creator.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/experiment-wizard.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/demo-runner.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/demo-creator-v2.js') }}"></script>
 
   <script>
 
@@ -3826,17 +4643,8 @@
       });
 
 
-      // Wire up Run Demo button
-      const runDemoBtn = document.getElementById('run-demo-btn');
-      if (runDemoBtn) {
-        runDemoBtn.addEventListener('click', () => {
-          if (typeof runDemo === 'function') {
-            runDemo();
-          } else {
-            showUpdateToast('Demo functionality not available', 'warning');
-          }
-        });
-      }
+      // Wire up Run Demo button - handled via onclick attribute with openDemoRunner()
+      // Legacy click handler removed - now using DemoRunner panel system
 
       // Wire up Reset button
       const resetBtn = document.getElementById('admin-reset-btn');
