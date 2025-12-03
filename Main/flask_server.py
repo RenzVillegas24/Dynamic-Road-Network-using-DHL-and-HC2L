@@ -2,6 +2,7 @@
 from flask import Flask, request, jsonify, render_template
 import pandas as pd
 import time
+import json
 from pathlib import Path
 import atexit
 import logging
@@ -177,6 +178,459 @@ def get_user_disruptions_for_api() -> list:
     """Load and format user-reported disruptions for API response."""
     rows = load_user_disruption_rows()
     return [format_user_disruption_row(row) for row in rows]
+
+# ============================================================================
+# DEMO DISRUPTIONS API
+# ============================================================================
+# These functions create demo-specific disruption CSV files for routers
+
+def snap_location_to_edge(lat: float, lng: float) -> dict:
+    """
+    Snap a location to the nearest road edge.
+    Returns edge source/target and coordinates.
+    """
+    try:
+        snap_result = mapper.snap_to_nearest_road(lat, lng, max_distance=500)
+        if snap_result:
+            return {
+                'success': True,
+                'source': snap_result['edge'][0],
+                'target': snap_result['edge'][1],
+                'source_lat': snap_result['source_coord']['lat'],
+                'source_lon': snap_result['source_coord']['lng'],
+                'target_lat': snap_result['target_coord']['lat'],
+                'target_lon': snap_result['target_coord']['lng'],
+                'road_name': snap_result.get('road_name', 'Unknown'),
+                'highway_type': snap_result.get('highway_type', 'unknown')
+            }
+        return {'success': False, 'error': 'No nearby edge found'}
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+
+
+def validate_location_near_road(lat: float, lng: float, max_distance: float = 100) -> dict:
+    """
+    Validate if a location is within max_distance meters of a road.
+    
+    Args:
+        lat: Latitude
+        lng: Longitude
+        max_distance: Maximum distance in meters (default 100m)
+        
+    Returns:
+        dict with success status and snapped coordinates if valid
+    """
+    try:
+        snap_result = mapper.snap_to_nearest_road(lat, lng, max_distance=max_distance)
+        if snap_result:
+            return {
+                'valid': True,
+                'snapped_lat': snap_result['point']['lat'],
+                'snapped_lng': snap_result['point']['lng'],
+                'road_name': snap_result.get('road_name', 'Unknown'),
+                'distance': snap_result.get('distance', 0)
+            }
+        return {'valid': False, 'error': 'No road within distance'}
+    except Exception as e:
+        return {'valid': False, 'error': str(e)}
+
+
+def get_available_matched_edges() -> dict:
+    """
+    Load all available matched edges from existing flow/incident CSV files.
+    Returns a cache of edges that can be used for random disruption generation.
+    """
+    import csv
+    import glob
+    
+    flow_dir = Path(Config.DISRUPTIONS_DIR) / 'flow'
+    incident_dir = Path(Config.DISRUPTIONS_DIR) / 'incidents'
+    
+    flow_edges = []
+    incident_edges = []
+    
+    # Load flow edges from most recent file
+    flow_files = sorted(flow_dir.glob('flow_*.csv'), reverse=True)
+    if flow_files:
+        try:
+            with open(flow_files[0], 'r') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get('source') and row.get('target'):
+                        flow_edges.append(row)
+            console_logger.data(f"Loaded {len(flow_edges)} flow edges from {flow_files[0].name}")
+        except Exception as e:
+            console_logger.warning(f"Error loading flow edges: {e}")
+    
+    # Load incident edges from all files (they have fewer entries)
+    incident_files = sorted(incident_dir.glob('incident_*.csv'), reverse=True)
+    for ifile in incident_files[:5]:  # Load from last 5 incident files
+        try:
+            with open(ifile, 'r') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get('source') and row.get('target'):
+                        incident_edges.append(row)
+        except Exception as e:
+            console_logger.warning(f"Error loading incident edges from {ifile}: {e}")
+    
+    console_logger.data(f"Loaded {len(incident_edges)} incident edges from {len(incident_files[:5])} files")
+    
+    return {
+        'flow_edges': flow_edges,
+        'incident_edges': incident_edges
+    }
+
+
+def select_random_edges_for_demo(flow_count: int, incident_count: int, 
+                                  severity_min: float = 0.3, severity_max: float = 0.9) -> dict:
+    """
+    Select random edges from existing matched edges for demo disruptions.
+    
+    Args:
+        flow_count: Number of flow disruptions to generate (0 = no flow)
+        incident_count: Number of incident disruptions to generate (0 = no incidents)
+        severity_min: Minimum severity (0-1)
+        severity_max: Maximum severity (0-1)
+        
+    Returns:
+        dict with selected flow and incident data ready for CSV creation
+    """
+    import random
+    from datetime import datetime, timedelta
+    
+    # Cap the total at 2000 disruptions
+    MAX_TOTAL = 2000
+    total_requested = flow_count + incident_count
+    if total_requested > MAX_TOTAL:
+        # Scale down proportionally
+        scale = MAX_TOTAL / total_requested
+        flow_count = int(flow_count * scale)
+        incident_count = int(incident_count * scale)
+    
+    # Ensure counts are non-negative integers
+    flow_count = max(0, int(flow_count))
+    incident_count = max(0, int(incident_count))
+    
+    edges = get_available_matched_edges()
+    
+    flow_rows = []
+    incident_rows = []
+    
+    # Return early if no edges or both counts are 0
+    if flow_count == 0 and incident_count == 0:
+        return {'flow_rows': [], 'incident_rows': []}
+    
+    # Select random flow edges
+    if edges['flow_edges'] and flow_count > 0:
+        sample_size = min(flow_count, len(edges['flow_edges']))
+        selected_flow = random.sample(edges['flow_edges'], sample_size)
+        
+        for i, edge in enumerate(selected_flow):
+            severity = random.uniform(severity_min, severity_max)
+            jam_factor = severity * 10
+            flow_speed = max(5, float(edge.get('flow_free_flow_kph', 60)) * (1 - severity * 0.8))
+            
+            flow_rows.append({
+                'id_hash': f'demo_flow_{i}',
+                'source_lat': edge.get('source_lat'),
+                'source_lon': edge.get('source_lon'),
+                'target_lat': edge.get('target_lat'),
+                'target_lon': edge.get('target_lon'),
+                'source': edge.get('source'),
+                'target': edge.get('target'),
+                'flow_speed_kph': flow_speed,
+                'flow_free_flow_kph': edge.get('flow_free_flow_kph', 60),
+                'flow_jam_factor': jam_factor,
+                'flow_confidence': 0.95,
+                'flow_traversability': 'open',
+                'highway_type': edge.get('highway_type', 'primary'),
+                'road_name': edge.get('road_name', 'Unknown')
+            })
+    
+    # If we need more flow, replicate some with different severities
+    while len(flow_rows) < flow_count and edges['flow_edges']:
+        edge = random.choice(edges['flow_edges'])
+        severity = random.uniform(severity_min, severity_max)
+        jam_factor = severity * 10
+        flow_speed = max(5, float(edge.get('flow_free_flow_kph', 60)) * (1 - severity * 0.8))
+        
+        flow_rows.append({
+            'id_hash': f'demo_flow_{len(flow_rows)}',
+            'source_lat': edge.get('source_lat'),
+            'source_lon': edge.get('source_lon'),
+            'target_lat': edge.get('target_lat'),
+            'target_lon': edge.get('target_lon'),
+            'source': edge.get('source'),
+            'target': edge.get('target'),
+            'flow_speed_kph': flow_speed,
+            'flow_free_flow_kph': edge.get('flow_free_flow_kph', 60),
+            'flow_jam_factor': jam_factor,
+            'flow_confidence': 0.95,
+            'flow_traversability': 'open',
+            'highway_type': edge.get('highway_type', 'primary'),
+            'road_name': edge.get('road_name', 'Unknown')
+        })
+    
+    # Select random incident edges (or use flow edges if no incidents available)
+    incident_source = edges['incident_edges'] if edges['incident_edges'] else edges['flow_edges']
+    incident_types = ['accident', 'construction', 'roadClosure', 'hazard']
+    
+    if incident_source and incident_count > 0:
+        sample_size = min(incident_count, len(incident_source))
+        selected_incidents = random.sample(incident_source, sample_size)
+        
+        for i, edge in enumerate(selected_incidents):
+            severity = random.uniform(severity_min, severity_max)
+            if severity > 0.7:
+                criticality = 'critical'
+            elif severity > 0.4:
+                criticality = 'major'
+            else:
+                criticality = 'minor'
+            
+            incident_type = random.choice(incident_types)
+            road_closed = severity > 0.8
+            road_name = edge.get('road_name', 'Unknown Road')
+            
+            incident_rows.append({
+                'source': edge.get('source'),
+                'target': edge.get('target'),
+                'source_lat': edge.get('source_lat'),
+                'source_lon': edge.get('source_lon'),
+                'target_lat': edge.get('target_lat'),
+                'target_lon': edge.get('target_lon'),
+                'incident_id': f'demo_incident_{i}',
+                'incident_type': incident_type,
+                'incident_criticality': criticality,
+                'incident_description': f'Demo {incident_type} on {road_name}',
+                'incident_road_closed': road_closed,
+                'incident_start_time': datetime.now().isoformat() + 'Z',
+                'incident_end_time': (datetime.now() + timedelta(hours=3)).isoformat() + 'Z',
+                'highway_type': edge.get('highway_type', 'primary'),
+                'road_name': road_name
+            })
+    
+    # If we need more incidents, replicate some
+    while len(incident_rows) < incident_count and incident_source:
+        edge = random.choice(incident_source)
+        severity = random.uniform(severity_min, severity_max)
+        if severity > 0.7:
+            criticality = 'critical'
+        elif severity > 0.4:
+            criticality = 'major'
+        else:
+            criticality = 'minor'
+        
+        incident_type = random.choice(incident_types)
+        road_name = edge.get('road_name', 'Unknown Road')
+        
+        incident_rows.append({
+            'source': edge.get('source'),
+            'target': edge.get('target'),
+            'source_lat': edge.get('source_lat'),
+            'source_lon': edge.get('source_lon'),
+            'target_lat': edge.get('target_lat'),
+            'target_lon': edge.get('target_lon'),
+            'incident_id': f'demo_incident_{len(incident_rows)}',
+            'incident_type': incident_type,
+            'incident_criticality': criticality,
+            'incident_description': f'Demo {incident_type} on {road_name}',
+            'incident_road_closed': severity > 0.8,
+            'incident_start_time': datetime.now().isoformat() + 'Z',
+            'incident_end_time': (datetime.now() + timedelta(hours=3)).isoformat() + 'Z',
+            'highway_type': edge.get('highway_type', 'primary'),
+            'road_name': road_name
+        })
+    
+    return {
+        'flow_rows': flow_rows,
+        'incident_rows': incident_rows
+    }
+
+
+def create_demo_disruption_files(demo_id: str, flow_data: list = None, incident_data: list = None,
+                                  use_random_edges: bool = True, flow_count: int = 5, incident_count: int = 3,
+                                  severity_min: float = 0.3, severity_max: float = 0.9) -> dict:
+    """
+    Create disruption CSV files for a demo.
+    
+    Args:
+        demo_id: Unique demo identifier
+        flow_data: List of flow disruption dictionaries with lat/lng (for custom locations)
+        incident_data: List of incident dictionaries with lat/lng (for custom locations)
+        use_random_edges: If True, select random edges from existing matched_edges CSV files
+        flow_count: Number of random flow disruptions (when use_random_edges=True)
+        incident_count: Number of random incidents (when use_random_edges=True)
+        severity_min: Minimum severity for random disruptions
+        severity_max: Maximum severity for random disruptions
+        
+    Returns:
+        dict with success status, disruption directory path, and generated disruption details
+    """
+    import csv
+    from datetime import datetime
+    
+    # Create demo disruptions directory
+    demo_dir = Path(Config.DISRUPTIONS_DIR) / 'demos' / demo_id
+    flow_dir = demo_dir / 'flow'
+    incident_dir = demo_dir / 'incidents'
+    
+    flow_dir.mkdir(parents=True, exist_ok=True)
+    incident_dir.mkdir(parents=True, exist_ok=True)
+    
+    timestamp = datetime.now().strftime('%Y%m%dT%H%M%S%f')[:18]
+    
+    flow_rows = []
+    incident_rows = []
+    
+    if use_random_edges:
+        # NEW: Select random edges from existing matched_edges CSV files
+        console_logger.info(f"Generating {flow_count} flow and {incident_count} incident disruptions from matched edges")
+        selected = select_random_edges_for_demo(
+            flow_count=flow_count,
+            incident_count=incident_count,
+            severity_min=severity_min,
+            severity_max=severity_max
+        )
+        flow_rows = selected['flow_rows']
+        incident_rows = selected['incident_rows']
+    else:
+        # Original mode: snap custom locations to edges
+        if flow_data:
+            for i, flow in enumerate(flow_data):
+                snap = snap_location_to_edge(flow['lat'], flow['lng'])
+                if snap['success']:
+                    jam_factor = flow.get('severity', 0.5) * 10
+                    flow_speed = max(5, 60 - (jam_factor * 5))
+                    
+                    flow_rows.append({
+                        'id_hash': f'demo_{demo_id}_{i}',
+                        'source_lat': snap['source_lat'],
+                        'source_lon': snap['source_lon'],
+                        'target_lat': snap['target_lat'],
+                        'target_lon': snap['target_lon'],
+                        'source': snap['source'],
+                        'target': snap['target'],
+                        'flow_speed_kph': flow_speed,
+                        'flow_free_flow_kph': 60,
+                        'flow_jam_factor': jam_factor,
+                        'flow_confidence': 0.9,
+                        'flow_traversability': 'open',
+                        'highway_type': snap['highway_type'],
+                        'road_name': snap['road_name']
+                    })
+        
+        if incident_data:
+            for i, incident in enumerate(incident_data):
+                snap = snap_location_to_edge(incident['lat'], incident['lng'])
+                if snap['success']:
+                    severity = incident.get('severity', 0.5)
+                    if severity > 0.7:
+                        criticality = 'critical'
+                    elif severity > 0.4:
+                        criticality = 'major'
+                    else:
+                        criticality = 'minor'
+                    
+                    incident_rows.append({
+                        'source': snap['source'],
+                        'target': snap['target'],
+                        'source_lat': snap['source_lat'],
+                        'source_lon': snap['source_lon'],
+                        'target_lat': snap['target_lat'],
+                        'target_lon': snap['target_lon'],
+                        'incident_id': f'demo_{demo_id}_{i}',
+                        'incident_type': incident.get('type', 'construction'),
+                        'incident_criticality': criticality,
+                        'incident_description': incident.get('description', f'Demo incident on {snap["road_name"]}'),
+                        'incident_road_closed': severity > 0.8,
+                        'incident_start_time': datetime.now().isoformat() + 'Z',
+                        'incident_end_time': '',
+                        'highway_type': snap['highway_type'],
+                        'road_name': snap['road_name']
+                    })
+    
+    # Write flow CSV
+    flow_file = flow_dir / f'flow_{timestamp}.csv'
+    if flow_rows:
+        with open(flow_file, 'w', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=flow_rows[0].keys())
+            writer.writeheader()
+            writer.writerows(flow_rows)
+        console_logger.success(f"Created demo flow file: {flow_file} with {len(flow_rows)} entries")
+    else:
+        # Create empty flow file with headers
+        with open(flow_file, 'w', newline='') as f:
+            f.write('id_hash,source_lat,source_lon,target_lat,target_lon,source,target,flow_speed_kph,flow_free_flow_kph,flow_jam_factor,flow_confidence,flow_traversability,highway_type,road_name\n')
+    
+    # Write incident CSV
+    incident_file = incident_dir / f'incident_{timestamp}.csv'
+    if incident_rows:
+        with open(incident_file, 'w', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=incident_rows[0].keys())
+            writer.writeheader()
+            writer.writerows(incident_rows)
+        console_logger.success(f"Created demo incident file: {incident_file} with {len(incident_rows)} entries")
+    else:
+        # Create empty incident file with headers
+        with open(incident_file, 'w', newline='') as f:
+            f.write('source,target,source_lat,source_lon,target_lat,target_lon,incident_id,incident_type,incident_criticality,incident_description,incident_road_closed,incident_start_time,incident_end_time,highway_type,road_name\n')
+    
+    # Build response with disruption details for UI preview
+    disruption_details = {
+        'flow': [
+            {
+                'source_lat': float(r['source_lat']),
+                'source_lon': float(r['source_lon']),
+                'target_lat': float(r['target_lat']),
+                'target_lon': float(r['target_lon']),
+                'jam_factor': float(r['flow_jam_factor']),
+                'road_name': r['road_name']
+            } for r in flow_rows
+        ],
+        'incidents': [
+            {
+                'source_lat': float(r['source_lat']),
+                'source_lon': float(r['source_lon']),
+                'target_lat': float(r['target_lat']),
+                'target_lon': float(r['target_lon']),
+                'type': r['incident_type'],
+                'criticality': r['incident_criticality'],
+                'road_name': r['road_name']
+            } for r in incident_rows
+        ]
+    }
+    
+    return {
+        'success': True,
+        'demo_id': demo_id,
+        'disruption_dir': str(demo_dir),
+        'flow_count': len(flow_rows),
+        'incident_count': len(incident_rows),
+        'disruptions': disruption_details
+    }
+
+
+def cleanup_demo_disruptions(demo_id: str) -> bool:
+    """
+    Clean up demo disruption files after demo completes.
+    
+    Args:
+        demo_id: Demo identifier to clean up
+        
+    Returns:
+        True if cleanup successful
+    """
+    import shutil
+    
+    demo_dir = Path(Config.DISRUPTIONS_DIR) / 'demos' / demo_id
+    if demo_dir.exists():
+        shutil.rmtree(demo_dir)
+        console_logger.info(f"Cleaned up demo disruptions: {demo_id}")
+        return True
+    return False
+
 
 # ============================================================
 # GLOBAL CACHES - Prevent reloading data on every request
@@ -1134,6 +1588,729 @@ def delete_user_disruption(incident_id):
         'deleted': incident_id, 
         'remaining': len(rows_to_keep)
     })
+
+
+# ============================================================================
+# DEMO DISRUPTIONS API ROUTES
+# ============================================================================
+
+@app.route('/api/demo/disruptions', methods=['POST'])
+def create_demo_disruptions():
+    """
+    Create disruption files for a demo run.
+    
+    Request body:
+    {
+        "demo_id": "unique-demo-id",
+        "use_random_edges": true,  // NEW: use matched edges from existing CSVs
+        "flow_count": 5,           // NEW: number of random flow disruptions
+        "incident_count": 3,       // NEW: number of random incidents
+        "severity_min": 0.3,
+        "severity_max": 0.9,
+        "flow_data": [...],        // Optional: custom flow locations (when use_random_edges=false)
+        "incident_data": [...]     // Optional: custom incident locations
+    }
+    
+    Returns:
+    {
+        "success": true,
+        "disruption_dir": "/path/to/demo/disruptions",
+        "flow_count": 5,
+        "incident_count": 3,
+        "disruptions": {
+            "flow": [...],
+            "incidents": [...]
+        }
+    }
+    """
+    try:
+        data = request.json
+        demo_id = data.get('demo_id')
+        
+        if not demo_id:
+            return jsonify({'success': False, 'error': 'demo_id is required'}), 400
+        
+        # Check for new random edge mode (default: true)
+        use_random_edges = data.get('use_random_edges', True)
+        flow_count = data.get('flow_count', 5)
+        incident_count = data.get('incident_count', 3)
+        severity_min = data.get('severity_min', 0.3)
+        severity_max = data.get('severity_max', 0.9)
+        
+        # Legacy custom location data
+        flow_data = data.get('flow_data', [])
+        incident_data = data.get('incident_data', [])
+        
+        console_logger.processing(f"Creating demo disruptions for: {demo_id}")
+        if use_random_edges:
+            console_logger.data(f"  Mode: Random from matched edges")
+            console_logger.data(f"  Flow count: {flow_count}, Incident count: {incident_count}")
+        else:
+            console_logger.data(f"  Mode: Custom locations")
+            console_logger.data(f"  Flow items: {len(flow_data)}, Incident items: {len(incident_data)}")
+        
+        result = create_demo_disruption_files(
+            demo_id=demo_id,
+            flow_data=flow_data,
+            incident_data=incident_data,
+            use_random_edges=use_random_edges,
+            flow_count=flow_count,
+            incident_count=incident_count,
+            severity_min=severity_min,
+            severity_max=severity_max
+        )
+        
+        if result['success']:
+            console_logger.success(f"Demo disruptions created: {result['disruption_dir']}")
+            console_logger.data(f"  Generated: {result['flow_count']} flow, {result['incident_count']} incidents")
+            return jsonify(result)
+        else:
+            return jsonify(result), 500
+            
+    except Exception as e:
+        console_logger.error(f"Error creating demo disruptions: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/demo/disruptions/<demo_id>', methods=['DELETE'])
+def delete_demo_disruptions(demo_id):
+    """
+    Clean up disruption files for a completed demo.
+    
+    Returns:
+    {
+        "success": true,
+        "demo_id": "unique-demo-id"
+    }
+    """
+    try:
+        if cleanup_demo_disruptions(demo_id):
+            return jsonify({'success': True, 'demo_id': demo_id})
+        else:
+            return jsonify({'success': False, 'error': 'Demo disruptions not found'}), 404
+    except Exception as e:
+        console_logger.error(f"Error cleaning up demo disruptions: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/demo/snap_disruptions', methods=['POST'])
+def snap_demo_disruptions():
+    """
+    Snap disruption locations to road edges without creating files.
+    Useful for previewing where disruptions will appear.
+    
+    Request body:
+    {
+        "locations": [{"lat": 14.65, "lng": 121.05}, ...]
+    }
+    
+    Returns snapped locations with edge information.
+    """
+    try:
+        data = request.json
+        locations = data.get('locations', [])
+        
+        results = []
+        for loc in locations:
+            snap = snap_location_to_edge(loc['lat'], loc['lng'])
+            snap['original'] = {'lat': loc['lat'], 'lng': loc['lng']}
+            results.append(snap)
+        
+        return jsonify({
+            'success': True,
+            'snapped': results,
+            'count': len(results)
+        })
+        
+    except Exception as e:
+        console_logger.error(f"Error snapping demo disruptions: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/demo/validate_location', methods=['POST'])
+def validate_demo_location():
+    """
+    Validate if a location is near a road (within specified distance).
+    Used for random route generation to ensure points are near roads.
+    
+    Request body:
+    {
+        "lat": 14.65,
+        "lng": 121.05,
+        "max_distance": 100  // meters, default 100
+    }
+    
+    Returns:
+    {
+        "valid": true/false,
+        "snapped_lat": 14.65,
+        "snapped_lng": 121.05,
+        "road_name": "EDSA",
+        "distance": 45.2  // meters to nearest road
+    }
+    """
+    try:
+        data = request.json
+        lat = data.get('lat')
+        lng = data.get('lng')
+        max_distance = data.get('max_distance', 100)
+        
+        if lat is None or lng is None:
+            return jsonify({'valid': False, 'error': 'lat and lng are required'}), 400
+        
+        result = validate_location_near_road(lat, lng, max_distance)
+        return jsonify(result)
+        
+    except Exception as e:
+        console_logger.error(f"Error validating location: {e}")
+        return jsonify({'valid': False, 'error': str(e)}), 500
+
+
+@app.route('/api/demo/validate_locations_batch', methods=['POST'])
+def validate_locations_batch():
+    """
+    Validate multiple locations in one request to reduce round trips.
+    
+    Request body:
+    {
+        "locations": [{"lat": 14.65, "lng": 121.05}, ...],
+        "max_distance": 100
+    }
+    
+    Returns:
+    {
+        "success": true,
+        "results": [{"valid": true, "snapped_lat": ..., ...}, ...]
+    }
+    """
+    try:
+        data = request.json
+        locations = data.get('locations', [])
+        max_distance = data.get('max_distance', 100)
+        
+        results = []
+        for loc in locations:
+            lat = loc.get('lat')
+            lng = loc.get('lng')
+            if lat is not None and lng is not None:
+                result = validate_location_near_road(lat, lng, max_distance)
+                results.append(result)
+            else:
+                results.append({'valid': False, 'error': 'Missing coordinates'})
+        
+        return jsonify({
+            'success': True,
+            'results': results
+        })
+    except Exception as e:
+        console_logger.error(f"Error validating batch locations: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/demo/random_road_points', methods=['POST'])
+def get_random_road_points():
+    """
+    Get random valid road points directly from the road network.
+    Much faster than generating random lat/lng and validating.
+    
+    Request body:
+    {
+        "count": 10,
+        "min_lat": 14.5, "max_lat": 14.8,
+        "min_lng": 120.9, "max_lng": 121.2
+    }
+    
+    Returns:
+    {
+        "success": true,
+        "points": [{"lat": 14.65, "lng": 121.05, "road_name": "EDSA"}, ...]
+    }
+    """
+    import random
+    
+    try:
+        data = request.json or {}
+        count = data.get('count', 10)
+        
+        # Get QC boundaries
+        min_lat = data.get('min_lat', 14.55)
+        max_lat = data.get('max_lat', 14.78)
+        min_lng = data.get('min_lng', 120.98)
+        max_lng = data.get('max_lng', 121.12)
+        
+        # Get edges from the graph
+        edges = get_available_matched_edges()
+        all_edges = edges.get('flow_edges', [])
+        
+        if not all_edges:
+            # Fallback: try to get edges from the road network
+            return jsonify({'success': False, 'error': 'No road edges available'}), 500
+        
+        # Filter edges within bounds
+        valid_edges = []
+        for edge in all_edges:
+            try:
+                src_lat = float(edge.get('source_lat', 0))
+                src_lng = float(edge.get('source_lon', 0))
+                if min_lat <= src_lat <= max_lat and min_lng <= src_lng <= max_lng:
+                    valid_edges.append({
+                        'lat': src_lat,
+                        'lng': src_lng,
+                        'road_name': edge.get('road_name', 'Unknown Road'),
+                        'highway_type': edge.get('highway_type', 'unknown')
+                    })
+                
+                tgt_lat = float(edge.get('target_lat', 0))
+                tgt_lng = float(edge.get('target_lon', 0))
+                if min_lat <= tgt_lat <= max_lat and min_lng <= tgt_lng <= max_lng:
+                    valid_edges.append({
+                        'lat': tgt_lat,
+                        'lng': tgt_lng,
+                        'road_name': edge.get('road_name', 'Unknown Road'),
+                        'highway_type': edge.get('highway_type', 'unknown')
+                    })
+            except (ValueError, TypeError):
+                continue
+        
+        if not valid_edges:
+            return jsonify({'success': False, 'error': 'No edges within bounds'}), 500
+        
+        # Sample unique random points
+        sample_size = min(count, len(valid_edges))
+        selected = random.sample(valid_edges, sample_size)
+        
+        # If we need more than available, duplicate with slight variation
+        while len(selected) < count:
+            base = random.choice(valid_edges)
+            selected.append({
+                'lat': base['lat'] + random.uniform(-0.001, 0.001),
+                'lng': base['lng'] + random.uniform(-0.001, 0.001),
+                'road_name': base['road_name'],
+                'highway_type': base['highway_type']
+            })
+        
+        return jsonify({
+            'success': True,
+            'points': selected,
+            'count': len(selected)
+        })
+        
+    except Exception as e:
+        console_logger.error(f"Error getting random road points: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/demo/random_edges', methods=['POST'])
+def get_random_edges():
+    """
+    Get random road edges for demo disruption preview.
+    These are actual road edges from existing matched flow/incident data.
+    Includes full road geometry for proper visualization.
+    
+    Request body:
+    {
+        "flow_count": 5,
+        "incident_count": 3,
+        "severity_min": 0,
+        "severity_max": 1
+    }
+    
+    Returns:
+    {
+        "success": true,
+        "flow": [...],
+        "incidents": [...]
+    }
+    """
+    try:
+        data = request.json or {}
+        flow_count = data.get('flow_count', 5)
+        incident_count = data.get('incident_count', 3)
+        severity_min = data.get('severity_min', 0)
+        severity_max = data.get('severity_max', 1)
+        
+        selected = select_random_edges_for_demo(
+            flow_count=flow_count,
+            incident_count=incident_count,
+            severity_min=severity_min,
+            severity_max=severity_max
+        )
+        
+        # Load edge geometry lookup
+        _, edge_lookup = load_edges_with_cache()
+        
+        # Format for preview with geometry
+        flow_preview = []
+        for r in selected['flow_rows']:
+            source = int(r.get('source', 0))
+            target = int(r.get('target', 0))
+            edge_key = (source, target)
+            
+            # Get geometry from lookup
+            edge_data = edge_lookup.get(edge_key, {}) if edge_lookup else {}
+            geometry = edge_data.get('geometry', None)
+            
+            # Fallback to source/target line if no geometry
+            if not geometry or len(geometry) < 2:
+                geometry = [
+                    [float(r['source_lat']), float(r['source_lon'])],
+                    [float(r['target_lat']), float(r['target_lon'])]
+                ]
+            
+            # Calculate severity label from jam_factor
+            jam_factor = float(r['flow_jam_factor'])
+            if jam_factor >= 6.0:
+                severity = 'Heavy'
+            elif jam_factor >= 3.0:
+                severity = 'Medium'
+            else:
+                severity = 'Light'
+            
+            flow_preview.append({
+                'source': source,
+                'target': target,
+                'source_lat': float(r['source_lat']),
+                'source_lon': float(r['source_lon']),
+                'target_lat': float(r['target_lat']),
+                'target_lon': float(r['target_lon']),
+                'jam_factor': jam_factor,
+                'severity': severity,
+                'road_name': r['road_name'],
+                'highway_type': r['highway_type'],
+                'geometry': geometry,
+                'type': 'flow'
+            })
+        
+        incident_preview = []
+        for r in selected['incident_rows']:
+            source = int(r.get('source', 0))
+            target = int(r.get('target', 0))
+            edge_key = (source, target)
+            
+            # Get geometry from lookup
+            edge_data = edge_lookup.get(edge_key, {}) if edge_lookup else {}
+            geometry = edge_data.get('geometry', None)
+            
+            # Fallback to source/target line if no geometry
+            if not geometry or len(geometry) < 2:
+                geometry = [
+                    [float(r['source_lat']), float(r['source_lon'])],
+                    [float(r['target_lat']), float(r['target_lon'])]
+                ]
+            
+            incident_preview.append({
+                'source': source,
+                'target': target,
+                'source_lat': float(r['source_lat']),
+                'source_lon': float(r['source_lon']),
+                'target_lat': float(r['target_lat']),
+                'target_lon': float(r['target_lon']),
+                'type': r['incident_type'],
+                'criticality': r['incident_criticality'],
+                'road_closed': r.get('incident_road_closed', False),
+                'road_name': r['road_name'],
+                'highway_type': r['highway_type'],
+                'geometry': geometry,
+                'is_incident': True
+            })
+        
+        return jsonify({
+            'success': True,
+            'flow': flow_preview,
+            'incidents': incident_preview,
+            'flow_count': len(flow_preview),
+            'incident_count': len(incident_preview)
+        })
+        
+    except Exception as e:
+        console_logger.error(f"Error getting random edges: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ============================================================================
+# DEMO CONFIGURATION FILE STORAGE API
+# ============================================================================
+# Stores demo configurations as JSON files in data/demos/configs/
+
+DEMO_CONFIGS_DIR = Path(Config.DATA_DIR) / 'demos' / 'configs'
+DEMO_RESULTS_DIR = Path(Config.DATA_DIR) / 'demos' / 'results'
+
+# Ensure directories exist
+DEMO_CONFIGS_DIR.mkdir(parents=True, exist_ok=True)
+DEMO_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+@app.route('/api/demo/configs', methods=['GET'])
+def list_demo_configs():
+    """
+    List all saved demo configurations.
+    
+    Returns:
+    {
+        "success": true,
+        "configs": [...]
+    }
+    """
+    try:
+        configs = []
+        for config_file in sorted(DEMO_CONFIGS_DIR.glob('*.json'), reverse=True):
+            try:
+                with open(config_file, 'r') as f:
+                    config = json.load(f)
+                    configs.append(config)
+            except Exception as e:
+                console_logger.warning(f"Error loading config {config_file}: {e}")
+        
+        return jsonify({
+            'success': True,
+            'configs': configs,
+            'count': len(configs)
+        })
+    except Exception as e:
+        console_logger.error(f"Error listing configs: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/demo/configs', methods=['POST'])
+def save_demo_config():
+    """
+    Save a new demo configuration.
+    
+    Request body: The config object to save
+    
+    Returns:
+    {
+        "success": true,
+        "config": {...}
+    }
+    """
+    try:
+        config = request.json
+        
+        # Generate ID if not present
+        if not config.get('id'):
+            config['id'] = f"demo-{int(time.time() * 1000)}"
+        
+        config['savedAt'] = datetime.now().isoformat()
+        
+        # Generate disruption folder key
+        if not config.get('disruptionFolderKey'):
+            config['disruptionFolderKey'] = config['id']
+        
+        # Save to file
+        config_file = DEMO_CONFIGS_DIR / f"{config['id']}.json"
+        with open(config_file, 'w') as f:
+            json.dump(config, f, indent=2)
+        
+        console_logger.success(f"Saved demo config: {config['id']}")
+        
+        return jsonify({
+            'success': True,
+            'config': config
+        })
+    except Exception as e:
+        console_logger.error(f"Error saving config: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/demo/configs/<config_id>', methods=['GET'])
+def get_demo_config(config_id):
+    """
+    Get a specific demo configuration by ID.
+    
+    Returns:
+    {
+        "success": true,
+        "config": {...}
+    }
+    """
+    try:
+        config_file = DEMO_CONFIGS_DIR / f"{config_id}.json"
+        
+        if not config_file.exists():
+            return jsonify({'success': False, 'error': 'Config not found'}), 404
+        
+        with open(config_file, 'r') as f:
+            config = json.load(f)
+        
+        return jsonify({
+            'success': True,
+            'config': config
+        })
+    except Exception as e:
+        console_logger.error(f"Error getting config {config_id}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/demo/configs/<config_id>', methods=['PUT'])
+def update_demo_config(config_id):
+    """
+    Update an existing demo configuration.
+    
+    Request body: The updated config object
+    
+    Returns:
+    {
+        "success": true,
+        "config": {...}
+    }
+    """
+    try:
+        config = request.json
+        config['id'] = config_id
+        config['savedAt'] = datetime.now().isoformat()
+        
+        config_file = DEMO_CONFIGS_DIR / f"{config_id}.json"
+        with open(config_file, 'w') as f:
+            json.dump(config, f, indent=2)
+        
+        console_logger.success(f"Updated demo config: {config_id}")
+        
+        return jsonify({
+            'success': True,
+            'config': config
+        })
+    except Exception as e:
+        console_logger.error(f"Error updating config {config_id}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/demo/configs/<config_id>', methods=['DELETE'])
+def delete_demo_config(config_id):
+    """
+    Delete a demo configuration and its associated disruption folder.
+    
+    Returns:
+    {
+        "success": true,
+        "config_id": "..."
+    }
+    """
+    try:
+        import shutil
+        
+        config_file = DEMO_CONFIGS_DIR / f"{config_id}.json"
+        
+        # Load config to get disruption folder key
+        disruption_folder_key = config_id
+        if config_file.exists():
+            try:
+                with open(config_file, 'r') as f:
+                    config = json.load(f)
+                    disruption_folder_key = config.get('disruptionFolderKey', config_id)
+            except:
+                pass
+            
+            # Delete config file
+            config_file.unlink()
+            console_logger.info(f"Deleted config file: {config_id}")
+        
+        # Delete associated disruption folder
+        disruption_dir = Path(Config.DISRUPTIONS_DIR) / 'demos' / disruption_folder_key
+        if disruption_dir.exists():
+            shutil.rmtree(disruption_dir)
+            console_logger.info(f"Deleted disruption folder: {disruption_folder_key}")
+        
+        # Delete associated results folder
+        results_dir = DEMO_RESULTS_DIR / config_id
+        if results_dir.exists():
+            shutil.rmtree(results_dir)
+            console_logger.info(f"Deleted results folder: {config_id}")
+        
+        return jsonify({
+            'success': True,
+            'config_id': config_id
+        })
+    except Exception as e:
+        console_logger.error(f"Error deleting config {config_id}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/demo/results/<config_id>', methods=['POST'])
+def save_demo_results(config_id):
+    """
+    Save demo experiment results.
+    
+    Request body: The results object to save
+    
+    Returns:
+    {
+        "success": true,
+        "results_file": "..."
+    }
+    """
+    try:
+        results = request.json
+        
+        results_dir = DEMO_RESULTS_DIR / config_id
+        results_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Generate filename with timestamp
+        timestamp = datetime.now().strftime('%Y%m%dT%H%M%S')
+        results_file = results_dir / f"results_{timestamp}.json"
+        
+        results['savedAt'] = datetime.now().isoformat()
+        results['configId'] = config_id
+        
+        with open(results_file, 'w') as f:
+            json.dump(results, f, indent=2)
+        
+        console_logger.success(f"Saved demo results: {results_file}")
+        
+        return jsonify({
+            'success': True,
+            'results_file': str(results_file)
+        })
+    except Exception as e:
+        console_logger.error(f"Error saving results for {config_id}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/demo/results/<config_id>', methods=['GET'])
+def get_demo_results(config_id):
+    """
+    Get all results for a demo configuration.
+    
+    Returns:
+    {
+        "success": true,
+        "results": [...]
+    }
+    """
+    try:
+        results_dir = DEMO_RESULTS_DIR / config_id
+        
+        if not results_dir.exists():
+            return jsonify({
+                'success': True,
+                'results': [],
+                'count': 0
+            })
+        
+        results = []
+        for results_file in sorted(results_dir.glob('results_*.json'), reverse=True):
+            try:
+                with open(results_file, 'r') as f:
+                    result = json.load(f)
+                    results.append(result)
+            except Exception as e:
+                console_logger.warning(f"Error loading result {results_file}: {e}")
+        
+        return jsonify({
+            'success': True,
+            'results': results,
+            'count': len(results)
+        })
+    except Exception as e:
+        console_logger.error(f"Error getting results for {config_id}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 
 @app.route('/search_location', methods=['POST'])
 def search_location():
