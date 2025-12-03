@@ -189,34 +189,8 @@ const DemoCreator = {
         this.setupLocationSearch('demo-start-search', 'demo-start-dropdown', 'start');
         this.setupLocationSearch('demo-end-search', 'demo-end-dropdown', 'end');
         
-        // Tau mode change
-        document.getElementById('demo-tau-mode')?.addEventListener('change', (e) => {
-            this.sequence.tauMode = e.target.value;
-            this.updateTauModeUI();
-        });
-        
-        // Algorithm change
-        document.getElementById('demo-algorithm-select')?.addEventListener('change', (e) => {
-            this.sequence.algorithm = e.target.value;
-        });
-        
-        // Disruption mode change
-        document.getElementById('demo-disruption-mode')?.addEventListener('change', (e) => {
-            this.disruptions.mode = e.target.value;
-            this.updateDisruptionModeUI();
-        });
-        
-        // Disruption generation scope change
-        document.getElementById('disruption-generation-scope')?.addEventListener('change', (e) => {
-            this.disruptions.generationScope = e.target.value;
-            this.updateScopeDescription();
-        });
-        
-        // TAU generation scope change
-        document.getElementById('tau-generation-scope')?.addEventListener('change', (e) => {
-            this.sequence.tauGenerationScope = e.target.value;
-            this.updateTauScopeDescription();
-        });
+        // Note: All selections (tau mode, algorithm, disruption mode, disruption scope, tau scope)
+        // now use radio buttons with onchange handlers in HTML
     },
 
     setupLocationSearch(inputId, dropdownId, type) {
@@ -394,16 +368,20 @@ const DemoCreator = {
     },
 
     updateUIFromState() {
-        // Update algorithm select
-        const algorithmSelect = document.getElementById('demo-algorithm-select');
-        if (algorithmSelect) algorithmSelect.value = this.sequence.algorithm;
+        // Update algorithm radio buttons
+        const algorithmRadio = document.querySelector(`input[name="demo-algorithm"][value="${this.sequence.algorithm}"]`);
+        if (algorithmRadio) algorithmRadio.checked = true;
         
-        // Update tau mode
-        const tauMode = document.getElementById('demo-tau-mode');
-        if (tauMode) {
-            tauMode.value = this.sequence.tauMode;
+        // Update tau mode radio buttons
+        const tauModeRadio = document.querySelector(`input[name="demo-tau-mode"][value="${this.sequence.tauMode}"]`);
+        if (tauModeRadio) {
+            tauModeRadio.checked = true;
             this.updateTauModeUI();
         }
+        
+        // Update tau scope radio buttons
+        const tauScopeRadio = document.querySelector(`input[name="tau-generation-scope"][value="${this.sequence.tauGenerationScope || 'all'}"]`);
+        if (tauScopeRadio) tauScopeRadio.checked = true;
         
         // Update tau values
         const tauFixed = document.getElementById('demo-tau-fixed');
@@ -422,12 +400,16 @@ const DemoCreator = {
         const stepDelay = document.getElementById('demo-step-delay');
         if (stepDelay) stepDelay.value = this.sequence.stepDelay;
         
-        // Update disruption mode
-        const disruptionMode = document.getElementById('demo-disruption-mode');
-        if (disruptionMode) {
-            disruptionMode.value = this.disruptions.mode;
+        // Update disruption mode radio buttons
+        const disruptionModeRadio = document.querySelector(`input[name="demo-disruption-mode"][value="${this.disruptions.mode}"]`);
+        if (disruptionModeRadio) {
+            disruptionModeRadio.checked = true;
             this.updateDisruptionModeUI();
         }
+        
+        // Update disruption scope radio buttons
+        const disruptionScopeRadio = document.querySelector(`input[name="disruption-generation-scope"][value="${this.disruptions.generationScope || 'per-trial-route'}"]`);
+        if (disruptionScopeRadio) disruptionScopeRadio.checked = true;
         
         // Update disruption counts
         const flowCount = document.getElementById('random-flow-count');
@@ -537,17 +519,28 @@ const DemoCreator = {
         if (startSearch) startSearch.value = '';
         if (endSearch) endSearch.value = '';
         
-        // Reset disruption mode select
-        const disruptionMode = document.getElementById('demo-disruption-mode');
-        if (disruptionMode) disruptionMode.value = 'none';
+        // Reset disruption mode radio buttons
+        const disruptionModeRadio = document.querySelector('input[name="demo-disruption-mode"][value="random-both"]');
+        if (disruptionModeRadio) disruptionModeRadio.checked = true;
+        this.disruptions.mode = 'random-both';
+        this.updateDisruptionModeUI();
         
-        // Reset algorithm select
-        const algorithmSelect = document.getElementById('demo-algorithm-select');
-        if (algorithmSelect) algorithmSelect.value = 'both';
+        // Reset disruption scope radio buttons
+        const disruptionScopeRadio = document.querySelector('input[name="disruption-generation-scope"][value="per-trial-route"]');
+        if (disruptionScopeRadio) disruptionScopeRadio.checked = true;
         
-        // Reset tau mode
-        const tauMode = document.getElementById('demo-tau-mode');
-        if (tauMode) tauMode.value = 'sequence';
+        // Reset algorithm radio buttons
+        const algorithmRadio = document.querySelector('input[name="demo-algorithm"][value="both"]');
+        if (algorithmRadio) algorithmRadio.checked = true;
+        
+        // Reset tau mode radio buttons
+        const tauModeRadio = document.querySelector('input[name="demo-tau-mode"][value="sequence"]');
+        if (tauModeRadio) tauModeRadio.checked = true;
+        this.updateTauModeUI();
+        
+        // Reset tau scope radio buttons
+        const tauScopeRadio = document.querySelector('input[name="tau-generation-scope"][value="all"]');
+        if (tauScopeRadio) tauScopeRadio.checked = true;
         
         // Reset trials
         const trialsInput = document.getElementById('demo-trials-count');
@@ -1165,6 +1158,9 @@ const DemoCreator = {
     updateDisruptionModeUI() {
         const mode = this.disruptions.mode;
         
+        // Clear the disruption preview when mode changes
+        this.clearDisruptionPreview(true);
+        
         document.getElementById('disruption-random-settings')?.classList.toggle('hidden', 
             mode === 'none' || mode === 'custom');
         document.getElementById('disruption-custom-settings')?.classList.toggle('hidden', 
@@ -1175,13 +1171,85 @@ const DemoCreator = {
             mode !== 'random-flow' && mode !== 'random-both');
         document.getElementById('disruption-incident-count-row')?.classList.toggle('hidden',
             mode !== 'random-incidents' && mode !== 'random-both');
+        
+        // Update visual styling for radio options
+        document.querySelectorAll('.disruption-mode-option').forEach(label => {
+            const radio = label.querySelector('input[type="radio"]');
+            if (radio && radio.checked) {
+                label.classList.add('ring-2', 'ring-white', 'ring-offset-2', 'ring-offset-slate-100', 'shadow-lg');
+            } else {
+                label.classList.remove('ring-2', 'ring-white', 'ring-offset-2', 'ring-offset-slate-100', 'shadow-lg');
+            }
+        });
+    },
+
+    /**
+     * Set disruption mode from radio button (called from HTML)
+     */
+    setDisruptionMode(mode) {
+        this.disruptions.mode = mode;
+        this.updateDisruptionModeUI();
+    },
+
+    /**
+     * Get selected disruption mode from radio buttons
+     */
+    getSelectedDisruptionMode() {
+        return document.querySelector('input[name="demo-disruption-mode"]:checked')?.value || 'random-both';
+    },
+
+    /**
+     * Set disruption scope from radio button (called from HTML)
+     */
+    setDisruptionScope(scope) {
+        this.disruptions.generationScope = scope;
+        this.updateScopeDescription();
+    },
+
+    /**
+     * Get selected disruption scope from radio buttons
+     */
+    getSelectedDisruptionScope() {
+        return document.querySelector('input[name="disruption-generation-scope"]:checked')?.value || 'per-trial-route';
+    },
+
+    /**
+     * Update custom disruption type-specific inputs (incident: criticality, traffic: jam factor)
+     */
+    updateCustomDisruptionTypeUI() {
+        const selectedType = document.querySelector('input[name="custom-disruption-type"]:checked')?.value || 'incident';
+        
+        // Show/hide type-specific settings
+        document.getElementById('custom-incident-settings')?.classList.toggle('hidden', selectedType !== 'incident');
+        document.getElementById('custom-traffic-settings')?.classList.toggle('hidden', selectedType !== 'traffic');
+    },
+
+    /**
+     * Get custom disruption type from radio buttons
+     */
+    getCustomDisruptionType() {
+        return document.querySelector('input[name="custom-disruption-type"]:checked')?.value || 'incident';
+    },
+
+    /**
+     * Get custom incident criticality from radio buttons
+     */
+    getCustomIncidentCriticality() {
+        return document.querySelector('input[name="custom-incident-criticality"]:checked')?.value || 'major';
+    },
+
+    /**
+     * Get custom jam factor from slider
+     */
+    getCustomJamFactor() {
+        return parseFloat(document.getElementById('custom-jam-factor')?.value) || 5;
     },
 
     /**
      * Update scope description based on selection
      */
     updateScopeDescription() {
-        const scope = document.getElementById('disruption-generation-scope')?.value || 'per-trial-route';
+        const scope = this.getSelectedDisruptionScope();
         const descriptions = {
             'all': 'One set of disruptions used for all routes across all trials',
             'per-trial': 'Each trial gets different disruptions (same across routes within trial)',
@@ -1195,7 +1263,9 @@ const DemoCreator = {
     },
 
     updateTauScopeDescription() {
-        const scope = document.getElementById('tau-generation-scope')?.value || 'all';
+        const scope = this.getSelectedTauScope();
+        this.sequence.tauGenerationScope = scope;
+        
         const descriptions = {
             'all': 'All routes in all trials use the same TAU values in sequence',
             'per-trial': 'TAU sequence restarts for each trial',
@@ -1766,22 +1836,37 @@ const DemoCreator = {
                 const data = await response.json();
                 
                 if (data.success) {
+                    const disruptionType = this.getCustomDisruptionType();
+                    
+                    // Build disruption with type-specific properties
                     const disruption = {
                         id: `disruption-${Date.now()}`,
-                        type: document.getElementById('custom-disruption-type')?.value || 'incident',
+                        type: disruptionType,
                         lat: data.snapped_point.lat,
                         lng: data.snapped_point.lng,
                         roadName: data.road_name || 'Unknown Road',
                         source: data.routing_nodes[0],
-                        target: data.routing_nodes[1],
-                        severity: parseFloat(document.getElementById('custom-disruption-severity')?.value) || 0.5
+                        target: data.routing_nodes[1]
                     };
+                    
+                    if (disruptionType === 'incident') {
+                        // For incidents: store criticality
+                        disruption.criticality = this.getCustomIncidentCriticality();
+                        // Map criticality to severity for display
+                        disruption.severity = disruption.criticality === 'critical' ? 0.9 : 
+                                              disruption.criticality === 'major' ? 0.6 : 0.3;
+                    } else {
+                        // For traffic: store jam factor
+                        disruption.jamFactor = this.getCustomJamFactor();
+                        // Map jam factor to severity for display (0-10 → 0-1)
+                        disruption.severity = disruption.jamFactor / 10;
+                    }
                     
                     this.disruptions.customItems.push(disruption);
                     this.addDisruptionMarker(disruption);
                     this.renderDisruptionsList();
                     
-                    showUpdateToast(`Added disruption on ${disruption.roadName}`, 'success');
+                    showUpdateToast(`Added ${disruptionType} disruption on ${disruption.roadName}`, 'success');
                 } else {
                     showUpdateToast('Could not snap to road', 'warning');
                 }
@@ -1799,6 +1884,18 @@ const DemoCreator = {
 
     addDisruptionMarker(disruption) {
         const color = disruption.type === 'incident' ? 'red' : 'orange';
+        
+        // Build popup content based on type
+        let popupContent = `<b>${disruption.type === 'incident' ? '🚨 Incident' : '🚦 Traffic'}</b><br>${disruption.roadName}<br>`;
+        
+        if (disruption.type === 'incident') {
+            const criticalityEmoji = disruption.criticality === 'critical' ? '🚫' : 
+                                     disruption.criticality === 'major' ? '🚧' : '⚠️';
+            popupContent += `Criticality: ${criticalityEmoji} ${disruption.criticality || 'major'}`;
+        } else {
+            popupContent += `Jam Factor: ${disruption.jamFactor?.toFixed(1) || (disruption.severity * 10).toFixed(1)}`;
+        }
+        
         const marker = L.circleMarker([disruption.lat, disruption.lng], {
             radius: 10,
             fillColor: color,
@@ -1806,11 +1903,7 @@ const DemoCreator = {
             weight: 2,
             opacity: 1,
             fillOpacity: 0.8
-        }).bindPopup(`
-            <b>${disruption.type === 'incident' ? '🚨 Incident' : '🚦 Traffic'}</b><br>
-            ${disruption.roadName}<br>
-            Severity: ${(disruption.severity * 100).toFixed(0)}%
-        `).addTo(map);
+        }).bindPopup(popupContent).addTo(map);
         
         this.disruptionMarkers.push({ id: disruption.id, marker });
     },
@@ -1847,46 +1940,174 @@ const DemoCreator = {
             return;
         }
         
-        container.innerHTML = this.disruptions.customItems.map(d => `
-            <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                <span class="text-xl">${d.type === 'incident' ? '🚨' : '🚦'}</span>
-                <div class="flex-1 min-w-0">
-                    <div class="font-medium text-gray-800 truncate">${d.roadName}</div>
-                    <div class="text-xs text-gray-500">Severity: ${(d.severity * 100).toFixed(0)}%</div>
+        container.innerHTML = this.disruptions.customItems.map(d => {
+            // Build type-specific detail text
+            let detailText;
+            if (d.type === 'incident') {
+                const criticalityEmoji = d.criticality === 'critical' ? '🚫' : 
+                                         d.criticality === 'major' ? '🚧' : '⚠️';
+                detailText = `Criticality: ${criticalityEmoji} ${d.criticality || 'major'}`;
+            } else {
+                detailText = `Jam Factor: ${d.jamFactor?.toFixed(1) || (d.severity * 10).toFixed(1)}`;
+            }
+            
+            return `
+                <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                    <span class="text-xl">${d.type === 'incident' ? '🚨' : '🚦'}</span>
+                    <div class="flex-1 min-w-0">
+                        <div class="font-medium text-gray-800 truncate">${d.roadName}</div>
+                        <div class="text-xs text-gray-500">${detailText}</div>
+                    </div>
+                    <button onclick="DemoCreator.removeDisruption('${d.id}')" 
+                            class="p-1 hover:bg-red-100 rounded transition-colors">
+                        <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
                 </div>
-                <button onclick="DemoCreator.removeDisruption('${d.id}')" 
-                        class="p-1 hover:bg-red-100 rounded transition-colors">
-                    <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                    </svg>
-                </button>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     },
 
     // ==========================================================================
-    // SEQUENCE CONFIGURATION
+    // TAU CONFIGURATION
     // ==========================================================================
 
     updateTauModeUI() {
-        const mode = this.sequence.tauMode;
+        // Get the selected tau mode from radio buttons (fixed or random only)
+        const selectedMode = document.querySelector('input[name="demo-tau-mode"]:checked')?.value || 'fixed';
+        this.sequence.tauMode = selectedMode;
         
-        document.getElementById('tau-fixed-setting')?.classList.toggle('hidden', mode !== 'fixed');
-        document.getElementById('tau-random-setting')?.classList.toggle('hidden', mode !== 'random');
-        document.getElementById('tau-sequence-setting')?.classList.toggle('hidden', mode !== 'sequence');
+        document.getElementById('tau-fixed-setting')?.classList.toggle('hidden', selectedMode !== 'fixed');
+        document.getElementById('tau-random-setting')?.classList.toggle('hidden', selectedMode !== 'random');
+        
+        // Update visual styling for radio options
+        document.querySelectorAll('.tau-mode-option').forEach(label => {
+            const radio = label.querySelector('input[type="radio"]');
+            if (radio && radio.checked) {
+                label.classList.add('ring-2', 'ring-white', 'ring-offset-2', 'ring-offset-slate-100', 'shadow-lg');
+            } else {
+                label.classList.remove('ring-2', 'ring-white', 'ring-offset-2', 'ring-offset-slate-100', 'shadow-lg');
+            }
+        });
+        
+        // Update fixed value help text based on scope
+        this.updateTauFixedHelp();
+    },
+
+    updateTauScopeUI() {
+        const scope = this.getSelectedTauScope();
+        const descriptionEl = document.getElementById('tau-scope-description');
+        
+        const descriptions = {
+            'all': 'All routes in all trials use the same TAU value',
+            'per-trial': 'Each trial gets a unique TAU value (same across routes)',
+            'per-route': 'Each route gets a unique TAU value (same across trials)',
+            'per-trial-route': 'Each route in each trial gets a unique TAU value'
+        };
+        
+        if (descriptionEl) {
+            descriptionEl.textContent = descriptions[scope] || descriptions['all'];
+        }
+        
+        // Update fixed value help text based on scope
+        this.updateTauFixedHelp();
+    },
+
+    updateTauFixedHelp() {
+        const scope = this.getSelectedTauScope();
+        const mode = document.querySelector('input[name="demo-tau-mode"]:checked')?.value || 'fixed';
+        const helpEl = document.getElementById('tau-fixed-help');
+        
+        if (!helpEl || mode !== 'fixed') return;
+        
+        const trials = parseInt(document.getElementById('demo-trials-count')?.value) || 1;
+        const routes = this.routes.length || 1;
+        
+        let helpText = '';
+        switch (scope) {
+            case 'all':
+                helpText = 'Enter a single τ value (e.g., 0.5)';
+                break;
+            case 'per-trial':
+                helpText = `Enter ${trials} τ value(s) for ${trials} trial(s) (e.g., ${Array(trials).fill(0).map((_, i) => (0.3 + i * 0.2).toFixed(1)).join(', ')})`;
+                break;
+            case 'per-route':
+                helpText = `Enter ${routes} τ value(s) for ${routes} route(s)`;
+                break;
+            case 'per-trial-route':
+                const total = trials * routes;
+                helpText = `Enter ${total} τ value(s) for ${trials} trial(s) × ${routes} route(s)`;
+                break;
+        }
+        
+        helpEl.textContent = helpText;
+    },
+
+    /**
+     * Get the selected algorithm from radio buttons
+     */
+    getSelectedAlgorithm() {
+        return document.querySelector('input[name="demo-algorithm"]:checked')?.value || 'both';
+    },
+
+    /**
+     * Update visual styling for algorithm radio options
+     */
+    updateAlgorithmUI() {
+        document.querySelectorAll('.algorithm-option').forEach(label => {
+            const radio = label.querySelector('input[type="radio"]');
+            if (radio && radio.checked) {
+                label.classList.add('ring-2', 'ring-white', 'ring-offset-2', 'ring-offset-slate-100', 'shadow-lg');
+            } else {
+                label.classList.remove('ring-2', 'ring-white', 'ring-offset-2', 'ring-offset-slate-100', 'shadow-lg');
+            }
+        });
+    },
+
+    /**
+     * Get the selected TAU generation scope from radio buttons
+     */
+    getSelectedTauScope() {
+        return document.querySelector('input[name="tau-generation-scope"]:checked')?.value || 'all';
     },
 
     getTauValues() {
-        switch (this.sequence.tauMode) {
+        const mode = document.querySelector('input[name="demo-tau-mode"]:checked')?.value || 'fixed';
+        const scope = this.getSelectedTauScope();
+        const trials = parseInt(document.getElementById('demo-trials-count')?.value) || 1;
+        const routes = this.routes.length || 1;
+        
+        switch (mode) {
             case 'fixed':
-                return [parseFloat(document.getElementById('demo-tau-fixed')?.value) || 0.5];
+                // Parse comma-separated fixed values
+                const fixedStr = document.getElementById('demo-tau-fixed-values')?.value || '0.5';
+                const fixedVals = fixedStr.split(',').map(v => parseFloat(v.trim())).filter(v => !isNaN(v));
+                
+                // Return appropriate number of values based on scope
+                let needed = 1;
+                if (scope === 'per-trial') needed = trials;
+                else if (scope === 'per-route') needed = routes;
+                else if (scope === 'per-trial-route') needed = trials * routes;
+                
+                // Expand values if not enough provided
+                while (fixedVals.length < needed) {
+                    fixedVals.push(fixedVals[fixedVals.length - 1] || 0.5);
+                }
+                return fixedVals.slice(0, needed);
+                
             case 'random':
                 const min = parseFloat(document.getElementById('demo-tau-random-min')?.value) || 0.1;
                 const max = parseFloat(document.getElementById('demo-tau-random-max')?.value) || 0.9;
-                return [Math.random() * (max - min) + min];
-            case 'sequence':
-                const seqStr = document.getElementById('demo-tau-sequence')?.value || '0.1, 0.3, 0.5, 0.7, 0.9';
-                return seqStr.split(',').map(v => parseFloat(v.trim())).filter(v => !isNaN(v));
+                
+                // Generate random values based on scope
+                let count = 1;
+                if (scope === 'per-trial') count = trials;
+                else if (scope === 'per-route') count = routes;
+                else if (scope === 'per-trial-route') count = trials * routes;
+                
+                return Array(count).fill(0).map(() => Math.random() * (max - min) + min);
+                
             default:
                 return [0.5];
         }
@@ -1900,7 +2121,7 @@ const DemoCreator = {
         const container = document.getElementById('demo-v2-review-summary');
         if (!container) return;
         
-        const algorithm = document.getElementById('demo-algorithm-select')?.value || 'both';
+        const algorithm = this.getSelectedAlgorithm();
         const tauValues = this.getTauValues();
         const stepDelay = parseInt(document.getElementById('demo-step-delay')?.value) || 2000;
         const trials = parseInt(document.getElementById('demo-trials-count')?.value) || 1;
@@ -1948,83 +2169,135 @@ const DemoCreator = {
     },
 
     async saveForLater() {
-        // Read severity range values
-        this.disruptions.severityMin = parseFloat(document.getElementById('random-severity-min')?.value) || 0;
-        this.disruptions.severityMax = parseFloat(document.getElementById('random-severity-max')?.value) || 1;
+        const saveBtn = document.getElementById('demo-v2-save-later-btn');
+        const originalContent = saveBtn?.innerHTML;
         
-        const trials = parseInt(document.getElementById('demo-trials-count')?.value) || 1;
-        
-        // Read TAU generation scope
-        this.sequence.tauGenerationScope = document.getElementById('tau-generation-scope')?.value || 'all';
-        
-        // Collect configuration
-        const config = {
-            name: document.getElementById('demo-v2-name')?.value || `Custom Demo - ${new Date().toLocaleString()}`,
-            routes: this.routes.map(r => ({
-                ...r,
-                tauValues: this.getTauValues()
-            })),
-            trials: trials,
-            algorithm: document.getElementById('demo-algorithm-select')?.value || 'both',
-            disruptions: { ...this.disruptions },
-            sequence: { ...this.sequence },
-            stepDelay: parseInt(document.getElementById('demo-step-delay')?.value) || 1000
-        };
-        
-        // If editing, update the config; otherwise save new
-        if (this.editingConfigId) {
-            config.id = this.editingConfigId;
-            await DemoRunner.updateConfig(config);
-            showUpdateToast('Demo configuration updated!', 'success');
-        } else {
-            await DemoRunner.saveConfig(config);
-            showUpdateToast('Demo configuration saved for later!', 'success');
+        // Show loading state
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = `
+                <svg class="animate-spin h-5 w-5 mr-2 inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Saving...
+            `;
         }
         
-        // Close the panel after saving
-        const panel = document.getElementById('demo-creator-panel');
-        if (panel) {
-            panel.classList.add('translate-x-full');
-        }
-        this.resetAll();
-    },
-
-    async saveAndRun() {
-        // Read severity range values
-        this.disruptions.severityMin = parseFloat(document.getElementById('random-severity-min')?.value) || 0;
-        this.disruptions.severityMax = parseFloat(document.getElementById('random-severity-max')?.value) || 1;
-        
-        const trials = parseInt(document.getElementById('demo-trials-count')?.value) || 1;
-        
-        // Read TAU generation scope
-        this.sequence.tauGenerationScope = document.getElementById('tau-generation-scope')?.value || 'all';
-        
-        // Collect configuration
-        const config = {
-            name: document.getElementById('demo-v2-name')?.value || `Custom Demo - ${new Date().toLocaleString()}`,
-            routes: this.routes.map(r => ({
-                ...r,
-                tauValues: this.getTauValues()
-            })),
-            trials: trials,
-            algorithm: document.getElementById('demo-algorithm-select')?.value || 'both',
-            disruptions: { ...this.disruptions },
-            sequence: { ...this.sequence },
-            stepDelay: parseInt(document.getElementById('demo-step-delay')?.value) || 1000
-        };
-        
-        // If editing, update the config; otherwise save new
-        if (document.getElementById('demo-v2-save-config')?.checked) {
+        try {
+            // Read severity range values
+            this.disruptions.severityMin = parseFloat(document.getElementById('random-severity-min')?.value) || 0;
+            this.disruptions.severityMax = parseFloat(document.getElementById('random-severity-max')?.value) || 1;
+            
+            const trials = parseInt(document.getElementById('demo-trials-count')?.value) || 1;
+            
+            // Read TAU generation scope from radio buttons
+            this.sequence.tauGenerationScope = this.getSelectedTauScope();
+            
+            // Collect configuration
+            const config = {
+                name: document.getElementById('demo-v2-name')?.value || `Custom Demo - ${new Date().toLocaleString()}`,
+                routes: this.routes.map(r => ({
+                    ...r,
+                    tauValues: this.getTauValues()
+                })),
+                trials: trials,
+                algorithm: this.getSelectedAlgorithm(),
+                disruptions: { ...this.disruptions },
+                sequence: { ...this.sequence },
+                stepDelay: parseInt(document.getElementById('demo-step-delay')?.value) || 1000
+            };
+            
+            // If editing, update the config; otherwise save new
             if (this.editingConfigId) {
                 config.id = this.editingConfigId;
                 await DemoRunner.updateConfig(config);
+                showUpdateToast('Demo configuration updated!', 'success');
             } else {
                 await DemoRunner.saveConfig(config);
+                showUpdateToast('Demo configuration saved for later!', 'success');
+            }
+            
+            // Close the panel after saving
+            const panel = document.getElementById('demo-creator-panel');
+            if (panel) {
+                panel.classList.add('translate-x-full');
+            }
+            this.resetAll();
+        } catch (error) {
+            console.error('Error saving configuration:', error);
+            showUpdateToast('Error saving configuration: ' + error.message, 'error');
+        } finally {
+            // Restore button state
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = originalContent;
             }
         }
+    },
+
+    async saveAndRun() {
+        const runBtn = document.getElementById('demo-v2-run-btn');
+        const originalContent = runBtn?.innerHTML;
         
-        // Run demo with detailed progress in this panel
-        await this.runDemoWithProgress(config);
+        // Show loading state
+        if (runBtn) {
+            runBtn.disabled = true;
+            runBtn.innerHTML = `
+                <svg class="animate-spin h-5 w-5 mr-2 inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Preparing...
+            `;
+        }
+        
+        try {
+            // Read severity range values
+            this.disruptions.severityMin = parseFloat(document.getElementById('random-severity-min')?.value) || 0;
+            this.disruptions.severityMax = parseFloat(document.getElementById('random-severity-max')?.value) || 1;
+            
+            const trials = parseInt(document.getElementById('demo-trials-count')?.value) || 1;
+            
+            // Read TAU generation scope from radio buttons
+            this.sequence.tauGenerationScope = this.getSelectedTauScope();
+            
+            // Collect configuration
+            const config = {
+                name: document.getElementById('demo-v2-name')?.value || `Custom Demo - ${new Date().toLocaleString()}`,
+                routes: this.routes.map(r => ({
+                    ...r,
+                    tauValues: this.getTauValues()
+                })),
+                trials: trials,
+                algorithm: this.getSelectedAlgorithm(),
+                disruptions: { ...this.disruptions },
+                sequence: { ...this.sequence },
+                stepDelay: parseInt(document.getElementById('demo-step-delay')?.value) || 1000
+            };
+            
+            // If editing, update the config; otherwise save new
+            if (document.getElementById('demo-v2-save-config')?.checked) {
+                if (this.editingConfigId) {
+                    config.id = this.editingConfigId;
+                    await DemoRunner.updateConfig(config);
+                } else {
+                    await DemoRunner.saveConfig(config);
+                }
+            }
+            
+            // Run demo with detailed progress in this panel
+            await this.runDemoWithProgress(config);
+        } catch (error) {
+            console.error('Error running demo:', error);
+            showUpdateToast('Error running demo: ' + error.message, 'error');
+        } finally {
+            // Restore button state
+            if (runBtn) {
+                runBtn.disabled = false;
+                runBtn.innerHTML = originalContent;
+            }
+        }
     },
 
     async runDemoWithProgress(config) {

@@ -1766,41 +1766,108 @@
         <div id="demo-v2-step-2" class="hidden space-y-4">
           <h3 class="font-bold text-lg text-gray-800">🚦 Disruption Configuration</h3>
 
-          <div class="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
-            <label class="block text-sm font-medium text-gray-700 mb-2">Disruption Mode</label>
-            <select id="demo-disruption-mode" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
-              <option value="none">No Disruptions</option>
-              <option value="random-flow">Random Traffic Flow</option>
-              <option value="random-incidents">Random Incidents</option>
-              <option value="random-both" selected>Random Flow + Incidents</option>
-              <option value="custom">Custom Disruptions</option>
-            </select>
+          <div class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-5 border border-slate-300 shadow-sm">
+            <label class="block text-sm font-bold text-slate-700 mb-3">Disruption Mode</label>
+            <div class="space-y-2">
+              <div class="grid grid-cols-2 gap-2">
+                <label class="flex items-center text-white p-3 rounded-xl cursor-pointer hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] bg-gradient-to-r from-slate-400 to-slate-500 disruption-mode-option">
+                  <input type="radio" name="demo-disruption-mode" value="none"
+                         class="mr-3 w-4 h-4" onchange="DemoCreator.setDisruptionMode(this.value)">
+                  <div class="flex-1">
+                    <span class="font-bold text-sm">🚫 None</span>
+                    <p class="text-xs text-slate-100 mt-0.5">No disruptions</p>
+                  </div>
+                </label>
+                <label class="flex items-center text-white p-3 rounded-xl cursor-pointer hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] bg-gradient-to-r from-orange-500 to-amber-600 disruption-mode-option">
+                  <input type="radio" name="demo-disruption-mode" value="random-flow"
+                         class="mr-3 w-4 h-4" onchange="DemoCreator.setDisruptionMode(this.value)">
+                  <div class="flex-1">
+                    <span class="font-bold text-sm">🚦 Traffic</span>
+                    <p class="text-xs text-orange-100 mt-0.5">Traffic flow only</p>
+                  </div>
+                </label>
+                <label class="flex items-center text-white p-3 rounded-xl cursor-pointer hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] bg-gradient-to-r from-red-500 to-rose-600 disruption-mode-option">
+                  <input type="radio" name="demo-disruption-mode" value="random-incidents"
+                         class="mr-3 w-4 h-4" onchange="DemoCreator.setDisruptionMode(this.value)">
+                  <div class="flex-1">
+                    <span class="font-bold text-sm">🚨 Incidents</span>
+                    <p class="text-xs text-red-100 mt-0.5">Incidents only</p>
+                  </div>
+                </label>
+                <label class="flex items-center text-white p-3 rounded-xl cursor-pointer hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] bg-gradient-to-r from-purple-500 to-violet-600 disruption-mode-option">
+                  <input type="radio" name="demo-disruption-mode" value="random-both" checked
+                         class="mr-3 w-4 h-4" onchange="DemoCreator.setDisruptionMode(this.value)">
+                  <div class="flex-1">
+                    <span class="font-bold text-sm">⚡ Both</span>
+                    <p class="text-xs text-purple-100 mt-0.5">Traffic + Incidents</p>
+                  </div>
+                </label>
+              </div>
+              <label class="flex items-center text-white p-3 rounded-xl cursor-pointer hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] bg-gradient-to-r from-blue-500 to-cyan-600 disruption-mode-option">
+                <input type="radio" name="demo-disruption-mode" value="custom"
+                       class="mr-3 w-4 h-4" onchange="DemoCreator.setDisruptionMode(this.value)">
+                <div class="flex-1">
+                  <span class="font-bold text-sm">🎯 Custom Disruptions</span>
+                  <p class="text-xs text-blue-100 mt-0.5">Define specific disruption locations</p>
+                </div>
+              </label>
+            </div>
           </div>
 
           <!-- Random Settings -->
-          <div id="disruption-random-settings" class="bg-orange-50 rounded-xl p-4 border border-orange-200 space-y-3">
-            <h4 class="font-semibold text-orange-800">Random Disruption Settings</h4>
+          <div id="disruption-random-settings" class="bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl p-5 border border-orange-200 space-y-4">
+            <h4 class="font-bold text-orange-800 flex items-center gap-2">
+              <span class="text-lg">🎲</span> Random Disruption Settings
+            </h4>
             
-            <!-- Generation Scope (NEW) -->
-            <div class="border-b border-orange-200 pb-3 mb-3">
-              <label class="block text-sm font-semibold text-orange-800 mb-2">Generation Scope</label>
-              <select id="disruption-generation-scope" class="w-full px-3 py-2 border border-orange-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500">
-                <option value="all">Same disruptions for all (routes & trials)</option>
-                <option value="per-trial">Different disruptions per trial</option>
-                <option value="per-route">Different disruptions per route</option>
-                <option value="per-trial-route" selected>Different per trial AND route</option>
-              </select>
-              <p class="text-xs text-orange-600 mt-1" id="scope-description">Each route in each trial gets unique disruptions</p>
+            <!-- Generation Scope -->
+            <div class="border-b border-orange-200 pb-4">
+              <label class="block text-sm font-semibold text-orange-800 mb-3">Generation Scope</label>
+              <div class="grid grid-cols-2 gap-2">
+                <label class="relative cursor-pointer group">
+                  <input type="radio" name="disruption-generation-scope" value="all"
+                         class="peer sr-only" onchange="DemoCreator.setDisruptionScope(this.value)">
+                  <div class="p-2.5 border-2 border-orange-200 rounded-xl peer-checked:border-orange-500 peer-checked:bg-gradient-to-br peer-checked:from-orange-100 peer-checked:to-amber-100 transition-all duration-200 text-center group-hover:shadow-md group-hover:scale-[1.02]">
+                    <span class="text-lg">🌐</span>
+                    <p class="text-xs font-medium text-orange-700">Same for All</p>
+                  </div>
+                </label>
+                <label class="relative cursor-pointer group">
+                  <input type="radio" name="disruption-generation-scope" value="per-trial"
+                         class="peer sr-only" onchange="DemoCreator.setDisruptionScope(this.value)">
+                  <div class="p-2.5 border-2 border-orange-200 rounded-xl peer-checked:border-orange-500 peer-checked:bg-gradient-to-br peer-checked:from-orange-100 peer-checked:to-amber-100 transition-all duration-200 text-center group-hover:shadow-md group-hover:scale-[1.02]">
+                    <span class="text-lg">🔄</span>
+                    <p class="text-xs font-medium text-orange-700">Per Trial</p>
+                  </div>
+                </label>
+                <label class="relative cursor-pointer group">
+                  <input type="radio" name="disruption-generation-scope" value="per-route"
+                         class="peer sr-only" onchange="DemoCreator.setDisruptionScope(this.value)">
+                  <div class="p-2.5 border-2 border-orange-200 rounded-xl peer-checked:border-orange-500 peer-checked:bg-gradient-to-br peer-checked:from-orange-100 peer-checked:to-amber-100 transition-all duration-200 text-center group-hover:shadow-md group-hover:scale-[1.02]">
+                    <span class="text-lg">🛤️</span>
+                    <p class="text-xs font-medium text-orange-700">Per Route</p>
+                  </div>
+                </label>
+                <label class="relative cursor-pointer group">
+                  <input type="radio" name="disruption-generation-scope" value="per-trial-route" checked
+                         class="peer sr-only" onchange="DemoCreator.setDisruptionScope(this.value)">
+                  <div class="p-2.5 border-2 border-orange-200 rounded-xl peer-checked:border-orange-500 peer-checked:bg-gradient-to-br peer-checked:from-orange-100 peer-checked:to-amber-100 transition-all duration-200 text-center group-hover:shadow-md group-hover:scale-[1.02]">
+                    <span class="text-lg">🔀</span>
+                    <p class="text-xs font-medium text-orange-700">Per Trial & Route</p>
+                  </div>
+                </label>
+              </div>
+              <p class="text-xs text-orange-600 mt-2" id="scope-description">Each route in each trial gets unique disruptions</p>
             </div>
             
             <div id="disruption-flow-count-row" class="flex items-center justify-between">
               <span class="text-sm text-orange-700">Traffic Flow Count</span>
-              <input type="number" id="random-flow-count" value="5" min="0" max="20"
+              <input type="number" id="random-flow-count" value="50" min="0" max="200"
                      class="w-20 px-3 py-1 border border-orange-300 rounded-lg text-center">
             </div>
             <div id="disruption-incident-count-row" class="flex items-center justify-between">
               <span class="text-sm text-orange-700">Incident Count</span>
-              <input type="number" id="random-incident-count" value="3" min="0" max="10"
+              <input type="number" id="random-incident-count" value="5" min="0" max="50"
                      class="w-20 px-3 py-1 border border-orange-300 rounded-lg text-center">
             </div>
             <div class="border-t border-orange-200 pt-3 mt-3">
@@ -1862,26 +1929,79 @@
           <div id="disruption-custom-settings" class="hidden space-y-3">
             <div class="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
               <h4 class="font-semibold text-gray-700 mb-3">Add Custom Disruption</h4>
-              <div class="grid grid-cols-2 gap-3 mb-3">
-                <div>
-                  <label class="block text-xs text-gray-600 mb-1">Type</label>
-                  <select id="custom-disruption-type" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                    <option value="incident">🚨 Incident</option>
-                    <option value="traffic">🚦 Traffic</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="block text-xs text-gray-600 mb-1">Severity</label>
-                  <div class="flex items-center gap-2">
-                    <input type="range" id="custom-disruption-severity" min="0.1" max="1" step="0.1" value="0.5"
-                           oninput="document.getElementById('custom-severity-display').value = this.value"
-                           class="flex-1">
-                    <input type="number" id="custom-severity-display" min="0.1" max="1" step="0.1" value="0.5"
-                           oninput="document.getElementById('custom-disruption-severity').value = this.value"
-                           class="w-16 px-2 py-1 text-sm border border-gray-300 rounded-lg text-center">
-                  </div>
+              
+              <!-- Type Selection - Radio Buttons -->
+              <div class="mb-4">
+                <label class="block text-xs text-gray-600 mb-2">Disruption Type</label>
+                <div class="grid grid-cols-2 gap-2">
+                  <label class="relative cursor-pointer">
+                    <input type="radio" name="custom-disruption-type" value="incident" checked
+                           class="peer sr-only" onchange="DemoCreator.updateCustomDisruptionTypeUI()">
+                    <div class="p-3 border-2 border-gray-200 rounded-lg peer-checked:border-red-500 peer-checked:bg-red-50 transition-all text-center">
+                      <span class="text-xl">🚨</span>
+                      <p class="text-sm font-medium text-gray-700 mt-1">Incident</p>
+                    </div>
+                  </label>
+                  <label class="relative cursor-pointer">
+                    <input type="radio" name="custom-disruption-type" value="traffic"
+                           class="peer sr-only" onchange="DemoCreator.updateCustomDisruptionTypeUI()">
+                    <div class="p-3 border-2 border-gray-200 rounded-lg peer-checked:border-orange-500 peer-checked:bg-orange-50 transition-all text-center">
+                      <span class="text-xl">🚦</span>
+                      <p class="text-sm font-medium text-gray-700 mt-1">Traffic</p>
+                    </div>
+                  </label>
                 </div>
               </div>
+              
+              <!-- Incident-specific: Criticality Selection -->
+              <div id="custom-incident-settings" class="mb-4">
+                <label class="block text-xs text-gray-600 mb-2">Incident Criticality</label>
+                <div class="grid grid-cols-3 gap-2">
+                  <label class="relative cursor-pointer">
+                    <input type="radio" name="custom-incident-criticality" value="minor"
+                           class="peer sr-only">
+                    <div class="p-2 border-2 border-gray-200 rounded-lg peer-checked:border-yellow-500 peer-checked:bg-yellow-50 transition-all text-center">
+                      <span class="text-lg">⚠️</span>
+                      <p class="text-xs font-medium text-gray-700">Minor</p>
+                    </div>
+                  </label>
+                  <label class="relative cursor-pointer">
+                    <input type="radio" name="custom-incident-criticality" value="major" checked
+                           class="peer sr-only">
+                    <div class="p-2 border-2 border-gray-200 rounded-lg peer-checked:border-orange-500 peer-checked:bg-orange-50 transition-all text-center">
+                      <span class="text-lg">�</span>
+                      <p class="text-xs font-medium text-gray-700">Major</p>
+                    </div>
+                  </label>
+                  <label class="relative cursor-pointer">
+                    <input type="radio" name="custom-incident-criticality" value="critical"
+                           class="peer sr-only">
+                    <div class="p-2 border-2 border-gray-200 rounded-lg peer-checked:border-red-500 peer-checked:bg-red-50 transition-all text-center">
+                      <span class="text-lg">🚫</span>
+                      <p class="text-xs font-medium text-gray-700">Critical</p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+              
+              <!-- Traffic-specific: Jam Factor -->
+              <div id="custom-traffic-settings" class="hidden mb-4">
+                <label class="block text-xs text-gray-600 mb-2">Jam Factor (0-10)</label>
+                <div class="flex items-center gap-3">
+                  <input type="range" id="custom-jam-factor" min="0" max="10" step="0.5" value="5"
+                         oninput="document.getElementById('custom-jam-factor-display').value = this.value"
+                         class="flex-1">
+                  <input type="number" id="custom-jam-factor-display" min="0" max="10" step="0.5" value="5"
+                         oninput="document.getElementById('custom-jam-factor').value = this.value"
+                         class="w-16 px-2 py-1 text-sm border border-gray-300 rounded-lg text-center">
+                </div>
+                <div class="flex justify-between text-xs text-gray-400 mt-1">
+                  <span>Free flow</span>
+                  <span>Moderate</span>
+                  <span>Standstill</span>
+                </div>
+              </div>
+              
               <button onclick="DemoCreator.addCustomDisruption()"
                       class="w-full py-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-lg transition-all">
                 📍 Click Map to Add Disruption
@@ -1904,55 +2024,125 @@
         <div id="demo-v2-step-3" class="hidden space-y-4">
           <h3 class="font-bold text-lg text-gray-800">⚙️ Sequence Configuration</h3>
 
-          <div class="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
-            <label class="block text-sm font-medium text-gray-700 mb-2">Algorithm</label>
-            <select id="demo-algorithm-select" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
-              <option value="both" selected>Both (HC2L & DHL Comparison)</option>
-              <option value="hc2l">HC2L Only</option>
-              <option value="dhl">DHL Only</option>
-            </select>
+          <div class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-5 border border-slate-300 shadow-sm">
+            <label class="block text-sm font-bold text-slate-700 mb-3">Algorithm Selection</label>
+            <div class="space-y-2">
+              <label class="flex items-center text-white p-3 rounded-xl cursor-pointer hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] bg-gradient-to-r from-purple-500 to-violet-600 algorithm-option">
+                <input type="radio" name="demo-algorithm" value="both" checked
+                       class="mr-3 w-4 h-4" onchange="DemoCreator.sequence.algorithm = this.value; DemoCreator.updateAlgorithmUI()">
+                <div class="flex-1">
+                  <span class="font-bold text-sm">⚖️ Both Algorithms</span>
+                  <p class="text-xs text-purple-100 mt-0.5">Compare HC2L and DHL side by side</p>
+                </div>
+              </label>
+              <div class="grid grid-cols-2 gap-2">
+                <label class="flex items-center text-white p-3 rounded-xl cursor-pointer hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] bg-gradient-to-r from-blue-500 to-cyan-600 algorithm-option">
+                  <input type="radio" name="demo-algorithm" value="hc2l"
+                         class="mr-3 w-4 h-4" onchange="DemoCreator.sequence.algorithm = this.value; DemoCreator.updateAlgorithmUI()">
+                  <div class="flex-1">
+                    <span class="font-bold text-sm">🔵 HC2L Only</span>
+                    <p class="text-xs text-blue-100 mt-0.5">Hierarchical Cut</p>
+                  </div>
+                </label>
+                <label class="flex items-center text-white p-3 rounded-xl cursor-pointer hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] bg-gradient-to-r from-emerald-500 to-green-600 algorithm-option">
+                  <input type="radio" name="demo-algorithm" value="dhl"
+                         class="mr-3 w-4 h-4" onchange="DemoCreator.sequence.algorithm = this.value; DemoCreator.updateAlgorithmUI()">
+                  <div class="flex-1">
+                    <span class="font-bold text-sm">🟢 DHL Only</span>
+                    <p class="text-xs text-emerald-100 mt-0.5">Dual Hierarchy</p>
+                  </div>
+                </label>
+              </div>
+            </div>
           </div>
 
-          <div class="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
-            <label class="block text-sm font-medium text-gray-700 mb-2">TAU (τ) Configuration</label>
-            <select id="demo-tau-mode" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 mb-3">
-              <option value="sequence" selected>Test Sequence</option>
-              <option value="fixed">Fixed Value</option>
-              <option value="random">Random</option>
-            </select>
-
-            <div id="tau-fixed-setting" class="hidden">
-              <input type="number" id="demo-tau-fixed" value="0.5" min="0" max="1" step="0.1"
-                     class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-            </div>
-            <div id="tau-random-setting" class="hidden grid grid-cols-2 gap-3">
-              <div>
-                <label class="block text-xs text-gray-600 mb-1">Min</label>
-                <input type="number" id="demo-tau-random-min" value="0.1" min="0" max="1" step="0.1"
-                       class="w-full px-3 py-2 border border-gray-300 rounded-lg">
-              </div>
-              <div>
-                <label class="block text-xs text-gray-600 mb-1">Max</label>
-                <input type="number" id="demo-tau-random-max" value="0.9" min="0" max="1" step="0.1"
-                       class="w-full px-3 py-2 border border-gray-300 rounded-lg">
-              </div>
-            </div>
-            <div id="tau-sequence-setting">
-              <input type="text" id="demo-tau-sequence" value="0.1, 0.3, 0.5, 0.7, 0.9"
-                     class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="0.1, 0.3, 0.5, 0.7, 0.9">
-              <p class="text-xs text-gray-500 mt-1">Comma-separated τ values to test</p>
+          <div class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-5 border border-slate-300 shadow-sm">
+            <label class="block text-sm font-bold text-slate-700 mb-3">TAU (τ) Configuration</label>
+            
+            <!-- TAU Mode Selection with Gradient Style -->
+            <div class="space-y-2 mb-4">
+              <label class="flex items-center text-white p-3 rounded-xl cursor-pointer hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] bg-gradient-to-r from-blue-500 to-cyan-600 tau-mode-option">
+                <input type="radio" name="demo-tau-mode" value="fixed" checked
+                       class="mr-3 w-4 h-4" onchange="DemoCreator.updateTauModeUI()">
+                <div class="flex-1">
+                  <span class="font-bold text-sm">🎯 Fixed Value</span>
+                  <p class="text-xs text-blue-100 mt-0.5">Use specific τ values for each scope</p>
+                </div>
+              </label>
+              <label class="flex items-center text-white p-3 rounded-xl cursor-pointer hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] bg-gradient-to-r from-orange-500 to-amber-600 tau-mode-option">
+                <input type="radio" name="demo-tau-mode" value="random"
+                       class="mr-3 w-4 h-4" onchange="DemoCreator.updateTauModeUI()">
+                <div class="flex-1">
+                  <span class="font-bold text-sm">🎲 Random Range</span>
+                  <p class="text-xs text-orange-100 mt-0.5">Generate random τ within a range</p>
+                </div>
+              </label>
             </div>
             
             <!-- TAU Generation Scope -->
-            <div class="border-t border-gray-200 pt-3 mt-3">
-              <label class="block text-sm font-semibold text-gray-700 mb-2">TAU Generation Scope</label>
-              <select id="tau-generation-scope" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500">
-                <option value="all" selected>Same TAU sequence for all (routes & trials)</option>
-                <option value="per-trial">Cycle TAU per trial</option>
-                <option value="per-route">Cycle TAU per route</option>
-                <option value="per-trial-route">Cycle TAU per trial AND route</option>
-              </select>
-              <p class="text-xs text-gray-500 mt-1" id="tau-scope-description">All routes in all trials use the same TAU values in sequence</p>
+            <div class="border-t border-slate-300 pt-3 mt-3">
+              <label class="block text-sm font-semibold text-slate-700 mb-2">TAU Scope</label>
+              <div class="grid grid-cols-2 gap-2">
+                <label class="relative cursor-pointer group">
+                  <input type="radio" name="tau-generation-scope" value="all" checked
+                         class="peer sr-only" onchange="DemoCreator.updateTauScopeUI()">
+                  <div class="p-2.5 border-2 border-slate-200 rounded-xl peer-checked:border-purple-500 peer-checked:bg-gradient-to-br peer-checked:from-purple-50 peer-checked:to-indigo-50 transition-all duration-200 text-center group-hover:shadow-md group-hover:scale-[1.02]">
+                    <span class="text-lg">🌐</span>
+                    <p class="text-xs font-medium text-slate-700">Same for All</p>
+                  </div>
+                </label>
+                <label class="relative cursor-pointer group">
+                  <input type="radio" name="tau-generation-scope" value="per-trial"
+                         class="peer sr-only" onchange="DemoCreator.updateTauScopeUI()">
+                  <div class="p-2.5 border-2 border-slate-200 rounded-xl peer-checked:border-purple-500 peer-checked:bg-gradient-to-br peer-checked:from-purple-50 peer-checked:to-indigo-50 transition-all duration-200 text-center group-hover:shadow-md group-hover:scale-[1.02]">
+                    <span class="text-lg">🔄</span>
+                    <p class="text-xs font-medium text-slate-700">Per Trial</p>
+                  </div>
+                </label>
+                <label class="relative cursor-pointer group">
+                  <input type="radio" name="tau-generation-scope" value="per-route"
+                         class="peer sr-only" onchange="DemoCreator.updateTauScopeUI()">
+                  <div class="p-2.5 border-2 border-slate-200 rounded-xl peer-checked:border-purple-500 peer-checked:bg-gradient-to-br peer-checked:from-purple-50 peer-checked:to-indigo-50 transition-all duration-200 text-center group-hover:shadow-md group-hover:scale-[1.02]">
+                    <span class="text-lg">🛤️</span>
+                    <p class="text-xs font-medium text-slate-700">Per Route</p>
+                  </div>
+                </label>
+                <label class="relative cursor-pointer group">
+                  <input type="radio" name="tau-generation-scope" value="per-trial-route"
+                         class="peer sr-only" onchange="DemoCreator.updateTauScopeUI()">
+                  <div class="p-2.5 border-2 border-slate-200 rounded-xl peer-checked:border-purple-500 peer-checked:bg-gradient-to-br peer-checked:from-purple-50 peer-checked:to-indigo-50 transition-all duration-200 text-center group-hover:shadow-md group-hover:scale-[1.02]">
+                    <span class="text-lg">🔀</span>
+                    <p class="text-xs font-medium text-slate-700">Per Trial & Route</p>
+                  </div>
+                </label>
+              </div>
+              <p class="text-xs text-slate-500 mt-2" id="tau-scope-description">All routes in all trials use the same TAU value</p>
+            </div>
+
+            <!-- Fixed TAU Values (shown when mode is fixed) -->
+            <div id="tau-fixed-setting" class="border-t border-slate-300 pt-3 mt-3">
+              <label class="block text-xs font-semibold text-slate-600 mb-2">Fixed τ Values</label>
+              <p class="text-xs text-slate-500 mb-2" id="tau-fixed-help">Enter comma-separated τ values (one per scope item)</p>
+              <input type="text" id="demo-tau-fixed-values" value="0.5"
+                     placeholder="0.5 or 0.3, 0.5, 0.7"
+                     class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+            </div>
+            
+            <!-- Random TAU Range (shown when mode is random) -->
+            <div id="tau-random-setting" class="hidden border-t border-slate-300 pt-3 mt-3">
+              <label class="block text-xs font-semibold text-slate-600 mb-2">Random τ Range</label>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs text-slate-500 mb-1">Min</label>
+                  <input type="number" id="demo-tau-random-min" value="0.1" min="0" max="1" step="0.1"
+                         class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500">
+                </div>
+                <div>
+                  <label class="block text-xs text-slate-500 mb-1">Max</label>
+                  <input type="number" id="demo-tau-random-max" value="0.9" min="0" max="1" step="0.1"
+                         class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500">
+                </div>
+              </div>
             </div>
           </div>
 

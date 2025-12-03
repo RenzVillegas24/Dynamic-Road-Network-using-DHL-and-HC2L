@@ -631,6 +631,10 @@ const DemoRunner = {
         const trials = config.trials || 1;
         const routes = config.routes || [];
         
+        // Check if this is a saved config with pre-generated disruptions
+        const disruptionKey = config.disruptionKey || null;
+        const hasSavedDisruptions = disruptionKey && config.disruptions?.savedSets;
+        
         // Initialize detailed progress
         this.currentProgress = {
             trial: 0,
@@ -648,6 +652,9 @@ const DemoRunner = {
         };
         
         console.log('🎬 Starting demo:', config.name);
+        if (hasSavedDisruptions) {
+            console.log(`📁 Using saved disruptions from: ${disruptionKey}`);
+        }
         showUpdateToast(`🎬 Starting: ${config.name}`, 'info');
         
         this.showTab('running');
@@ -657,25 +664,30 @@ const DemoRunner = {
             // Reset map
             await this.resetMap();
             
-            // Generate demo-specific disruptions based on scope
-            const demoId = `demo_${Date.now()}`;
+            // Get disruption config
             const disruptions = config.disruptions || {};
             const generationScope = disruptions.generationScope || 'all';
             
-            // Pre-generate disruption sets based on scope
-            this.disruptionSets = {};  // Store disruption sets by key
-            
-            if (generationScope === 'all') {
-                // Generate one set for all trials/routes
-                await this.setupDemoDisruptions(config, demoId, 'all');
-            } else if (generationScope === 'per-route') {
-                // Pre-generate disruption set for each route (used across all trials)
-                for (let i = 0; i < routes.length; i++) {
-                    const routeKey = `route_${i}`;
-                    await this.setupDemoDisruptions(config, `${demoId}_${routeKey}`, routeKey);
+            // If we have saved disruptions, we don't need to generate new ones
+            if (!hasSavedDisruptions) {
+                // Generate demo-specific disruptions based on scope
+                const demoId = `demo_${Date.now()}`;
+                
+                // Pre-generate disruption sets based on scope
+                this.disruptionSets = {};  // Store disruption sets by key
+                
+                if (generationScope === 'all') {
+                    // Generate one set for all trials/routes
+                    await this.setupDemoDisruptions(config, demoId, 'set_all');
+                } else if (generationScope === 'per-route') {
+                    // Pre-generate disruption set for each route (used across all trials)
+                    for (let i = 0; i < routes.length; i++) {
+                        const routeKey = `set_route_${i}`;
+                        await this.setupDemoDisruptions(config, `${demoId}_${routeKey}`, routeKey);
+                    }
                 }
+                // For per-trial and per-trial-route, generate on-the-fly in the loop
             }
-            // For per-trial and per-trial-route, generate on-the-fly in the loop
             
             // Run for each trial
             for (let trial = 0; trial < trials; trial++) {
@@ -683,9 +695,10 @@ const DemoRunner = {
                 
                 this.currentProgress.trial = trial + 1;
                 
-                // Generate disruptions for this trial if per-trial scope
-                if (generationScope === 'per-trial') {
-                    const trialKey = `trial_${trial}`;
+                // Generate disruptions for this trial if per-trial scope (only if not using saved)
+                if (!hasSavedDisruptions && generationScope === 'per-trial') {
+                    const demoId = `demo_${Date.now()}`;
+                    const trialKey = `set_trial_${trial}`;
                     await this.setupDemoDisruptions(config, `${demoId}_${trialKey}`, trialKey);
                 }
                 
@@ -701,14 +714,15 @@ const DemoRunner = {
                     this.currentProgress.status = `Setting up route ${i + 1}...`;
                     this.updateDetailedProgressUI();
                     
-                    // Generate disruptions for this trial-route if per-trial-route scope
-                    if (generationScope === 'per-trial-route') {
-                        const comboKey = `trial_${trial}_route_${i}`;
+                    // Generate disruptions for this trial-route if per-trial-route scope (only if not using saved)
+                    if (!hasSavedDisruptions && generationScope === 'per-trial-route') {
+                        const demoId = `demo_${Date.now()}`;
+                        const comboKey = `set_trial_${trial}_route_${i}`;
                         await this.setupDemoDisruptions(config, `${demoId}_${comboKey}`, comboKey);
                     }
                     
-                    // Set active disruptions based on scope
-                    this.activateDisruptionSet(generationScope, trial, i);
+                    // Set active disruptions based on scope (pass disruptionKey for saved configs)
+                    await this.activateDisruptionSet(generationScope, trial, i, disruptionKey);
                     
                     await this.processRouteWithProgress(route, config, trial);
                     await this.delay(config.stepDelay || 2000);
@@ -861,27 +875,47 @@ const DemoRunner = {
      * @param {string} scope - Generation scope ('all', 'per-trial', 'per-route', 'per-trial-route')
      * @param {number} trialIndex - Current trial index
      * @param {number} routeIndex - Current route index
+     * @param {string} disruptionKey - Optional: The disruption key from saved config
      */
-    activateDisruptionSet(scope, trialIndex, routeIndex) {
-        if (!this.disruptionSets) return;
-        
+    async activateDisruptionSet(scope, trialIndex, routeIndex, disruptionKey = null) {
+        // Determine set key based on scope
         let setKey;
         switch (scope) {
             case 'all':
-                setKey = 'all';
+                setKey = 'set_all';
                 break;
             case 'per-trial':
-                setKey = `trial_${trialIndex}`;
+                setKey = `set_trial_${trialIndex}`;
                 break;
             case 'per-route':
-                setKey = `route_${routeIndex}`;
+                setKey = `set_route_${routeIndex}`;
                 break;
             case 'per-trial-route':
-                setKey = `trial_${trialIndex}_route_${routeIndex}`;
+                setKey = `set_trial_${trialIndex}_route_${routeIndex}`;
                 break;
             default:
-                setKey = 'all';
+                setKey = 'set_all';
         }
+        
+        // If we have a saved config with disruption key, load from file system
+        if (disruptionKey) {
+            try {
+                const response = await fetch(`/api/demo/disruption-path/${disruptionKey}/${setKey}`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    this.demoDisruptionDir = result.disruption_dir;
+                    window.demoDisruptionDir = result.disruption_dir;
+                    console.log(`🔄 Loaded disruption set from saved config: ${setKey} -> ${result.disruption_dir}`);
+                    return;
+                }
+            } catch (error) {
+                console.warn(`⚠️ Could not load saved disruption set: ${error}`);
+            }
+        }
+        
+        // Fall back to runtime-generated disruption sets
+        if (!this.disruptionSets) return;
         
         const disruptionSet = this.disruptionSets[setKey];
         if (disruptionSet) {

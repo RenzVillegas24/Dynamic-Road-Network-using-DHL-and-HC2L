@@ -78,6 +78,9 @@ class Config:
     # Template and static directories
     TEMPLATES_DIR = MAIN_DIR / 'templates'
     STATIC_DIR = MAIN_DIR / 'static'
+
+    # Matched here osm directory
+    HERE_OSM_DIR = MAIN_DIR / 'here_osm'
     
     # ========================================================================
     # DATA FILES

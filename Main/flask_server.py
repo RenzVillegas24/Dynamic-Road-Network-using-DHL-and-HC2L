@@ -237,48 +237,45 @@ def validate_location_near_road(lat: float, lng: float, max_distance: float = 10
 
 def get_available_matched_edges() -> dict:
     """
-    Load all available matched edges from existing flow/incident CSV files.
-    Returns a cache of edges that can be used for random disruption generation.
+    Load all available matched edges from matched_edges.csv file.
+    This is the master source of edges that can be used for random disruption generation.
     """
     import csv
-    import glob
     
-    flow_dir = Path(Config.DISRUPTIONS_DIR) / 'flow'
-    incident_dir = Path(Config.DISRUPTIONS_DIR) / 'incidents'
+    matched_edges_file = Path(Config.HERE_OSM_DIR) / 'matched_edges.csv'
     
-    flow_edges = []
-    incident_edges = []
+    all_edges = []
     
-    # Load flow edges from most recent file
-    flow_files = sorted(flow_dir.glob('flow_*.csv'), reverse=True)
-    if flow_files:
+    if matched_edges_file.exists():
         try:
-            with open(flow_files[0], 'r') as f:
+            with open(matched_edges_file, 'r') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
                     if row.get('source') and row.get('target'):
-                        flow_edges.append(row)
-            console_logger.data(f"Loaded {len(flow_edges)} flow edges from {flow_files[0].name}")
+                        # Add default values for fields that might be needed
+                        edge = {
+                            'id_hash': row.get('id_hash', ''),
+                            'source': row.get('source'),
+                            'target': row.get('target'),
+                            'source_lat': row.get('source_lat'),
+                            'source_lon': row.get('source_lon'),
+                            'target_lat': row.get('target_lat'),
+                            'target_lon': row.get('target_lon'),
+                            'flow_free_flow_kph': row.get('flow_free_flow_kph', 60),
+                            'highway_type': row.get('highway_type', 'primary'),
+                            'road_name': row.get('road_name', 'Unknown Road')
+                        }
+                        all_edges.append(edge)
+            console_logger.data(f"Loaded {len(all_edges)} edges from matched_edges.csv")
         except Exception as e:
-            console_logger.warning(f"Error loading flow edges: {e}")
+            console_logger.warning(f"Error loading matched edges: {e}")
+    else:
+        console_logger.warning(f"matched_edges.csv not found at {matched_edges_file}")
     
-    # Load incident edges from all files (they have fewer entries)
-    incident_files = sorted(incident_dir.glob('incident_*.csv'), reverse=True)
-    for ifile in incident_files[:5]:  # Load from last 5 incident files
-        try:
-            with open(ifile, 'r') as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    if row.get('source') and row.get('target'):
-                        incident_edges.append(row)
-        except Exception as e:
-            console_logger.warning(f"Error loading incident edges from {ifile}: {e}")
-    
-    console_logger.data(f"Loaded {len(incident_edges)} incident edges from {len(incident_files[:5])} files")
-    
+    # Return same edges for both flow and incidents (they can use any matched edge)
     return {
-        'flow_edges': flow_edges,
-        'incident_edges': incident_edges
+        'flow_edges': all_edges,
+        'incident_edges': all_edges
     }
 
 
@@ -286,6 +283,7 @@ def select_random_edges_for_demo(flow_count: int, incident_count: int,
                                   severity_min: float = 0.3, severity_max: float = 0.9) -> dict:
     """
     Select random edges from existing matched edges for demo disruptions.
+    Each edge (source, target pair) can only appear once - no duplicates.
     
     Args:
         flow_count: Number of flow disruptions to generate (0 = no flow)
@@ -321,18 +319,30 @@ def select_random_edges_for_demo(flow_count: int, incident_count: int,
     if flow_count == 0 and incident_count == 0:
         return {'flow_rows': [], 'incident_rows': []}
     
-    # Select random flow edges
-    if edges['flow_edges'] and flow_count > 0:
-        sample_size = min(flow_count, len(edges['flow_edges']))
-        selected_flow = random.sample(edges['flow_edges'], sample_size)
-        
-        for i, edge in enumerate(selected_flow):
+    # Track used edges to prevent duplicates (key: (source, target))
+    used_edges = set()
+    
+    # Get all available edges and shuffle them
+    all_flow_edges = list(edges.get('flow_edges', []))
+    random.shuffle(all_flow_edges)
+    
+    # Select unique random flow edges
+    if all_flow_edges and flow_count > 0:
+        for edge in all_flow_edges:
+            if len(flow_rows) >= flow_count:
+                break
+                
+            edge_key = (edge.get('source'), edge.get('target'))
+            if edge_key in used_edges:
+                continue
+            
+            used_edges.add(edge_key)
             severity = random.uniform(severity_min, severity_max)
             jam_factor = severity * 10
             flow_speed = max(5, float(edge.get('flow_free_flow_kph', 60)) * (1 - severity * 0.8))
             
             flow_rows.append({
-                'id_hash': f'demo_flow_{i}',
+                'id_hash': f'demo_flow_{len(flow_rows)}',
                 'source_lat': edge.get('source_lat'),
                 'source_lon': edge.get('source_lon'),
                 'target_lat': edge.get('target_lat'),
@@ -348,39 +358,22 @@ def select_random_edges_for_demo(flow_count: int, incident_count: int,
                 'road_name': edge.get('road_name', 'Unknown')
             })
     
-    # If we need more flow, replicate some with different severities
-    while len(flow_rows) < flow_count and edges['flow_edges']:
-        edge = random.choice(edges['flow_edges'])
-        severity = random.uniform(severity_min, severity_max)
-        jam_factor = severity * 10
-        flow_speed = max(5, float(edge.get('flow_free_flow_kph', 60)) * (1 - severity * 0.8))
-        
-        flow_rows.append({
-            'id_hash': f'demo_flow_{len(flow_rows)}',
-            'source_lat': edge.get('source_lat'),
-            'source_lon': edge.get('source_lon'),
-            'target_lat': edge.get('target_lat'),
-            'target_lon': edge.get('target_lon'),
-            'source': edge.get('source'),
-            'target': edge.get('target'),
-            'flow_speed_kph': flow_speed,
-            'flow_free_flow_kph': edge.get('flow_free_flow_kph', 60),
-            'flow_jam_factor': jam_factor,
-            'flow_confidence': 0.95,
-            'flow_traversability': 'open',
-            'highway_type': edge.get('highway_type', 'primary'),
-            'road_name': edge.get('road_name', 'Unknown')
-        })
-    
     # Select random incident edges (or use flow edges if no incidents available)
-    incident_source = edges['incident_edges'] if edges['incident_edges'] else edges['flow_edges']
+    # Incidents should also not duplicate edges already used
+    incident_source = list(edges.get('incident_edges', [])) if edges.get('incident_edges') else list(edges.get('flow_edges', []))
+    random.shuffle(incident_source)
     incident_types = ['accident', 'construction', 'roadClosure', 'hazard']
     
     if incident_source and incident_count > 0:
-        sample_size = min(incident_count, len(incident_source))
-        selected_incidents = random.sample(incident_source, sample_size)
-        
-        for i, edge in enumerate(selected_incidents):
+        for edge in incident_source:
+            if len(incident_rows) >= incident_count:
+                break
+                
+            edge_key = (edge.get('source'), edge.get('target'))
+            if edge_key in used_edges:
+                continue
+            
+            used_edges.add(edge_key)
             severity = random.uniform(severity_min, severity_max)
             if severity > 0.7:
                 criticality = 'critical'
@@ -400,7 +393,7 @@ def select_random_edges_for_demo(flow_count: int, incident_count: int,
                 'source_lon': edge.get('source_lon'),
                 'target_lat': edge.get('target_lat'),
                 'target_lon': edge.get('target_lon'),
-                'incident_id': f'demo_incident_{i}',
+                'incident_id': f'demo_incident_{len(incident_rows)}',
                 'incident_type': incident_type,
                 'incident_criticality': criticality,
                 'incident_description': f'Demo {incident_type} on {road_name}',
@@ -410,38 +403,6 @@ def select_random_edges_for_demo(flow_count: int, incident_count: int,
                 'highway_type': edge.get('highway_type', 'primary'),
                 'road_name': road_name
             })
-    
-    # If we need more incidents, replicate some
-    while len(incident_rows) < incident_count and incident_source:
-        edge = random.choice(incident_source)
-        severity = random.uniform(severity_min, severity_max)
-        if severity > 0.7:
-            criticality = 'critical'
-        elif severity > 0.4:
-            criticality = 'major'
-        else:
-            criticality = 'minor'
-        
-        incident_type = random.choice(incident_types)
-        road_name = edge.get('road_name', 'Unknown Road')
-        
-        incident_rows.append({
-            'source': edge.get('source'),
-            'target': edge.get('target'),
-            'source_lat': edge.get('source_lat'),
-            'source_lon': edge.get('source_lon'),
-            'target_lat': edge.get('target_lat'),
-            'target_lon': edge.get('target_lon'),
-            'incident_id': f'demo_incident_{len(incident_rows)}',
-            'incident_type': incident_type,
-            'incident_criticality': criticality,
-            'incident_description': f'Demo {incident_type} on {road_name}',
-            'incident_road_closed': severity > 0.8,
-            'incident_start_time': datetime.now().isoformat() + 'Z',
-            'incident_end_time': (datetime.now() + timedelta(hours=3)).isoformat() + 'Z',
-            'highway_type': edge.get('highway_type', 'primary'),
-            'road_name': road_name
-        })
     
     return {
         'flow_rows': flow_rows,
@@ -2077,10 +2038,111 @@ def list_demo_configs():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+# Demo config disruption directory path
+DEMO_DISRUPTIONS_DIR = DEMO_CONFIGS_DIR / 'disruptions'
+
+
+def generate_disruption_key() -> str:
+    """Generate a unique disruption key (UUID)."""
+    import uuid
+    return str(uuid.uuid4())[:8]
+
+
+def get_demo_disruption_path(disruption_key: str) -> Path:
+    """Get the path to a demo's disruption folder."""
+    return DEMO_DISRUPTIONS_DIR / disruption_key
+
+
+def save_disruption_set_to_csv(disruption_key: str, set_key: str, disruptions: dict) -> dict:
+    """
+    Save a disruption set to CSV files compatible with C++ APIs.
+    
+    Args:
+        disruption_key: The unique demo disruption folder key (UUID)
+        set_key: The set key (e.g., 'all', 'trial_0', 'route_1', 'trial_0_route_1')
+        disruptions: Dict with 'flow' and 'incidents' lists
+        
+    Returns:
+        Dict with paths to created files
+    """
+    import csv
+    from datetime import datetime
+    
+    # Create folder structure: data/demos/configs/disruptions/{key}/{set_key}/flow/ and incidents/
+    base_path = DEMO_DISRUPTIONS_DIR / disruption_key / set_key
+    flow_dir = base_path / 'flow'
+    incidents_dir = base_path / 'incidents'
+    flow_dir.mkdir(parents=True, exist_ok=True)
+    incidents_dir.mkdir(parents=True, exist_ok=True)
+    
+    timestamp = datetime.now().strftime('%Y%m%dT%H%M%S')
+    
+    flow_file = None
+    incident_file = None
+    
+    # Write flow CSV (same format as HERE API)
+    flow_data = disruptions.get('flow', [])
+    if flow_data:
+        flow_file = flow_dir / f'flow_{timestamp}.csv'
+        flow_headers = [
+            'id_hash', 'source_lat', 'source_lon', 'target_lat', 'target_lon',
+            'source', 'target', 'flow_speed_kph', 'flow_free_flow_kph',
+            'flow_jam_factor', 'flow_confidence', 'flow_traversability',
+            'highway_type', 'road_name'
+        ]
+        with open(flow_file, 'w', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=flow_headers, extrasaction='ignore')
+            writer.writeheader()
+            for row in flow_data:
+                writer.writerow(row)
+        console_logger.data(f"Saved {len(flow_data)} flow entries to {flow_file}")
+    else:
+        # Create empty flow file with headers
+        flow_file = flow_dir / f'flow_{timestamp}.csv'
+        with open(flow_file, 'w', newline='') as f:
+            f.write('id_hash,source_lat,source_lon,target_lat,target_lon,source,target,flow_speed_kph,flow_free_flow_kph,flow_jam_factor,flow_confidence,flow_traversability,highway_type,road_name\n')
+    
+    # Write incident CSV (same format as HERE API)
+    incident_data = disruptions.get('incidents', [])
+    if incident_data:
+        incident_file = incidents_dir / f'incident_{timestamp}.csv'
+        incident_headers = [
+            'source', 'target', 'source_lat', 'source_lon', 'target_lat', 'target_lon',
+            'incident_id', 'incident_type', 'incident_criticality', 'incident_description',
+            'incident_road_closed', 'incident_start_time', 'incident_end_time',
+            'highway_type', 'road_name'
+        ]
+        with open(incident_file, 'w', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=incident_headers, extrasaction='ignore')
+            writer.writeheader()
+            for row in incident_data:
+                writer.writerow(row)
+        console_logger.data(f"Saved {len(incident_data)} incident entries to {incident_file}")
+    else:
+        # Create empty incident file with headers
+        incident_file = incidents_dir / f'incident_{timestamp}.csv'
+        with open(incident_file, 'w', newline='') as f:
+            f.write('source,target,source_lat,source_lon,target_lat,target_lon,incident_id,incident_type,incident_criticality,incident_description,incident_road_closed,incident_start_time,incident_end_time,highway_type,road_name\n')
+    
+    return {
+        'flow_file': str(flow_file) if flow_file else None,
+        'incident_file': str(incident_file) if incident_file else None,
+        'flow_count': len(flow_data),
+        'incident_count': len(incident_data),
+        'disruption_dir': str(base_path)
+    }
+
+
 @app.route('/api/demo/configs', methods=['POST'])
 def save_demo_config():
     """
     Save a new demo configuration.
+    
+    Disruptions are stored separately in CSV files at:
+    data/demos/configs/disruptions/{disruptionKey}/{setKey}/flow/ and incidents/
+    
+    The config JSON only stores the disruptionKey reference.
+    When running demos, the C++ APIs load from these CSV files.
     
     Request body: The config object to save
     
@@ -2099,16 +2161,93 @@ def save_demo_config():
         
         config['savedAt'] = datetime.now().isoformat()
         
-        # Generate disruption folder key
-        if not config.get('disruptionFolderKey'):
-            config['disruptionFolderKey'] = config['id']
+        # Generate unique disruption key
+        disruption_key = config.get('disruptionKey') or generate_disruption_key()
+        config['disruptionKey'] = disruption_key
         
-        # Save to file
+        # Extract disruption settings (keep mode, scope, severity settings)
+        disruptions_config = config.get('disruptions', {})
+        
+        # Extract and save disruptionSets to CSV files
+        disruption_sets = disruptions_config.pop('disruptionSets', {})
+        
+        if disruption_sets:
+            console_logger.processing(f"Saving {len(disruption_sets)} disruption sets for demo {config['id']}")
+            
+            saved_sets = {}
+            for set_key, set_data in disruption_sets.items():
+                # set_data contains: { flow: [], incidents: [], demoId: ..., disruptionDir: ... }
+                flow_rows = []
+                incident_rows = []
+                
+                # Extract flow data
+                if 'flow' in set_data:
+                    for item in set_data['flow']:
+                        flow_rows.append({
+                            'id_hash': item.get('id_hash', f'demo_{set_key}'),
+                            'source_lat': item.get('source_lat'),
+                            'source_lon': item.get('source_lon'),
+                            'target_lat': item.get('target_lat'),
+                            'target_lon': item.get('target_lon'),
+                            'source': item.get('source'),
+                            'target': item.get('target'),
+                            'flow_speed_kph': item.get('flow_speed_kph', 30),
+                            'flow_free_flow_kph': item.get('flow_free_flow_kph', 60),
+                            'flow_jam_factor': item.get('jam_factor', item.get('flow_jam_factor', 5)),
+                            'flow_confidence': item.get('flow_confidence', 0.95),
+                            'flow_traversability': item.get('flow_traversability', 'open'),
+                            'highway_type': item.get('highway_type', 'primary'),
+                            'road_name': item.get('road_name', 'Unknown')
+                        })
+                
+                # Extract incident data
+                if 'incidents' in set_data:
+                    for item in set_data['incidents']:
+                        incident_rows.append({
+                            'source': item.get('source'),
+                            'target': item.get('target'),
+                            'source_lat': item.get('source_lat'),
+                            'source_lon': item.get('source_lon'),
+                            'target_lat': item.get('target_lat'),
+                            'target_lon': item.get('target_lon'),
+                            'incident_id': item.get('incident_id', f'demo_{set_key}'),
+                            'incident_type': item.get('type', item.get('incident_type', 'construction')),
+                            'incident_criticality': item.get('criticality', item.get('incident_criticality', 'major')),
+                            'incident_description': item.get('incident_description', item.get('description', '')),
+                            'incident_road_closed': item.get('incident_road_closed', False),
+                            'incident_start_time': item.get('incident_start_time', ''),
+                            'incident_end_time': item.get('incident_end_time', ''),
+                            'highway_type': item.get('highway_type', 'primary'),
+                            'road_name': item.get('road_name', 'Unknown')
+                        })
+                
+                # Save to CSV
+                result = save_disruption_set_to_csv(
+                    disruption_key=disruption_key,
+                    set_key=set_key,
+                    disruptions={'flow': flow_rows, 'incidents': incident_rows}
+                )
+                
+                saved_sets[set_key] = {
+                    'disruption_dir': result['disruption_dir'],
+                    'flow_count': result['flow_count'],
+                    'incident_count': result['incident_count']
+                }
+            
+            # Store summary in config (not the actual data)
+            config['disruptions']['savedSets'] = saved_sets
+            console_logger.success(f"Saved {len(saved_sets)} disruption sets to {disruption_key}/")
+        
+        # Remove any remaining large data from disruptions
+        config['disruptions'].pop('customItems', None)
+        config['disruptions'].pop('previewedDisruptions', None)
+        
+        # Save config file (without the large disruption data)
         config_file = DEMO_CONFIGS_DIR / f"{config['id']}.json"
         with open(config_file, 'w') as f:
             json.dump(config, f, indent=2)
         
-        console_logger.success(f"Saved demo config: {config['id']}")
+        console_logger.success(f"Saved demo config: {config['id']} (disruptionKey: {disruption_key})")
         
         return jsonify({
             'success': True,
@@ -2116,6 +2255,8 @@ def save_demo_config():
         })
     except Exception as e:
         console_logger.error(f"Error saving config: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -2153,6 +2294,9 @@ def update_demo_config(config_id):
     """
     Update an existing demo configuration.
     
+    Disruptions are stored separately in CSV files at:
+    data/demos/configs/disruptions/{disruptionKey}/{setKey}/flow/ and incidents/
+    
     Request body: The updated config object
     
     Returns:
@@ -2166,6 +2310,85 @@ def update_demo_config(config_id):
         config['id'] = config_id
         config['savedAt'] = datetime.now().isoformat()
         
+        # Use existing disruption key or generate new one
+        disruption_key = config.get('disruptionKey') or generate_disruption_key()
+        config['disruptionKey'] = disruption_key
+        
+        # Extract disruption settings
+        disruptions_config = config.get('disruptions', {})
+        
+        # Extract and save disruptionSets to CSV files
+        disruption_sets = disruptions_config.pop('disruptionSets', {})
+        
+        if disruption_sets:
+            console_logger.processing(f"Updating {len(disruption_sets)} disruption sets for demo {config_id}")
+            
+            saved_sets = {}
+            for set_key, set_data in disruption_sets.items():
+                flow_rows = []
+                incident_rows = []
+                
+                # Extract flow data
+                if 'flow' in set_data:
+                    for item in set_data['flow']:
+                        flow_rows.append({
+                            'id_hash': item.get('id_hash', f'demo_{set_key}'),
+                            'source_lat': item.get('source_lat'),
+                            'source_lon': item.get('source_lon'),
+                            'target_lat': item.get('target_lat'),
+                            'target_lon': item.get('target_lon'),
+                            'source': item.get('source'),
+                            'target': item.get('target'),
+                            'flow_speed_kph': item.get('flow_speed_kph', 30),
+                            'flow_free_flow_kph': item.get('flow_free_flow_kph', 60),
+                            'flow_jam_factor': item.get('jam_factor', item.get('flow_jam_factor', 5)),
+                            'flow_confidence': item.get('flow_confidence', 0.95),
+                            'flow_traversability': item.get('flow_traversability', 'open'),
+                            'highway_type': item.get('highway_type', 'primary'),
+                            'road_name': item.get('road_name', 'Unknown')
+                        })
+                
+                # Extract incident data
+                if 'incidents' in set_data:
+                    for item in set_data['incidents']:
+                        incident_rows.append({
+                            'source': item.get('source'),
+                            'target': item.get('target'),
+                            'source_lat': item.get('source_lat'),
+                            'source_lon': item.get('source_lon'),
+                            'target_lat': item.get('target_lat'),
+                            'target_lon': item.get('target_lon'),
+                            'incident_id': item.get('incident_id', f'demo_{set_key}'),
+                            'incident_type': item.get('type', item.get('incident_type', 'construction')),
+                            'incident_criticality': item.get('criticality', item.get('incident_criticality', 'major')),
+                            'incident_description': item.get('incident_description', item.get('description', '')),
+                            'incident_road_closed': item.get('incident_road_closed', False),
+                            'incident_start_time': item.get('incident_start_time', ''),
+                            'incident_end_time': item.get('incident_end_time', ''),
+                            'highway_type': item.get('highway_type', 'primary'),
+                            'road_name': item.get('road_name', 'Unknown')
+                        })
+                
+                # Save to CSV
+                result = save_disruption_set_to_csv(
+                    disruption_key=disruption_key,
+                    set_key=set_key,
+                    disruptions={'flow': flow_rows, 'incidents': incident_rows}
+                )
+                
+                saved_sets[set_key] = {
+                    'disruption_dir': result['disruption_dir'],
+                    'flow_count': result['flow_count'],
+                    'incident_count': result['incident_count']
+                }
+            
+            config['disruptions']['savedSets'] = saved_sets
+            console_logger.success(f"Updated {len(saved_sets)} disruption sets")
+        
+        # Remove large data from config
+        config['disruptions'].pop('customItems', None)
+        config['disruptions'].pop('previewedDisruptions', None)
+        
         config_file = DEMO_CONFIGS_DIR / f"{config_id}.json"
         with open(config_file, 'w') as f:
             json.dump(config, f, indent=2)
@@ -2178,6 +2401,8 @@ def update_demo_config(config_id):
         })
     except Exception as e:
         console_logger.error(f"Error updating config {config_id}: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -2197,13 +2422,13 @@ def delete_demo_config(config_id):
         
         config_file = DEMO_CONFIGS_DIR / f"{config_id}.json"
         
-        # Load config to get disruption folder key
-        disruption_folder_key = config_id
+        # Load config to get disruption key
+        disruption_key = None
         if config_file.exists():
             try:
                 with open(config_file, 'r') as f:
                     config = json.load(f)
-                    disruption_folder_key = config.get('disruptionFolderKey', config_id)
+                    disruption_key = config.get('disruptionKey')
             except:
                 pass
             
@@ -2211,11 +2436,12 @@ def delete_demo_config(config_id):
             config_file.unlink()
             console_logger.info(f"Deleted config file: {config_id}")
         
-        # Delete associated disruption folder
-        disruption_dir = Path(Config.DISRUPTIONS_DIR) / 'demos' / disruption_folder_key
-        if disruption_dir.exists():
-            shutil.rmtree(disruption_dir)
-            console_logger.info(f"Deleted disruption folder: {disruption_folder_key}")
+        # Delete associated disruption folder (new structure)
+        if disruption_key:
+            disruption_dir = DEMO_DISRUPTIONS_DIR / disruption_key
+            if disruption_dir.exists():
+                shutil.rmtree(disruption_dir)
+                console_logger.info(f"Deleted disruption folder: {disruption_key}")
         
         # Delete associated results folder
         results_dir = DEMO_RESULTS_DIR / config_id
@@ -2229,6 +2455,44 @@ def delete_demo_config(config_id):
         })
     except Exception as e:
         console_logger.error(f"Error deleting config {config_id}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/demo/disruption-path/<disruption_key>/<set_key>', methods=['GET'])
+def get_demo_disruption_path(disruption_key, set_key):
+    """
+    Get the disruption folder path for a specific demo configuration set.
+    This path is used by C++ APIs to load disruption data.
+    
+    Args:
+        disruption_key: The unique disruption folder key (UUID)
+        set_key: The set key (e.g., 'set_all', 'set_trial_0', etc.)
+    
+    Returns:
+    {
+        "success": true,
+        "disruption_dir": "/absolute/path/to/disruptions",
+        "flow_dir": "/absolute/path/to/flow",
+        "incidents_dir": "/absolute/path/to/incidents"
+    }
+    """
+    try:
+        base_path = DEMO_DISRUPTIONS_DIR / disruption_key / set_key
+        
+        if not base_path.exists():
+            return jsonify({
+                'success': False, 
+                'error': f'Disruption folder not found: {disruption_key}/{set_key}'
+            }), 404
+        
+        return jsonify({
+            'success': True,
+            'disruption_dir': str(base_path.resolve()),
+            'flow_dir': str((base_path / 'flow').resolve()),
+            'incidents_dir': str((base_path / 'incidents').resolve())
+        })
+    except Exception as e:
+        console_logger.error(f"Error getting disruption path: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
