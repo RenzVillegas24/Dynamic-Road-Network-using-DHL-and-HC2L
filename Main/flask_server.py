@@ -235,9 +235,119 @@ def validate_location_near_road(lat: float, lng: float, max_distance: float = 10
         return {'valid': False, 'error': str(e)}
 
 
+# Cache for edge data loaded from quezon_city_edges.csv
+_edge_data_cache = None
+_edge_data_cache_time = 0
+EDGE_CACHE_TTL = 3600  # 1 hour cache
+
+
+def load_edge_data_from_graph() -> dict:
+    """
+    Load edge data from quezon_city_edges.csv.
+    This provides length, road_name, highway_type, and geometry for edges.
+    Returns a dict keyed by (source, target) tuple.
+    """
+    global _edge_data_cache, _edge_data_cache_time
+    
+    # Return cached data if still valid
+    if _edge_data_cache is not None and (time.time() - _edge_data_cache_time) < EDGE_CACHE_TTL:
+        return _edge_data_cache
+    
+    edges_file = Path(Config.DATA_DIR) / 'raw' / 'quezon_city_edges.csv'
+    edge_data = {}
+    
+    if edges_file.exists():
+        try:
+            with open(edges_file, 'r') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    source = row.get('source')
+                    target = row.get('target')
+                    if source and target:
+                        key = (source, target)
+                        edge_data[key] = {
+                            'length': float(row.get('length', 0)),
+                            'road_name': row.get('road_name', 'Unknown Road'),
+                            'highway_type': row.get('highway_type', 'unclassified'),
+                            'geometry': row.get('geometry', ''),
+                            'source_lat': float(row.get('source_lat', 0)),
+                            'source_lon': float(row.get('source_lon', 0)),
+                            'target_lat': float(row.get('target_lat', 0)),
+                            'target_lon': float(row.get('target_lon', 0))
+                        }
+            console_logger.data(f"Loaded {len(edge_data)} edges from quezon_city_edges.csv")
+            _edge_data_cache = edge_data
+            _edge_data_cache_time = time.time()
+        except Exception as e:
+            console_logger.warning(f"Error loading quezon_city_edges.csv: {e}")
+    else:
+        console_logger.warning(f"quezon_city_edges.csv not found at {edges_file}")
+    
+    return edge_data
+
+
+def get_edge_properties(source, target) -> dict:
+    """
+    Get edge properties (length, road_name, highway_type, geometry) for a source-target pair.
+    First checks quezon_city_edges.csv cache, returns defaults if not found.
+    """
+    edge_data = load_edge_data_from_graph()
+    key = (str(source), str(target))
+    
+    if key in edge_data:
+        return edge_data[key]
+    
+    # Try reverse direction
+    reverse_key = (str(target), str(source))
+    if reverse_key in edge_data:
+        return edge_data[reverse_key]
+    
+    return {
+        'length': 0,
+        'road_name': 'Unknown Road',
+        'highway_type': 'unclassified',
+        'geometry': ''
+    }
+
+
+def calculate_speed_from_jam_factor(free_flow_kph: float, jam_factor: float) -> float:
+    """
+    Calculate actual speed based on free flow speed and jam factor.
+    jam_factor: 0 = no traffic (free flow), 10 = standstill
+    """
+    # Linear interpolation: speed = free_flow * (1 - jam_factor/10)
+    # Minimum speed = 5 kph
+    return max(5.0, free_flow_kph * (1.0 - (jam_factor / 10.0)))
+
+
+def get_highway_free_flow_speed(highway_type: str) -> float:
+    """
+    Get free flow speed based on highway type.
+    """
+    speed_map = {
+        'motorway': 100.0,
+        'motorway_link': 80.0,
+        'trunk': 80.0,
+        'trunk_link': 60.0,
+        'primary': 60.0,
+        'primary_link': 50.0,
+        'secondary': 50.0,
+        'secondary_link': 40.0,
+        'tertiary': 40.0,
+        'tertiary_link': 30.0,
+        'residential': 30.0,
+        'unclassified': 30.0,
+        'service': 20.0,
+        'living_street': 15.0
+    }
+    return speed_map.get(highway_type, 40.0)
+
+
 def get_available_matched_edges() -> dict:
     """
     Load all available matched edges from matched_edges.csv file.
+    Uses free_flow_speed directly from matched_edges.csv.
+    Enriches edge data with additional properties from quezon_city_edges.csv (length, geometry, etc.)
     This is the master source of edges that can be used for random disruption generation.
     """
     import csv
@@ -248,27 +358,58 @@ def get_available_matched_edges() -> dict:
     
     if matched_edges_file.exists():
         try:
+            # Pre-load edge data from graph for enrichment
+            edge_graph_data = load_edge_data_from_graph()
+            
             with open(matched_edges_file, 'r') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    if row.get('source') and row.get('target'):
-                        # Add default values for fields that might be needed
+                    source = row.get('source')
+                    target = row.get('target')
+                    
+                    if source and target:
+                        # Look up edge properties from graph for additional data
+                        edge_props = get_edge_properties(source, target)
+                        highway_type = edge_props.get('highway_type', 'primary')
+                        
+                        # Use free_flow_speed from matched_edges.csv (primary source)
+                        # Fall back to highway-based calculation if not available
+                        csv_free_flow = row.get('free_flow_speed', '')
+                        if csv_free_flow and csv_free_flow.strip():
+                            try:
+                                free_flow_kph = float(csv_free_flow)
+                            except ValueError:
+                                free_flow_kph = get_highway_free_flow_speed(highway_type)
+                        else:
+                            free_flow_kph = get_highway_free_flow_speed(highway_type)
+                        
+                        # Use road_name from matched_edges.csv if available
+                        csv_road_name = row.get('road_name', '')
+                        road_name = csv_road_name if csv_road_name.strip() else edge_props.get('road_name', 'Unknown Road')
+                        
+                        # Build edge with enriched data
                         edge = {
                             'id_hash': row.get('id_hash', ''),
-                            'source': row.get('source'),
-                            'target': row.get('target'),
+                            'source': source,
+                            'target': target,
                             'source_lat': row.get('source_lat'),
                             'source_lon': row.get('source_lon'),
                             'target_lat': row.get('target_lat'),
                             'target_lon': row.get('target_lon'),
-                            'flow_free_flow_kph': row.get('flow_free_flow_kph', 60),
-                            'highway_type': row.get('highway_type', 'primary'),
-                            'road_name': row.get('road_name', 'Unknown Road')
+                            # Use free_flow_speed from CSV
+                            'flow_free_flow_kph': free_flow_kph,
+                            'road_name': road_name,
+                            # Enriched from quezon_city_edges.csv
+                            'length': edge_props.get('length', 0),
+                            'highway_type': highway_type,
+                            'geometry': edge_props.get('geometry', '')
                         }
                         all_edges.append(edge)
-            console_logger.data(f"Loaded {len(all_edges)} edges from matched_edges.csv")
+            console_logger.data(f"Loaded {len(all_edges)} edges from matched_edges.csv (using free_flow_speed from CSV)")
         except Exception as e:
             console_logger.warning(f"Error loading matched edges: {e}")
+            import traceback
+            traceback.print_exc()
     else:
         console_logger.warning(f"matched_edges.csv not found at {matched_edges_file}")
     
@@ -284,6 +425,7 @@ def select_random_edges_for_demo(flow_count: int, incident_count: int,
     """
     Select random edges from existing matched edges for demo disruptions.
     Each edge (source, target pair) can only appear once - no duplicates.
+    Now includes speed calculation from free flow and jam factor, plus edge length.
     
     Args:
         flow_count: Number of flow disruptions to generate (0 = no flow)
@@ -338,24 +480,37 @@ def select_random_edges_for_demo(flow_count: int, incident_count: int,
             
             used_edges.add(edge_key)
             severity = random.uniform(severity_min, severity_max)
-            jam_factor = severity * 10
-            flow_speed = max(5, float(edge.get('flow_free_flow_kph', 60)) * (1 - severity * 0.8))
+            jam_factor = severity * 10  # 0-10 scale
+            
+            # Get free flow speed from edge data (from matched_edges.csv free_flow_speed column)
+            free_flow_kph = float(edge.get('flow_free_flow_kph', 60))
+            
+            # Calculate actual speed using jam factor
+            flow_speed = calculate_speed_from_jam_factor(free_flow_kph, jam_factor)
+            
+            # Get edge length and geometry from enriched data
+            edge_length = float(edge.get('length', 0))
+            geometry = edge.get('geometry', '')
             
             flow_rows.append({
-                'id_hash': f'demo_flow_{len(flow_rows)}',
+                'id_hash': edge.get('id_hash', f'{int(time.time())}_{len(flow_rows)}'),
                 'source_lat': edge.get('source_lat'),
                 'source_lon': edge.get('source_lon'),
                 'target_lat': edge.get('target_lat'),
                 'target_lon': edge.get('target_lon'),
                 'source': edge.get('source'),
                 'target': edge.get('target'),
-                'flow_speed_kph': flow_speed,
-                'flow_free_flow_kph': edge.get('flow_free_flow_kph', 60),
-                'flow_jam_factor': jam_factor,
-                'flow_confidence': 0.95,
+                # Enhanced speed calculation
+                'flow_speed_kph': round(flow_speed, 2),
+                'flow_free_flow_kph': round(free_flow_kph, 2),
+                'flow_jam_factor': round(jam_factor, 2),
+                'flow_confidence': round(0.7 + random.uniform(0, 0.25), 2),  # 0.7-0.95
                 'flow_traversability': 'open',
+                # Edge properties from graph
+                'length': round(edge_length, 2),
                 'highway_type': edge.get('highway_type', 'primary'),
-                'road_name': edge.get('road_name', 'Unknown')
+                'road_name': edge.get('road_name', 'Unknown Road'),
+                'geometry': geometry
             })
     
     # Select random incident edges (or use flow edges if no incidents available)
@@ -385,6 +540,7 @@ def select_random_edges_for_demo(flow_count: int, incident_count: int,
             incident_type = random.choice(incident_types)
             road_closed = severity > 0.8
             road_name = edge.get('road_name', 'Unknown Road')
+            edge_length = float(edge.get('length', 0))
             
             incident_rows.append({
                 'source': edge.get('source'),
@@ -393,13 +549,15 @@ def select_random_edges_for_demo(flow_count: int, incident_count: int,
                 'source_lon': edge.get('source_lon'),
                 'target_lat': edge.get('target_lat'),
                 'target_lon': edge.get('target_lon'),
-                'incident_id': f'demo_incident_{len(incident_rows)}',
+                'incident_id': edge.get('id_hash', f'{int(time.time())}_{len(incident_rows)}'),
                 'incident_type': incident_type,
                 'incident_criticality': criticality,
                 'incident_description': f'Demo {incident_type} on {road_name}',
                 'incident_road_closed': road_closed,
                 'incident_start_time': datetime.now().isoformat() + 'Z',
                 'incident_end_time': (datetime.now() + timedelta(hours=3)).isoformat() + 'Z',
+                # Edge properties from graph
+                'length': round(edge_length, 2),
                 'highway_type': edge.get('highway_type', 'primary'),
                 'road_name': road_name
             })
@@ -538,27 +696,46 @@ def create_demo_disruption_files(demo_id: str, flow_data: list = None, incident_
         with open(incident_file, 'w', newline='') as f:
             f.write('source,target,source_lat,source_lon,target_lat,target_lon,incident_id,incident_type,incident_criticality,incident_description,incident_road_closed,incident_start_time,incident_end_time,highway_type,road_name\n')
     
-    # Build response with disruption details for UI preview
+    # Build response with disruption details for UI preview (includes speed and length)
     disruption_details = {
         'flow': [
             {
+                'id_hash': r.get('id_hash', ''),
                 'source_lat': float(r['source_lat']),
                 'source_lon': float(r['source_lon']),
                 'target_lat': float(r['target_lat']),
                 'target_lon': float(r['target_lon']),
-                'jam_factor': float(r['flow_jam_factor']),
-                'road_name': r['road_name']
+                'source': r.get('source'),
+                'target': r.get('target'),
+                # Speed data
+                'speed_kph': float(r.get('flow_speed_kph', 0)),
+                'free_flow_kph': float(r.get('flow_free_flow_kph', 60)),
+                'jam_factor': float(r.get('flow_jam_factor', 0)),
+                'flow_confidence': float(r.get('flow_confidence', 0.7)),
+                # Edge properties
+                'length': float(r.get('length', 0)),
+                'highway_type': r.get('highway_type', 'primary'),
+                'road_name': r.get('road_name', 'Unknown Road'),
+                'geometry': r.get('geometry', '')
             } for r in flow_rows
         ],
         'incidents': [
             {
+                'incident_id': r.get('incident_id', ''),
                 'source_lat': float(r['source_lat']),
                 'source_lon': float(r['source_lon']),
                 'target_lat': float(r['target_lat']),
                 'target_lon': float(r['target_lon']),
-                'type': r['incident_type'],
-                'criticality': r['incident_criticality'],
-                'road_name': r['road_name']
+                'source': r.get('source'),
+                'target': r.get('target'),
+                'type': r.get('incident_type', 'incident'),
+                'criticality': r.get('incident_criticality', 'minor'),
+                'description': r.get('incident_description', ''),
+                'road_closed': r.get('incident_road_closed', False),
+                # Edge properties
+                'length': float(r.get('length', 0)),
+                'highway_type': r.get('highway_type', 'primary'),
+                'road_name': r.get('road_name', 'Unknown Road')
             } for r in incident_rows
         ]
     }
@@ -1932,12 +2109,18 @@ def get_random_edges():
                 severity = 'Light'
             
             flow_preview.append({
+                'id_hash': r.get('id_hash', ''),
                 'source': source,
                 'target': target,
                 'source_lat': float(r['source_lat']),
                 'source_lon': float(r['source_lon']),
                 'target_lat': float(r['target_lat']),
                 'target_lon': float(r['target_lon']),
+                # 'flow_speed_kph': float(r.get('flow_speed_kph', 30)),
+                # 'flow_free_flow_kph': float(r.get('flow_free_flow_kph', 60)),
+                # 'flow_jam_factor': jam_factor,
+                # 'flow_confidence': float(r.get('flow_confidence', 0.95)),
+                # 'flow_traversability': r.get('flow_traversability', 'open'),
                 'jam_factor': jam_factor,
                 'severity': severity,
                 'road_name': r['road_name'],
@@ -1964,12 +2147,17 @@ def get_random_edges():
                 ]
             
             incident_preview.append({
+                'incident_id': r.get('incident_id', ''),
                 'source': source,
                 'target': target,
                 'source_lat': float(r['source_lat']),
                 'source_lon': float(r['source_lon']),
                 'target_lat': float(r['target_lat']),
                 'target_lon': float(r['target_lon']),
+                # 'incident_type': r['incident_type'],
+                # 'incident_criticality': r['incident_criticality'],
+                # 'incident_description': r.get('incident_description', ''),
+                # 'incident_road_closed': r.get('incident_road_closed', False),
                 'type': r['incident_type'],
                 'criticality': r['incident_criticality'],
                 'road_closed': r.get('incident_road_closed', False),
@@ -2493,6 +2681,138 @@ def get_demo_disruption_path(disruption_key, set_key):
         })
     except Exception as e:
         console_logger.error(f"Error getting disruption path: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/demo/disruption-data/<disruption_key>/<set_key>', methods=['GET'])
+def get_demo_disruption_data(disruption_key, set_key):
+    """
+    Load disruption data from saved CSV files for map visualization.
+    Returns the data in the format expected by showGeneratedDisruptions.
+    
+    Args:
+        disruption_key: The unique disruption folder key (UUID)
+        set_key: The set key (e.g., 'set_all', 'set_trial_0', etc.)
+    
+    Returns:
+    {
+        "success": true,
+        "incidents": [...],
+        "flowSegments": [...],
+        "disruption_dir": "..."
+    }
+    """
+    try:
+        import csv
+        
+        base_path = DEMO_DISRUPTIONS_DIR / disruption_key / set_key
+        
+        if not base_path.exists():
+            return jsonify({
+                'success': False, 
+                'error': f'Disruption folder not found: {disruption_key}/{set_key}'
+            }), 404
+        
+        incidents = []
+        flow_segments = []
+        
+        # Load incidents from CSV
+        incidents_dir = base_path / 'incidents'
+        if incidents_dir.exists():
+            for csv_file in incidents_dir.glob('*.csv'):
+                try:
+                    with open(csv_file, 'r') as f:
+                        reader = csv.DictReader(f)
+                        for row in reader:
+                            # Parse coordinates (CSV uses source_lon, target_lon)
+                            source_lat = float(row.get('source_lat', 0))
+                            source_lng = float(row.get('source_lon', row.get('source_lng', 0)))
+                            target_lat = float(row.get('target_lat', source_lat))
+                            target_lng = float(row.get('target_lon', row.get('target_lng', source_lng)))
+                            
+                            # Determine severity
+                            severity_value = float(row.get('incident_severity', row.get('severity_value', 0.5)))
+                            if severity_value > 0.7:
+                                severity = 'Heavy'
+                            elif severity_value > 0.4:
+                                severity = 'Medium'
+                            else:
+                                severity = 'Light'
+                            
+                            incident = {
+                                'id': row.get('incident_id', f"inc-{len(incidents)}"),
+                                'type': row.get('incident_type', 'Other'),
+                                'incident_type': row.get('incident_type', 'Other'),
+                                'source_lat': source_lat,
+                                'source_lng': source_lng,
+                                'target_lat': target_lat,
+                                'target_lng': target_lng,
+                                'severity': severity,
+                                'severity_value': severity_value,
+                                'road_name': row.get('road_name', 'Unknown Road'),
+                                'description': row.get('incident_description', row.get('description', '')),
+                                'criticality': row.get('incident_criticality', 'minor'),
+                                'incident_criticality': row.get('incident_criticality', 'minor'),
+                                'incident_road_closed': row.get('incident_road_closed', 'False').lower() == 'true',
+                                'incident_description': row.get('incident_description', row.get('description', ''))
+                            }
+                            incidents.append(incident)
+                except Exception as e:
+                    console_logger.warning(f"Error reading incident file {csv_file}: {e}")
+        
+        # Load flow segments from CSV
+        flow_dir = base_path / 'flow'
+        if flow_dir.exists():
+            for csv_file in flow_dir.glob('*.csv'):
+                try:
+                    with open(csv_file, 'r') as f:
+                        reader = csv.DictReader(f)
+                        for row in reader:
+                            # Parse coordinates (CSV uses source_lon, target_lon)
+                            source_lat = float(row.get('source_lat', 0))
+                            source_lng = float(row.get('source_lon', row.get('source_lng', 0)))
+                            target_lat = float(row.get('target_lat', source_lat))
+                            target_lng = float(row.get('target_lon', row.get('target_lng', source_lng)))
+                            
+                            # Calculate severity from jam factor
+                            jam_factor = float(row.get('flow_jam_factor', row.get('jam_factor', 0)))
+                            severity_value = min(jam_factor / 10.0, 1.0)  # Normalize to 0-1
+                            if severity_value > 0.7:
+                                severity = 'Heavy'
+                            elif severity_value > 0.4:
+                                severity = 'Medium'
+                            else:
+                                severity = 'Light'
+                            
+                            flow_segment = {
+                                'id': row.get('id_hash', f"flow-{len(flow_segments)}"),
+                                'type': 'TrafficFlow',
+                                'incident_type': 'Congestion',
+                                'source_lat': source_lat,
+                                'source_lng': source_lng,
+                                'target_lat': target_lat,
+                                'target_lng': target_lng,
+                                'severity': severity,
+                                'severity_value': severity_value,
+                                'jam_factor': jam_factor,
+                                'speed_kph': float(row.get('flow_speed_kph', row.get('speed_kph', 0))),
+                                'free_flow_kph': float(row.get('flow_free_flow_kph', row.get('free_flow_kph', 0))),
+                                'road_name': row.get('road_name', 'Unknown Road')
+                            }
+                            flow_segments.append(flow_segment)
+                except Exception as e:
+                    console_logger.warning(f"Error reading flow file {csv_file}: {e}")
+        
+        console_logger.info(f"Loaded {len(incidents)} incidents and {len(flow_segments)} flow segments for {disruption_key}/{set_key}")
+        
+        return jsonify({
+            'success': True,
+            'incidents': incidents,
+            'flowSegments': flow_segments,
+            'disruption_dir': str(base_path.resolve())
+        })
+    except Exception as e:
+        console_logger.error(f"Error loading disruption data: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 

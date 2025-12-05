@@ -33,7 +33,7 @@ const DemoRunner = {
     // Demo-specific disruption data
     demoDisruptionDir: null,
     generatedDisruptions: {
-        flow: [],
+        flowSegments: [],
         incidents: []
     },
     
@@ -318,8 +318,8 @@ const DemoRunner = {
     },
 
     showTab(tabName) {
-        // Hide all tabs
-        ['main', 'random-settings', 'running'].forEach(tab => {
+        // Hide all tabs (including results)
+        ['main', 'random-settings', 'running', 'results'].forEach(tab => {
             const el = document.getElementById(`demo-runner-tab-${tab}`);
             if (el) el.classList.add('hidden');
         });
@@ -338,6 +338,63 @@ const DemoRunner = {
         if (activeBtn) {
             activeBtn.classList.remove('bg-gray-200', 'text-gray-700');
             activeBtn.classList.add('bg-purple-600', 'text-white');
+        }
+        
+        // When switching to running tab, refresh the disruption display
+        if (tabName === 'running') {
+            console.log('🗺️ Switching to running tab, checking disruptions...');
+            console.log('   generatedDisruptions:', this.generatedDisruptions);
+            console.log('   disruptionSets:', Object.keys(this.disruptionSets || {}));
+            
+            // Initialize checkboxes to be checked
+            const showIncidentsCheckbox = document.getElementById('demo-show-incidents');
+            const showFlowCheckbox = document.getElementById('demo-show-flow');
+            
+            // Ensure checkboxes are checked by default
+            if (showIncidentsCheckbox && !showIncidentsCheckbox.checked) {
+                showIncidentsCheckbox.checked = true;
+            }
+            if (showFlowCheckbox && !showFlowCheckbox.checked) {
+                showFlowCheckbox.checked = true;
+            }
+            
+            const showIncidents = showIncidentsCheckbox?.checked ?? true;
+            const showFlow = showFlowCheckbox?.checked ?? true;
+            
+            // Check if we have disruptions to display
+            const hasIncidents = this.generatedDisruptions?.incidents?.length > 0;
+            const hasFlow = this.generatedDisruptions?.flowSegments?.length > 0;
+            
+            console.log(`   Has incidents: ${hasIncidents}, Has flow: ${hasFlow}`);
+            
+            if (hasIncidents || hasFlow) {
+                // Force refresh the disruption visualization
+                this.refreshDisruptionDisplay();
+            } else {
+                // Update preview to show "no disruptions"
+                this.updateDisruptionPreview();
+            }
+        }
+    },
+    
+    /**
+     * Force refresh the disruption display on the map
+     */
+    refreshDisruptionDisplay() {
+        const showIncidents = document.getElementById('demo-show-incidents')?.checked ?? true;
+        const showFlow = document.getElementById('demo-show-flow')?.checked ?? true;
+        
+        console.log('🔄 Refreshing disruption display:', { showIncidents, showFlow });
+        
+        // Show the disruptions on map
+        this.showGeneratedDisruptions(showIncidents, showFlow);
+        
+        // Update the preview list
+        this.updateDisruptionPreview();
+        
+        // Update disruption sets if available
+        if (this.disruptionSets && Object.keys(this.disruptionSets).length > 0) {
+            this.showDisruptionSetsPreview();
         }
     },
 
@@ -627,13 +684,14 @@ const DemoRunner = {
         this.isRunning = true;
         this.isPaused = false;
         this.currentDemo = config;
+        this.currentDemoId = null;  // Track demoId for cleanup
         
         const trials = config.trials || 1;
         const routes = config.routes || [];
         
-        // Check if this is a saved config with pre-generated disruptions
-        const disruptionKey = config.disruptionKey || null;
-        const hasSavedDisruptions = disruptionKey && config.disruptions?.savedSets;
+        // Check if this is a saved config with pre-generated disruptions (in-memory)
+        const configDisruptionSets = config.disruptions?.disruptionSets || {};
+        const hasConfigDisruptions = Object.keys(configDisruptionSets).length > 0;
         
         // Initialize detailed progress
         this.currentProgress = {
@@ -652,8 +710,8 @@ const DemoRunner = {
         };
         
         console.log('🎬 Starting demo:', config.name);
-        if (hasSavedDisruptions) {
-            console.log(`📁 Using saved disruptions from: ${disruptionKey}`);
+        if (hasConfigDisruptions) {
+            console.log(`� Using ${Object.keys(configDisruptionSets).length} saved disruption sets from config`);
         }
         showUpdateToast(`🎬 Starting: ${config.name}`, 'info');
         
@@ -668,22 +726,25 @@ const DemoRunner = {
             const disruptions = config.disruptions || {};
             const generationScope = disruptions.generationScope || 'all';
             
-            // If we have saved disruptions, we don't need to generate new ones
-            if (!hasSavedDisruptions) {
-                // Generate demo-specific disruptions based on scope
-                const demoId = `demo_${Date.now()}`;
-                
-                // Pre-generate disruption sets based on scope
-                this.disruptionSets = {};  // Store disruption sets by key
-                
+            // Handle disruption setup
+            this.disruptionSets = {};  // Store disruption sets by key
+            this.currentDemoId = `demo_${Date.now()}`;
+            
+            if (hasConfigDisruptions) {
+                // Use saved disruption sets from config - write to temp files for routing
+                for (const [setKey, setData] of Object.entries(configDisruptionSets)) {
+                    await this.activateConfigDisruptionSet(setKey, setData, this.currentDemoId);
+                }
+            } else {
+                // Generate new disruptions based on scope
                 if (generationScope === 'all') {
                     // Generate one set for all trials/routes
-                    await this.setupDemoDisruptions(config, demoId, 'set_all');
+                    await this.setupDemoDisruptions(config, this.currentDemoId, 'set_all');
                 } else if (generationScope === 'per-route') {
                     // Pre-generate disruption set for each route (used across all trials)
                     for (let i = 0; i < routes.length; i++) {
                         const routeKey = `set_route_${i}`;
-                        await this.setupDemoDisruptions(config, `${demoId}_${routeKey}`, routeKey);
+                        await this.setupDemoDisruptions(config, `${this.currentDemoId}_${routeKey}`, routeKey);
                     }
                 }
                 // For per-trial and per-trial-route, generate on-the-fly in the loop
@@ -695,11 +756,10 @@ const DemoRunner = {
                 
                 this.currentProgress.trial = trial + 1;
                 
-                // Generate disruptions for this trial if per-trial scope (only if not using saved)
-                if (!hasSavedDisruptions && generationScope === 'per-trial') {
-                    const demoId = `demo_${Date.now()}`;
+                // Generate disruptions for this trial if per-trial scope (only if not using config-saved)
+                if (!hasConfigDisruptions && generationScope === 'per-trial') {
                     const trialKey = `set_trial_${trial}`;
-                    await this.setupDemoDisruptions(config, `${demoId}_${trialKey}`, trialKey);
+                    await this.setupDemoDisruptions(config, `${this.currentDemoId}_${trialKey}`, trialKey);
                 }
                 
                 // Process each route
@@ -714,15 +774,14 @@ const DemoRunner = {
                     this.currentProgress.status = `Setting up route ${i + 1}...`;
                     this.updateDetailedProgressUI();
                     
-                    // Generate disruptions for this trial-route if per-trial-route scope (only if not using saved)
-                    if (!hasSavedDisruptions && generationScope === 'per-trial-route') {
-                        const demoId = `demo_${Date.now()}`;
+                    // Generate disruptions for this trial-route if per-trial-route scope (only if not using config-saved)
+                    if (!hasConfigDisruptions && generationScope === 'per-trial-route') {
                         const comboKey = `set_trial_${trial}_route_${i}`;
-                        await this.setupDemoDisruptions(config, `${demoId}_${comboKey}`, comboKey);
+                        await this.setupDemoDisruptions(config, `${this.currentDemoId}_${comboKey}`, comboKey);
                     }
                     
-                    // Set active disruptions based on scope (pass disruptionKey for saved configs)
-                    await this.activateDisruptionSet(generationScope, trial, i, disruptionKey);
+                    // Set active disruptions based on scope
+                    await this.activateDisruptionSet(generationScope, trial, i);
                     
                     await this.processRouteWithProgress(route, config, trial);
                     await this.delay(config.stepDelay || 2000);
@@ -739,8 +798,10 @@ const DemoRunner = {
                     clearRoutes();
                 }
                 
-                // Cleanup demo disruptions
-                await this.cleanupDemoDisruptions(demoId);
+                // Cleanup demo disruptions (only if we generated them at runtime)
+                if (this.currentDemoId) {
+                    await this.cleanupDemoDisruptions(this.currentDemoId);
+                }
                 
                 // Show results summary after a short delay
                 setTimeout(() => {
@@ -756,6 +817,7 @@ const DemoRunner = {
         } finally {
             this.isRunning = false;
             this.currentDemo = null;
+            this.currentDemoId = null;  // Reset demoId
             this.demoDisruptionDir = null;
         }
     },
@@ -871,13 +933,53 @@ const DemoRunner = {
     },
     
     /**
+     * Activate a disruption set from config - writes to temp files and stores in disruptionSets
+     * @param {string} setKey - The disruption set key (e.g., 'set_all', 'set_trial_0', etc.)
+     * @param {Object} setData - The disruption data { flow: [...], incidents: [...] }
+     * @param {string} demoId - The demo ID for file naming
+     */
+    async activateConfigDisruptionSet(setKey, setData, demoId) {
+        try {
+            // Write the disruption data to temp files via API
+            const response = await fetch('/api/demo/disruptions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    demo_id: `${demoId}_${setKey}`,
+                    use_random_edges: false,  // Use custom locations from config
+                    flow_data: setData.flow || [],
+                    incident_data: setData.incidents || []
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                // Store in our runtime disruption sets
+                this.disruptionSets[setKey] = {
+                    disruptionDir: result.disruption_dir,
+                    demoId: `${demoId}_${setKey}`,
+                    disruptions: {
+                        flow: setData.flow || [],
+                        incidents: setData.incidents || []
+                    }
+                };
+                console.log(`📦 Activated config disruption set: ${setKey} -> ${result.disruption_dir}`);
+            } else {
+                console.warn(`⚠️ Failed to activate config disruption set ${setKey}:`, result.error);
+            }
+        } catch (error) {
+            console.error(`❌ Error activating config disruption set ${setKey}:`, error);
+        }
+    },
+    
+    /**
      * Activate the appropriate disruption set based on scope
      * @param {string} scope - Generation scope ('all', 'per-trial', 'per-route', 'per-trial-route')
      * @param {number} trialIndex - Current trial index
      * @param {number} routeIndex - Current route index
-     * @param {string} disruptionKey - Optional: The disruption key from saved config
      */
-    async activateDisruptionSet(scope, trialIndex, routeIndex, disruptionKey = null) {
+    async activateDisruptionSet(scope, trialIndex, routeIndex) {
         // Determine set key based on scope
         let setKey;
         switch (scope) {
@@ -897,36 +999,48 @@ const DemoRunner = {
                 setKey = 'set_all';
         }
         
-        // If we have a saved config with disruption key, load from file system
-        if (disruptionKey) {
-            try {
-                const response = await fetch(`/api/demo/disruption-path/${disruptionKey}/${setKey}`);
-                const result = await response.json();
-                
-                if (result.success) {
-                    this.demoDisruptionDir = result.disruption_dir;
-                    window.demoDisruptionDir = result.disruption_dir;
-                    console.log(`🔄 Loaded disruption set from saved config: ${setKey} -> ${result.disruption_dir}`);
-                    return;
-                }
-            } catch (error) {
-                console.warn(`⚠️ Could not load saved disruption set: ${error}`);
-            }
-        }
-        
-        // Fall back to runtime-generated disruption sets
+        // Use runtime-generated disruption sets
         if (!this.disruptionSets) return;
         
         const disruptionSet = this.disruptionSets[setKey];
         if (disruptionSet) {
             this.demoDisruptionDir = disruptionSet.disruptionDir;
             window.demoDisruptionDir = disruptionSet.disruptionDir;
-            this.generatedDisruptions = disruptionSet.disruptions;
+            
+            // Convert API format (flow/incidents) to display format (flowSegments/incidents)
+            const disruptions = disruptionSet.disruptions || {};
+            this.generatedDisruptions = {
+                incidents: (disruptions.incidents || []).map(d => ({
+                    ...d,
+                    source_lng: d.source_lon || d.source_lng,
+                    target_lng: d.target_lon || d.target_lng,
+                    incident_type: d.type || d.incident_type || 'Incident',
+                    severity: d.criticality === 'critical' ? 'Heavy' : 
+                              d.criticality === 'major' ? 'Medium' : 'Light'
+                })),
+                flowSegments: (disruptions.flow || []).map(d => ({
+                    ...d,
+                    source_lng: d.source_lon || d.source_lng,
+                    target_lng: d.target_lon || d.target_lng,
+                    incident_type: 'Congestion',
+                    severity: d.jam_factor > 7 ? 'Heavy' : 
+                              d.jam_factor > 4 ? 'Medium' : 'Light',
+                    current_speed: d.speed_kph,
+                    free_flow_speed: d.free_flow_kph
+                }))
+            };
             
             console.log(`🔄 Activated disruption set: ${setKey}`);
+            console.log(`   Incidents: ${this.generatedDisruptions.incidents.length}, Flow: ${this.generatedDisruptions.flowSegments.length}`);
+            
+            // Update current preview set and refresh UI
+            this.currentPreviewSet = setKey;
             
             // Update map visualization to show current disruptions
             this.showGeneratedDisruptions(true, true);
+            
+            // Update the disruption preview panel
+            this.showDisruptionSetsPreview();
         } else {
             console.warn(`⚠️ Disruption set not found for key: ${setKey}`);
         }
@@ -1002,17 +1116,36 @@ const DemoRunner = {
 
         await this.delay(500);
 
-        // Test each tau value
-        const tauValues = route.tauValues || [0.5];
-        this.currentProgress.totalTaus = tauValues.length;
+        // Determine TAU values to test based on scope
+        const tauScope = config.sequence?.tauGenerationScope || 'all';
+        let tauValuesToTest;
         
-        for (let tauIdx = 0; tauIdx < tauValues.length; tauIdx++) {
+        switch (tauScope) {
+            case 'per-trial':
+                // For per-trial, route has all trial TAUs, pick the one for this trial
+                tauValuesToTest = [(route.tauValues || [])[trialIndex] || 0.5];
+                break;
+            case 'per-trial-route':
+                // For per-trial-route, route has TAUs for each trial, pick the one for this trial
+                tauValuesToTest = [(route.tauValues || [])[trialIndex] || 0.5];
+                break;
+            case 'all':
+            case 'per-route':
+            default:
+                // For 'all' and 'per-route', route has single TAU, use all values provided
+                tauValuesToTest = route.tauValues || [0.5];
+                break;
+        }
+        
+        this.currentProgress.totalTaus = tauValuesToTest.length;
+        
+        for (let tauIdx = 0; tauIdx < tauValuesToTest.length; tauIdx++) {
             if (!this.isRunning) break;
             while (this.isPaused) {
                 await this.delay(100);
             }
             
-            const tau = tauValues[tauIdx];
+            const tau = tauValuesToTest[tauIdx];
             this.currentProgress.tauIndex = tauIdx + 1;
             this.currentProgress.currentTau = tau;
 
@@ -1023,17 +1156,26 @@ const DemoRunner = {
                     await this.delay(100);
                 }
 
+                // Skip redundant DHL runs - DHL doesn't use TAU so only run once (on first tau iteration)
+                if (algo === 'dhl' && tauIdx > 0) {
+                    continue;
+                }
+
+                // DHL uses default 0.5, HC2L uses the specified tau
+                const effectiveTau = algo === 'hc2l' ? tau : 0.5;
+                
                 this.currentProgress.algorithm = algo.toUpperCase();
-                this.currentProgress.status = `Testing ${algo.toUpperCase()} with τ = ${tau.toFixed(2)}`;
+                this.currentProgress.currentTau = effectiveTau;
+                this.currentProgress.status = `Testing ${algo.toUpperCase()} with τ = ${effectiveTau.toFixed(2)}`;
                 this.updateDetailedProgressUI();
                 
                 // Set algorithm
                 document.querySelector(`input[name="algorithm"][value="${algo}"]`)?.click();
                 
-                // Set tau
+                // Set tau value
                 const thresholdInput = document.getElementById('threshold-input');
                 if (thresholdInput) {
-                    thresholdInput.value = tau;
+                    thresholdInput.value = effectiveTau;
                     thresholdInput.dispatchEvent(new Event('input'));
                 }
 
@@ -1044,10 +1186,16 @@ const DemoRunner = {
                     await computeRouteBasedOnSelection();
                 }
 
-                // Capture result
+                // Capture result with the effective tau used
                 await this.delay(500);
-                const result = this.captureCurrentResult(algo, tau, route, trialIndex);
+                const result = this.captureCurrentResult(algo, effectiveTau, route, trialIndex);
                 if (result) {
+                    console.log(`✅ Captured ${algo.toUpperCase()} result:`, {
+                        distance: result.metrics.displayDistance,
+                        distanceKm: result.metrics.distanceKm,
+                        tau: result.tau,
+                        route: result.route
+                    });
                     this.currentProgress.lastResult = result;
                     this.currentProgress.results.push(result);
                 }
@@ -1070,35 +1218,60 @@ const DemoRunner = {
                 metrics: {}
             };
 
-            // Read from Algorithm Metrics panel elements
-            const getMetricValue = (id) => {
+            // Read from Algorithm Metrics panel elements with improved extraction
+            const getMetricValue = (id, stripUnits = false) => {
                 const el = document.getElementById(id);
                 if (el) {
-                    const text = el.textContent.trim();
-                    return text !== '--' ? text : null;
+                    let text = el.textContent.trim();
+                    if (text === '--' || text === '-- sec' || text === '-- ms' || text === '-- edges' || text.startsWith('--')) {
+                        return null;
+                    }
+                    // Strip common unit suffixes if requested
+                    if (stripUnits) {
+                        text = text.replace(/\s*(sec|ms|edges|km|m|MB|nodes|units)$/i, '').trim();
+                    }
+                    return text;
                 }
                 return null;
+            };
+
+            // Get numeric value from an element
+            const getNumericValue = (id) => {
+                const text = getMetricValue(id, true);
+                if (text === null) return null;
+                const num = parseFloat(text.replace(/[^\d.-]/g, ''));
+                return isNaN(num) ? null : num;
             };
 
             // Algorithm Metrics panel elements
             result.metrics.algorithm = getMetricValue('metrics-algorithm');
             result.metrics.queryTime = getMetricValue('metrics-query-time');
+            result.metrics.queryTimeNum = getNumericValue('metrics-query-time');
             result.metrics.baselineEta = getMetricValue('metrics-baseline-eta');
             result.metrics.actualEta = getMetricValue('metrics-actual-eta');
             result.metrics.timeImpact = getMetricValue('metrics-time-impact');
             result.metrics.disruptedEdges = getMetricValue('metrics-disrupted-edges');
+            
+            // Distance - try multiple sources
             result.metrics.distance = getMetricValue('metrics-distance');
+            result.metrics.distanceNum = getNumericValue('metrics-distance');
             result.metrics.pathLength = getMetricValue('metrics-path-length');
             result.metrics.edgeCount = getMetricValue('metrics-edge-count');
             result.metrics.labelingTime = getMetricValue('metrics-labeling-time');
             result.metrics.labelingSize = getMetricValue('metrics-labeling-size');
             result.metrics.calculatedDistance = getMetricValue('metrics-calculated-distance');
+            result.metrics.calculatedDistanceNum = getNumericValue('metrics-calculated-distance');
 
             // Also try main route display elements
             const routeDistance = document.getElementById('route-distance')?.textContent?.trim();
             const routeEta = document.getElementById('route-eta')?.textContent?.trim();
             if (routeDistance && routeDistance !== '--') {
                 result.metrics.displayDistance = routeDistance;
+                // Extract numeric distance in km
+                const kmMatch = routeDistance.match(/([\d.]+)\s*km/i);
+                if (kmMatch) {
+                    result.metrics.distanceKm = parseFloat(kmMatch[1]);
+                }
             }
             if (routeEta && routeEta !== '--') {
                 result.metrics.displayEta = routeEta;
@@ -1466,56 +1639,233 @@ const DemoRunner = {
         return this.generatedDisruptions;
     },
 
-    // Show generated disruptions on map
+    // Demo disruption layer group for map display
+    demoDisruptionLayers: [],
+
+    // Show generated disruptions on map - mirrors DemoCreator.displayDisruptionsOnMap approach
     async showGeneratedDisruptions(showIncidents = true, showFlow = true) {
-        console.log('🗺️ Showing generated disruptions:', { showIncidents, showFlow });
+        console.log('🗺️ showGeneratedDisruptions called:', { showIncidents, showFlow });
+        console.log('   Current disruption data:', {
+            incidentCount: this.generatedDisruptions?.incidents?.length || 0,
+            flowCount: this.generatedDisruptions?.flowSegments?.length || 0
+        });
         
-        // Clear existing disruption markers first
-        if (typeof clearDisruptionMarkers === 'function') {
-            clearDisruptionMarkers();
-        }
+        // Clear existing demo disruption layers
+        this.clearDemoDisruptionLayers();
         
-        const allDisruptions = [];
+        // Get map reference - try multiple options
+        const mapRef = window.map || (typeof map !== 'undefined' ? map : null);
         
-        if (showIncidents && this.generatedDisruptions.incidents.length > 0) {
-            allDisruptions.push(...this.generatedDisruptions.incidents);
-        }
-        
-        if (showFlow && this.generatedDisruptions.flowSegments.length > 0) {
-            allDisruptions.push(...this.generatedDisruptions.flowSegments);
-        }
-        
-        if (allDisruptions.length === 0) {
-            console.log('No disruptions to display');
+        if (!mapRef) {
+            console.warn('❌ Map not available for disruption display');
             return;
         }
         
-        // Format for showAllDisruptionsOnMap
-        const disruptionData = {
-            disruptions_by_type: {},
-            total_disruptions: allDisruptions.length,
-            severity_counts: { Heavy: 0, Medium: 0, Light: 0 }
+        console.log('✅ Map reference obtained, adding layers...');
+        
+        // Color scheme matching traffic-visualization.js
+        const flowColors = {
+            heavy: { color: '#ef4444', weight: 6, opacity: 0.85 },   // Red - Heavy traffic
+            medium: { color: '#f59e0b', weight: 5, opacity: 0.75 },  // Amber - Medium traffic
+            light: { color: '#10b981', weight: 4, opacity: 0.65 }    // Green - Light traffic
         };
         
-        // Group by type
-        allDisruptions.forEach(d => {
-            const type = d.incident_type || d.type || 'Other';
-            if (!disruptionData.disruptions_by_type[type]) {
-                disruptionData.disruptions_by_type[type] = [];
-            }
-            disruptionData.disruptions_by_type[type].push(d);
-            
-            // Count severity
-            const severity = d.severity || 'Medium';
-            if (disruptionData.severity_counts[severity] !== undefined) {
-                disruptionData.severity_counts[severity]++;
-            }
-        });
+        const incidentIcons = {
+            'accident': '🚗',
+            'construction': '🏗️',
+            'roadClosure': '🚧',
+            'hazard': '⚠️',
+            'Road Closure': '🚧',
+            'Accident': '🚗',
+            'Construction': '🏗️',
+            'default': '📍'
+        };
         
-        // Show on map
-        if (typeof showAllDisruptionsOnMap === 'function') {
-            showAllDisruptionsOnMap(disruptionData);
-            console.log(`✅ Displayed ${allDisruptions.length} demo disruptions on map`);
+        // Add flow disruption polylines
+        if (showFlow && this.generatedDisruptions.flowSegments && this.generatedDisruptions.flowSegments.length > 0) {
+            this.generatedDisruptions.flowSegments.forEach((f, i) => {
+                const sourceLat = parseFloat(f.source_lat);
+                const sourceLng = parseFloat(f.source_lng || f.source_lon);
+                const targetLat = parseFloat(f.target_lat);
+                const targetLng = parseFloat(f.target_lng || f.target_lon);
+                
+                if (isNaN(sourceLat) || isNaN(sourceLng) || isNaN(targetLat) || isNaN(targetLng)) {
+                    console.warn('Skipping flow segment with invalid coordinates:', f);
+                    return;
+                }
+                
+                // Determine severity
+                const jamFactor = parseFloat(f.jam_factor) || 0;
+                let severity = f.severity || (jamFactor >= 7 ? 'Heavy' : jamFactor >= 4 ? 'Medium' : 'Light');
+                
+                let style;
+                switch (severity) {
+                    case 'Heavy':
+                        style = flowColors.heavy;
+                        break;
+                    case 'Medium':
+                        style = flowColors.medium;
+                        break;
+                    default:
+                        style = flowColors.light;
+                }
+                
+                const polyline = L.polyline([
+                    [sourceLat, sourceLng],
+                    [targetLat, targetLng]
+                ], {
+                    color: style.color,
+                    weight: style.weight,
+                    opacity: style.opacity,
+                    className: 'demo-disruption-flow'
+                });
+                
+                // Create popup
+                const popup = typeof PopupStyles !== 'undefined' ? 
+                    PopupStyles.createTrafficPopup({
+                        road_name: f.road_name || 'Unknown Road',
+                        incident_type: 'Congestion',
+                        severity: severity,
+                        speed_kph: f.speed_kph || f.current_speed || 0,
+                        free_flow_kph: f.free_flow_kph || 50,
+                        jam_factor: jamFactor,
+                        is_closed: false
+                    }) :
+                    `<div class="popup-content">
+                        <b>🚦 Traffic Congestion</b><br>
+                        <b>Road:</b> ${f.road_name || 'Unknown Road'}<br>
+                        <b>Severity:</b> <span style="color: ${style.color}">${severity}</span><br>
+                        <b>Jam Factor:</b> ${jamFactor.toFixed(1)} / 10
+                    </div>`;
+                
+                polyline.bindPopup(popup);
+                
+                // Hover effects
+                polyline.on('mouseover', function() {
+                    this.setStyle({ weight: style.weight + 2, opacity: Math.min(style.opacity + 0.2, 1) });
+                });
+                polyline.on('mouseout', function() {
+                    this.setStyle({ weight: style.weight, opacity: style.opacity });
+                });
+                
+                polyline.addTo(mapRef);
+                this.demoDisruptionLayers.push(polyline);
+            });
+            
+            console.log(`✅ Added ${this.generatedDisruptions.flowSegments.length} flow segments to map`);
+        }
+        
+        // Add incident markers with polylines
+        if (showIncidents && this.generatedDisruptions.incidents && this.generatedDisruptions.incidents.length > 0) {
+            this.generatedDisruptions.incidents.forEach((inc, i) => {
+                const sourceLat = parseFloat(inc.source_lat);
+                const sourceLng = parseFloat(inc.source_lng || inc.source_lon);
+                const targetLat = parseFloat(inc.target_lat);
+                const targetLng = parseFloat(inc.target_lng || inc.target_lon);
+                
+                if (isNaN(sourceLat) || isNaN(sourceLng) || isNaN(targetLat) || isNaN(targetLng)) {
+                    console.warn('Skipping incident with invalid coordinates:', inc);
+                    return;
+                }
+                
+                // Determine color based on criticality
+                const criticality = (inc.criticality || inc.incident_criticality || 'minor').toLowerCase();
+                let fillColor = '#f59e0b'; // amber - default
+                let severity = 'Medium';
+                
+                if (criticality === 'critical') {
+                    fillColor = '#dc2626'; // dark red
+                    severity = 'Heavy';
+                } else if (criticality === 'major') {
+                    fillColor = '#ef4444'; // red
+                    severity = 'Medium';
+                } else {
+                    fillColor = '#f59e0b'; // amber
+                    severity = 'Light';
+                }
+                
+                // Draw polyline for incident edge
+                const polyline = L.polyline([
+                    [sourceLat, sourceLng],
+                    [targetLat, targetLng]
+                ], {
+                    color: fillColor,
+                    weight: 5,
+                    opacity: 0.8,
+                    dashArray: '10, 5',
+                    className: 'demo-disruption-incident'
+                });
+                
+                // Create popup
+                const incidentType = inc.incident_type || inc.type || 'Incident';
+                const popup = typeof PopupStyles !== 'undefined' ? 
+                    PopupStyles.createIncidentPopup({
+                        road_name: inc.road_name || 'Unknown Road',
+                        incident_type: incidentType,
+                        incident_criticality: criticality,
+                        incident_road_closed: inc.incident_road_closed || false,
+                        incident_description: inc.incident_description || inc.description || '',
+                        highway_type: inc.highway_type || ''
+                    }) :
+                    `<div class="popup-content">
+                        <b>${incidentIcons[incidentType] || incidentIcons.default} ${incidentType}</b><br>
+                        <b>Road:</b> ${inc.road_name || 'Unknown Road'}<br>
+                        <b>Criticality:</b> <span style="color: ${fillColor}">${criticality}</span>
+                    </div>`;
+                
+                polyline.bindPopup(popup);
+                
+                // Hover effects
+                polyline.on('mouseover', function() {
+                    this.setStyle({ weight: 7, opacity: 0.95 });
+                });
+                polyline.on('mouseout', function() {
+                    this.setStyle({ weight: 5, opacity: 0.8 });
+                });
+                
+                polyline.addTo(mapRef);
+                this.demoDisruptionLayers.push(polyline);
+                
+                // Add small circle marker at midpoint
+                const midLat = (sourceLat + targetLat) / 2;
+                const midLng = (sourceLng + targetLng) / 2;
+                
+                const icon = incidentIcons[incidentType] || incidentIcons.default;
+                const marker = L.marker([midLat, midLng], {
+                    icon: L.divIcon({
+                        className: 'demo-incident-icon',
+                        html: `<div style="background: ${fillColor}; color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">${icon}</div>`,
+                        iconSize: [24, 24],
+                        iconAnchor: [12, 12]
+                    })
+                });
+                
+                marker.bindPopup(popup);
+                marker.addTo(mapRef);
+                this.demoDisruptionLayers.push(marker);
+            });
+            
+            console.log(`✅ Added ${this.generatedDisruptions.incidents.length} incidents to map`);
+        }
+        
+        console.log(`📊 Total demo disruption layers: ${this.demoDisruptionLayers.length}`);
+    },
+    
+    // Clear demo disruption layers from map
+    clearDemoDisruptionLayers() {
+        if (this.demoDisruptionLayers && this.demoDisruptionLayers.length > 0) {
+            const mapRef = window.map || (typeof map !== 'undefined' ? map : null);
+            this.demoDisruptionLayers.forEach(layer => {
+                if (mapRef) {
+                    try {
+                        mapRef.removeLayer(layer);
+                    } catch (e) {
+                        console.debug('Could not remove layer:', e);
+                    }
+                }
+            });
+            this.demoDisruptionLayers = [];
+            console.log('🧹 Cleared demo disruption layers');
         }
     },
     
@@ -1523,12 +1873,246 @@ const DemoRunner = {
      * Hide generated disruptions from the map
      */
     hideGeneratedDisruptions() {
+        this.clearDemoDisruptionLayers();
+        // Also clear any existing disruption markers from the main system
         if (typeof clearDisruptionMarkers === 'function') {
             clearDisruptionMarkers();
         }
-        console.log('🧹 Cleared disruption markers from map');
+    },
+    
+    // Current disruption set key for display
+    currentPreviewSet: null,
+
+    /**
+     * Show disruption sets preview panel (matching Demo Creator style)
+     */
+    showDisruptionSetsPreview() {
+        const setsPanel = document.getElementById('demo-runner-disruption-sets');
+        const buttonsContainer = document.getElementById('demo-runner-set-buttons');
+        const previewContainer = document.getElementById('demo-runner-disruption-preview');
+        
+        if (!setsPanel || !buttonsContainer || !previewContainer) return;
+        
+        const sets = this.disruptionSets || {};
+        const setKeys = Object.keys(sets);
+        
+        if (setKeys.length === 0) {
+            setsPanel.classList.add('hidden');
+            previewContainer.innerHTML = this.renderCurrentDisruptionList();
+            return;
+        }
+        
+        // Show sets panel and render buttons
+        setsPanel.classList.remove('hidden');
+        
+        buttonsContainer.innerHTML = setKeys.map(key => `
+            <button onclick="DemoRunner.selectDisruptionSet('${key}')"
+                    class="px-2 py-1 text-xs rounded-lg transition-colors ${this.currentPreviewSet === key ? 
+                        'bg-amber-600 text-white' : 'bg-amber-100 text-amber-700 hover:bg-amber-200'}">
+                ${this.getSetLabel(key)}
+            </button>
+        `).join('');
+        
+        // Render current set details
+        previewContainer.innerHTML = this.renderCurrentDisruptionList();
     },
 
+    /**
+     * Get friendly label for disruption set key
+     */
+    getSetLabel(key) {
+        if (!key) return 'Unknown';
+        
+        if (key === 'set_all') return 'All Trials/Routes';
+        
+        const match = key.match(/set_trial_(\d+)(?:_route_(\d+))?/);
+        if (match) {
+            const trial = parseInt(match[1]) + 1;
+            const route = match[2] !== undefined ? parseInt(match[2]) + 1 : null;
+            if (route !== null) {
+                return `T${trial}/R${route}`;
+            }
+            return `Trial ${trial}`;
+        }
+        
+        const routeMatch = key.match(/set_route_(\d+)/);
+        if (routeMatch) {
+            return `Route ${parseInt(routeMatch[1]) + 1}`;
+        }
+        
+        return key.replace('set_', '').replace(/_/g, ' ');
+    },
+
+    /**
+     * Select a disruption set to view
+     */
+    selectDisruptionSet(setKey) {
+        if (!this.disruptionSets || !this.disruptionSets[setKey]) return;
+        
+        this.currentPreviewSet = setKey;
+        
+        // Update generatedDisruptions to match the selected set
+        const setData = this.disruptionSets[setKey];
+        const disruptions = setData.disruptions || {};
+        
+        this.generatedDisruptions = {
+            incidents: (disruptions.incidents || []).map(d => ({
+                ...d,
+                source_lng: d.source_lon || d.source_lng,
+                target_lng: d.target_lon || d.target_lng,
+                incident_type: d.type || d.incident_type || 'Incident',
+                severity: d.criticality === 'critical' ? 'Heavy' : 
+                          d.criticality === 'major' ? 'Medium' : 'Light'
+            })),
+            flowSegments: (disruptions.flow || []).map(d => ({
+                ...d,
+                source_lng: d.source_lon || d.source_lng,
+                target_lng: d.target_lon || d.target_lng,
+                incident_type: 'Congestion',
+                severity: d.jam_factor > 7 ? 'Heavy' : 
+                          d.jam_factor > 4 ? 'Medium' : 'Light',
+                current_speed: d.speed_kph,
+                free_flow_speed: d.free_flow_kph
+            }))
+        };
+        
+        // Refresh map display
+        const showIncidents = document.getElementById('demo-show-incidents')?.checked ?? true;
+        const showFlow = document.getElementById('demo-show-flow')?.checked ?? true;
+        this.showGeneratedDisruptions(showIncidents, showFlow);
+        
+        // Refresh preview panel
+        this.showDisruptionSetsPreview();
+    },
+
+    /**
+     * Render the current disruption list for the preview panel
+     */
+    renderCurrentDisruptionList() {
+        const flow = this.generatedDisruptions.flowSegments || [];
+        const incidents = this.generatedDisruptions.incidents || [];
+        
+        if (flow.length === 0 && incidents.length === 0) {
+            return `<div class="text-xs text-gray-500 text-center py-2">No disruptions loaded</div>`;
+        }
+        
+        let html = '';
+        
+        // Flow disruptions
+        if (flow.length > 0) {
+            html += `<div class="text-xs font-semibold text-orange-600 mb-1">🚦 Traffic Flow (${flow.length})</div>`;
+            html += `<div class="space-y-1 mb-2">`;
+            flow.slice(0, 10).forEach((f, i) => {
+                const jamFactor = parseFloat(f.jam_factor) || 0;
+                const severityColor = jamFactor >= 7 ? 'text-red-600' : jamFactor >= 4 ? 'text-amber-600' : 'text-green-600';
+                html += `
+                    <div class="flex items-center justify-between bg-orange-50 rounded px-2 py-1 text-xs cursor-pointer hover:bg-orange-100"
+                         onclick="DemoRunner.focusDisruption('flow', ${i})">
+                        <span class="truncate flex-1 text-gray-700">${f.road_name || 'Unknown Road'}</span>
+                        <span class="${severityColor} font-semibold ml-2">JF: ${jamFactor.toFixed(1)}</span>
+                    </div>
+                `;
+            });
+            if (flow.length > 10) {
+                html += `<div class="text-xs text-gray-400 text-center">+${flow.length - 10} more...</div>`;
+            }
+            html += `</div>`;
+        }
+        
+        // Incidents
+        if (incidents.length > 0) {
+            html += `<div class="text-xs font-semibold text-red-600 mb-1">🚨 Incidents (${incidents.length})</div>`;
+            html += `<div class="space-y-1">`;
+            incidents.slice(0, 10).forEach((inc, i) => {
+                const criticality = (inc.criticality || inc.incident_criticality || 'minor').toLowerCase();
+                const critColor = criticality === 'critical' ? 'text-red-700' : criticality === 'major' ? 'text-red-500' : 'text-amber-600';
+                html += `
+                    <div class="flex items-center justify-between bg-red-50 rounded px-2 py-1 text-xs cursor-pointer hover:bg-red-100"
+                         onclick="DemoRunner.focusDisruption('incident', ${i})">
+                        <span class="truncate flex-1 text-gray-700">${inc.road_name || 'Unknown Road'}</span>
+                        <span class="${critColor} font-semibold ml-2">${inc.incident_type || inc.type || 'Incident'}</span>
+                    </div>
+                `;
+            });
+            if (incidents.length > 10) {
+                html += `<div class="text-xs text-gray-400 text-center">+${incidents.length - 10} more...</div>`;
+            }
+            html += `</div>`;
+        }
+        
+        return html;
+    },
+
+    /**
+     * Focus map on a specific disruption
+     */
+    focusDisruption(type, index) {
+        let item;
+        if (type === 'flow') {
+            item = this.generatedDisruptions.flowSegments?.[index];
+        } else {
+            item = this.generatedDisruptions.incidents?.[index];
+        }
+        
+        if (!item || !window.map) return;
+        
+        // Calculate center of the disruption
+        const lat = (parseFloat(item.source_lat) + parseFloat(item.target_lat)) / 2;
+        const lng = (parseFloat(item.source_lng || item.source_lon) + parseFloat(item.target_lng || item.target_lon)) / 2;
+        
+        if (!isNaN(lat) && !isNaN(lng)) {
+            map.setView([lat, lng], 16);
+            console.log(`🔍 Focused on ${type} disruption at [${lat.toFixed(4)}, ${lng.toFixed(4)}]`);
+        }
+    },
+
+    /**
+     * Toggle incidents visibility on map (called from checkbox)
+     */
+    toggleIncidents(show) {
+        console.log('🚨 Toggle incidents:', show);
+        const showFlow = document.getElementById('demo-show-flow')?.checked ?? true;
+        this.showGeneratedDisruptions(show, showFlow);
+        // Also update the preview panel
+        this.updateDisruptionPreview();
+    },
+
+    /**
+     * Toggle flow overlay visibility on map (called from checkbox)
+     */
+    toggleFlowOverlay(show) {
+        console.log('🚦 Toggle flow overlay:', show);
+        const showIncidents = document.getElementById('demo-show-incidents')?.checked ?? true;
+        this.showGeneratedDisruptions(showIncidents, show);
+        // Also update the preview panel
+        this.updateDisruptionPreview();
+    },
+    
+    /**
+     * Update the disruption preview panel based on current checkbox states
+     */
+    updateDisruptionPreview() {
+        const showIncidents = document.getElementById('demo-show-incidents')?.checked ?? true;
+        const showFlow = document.getElementById('demo-show-flow')?.checked ?? true;
+        const previewContainer = document.getElementById('demo-runner-disruption-preview');
+        
+        if (!previewContainer) return;
+        
+        const flow = showFlow ? (this.generatedDisruptions.flowSegments || []) : [];
+        const incidents = showIncidents ? (this.generatedDisruptions.incidents || []) : [];
+        
+        if (flow.length === 0 && incidents.length === 0) {
+            if (!showIncidents && !showFlow) {
+                previewContainer.innerHTML = '<div class="text-xs text-gray-500 text-center py-2">Disruption display disabled</div>';
+            } else {
+                previewContainer.innerHTML = '<div class="text-xs text-gray-500 text-center py-2">No disruptions to display</div>';
+            }
+            return;
+        }
+        
+        previewContainer.innerHTML = this.renderCurrentDisruptionList();
+    },
+    
     // Apply disruption mode from config - NOW uses generated disruptions instead of HERE API
     async applyDemoDisruptions(config) {
         const mode = config.disruptions?.mode || config.disruptionMode || 'none';
@@ -1572,6 +2156,9 @@ const DemoRunner = {
         
         // Show the generated disruptions on map
         await this.showGeneratedDisruptions(showIncidents, showFlow);
+        
+        // Update the disruption preview panel
+        this.showDisruptionSetsPreview();
         
         // Also set the dataset radio for the routing algorithm
         let datasetValue = 'none';
@@ -1727,94 +2314,246 @@ const DemoRunner = {
     showResultsSummary() {
         // Use currentProgress.results instead of resultsHistory
         const results = this.currentProgress.results || [];
+        console.log('📊 Showing results summary with', results.length, 'results');
+        console.log('📊 Raw results:', JSON.stringify(results, null, 2));
+        
         if (!results || results.length === 0) {
             showUpdateToast('No results to display', 'info');
             return;
         }
 
-        // Calculate summary statistics
-        const hc2lResults = results.filter(r => r.algorithm === 'hc2l' || r.algorithm === 'HC2L');
-        const dhlResults = results.filter(r => r.algorithm === 'dhl' || r.algorithm === 'DHL');
+        // Calculate summary statistics - extract metrics from result objects
+        const hc2lResults = results.filter(r => (r.algorithm || '').toUpperCase() === 'HC2L');
+        const dhlResults = results.filter(r => (r.algorithm || '').toUpperCase() === 'DHL');
 
-        const calcAvg = (arr, key) => {
-            const validValues = arr.map(r => parseFloat(r[key])).filter(v => !isNaN(v) && v > 0);
-            return validValues.length > 0 ? (validValues.reduce((a, b) => a + b, 0) / validValues.length).toFixed(2) : 'N/A';
+        console.log('📊 Results Summary Data:', {
+            totalResults: results.length,
+            hc2lCount: hc2lResults.length,
+            dhlCount: dhlResults.length,
+            sampleResult: results[0]
+        });
+
+        // Helper to extract numeric value from metrics - try multiple keys
+        const getNumericMetric = (metrics, ...keys) => {
+            for (const key of keys) {
+                const value = metrics[key];
+                if (value === null || value === undefined || value === '--' || value === 'N/A') continue;
+                if (typeof value === 'number' && !isNaN(value)) return value;
+                const str = String(value).replace(/[^\d.-]/g, '');
+                const num = parseFloat(str);
+                if (!isNaN(num)) return num;
+            }
+            return NaN;
+        };
+
+        // Calculate averages from metrics with detailed logging
+        const calcAvg = (arr, ...metricKeys) => {
+            const validValues = arr.map(r => {
+                const metrics = r.metrics || {};
+                return getNumericMetric(metrics, ...metricKeys);
+            }).filter(v => !isNaN(v) && v > 0);
+            
+            const avg = validValues.length > 0 ? (validValues.reduce((a, b) => a + b, 0) / validValues.length).toFixed(2) : 'N/A';
+            console.log(`   Distance extraction (${metricKeys.join('|')}): values=${validValues.join(',')}, avg=${avg}`);
+            return avg;
         };
 
         const hc2lStats = {
             count: hc2lResults.length,
-            avgDistance: calcAvg(hc2lResults, 'displayDistance') || calcAvg(hc2lResults, 'distance'),
-            avgTime: calcAvg(hc2lResults, 'time')
+            avgDistance: calcAvg(hc2lResults, 'distanceKm', 'distanceNum', 'calculatedDistanceNum', 'displayDistance', 'distance', 'calculatedDistance'),
+            avgQueryTime: calcAvg(hc2lResults, 'queryTimeNum', 'queryTime'),
+            avgEta: calcAvg(hc2lResults, 'actualEta')
         };
 
         const dhlStats = {
             count: dhlResults.length,
-            avgDistance: calcAvg(dhlResults, 'displayDistance') || calcAvg(dhlResults, 'distance'),
-            avgTime: calcAvg(dhlResults, 'time')
+            avgDistance: calcAvg(dhlResults, 'distanceKm', 'distanceNum', 'calculatedDistanceNum', 'displayDistance', 'distance', 'calculatedDistance'),
+            avgQueryTime: calcAvg(dhlResults, 'queryTimeNum', 'queryTime'),
+            avgEta: calcAvg(dhlResults, 'actualEta')
         };
 
-        // Build summary HTML
-        let summaryHTML = `
-            <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000]" id="demo-results-modal">
-                <div class="bg-white rounded-lg shadow-2xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden">
-                    <div class="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4 flex justify-between items-center">
-                        <h3 class="text-xl font-bold text-white">📊 Demo Results Summary</h3>
-                        <button onclick="document.getElementById('demo-results-modal').remove()" class="text-white hover:text-gray-200 text-2xl">&times;</button>
+        // Update the demo name in the results panel
+        const demoNameEl = document.getElementById('demo-results-demo-name');
+        if (demoNameEl) {
+            demoNameEl.textContent = this.currentDemo?.name || 'Demo Results';
+        }
+
+        // Build statistics cards HTML
+        let statsHTML = '';
+        
+        if (hc2lStats.count > 0) {
+            statsHTML += `
+                <div class="bg-blue-50 rounded-xl p-4 border border-blue-200">
+                    <h4 class="font-bold text-blue-700 mb-2 flex items-center gap-1">
+                        <span>🔵</span> HC2L
+                    </h4>
+                    <p class="text-sm text-gray-700"><strong>Routes:</strong> ${hc2lStats.count}</p>
+                    <p class="text-sm text-gray-700"><strong>Avg Distance:</strong> ${hc2lStats.avgDistance}</p>
+                    <p class="text-sm text-gray-700"><strong>Avg Query:</strong> ${hc2lStats.avgQueryTime} ms</p>
+                </div>
+            `;
+        }
+        
+        if (dhlStats.count > 0) {
+            statsHTML += `
+                <div class="bg-green-50 rounded-xl p-4 border border-green-200">
+                    <h4 class="font-bold text-green-700 mb-2 flex items-center gap-1">
+                        <span>🟢</span> DHL
+                    </h4>
+                    <p class="text-sm text-gray-700"><strong>Routes:</strong> ${dhlStats.count}</p>
+                    <p class="text-sm text-gray-700"><strong>Avg Distance:</strong> ${dhlStats.avgDistance}</p>
+                    <p class="text-sm text-gray-700"><strong>Avg Query:</strong> ${dhlStats.avgQueryTime} ms</p>
+                </div>
+            `;
+        }
+
+        // If no stats for either, show a summary card
+        if (!statsHTML) {
+            statsHTML = `
+                <div class="col-span-2 bg-gray-50 rounded-xl p-4 border border-gray-200 text-center">
+                    <p class="text-gray-600">No algorithm-specific statistics available</p>
+                </div>
+            `;
+        }
+
+        // Update statistics cards
+        const statsContainer = document.getElementById('demo-results-stats');
+        if (statsContainer) {
+            statsContainer.innerHTML = statsHTML;
+        }
+
+        // Update results count
+        const countEl = document.getElementById('demo-results-count');
+        if (countEl) {
+            countEl.textContent = `(${results.length} total)`;
+        }
+
+        // Build collapsible results list HTML
+        const resultsListHTML = results.map((r, i) => {
+            const metrics = r.metrics || {};
+            const algoColor = (r.algorithm || '').toUpperCase() === 'HC2L' ? 'blue' : 'green';
+            const algoIcon = (r.algorithm || '').toUpperCase() === 'HC2L' ? '🔵' : '🟢';
+            
+            // Helper to get best display value for a metric
+            const getDisplayValue = (...keys) => {
+                for (const key of keys) {
+                    const val = metrics[key];
+                    if (val !== null && val !== undefined && val !== '--' && val !== 'N/A') {
+                        return val;
+                    }
+                }
+                return 'N/A';
+            };
+            
+            // Extract key metrics for display - match Results History approach
+            // Results History works, so use same order: displayDistance first (it has proper formatting)
+            const distance = metrics.displayDistance || metrics.calculatedDistance || metrics.distance || 'N/A';
+            const eta = getDisplayValue('actualEta', 'displayEta');
+            const queryTime = getDisplayValue('queryTime');
+            const pathLength = getDisplayValue('pathLength');
+            const edgeCount = getDisplayValue('edgeCount');
+            const labelingTime = getDisplayValue('labelingTime');
+            const labelingSize = getDisplayValue('labelingSize');
+            const disruptedEdges = getDisplayValue('disruptedEdges');
+            const timeImpact = getDisplayValue('timeImpact');
+            
+            return `
+                <div class="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden result-item" data-result-index="${i}">
+                    <!-- Header (clickable to expand) -->
+                    <div class="p-3 cursor-pointer hover:bg-gray-100 transition-colors flex justify-between items-center"
+                         onclick="DemoRunner.toggleResultDetails(${i})">
+                        <div class="flex items-center gap-2">
+                            <span class="text-lg">${algoIcon}</span>
+                            <span class="font-medium text-gray-800">#${i + 1} ${r.algorithm || 'Unknown'}</span>
+                            <span class="text-xs bg-${algoColor}-100 text-${algoColor}-700 px-2 py-0.5 rounded">τ = ${r.tau?.toFixed(2) || 'N/A'}</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="text-sm text-gray-600 font-medium">📏 ${distance}</span>
+                            <svg class="w-5 h-5 text-gray-400 transform transition-transform result-chevron" id="chevron-${i}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </div>
                     </div>
-                    <div class="p-6 overflow-y-auto max-h-[60vh]">
-                        <div class="grid grid-cols-2 gap-4 mb-6">
-                            ${hc2lStats.count > 0 ? `
-                            <div class="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                                <h4 class="font-bold text-blue-700 mb-2">🔵 HC2L Results</h4>
-                                <p class="text-sm text-gray-700"><strong>Routes:</strong> ${hc2lStats.count}</p>
-                                <p class="text-sm text-gray-700"><strong>Avg Distance:</strong> ${hc2lStats.avgDistance} km</p>
-                                <p class="text-sm text-gray-700"><strong>Avg Time:</strong> ${hc2lStats.avgTime} s</p>
-                            </div>
-                            ` : ''}
-                            ${dhlStats.count > 0 ? `
-                            <div class="bg-green-50 rounded-lg p-4 border border-green-200">
-                                <h4 class="font-bold text-green-700 mb-2">🟢 DHL Results</h4>
-                                <p class="text-sm text-gray-700"><strong>Routes:</strong> ${dhlStats.count}</p>
-                                <p class="text-sm text-gray-700"><strong>Avg Distance:</strong> ${dhlStats.avgDistance} km</p>
-                                <p class="text-sm text-gray-700"><strong>Avg Time:</strong> ${dhlStats.avgTime} s</p>
-                            </div>
-                            ` : ''}
+                    
+                    <!-- Collapsible Details -->
+                    <div id="result-details-${i}" class="hidden border-t border-gray-200 bg-white p-3">
+                        <div class="text-xs text-gray-500 mb-2">
+                            <strong>Route:</strong> ${r.route || 'N/A'}
+                        </div>
+                        <div class="text-xs text-gray-500 mb-2">
+                            <strong>Trial:</strong> ${r.trial || 'N/A'} | <strong>Timestamp:</strong> ${r.timestamp ? new Date(r.timestamp).toLocaleTimeString() : 'N/A'}
                         </div>
                         
-                        <h4 class="font-semibold text-gray-700 mb-3">📋 All Results (${results.length} total)</h4>
-                        <div class="space-y-2 max-h-60 overflow-y-auto">
-                            ${results.map((r, i) => `
-                                <div class="bg-gray-50 rounded p-3 text-sm border">
-                                    <div class="flex justify-between items-start">
-                                        <span class="font-medium">#${i + 1} ${r.algorithm?.toUpperCase() || 'Unknown'}</span>
-                                        <span class="text-xs text-gray-500">${r.routeLabel || ''}</span>
-                                    </div>
-                                    <div class="grid grid-cols-3 gap-2 mt-2 text-gray-600">
-                                        <span>📏 ${r.displayDistance || r.distance || 'N/A'} km</span>
-                                        <span>⏱️ ${r.time || 'N/A'} s</span>
-                                        <span>🚗 ${r.hops || 'N/A'} hops</span>
-                                    </div>
-                                </div>
-                            `).join('')}
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+                            <div class="bg-gray-50 rounded p-2">
+                                <div class="text-gray-500">Distance</div>
+                                <div class="font-semibold text-gray-800">${distance}</div>
+                            </div>
+                            <div class="bg-gray-50 rounded p-2">
+                                <div class="text-gray-500">ETA</div>
+                                <div class="font-semibold text-gray-800">${eta}</div>
+                            </div>
+                            <div class="bg-gray-50 rounded p-2">
+                                <div class="text-gray-500">Query Time</div>
+                                <div class="font-semibold text-gray-800">${queryTime}</div>
+                            </div>
+                            <div class="bg-gray-50 rounded p-2">
+                                <div class="text-gray-500">Path Length</div>
+                                <div class="font-semibold text-gray-800">${pathLength}</div>
+                            </div>
+                            <div class="bg-gray-50 rounded p-2">
+                                <div class="text-gray-500">Edge Count</div>
+                                <div class="font-semibold text-gray-800">${edgeCount}</div>
+                            </div>
+                            <div class="bg-gray-50 rounded p-2">
+                                <div class="text-gray-500">Labeling Time</div>
+                                <div class="font-semibold text-gray-800">${labelingTime}</div>
+                            </div>
+                            <div class="bg-gray-50 rounded p-2">
+                                <div class="text-gray-500">Labeling Size</div>
+                                <div class="font-semibold text-gray-800">${labelingSize}</div>
+                            </div>
+                            <div class="bg-gray-50 rounded p-2">
+                                <div class="text-gray-500">Disrupted Edges</div>
+                                <div class="font-semibold text-gray-800">${disruptedEdges}</div>
+                            </div>
+                            ${timeImpact !== 'N/A' ? `
+                            <div class="col-span-2 bg-amber-50 rounded p-2">
+                                <div class="text-amber-700">Time Impact</div>
+                                <div class="font-semibold text-amber-800">${timeImpact}</div>
+                            </div>
+                            ` : ''}
                         </div>
                     </div>
-                    <div class="bg-gray-50 px-6 py-4 flex justify-end gap-3">
-                        <button onclick="DemoRunner.exportResults()" class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm">
-                            📥 Export Results
-                        </button>
-                        <button onclick="document.getElementById('demo-results-modal').remove()" class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 text-sm">
-                            Close
-                        </button>
-                    </div>
                 </div>
-            </div>
-        `;
+            `;
+        }).join('');
 
-        // Remove existing modal if any
-        document.getElementById('demo-results-modal')?.remove();
+        // Update results list
+        const resultsListContainer = document.getElementById('demo-results-list');
+        if (resultsListContainer) {
+            resultsListContainer.innerHTML = resultsListHTML || '<p class="text-gray-500 text-center py-4">No results available</p>';
+        }
+
+        // Switch to results tab in the panel
+        this.showTab('results');
+    },
+
+    /**
+     * Toggle result details visibility (collapsible)
+     */
+    toggleResultDetails(index) {
+        const detailsEl = document.getElementById(`result-details-${index}`);
+        const chevronEl = document.getElementById(`chevron-${index}`);
         
-        // Add to document
-        document.body.insertAdjacentHTML('beforeend', summaryHTML);
+        if (detailsEl) {
+            const isHidden = detailsEl.classList.contains('hidden');
+            detailsEl.classList.toggle('hidden');
+            
+            if (chevronEl) {
+                chevronEl.classList.toggle('rotate-180', isHidden);
+            }
+        }
     },
 
     exportResults() {

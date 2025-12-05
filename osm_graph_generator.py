@@ -136,6 +136,16 @@ def generate_edges_csv(G, osm_to_seq, output_path: Path):
         if isinstance(road_name, list):
             road_name = ', '.join(road_name)
         
+        # Handle unnamed/unknown roads
+        if not road_name or road_name.lower() in ['unknown', 'unnamed']:
+            # Convert highway_type to sentence case
+            highway_sentence = ' '.join(word.capitalize() for word in highway.split('_'))
+
+            if highway_sentence == 'Unknown':
+                road_name = f"Road ({seq_source}, {seq_target})"
+            else:
+                road_name = f"{highway_sentence} Road ({seq_source}, {seq_target})"
+        
         length = data.get('length', 0.0)
         
         # Convert oneway to integer format: 1 (forward), 0 (bidirectional), -1 (reverse)

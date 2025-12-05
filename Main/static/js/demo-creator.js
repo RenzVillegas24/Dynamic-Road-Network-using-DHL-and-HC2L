@@ -1,37 +1,79 @@
 /**
- * Custom Demo Creator
+ * Demo Creator
  * 
- * Intuitive demo creation with:
+ * Unified demo creation with:
  * - Location search like start/destination selection
  * - Random route generation option
  * - Visual disruption configuration
+ * - Edit and Create modes
  * - Easy-to-use interface
  */
 
 const DemoCreator = {
+    // ==========================================================================
+    // DEFAULT VALUES - Used for HTML element defaults and JS processing fallbacks
+    // ==========================================================================
+    DEFAULTS: {
+        // Disruption settings
+        disruption: {
+            mode: 'random-both',
+            generationScope: 'per-trial-route',
+            flowCount: 1500,
+            incidentCount: 3,
+            severityMin: 0.1,
+            severityMax: 0.7,
+        },
+        // TAU/Algorithm settings
+        sequence: {
+            algorithm: 'both',
+            tauMode: 'random',
+            tauFixed: 0.5,
+            tauRandomMin: 0.1,
+            tauRandomMax: 0.9,
+            tauGenerationScope: 'per-trial-route',
+            stepDelay: 2000,
+            trials: 1,
+        },
+        // Route generation
+        route: {
+            minDistance: 0.5,  // km
+            maxDistance: 10,   // km
+            randomCount: 3,
+        },
+        // Custom disruption
+        customDisruption: {
+            type: 'incident',
+            criticality: 'major',
+            jamFactor: 5,
+        }
+    },
+    
+    // Mode: 'create' or 'edit'
+    mode: 'create',
+    
     // State
     routes: [],
     currentRouteIndex: -1,
     disruptions: {
         mode: 'random-both', // 'none', 'random-flow', 'random-incidents', 'random-both', 'custom'
         generationScope: 'per-trial-route', // 'all', 'per-trial', 'per-route', 'per-trial-route'
-        randomFlowCount: 5,
+        randomFlowCount: 1500,
         randomIncidentCount: 3,
-        severityMin: 0,
-        severityMax: 1,
+        severityMin: 0.1,
+        severityMax: 0.7,
         customItems: [],
         // Store multiple disruption sets based on generation scope
         disruptionSets: {}  // Key: 'all', 'trial_0', 'route_1', 'trial_0_route_1', etc.
     },
     sequence: {
         algorithm: 'both',
-        tauMode: 'sequence', // 'fixed', 'random', 'sequence'
+        tauMode: 'random', // 'fixed', 'random'
         tauFixed: 0.5,
-        tauSequence: [0.1, 0.3, 0.5, 0.7, 0.9],
+        tauSequence: [],
         tauRandomMin: 0.1,
         tauRandomMax: 0.9,
-        tauGenerationScope: 'all', // 'all', 'per-trial', 'per-route', 'per-trial-route'
-        stepDelay: 1000,
+        tauGenerationScope: 'per-trial-route', // 'all', 'per-trial', 'per-route', 'per-trial-route'
+        stepDelay: 2000,
         showMetrics: true,
         trials: 1
     },
@@ -46,6 +88,18 @@ const DemoCreator = {
     
     // Edit mode state
     editingConfigId: null,
+    
+    // Track if disruptions need to be generated when entering step 2
+    disruptionsNeedGeneration: true,
+    
+    // Track if TAU values need to be generated when entering step 3
+    tauNeedsGeneration: true,
+    
+    // Track last generated trials/routes for change detection
+    lastGeneratedTrials: undefined,
+    lastGeneratedRoutes: undefined,
+    lastGeneratedTauTrials: undefined,
+    lastGeneratedTauRoutes: undefined,
     
     // Running state
     isRunning: false,
@@ -89,8 +143,68 @@ const DemoCreator = {
     async init() {
         await this.loadQCBoundary();
         console.log('🎨 Initializing Demo Creator...');
+        this.applyDefaultsToUI();
         this.bindEvents();
         this.renderRoutesList();
+    },
+    
+    /**
+     * Apply default values to UI elements
+     */
+    applyDefaultsToUI() {
+        const d = this.DEFAULTS;
+        
+        // Disruption defaults
+        const flowCountEl = document.getElementById('random-flow-count');
+        if (flowCountEl) flowCountEl.value = d.disruption.flowCount;
+        
+        const incidentCountEl = document.getElementById('random-incident-count');
+        if (incidentCountEl) incidentCountEl.value = d.disruption.incidentCount;
+        
+        const severityMinEl = document.getElementById('random-severity-min');
+        if (severityMinEl) {
+            severityMinEl.value = d.disruption.severityMin;
+            const display = document.getElementById('random-severity-min-display');
+            if (display) display.textContent = d.disruption.severityMin;
+        }
+        
+        const severityMaxEl = document.getElementById('random-severity-max');
+        if (severityMaxEl) {
+            severityMaxEl.value = d.disruption.severityMax;
+            const display = document.getElementById('random-severity-max-display');
+            if (display) display.textContent = d.disruption.severityMax;
+        }
+        
+        // TAU defaults
+        const tauRandomMinEl = document.getElementById('demo-tau-random-min');
+        if (tauRandomMinEl) tauRandomMinEl.value = d.sequence.tauRandomMin;
+        
+        const tauRandomMaxEl = document.getElementById('demo-tau-random-max');
+        if (tauRandomMaxEl) tauRandomMaxEl.value = d.sequence.tauRandomMax;
+        
+        const stepDelayEl = document.getElementById('demo-step-delay');
+        if (stepDelayEl) stepDelayEl.value = d.sequence.stepDelay;
+        
+        const trialsEl = document.getElementById('demo-trials-count');
+        if (trialsEl) trialsEl.value = d.sequence.trials;
+        
+        // Set default radio selections
+        const disruptionModeRadio = document.querySelector(`input[name="demo-disruption-mode"][value="${d.disruption.mode}"]`);
+        if (disruptionModeRadio) disruptionModeRadio.checked = true;
+        
+        const disruptionScopeRadio = document.querySelector(`input[name="disruption-generation-scope"][value="${d.disruption.generationScope}"]`);
+        if (disruptionScopeRadio) disruptionScopeRadio.checked = true;
+        
+        const algorithmRadio = document.querySelector(`input[name="demo-algorithm"][value="${d.sequence.algorithm}"]`);
+        if (algorithmRadio) algorithmRadio.checked = true;
+        
+        const tauModeRadio = document.querySelector(`input[name="demo-tau-mode"][value="${d.sequence.tauMode}"]`);
+        if (tauModeRadio) tauModeRadio.checked = true;
+        
+        const tauScopeRadio = document.querySelector(`input[name="tau-generation-scope"][value="${d.sequence.tauGenerationScope}"]`);
+        if (tauScopeRadio) tauScopeRadio.checked = true;
+        
+        console.log('✅ Applied default values to UI');
     },
     
     /**
@@ -289,15 +403,96 @@ const DemoCreator = {
         if (panel) {
             panel.classList.remove('translate-x-full');
             
-            // If editing a saved config, load it
+            // Set mode based on whether we're editing
             if (configToEdit) {
+                this.mode = 'edit';
                 this.loadConfig(configToEdit);
             } else {
+                this.mode = 'create';
                 this.editingConfigId = null;
+                this.disruptionsNeedGeneration = true;
+                this.tauNeedsGeneration = true;
+                // Apply defaults for create mode
+                this.applyDefaultsToUI();
             }
+            
+            // Update panel title based on mode
+            this.updatePanelTitle();
+            
+            // Update route/disruption visibility for step 1
+            this.updateMapLayerVisibility(1);
             
             this.goToStep(1);
         }
+    },
+    
+    /**
+     * Update panel title based on current mode (create/edit)
+     */
+    updatePanelTitle() {
+        const titleEl = document.getElementById('demo-creator-title');
+        if (titleEl) {
+            if (this.mode === 'edit') {
+                titleEl.innerHTML = `
+                    <span class="flex items-center gap-2">
+                        <span class="text-xl">✏️</span>
+                        <span>Edit Demo</span>
+                        <span class="px-2 py-0.5 bg-blue-500 text-white text-xs rounded-full">Editing</span>
+                    </span>
+                `;
+            } else {
+                titleEl.innerHTML = `
+                    <span class="flex items-center gap-2">
+                        <span class="text-xl">🎨</span>
+                        <span>Demo Creator</span>
+                        <span class="px-2 py-0.5 bg-green-500 text-white text-xs rounded-full">New</span>
+                    </span>
+                `;
+            }
+        }
+    },
+    
+    /**
+     * Update map layer visibility based on current step
+     * Routes: only on steps 1 and 4 (Config and Review)
+     * Disruptions: only on steps 2 and 4 (Disruptions and Review)
+     */
+    updateMapLayerVisibility(step) {
+        const showRoutes = step === 1 || step === 4;
+        const showDisruptions = step === 2 || step === 4;
+        
+        // Show/hide route markers
+        this.routeMarkers.forEach(marker => {
+            if (map && marker) {
+                if (showRoutes) {
+                    if (!map.hasLayer(marker)) map.addLayer(marker);
+                } else {
+                    if (map.hasLayer(marker)) map.removeLayer(marker);
+                }
+            }
+        });
+        
+        // Show/hide disruption preview markers
+        this.disruptionPreviewMarkers.forEach(marker => {
+            if (map && marker) {
+                if (showDisruptions) {
+                    if (!map.hasLayer(marker)) map.addLayer(marker);
+                } else {
+                    if (map.hasLayer(marker)) map.removeLayer(marker);
+                }
+            }
+        });
+        
+        // Show/hide custom disruption markers
+        this.disruptionMarkers.forEach(m => {
+            if (map && m.marker) {
+                if (showDisruptions) {
+                    if (!map.hasLayer(m.marker)) map.addLayer(m.marker);
+                } else {
+                    if (map.hasLayer(m.marker)) map.removeLayer(m.marker);
+                }
+            }
+        });
     },
 
     loadConfig(config) {
@@ -305,6 +500,7 @@ const DemoCreator = {
         
         // Store editing state
         this.editingConfigId = config.id;
+        this.mode = 'edit';
         
         // Load routes
         this.routes = config.routes ? config.routes.map(r => ({
@@ -321,12 +517,18 @@ const DemoCreator = {
                 randomIncidentCount: config.disruptions.randomIncidentCount || 3,
                 severityMin: config.disruptions.severityMin || 0.3,
                 severityMax: config.disruptions.severityMax || 0.9,
-                customItems: config.disruptions.customItems || []
+                customItems: config.disruptions.customItems || [],
+                disruptionSets: config.disruptions.disruptionSets || {}
             };
         } else {
             // Handle legacy config format
             this.disruptions.mode = config.disruptionMode || 'none';
+            this.disruptions.disruptionSets = {};
         }
+        
+        // Determine if we need to generate disruptions (only if no sets exist)
+        const hasExistingDisruptions = Object.keys(this.disruptions.disruptionSets || {}).length > 0;
+        this.disruptionsNeedGeneration = !hasExistingDisruptions;
         
         // Load sequence settings
         this.sequence.algorithm = config.algorithm || 'both';
@@ -362,6 +564,22 @@ const DemoCreator = {
         const nameInput = document.getElementById('demo-v2-name');
         if (nameInput) {
             nameInput.value = config.name || '';
+        }
+        
+        // Show disruption sets if they exist
+        const disruptionSets = this.disruptions.disruptionSets || {};
+        const setKeys = Object.keys(disruptionSets);
+        if (setKeys.length > 0) {
+            console.log(`📦 Loaded ${setKeys.length} disruption sets:`, setKeys);
+            this.currentPreviewSet = setKeys[0];
+            this.showDisruptionSetsPreview();
+            this.displayDisruptionsOnMap(disruptionSets[setKeys[0]]);
+            
+            // Update the disruption set status text
+            const statusEl = document.getElementById('disruption-sets-status');
+            if (statusEl) {
+                statusEl.textContent = `${setKeys.length} set(s) loaded`;
+            }
         }
         
         showUpdateToast(`Loaded: ${config.name}`, 'info');
@@ -600,6 +818,9 @@ const DemoCreator = {
                     }
                 }
             });
+            
+            // Update map layer visibility based on step
+            this.updateMapLayerVisibility(step);
         }
         
         // Update nav buttons
@@ -607,14 +828,105 @@ const DemoCreator = {
         document.getElementById('demo-v2-prev-btn')?.classList.toggle('hidden', step === 1 || isRunning);
         document.getElementById('demo-v2-next-btn')?.classList.toggle('hidden', step === 4 || isRunning);
         document.getElementById('demo-v2-run-btn')?.classList.toggle('hidden', step !== 4);
-        document.getElementById('demo-v2-save-later-btn')?.classList.toggle('hidden', step !== 4);
+        document.getElementById('demo-v2-save-btn')?.classList.toggle('hidden', step !== 4);
+        document.getElementById('demo-v2-save-run-btn')?.classList.toggle('hidden', step !== 4);
         
         // Show/hide step indicators during running
         document.querySelector('.sticky.top-\\[68px\\]')?.classList.toggle('opacity-50', isRunning);
         
+        // Step 2: Auto-generate disruptions if empty and entering disruption step
+        if (step === 2) {
+            this.handleDisruptionStepEntry();
+        }
+        
+        // Step 3: Auto-generate TAU values if needed when entering sequence step
+        if (step === 3) {
+            this.handleSequenceStepEntry();
+        }
+        
         // Update review if on step 4
         if (step === 4) {
             this.updateReviewSummary();
+        }
+    },
+    
+    /**
+     * Handle entering the disruption step (step 2)
+     * Auto-generates disruptions if the sets are empty or trials/routes changed
+     */
+    handleDisruptionStepEntry() {
+        const disruptionSets = this.disruptions.disruptionSets || {};
+        const hasDisruptions = Object.keys(disruptionSets).length > 0;
+        
+        // Get current trials and routes count
+        const currentTrials = parseInt(document.getElementById('demo-trials-count')?.value) || 1;
+        const currentRoutes = this.routes.length || 1;
+        
+        // Check if trials or routes changed since last generation
+        const trialsChanged = this.lastGeneratedTrials !== undefined && this.lastGeneratedTrials !== currentTrials;
+        const routesChanged = this.lastGeneratedRoutes !== undefined && this.lastGeneratedRoutes !== currentRoutes;
+        
+        if (trialsChanged || routesChanged) {
+            console.log(`📦 Disruption regeneration needed: trials ${this.lastGeneratedTrials} → ${currentTrials}, routes ${this.lastGeneratedRoutes} → ${currentRoutes}`);
+            this.disruptionsNeedGeneration = true;
+        }
+        
+        if ((!hasDisruptions || trialsChanged || routesChanged) && this.disruptionsNeedGeneration) {
+            console.log('📦 Disruption step opened - auto-generating disruptions...');
+            
+            // Trigger auto-generation with a small delay to let UI settle
+            setTimeout(() => {
+                this.autoGenerateDisruptions();
+            }, 100);
+        } else if (hasDisruptions) {
+            // Show existing disruption sets
+            const setKeys = Object.keys(disruptionSets);
+            this.currentPreviewSet = setKeys[0];
+            this.showDisruptionSetsPreview();
+            this.displayDisruptionsOnMap(disruptionSets[setKeys[0]]);
+            
+            console.log(`📦 Showing existing ${setKeys.length} disruption sets`);
+        }
+    },
+
+    /**
+     * Handle entering the sequence step (step 3)
+     * Auto-generates TAU values if needed or if trials/routes changed
+     */
+    handleSequenceStepEntry() {
+        // Get current trials and routes count
+        const currentTrials = parseInt(document.getElementById('demo-trials-count')?.value) || 1;
+        const currentRoutes = this.routes.length || 1;
+        const tauMode = this.getSelectedTauMode();
+        
+        // IMPORTANT: Always update the TAU mode UI when entering this step
+        // This ensures the correct UI (fixed/random settings) is displayed based on selected mode
+        this.updateTauModeUI();
+        
+        // Check if trials or routes changed since last TAU generation
+        const trialsChanged = this.lastGeneratedTauTrials !== undefined && this.lastGeneratedTauTrials !== currentTrials;
+        const routesChanged = this.lastGeneratedTauRoutes !== undefined && this.lastGeneratedTauRoutes !== currentRoutes;
+        
+        if (trialsChanged || routesChanged) {
+            console.log(`🎯 TAU regeneration needed: trials ${this.lastGeneratedTauTrials} → ${currentTrials}, routes ${this.lastGeneratedTauRoutes} → ${currentRoutes}`);
+            this.tauNeedsGeneration = true;
+        }
+        
+        // Auto-generate TAU values if in random mode and needs generation
+        if (tauMode === 'random' && (this.tauNeedsGeneration || !this.generatedTauValues || this.generatedTauValues.length === 0)) {
+            console.log('🎯 Sequence step opened - auto-generating TAU values...');
+            
+            // Store current trials/routes for change detection
+            this.lastGeneratedTauTrials = currentTrials;
+            this.lastGeneratedTauRoutes = currentRoutes;
+            
+            // Trigger auto-generation with a small delay to let UI settle
+            setTimeout(() => {
+                this.generateRandomTauValues();
+                this.tauNeedsGeneration = false;
+            }, 100);
+        } else {
+            console.log(`🎯 TAU values already generated: ${this.generatedTauValues?.length || 0} values`);
         }
     },
 
@@ -1199,14 +1511,6 @@ const DemoCreator = {
     },
 
     /**
-     * Set disruption scope from radio button (called from HTML)
-     */
-    setDisruptionScope(scope) {
-        this.disruptions.generationScope = scope;
-        this.updateScopeDescription();
-    },
-
-    /**
      * Get selected disruption scope from radio buttons
      */
     getSelectedDisruptionScope() {
@@ -1276,6 +1580,209 @@ const DemoCreator = {
         if (descEl) {
             descEl.textContent = descriptions[scope] || '';
         }
+    },
+
+    // Debounce timer for auto-generation
+    disruptionGenerationTimer: null,
+    
+    /**
+     * Called when disruption scope or settings change - triggers auto-generation
+     */
+    setDisruptionScope(scope) {
+        this.disruptions.generationScope = scope;
+        this.updateScopeDescription();
+        // Trigger auto-generation with debounce
+        this.onDisruptionSettingChange();
+    },
+    
+    /**
+     * Called when any disruption setting changes - auto-generates disruptions
+     */
+    onDisruptionSettingChange() {
+        // Clear previous timer
+        if (this.disruptionGenerationTimer) {
+            clearTimeout(this.disruptionGenerationTimer);
+        }
+        
+        // Update status to show pending
+        const statusText = document.getElementById('disruption-status-text');
+        if (statusText) {
+            statusText.textContent = 'Regenerating...';
+            statusText.className = 'text-orange-500';
+        }
+        
+        // Debounce: wait 500ms before generating to avoid rapid calls
+        this.disruptionGenerationTimer = setTimeout(() => {
+            this.autoGenerateDisruptions();
+        }, 500);
+    },
+    
+    /**
+     * Auto-generate disruptions and show on map
+     */
+    async autoGenerateDisruptions() {
+        const flowCount = parseInt(document.getElementById('random-flow-count')?.value) || 1500;
+        const incidentCount = parseInt(document.getElementById('random-incident-count')?.value) || 5;
+        const severityMin = parseFloat(document.getElementById('random-severity-min')?.value) || 0.1;
+        const severityMax = parseFloat(document.getElementById('random-severity-max')?.value) || 0.7;
+        const scope = this.getSelectedDisruptionScope();
+        const trials = parseInt(document.getElementById('demo-trials-count')?.value) || 1;
+        const routeCount = this.routes.length || 1;
+        
+        // Show loading indicator
+        const loadingIndicator = document.getElementById('disruption-loading-indicator');
+        const loadingText = document.getElementById('disruption-loading-text');
+        const statusText = document.getElementById('disruption-status-text');
+        
+        if (loadingIndicator) loadingIndicator.classList.remove('hidden');
+        if (statusText) statusText.textContent = 'Generating...';
+        
+        // Disable navigation buttons while generating
+        this.setNavigationButtonsEnabled(false);
+        
+        try {
+            // Calculate required sets
+            const requiredSets = this.calculateRequiredSets();
+            if (loadingText) loadingText.textContent = `Generating ${requiredSets} sets...`;
+            
+            // Clear previous sets
+            this.disruptions.disruptionSets = {};
+            
+            // Generate set keys
+            const setKeys = [];
+            if (scope === 'all') {
+                setKeys.push('set_all');
+            } else if (scope === 'per-trial') {
+                for (let t = 0; t < trials; t++) {
+                    setKeys.push(`set_trial_${t}`);
+                }
+            } else if (scope === 'per-route') {
+                for (let r = 0; r < routeCount; r++) {
+                    setKeys.push(`set_route_${r}`);
+                }
+            } else if (scope === 'per-trial-route') {
+                for (let t = 0; t < trials; t++) {
+                    for (let r = 0; r < routeCount; r++) {
+                        setKeys.push(`set_trial_${t}_route_${r}`);
+                    }
+                }
+            }
+            
+            // Generate each set
+            let generatedCount = 0;
+            for (const setKey of setKeys) {
+                const response = await fetch('/api/demo/random_edges', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        flow_count: flowCount,
+                        incident_count: incidentCount,
+                        severity_min: severityMin,
+                        severity_max: severityMax
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    this.disruptions.disruptionSets[setKey] = {
+                        flow: result.flow || [],
+                        incidents: result.incidents || [],
+                        flowCount: result.flow_count,
+                        incidentCount: result.incident_count
+                    };
+                    generatedCount++;
+                }
+                
+                // Update progress
+                if (loadingText) loadingText.textContent = `Set ${generatedCount}/${setKeys.length}...`;
+            }
+            
+            // Show the first set on map
+            const firstKey = setKeys[0];
+            if (this.disruptions.disruptionSets[firstKey]) {
+                this.currentPreviewSet = firstKey;
+                this.displayDisruptionsOnMap(this.disruptions.disruptionSets[firstKey]);
+            }
+            
+            // Show sets list UI
+            this.showDisruptionSetsPreview();
+            
+            // Update status
+            if (statusText) {
+                statusText.textContent = `✓ ${generatedCount} sets ready`;
+                statusText.className = 'text-green-600 font-medium';
+            }
+            
+            // Update status text below button
+            const setsStatusEl = document.getElementById('disruption-sets-status');
+            if (setsStatusEl) {
+                setsStatusEl.textContent = `${generatedCount} set(s) generated`;
+            }
+            
+            console.log(`📦 Auto-generated ${generatedCount} disruption sets for scope: ${scope}`);
+            
+            // Track what trials/routes we generated for
+            this.lastGeneratedTrials = trials;
+            this.lastGeneratedRoutes = routeCount;
+            this.disruptionsNeedGeneration = false;
+            
+        } catch (error) {
+            console.error('Error auto-generating disruptions:', error);
+            if (statusText) {
+                statusText.textContent = 'Generation failed';
+                statusText.className = 'text-red-600';
+            }
+        } finally {
+            // Hide loading indicator
+            if (loadingIndicator) loadingIndicator.classList.add('hidden');
+            // Re-enable navigation buttons
+            this.setNavigationButtonsEnabled(true);
+        }
+    },
+    
+    /**
+     * Generate random disruptions - called by button click
+     * Similar to generateRandomTauValues()
+     */
+    async generateRandomDisruptions() {
+        // Check if disruption mode is not 'custom' or 'none'
+        const mode = this.disruptions.mode || 'random-both';
+        if (mode === 'none') {
+            showUpdateToast('Disruption mode is set to None', 'warning');
+            return;
+        }
+        
+        // Update button to show loading
+        const btn = document.getElementById('generate-disruptions-btn');
+        const originalContent = btn?.innerHTML;
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="animate-spin inline-block">⏳</span> Generating...';
+        }
+        
+        try {
+            await this.autoGenerateDisruptions();
+            showUpdateToast('Disruptions generated successfully!', 'success');
+        } catch (error) {
+            console.error('Error generating disruptions:', error);
+            showUpdateToast('Failed to generate disruptions', 'error');
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalContent;
+            }
+        }
+    },
+    
+    /**
+     * Enable/disable navigation buttons
+     */
+    setNavigationButtonsEnabled(enabled) {
+        const prevBtn = document.getElementById('demo-prev-btn');
+        const nextBtn = document.getElementById('demo-next-btn');
+        if (prevBtn) prevBtn.disabled = !enabled;
+        if (nextBtn) nextBtn.disabled = !enabled;
     },
 
     /**
@@ -1428,6 +1935,12 @@ const DemoCreator = {
             
             // Show sets list UI
             this.showDisruptionSetsPreview();
+            
+            // Update status text
+            const statusEl = document.getElementById('disruption-sets-status');
+            if (statusEl) {
+                statusEl.textContent = `${generatedCount} set(s) generated`;
+            }
             
             showUpdateToast(`Generated ${generatedCount} disruption sets`, 'success');
             
@@ -1973,75 +2486,206 @@ const DemoCreator = {
     // TAU CONFIGURATION
     // ==========================================================================
 
+    // Store generated tau values for random mode
+    generatedTauValues: [],
+
     updateTauModeUI() {
         // Get the selected tau mode from radio buttons (fixed or random only)
-        const selectedMode = document.querySelector('input[name="demo-tau-mode"]:checked')?.value || 'fixed';
+        const selectedMode = this.getSelectedTauMode();
         this.sequence.tauMode = selectedMode;
         
         document.getElementById('tau-fixed-setting')?.classList.toggle('hidden', selectedMode !== 'fixed');
         document.getElementById('tau-random-setting')?.classList.toggle('hidden', selectedMode !== 'random');
         
-        // Update visual styling for radio options
+        // Update visual styling for mode options
         document.querySelectorAll('.tau-mode-option').forEach(label => {
             const radio = label.querySelector('input[type="radio"]');
             if (radio && radio.checked) {
-                label.classList.add('ring-2', 'ring-white', 'ring-offset-2', 'ring-offset-slate-100', 'shadow-lg');
+                label.classList.add('ring-2', 'ring-white', 'ring-offset-2', 'ring-offset-purple-100', 'shadow-lg');
             } else {
-                label.classList.remove('ring-2', 'ring-white', 'ring-offset-2', 'ring-offset-slate-100', 'shadow-lg');
+                label.classList.remove('ring-2', 'ring-white', 'ring-offset-2', 'ring-offset-purple-100', 'shadow-lg');
             }
         });
         
-        // Update fixed value help text based on scope
-        this.updateTauFixedHelp();
+        // Update fixed value inputs based on scope
+        this.updateTauInputs();
+        
+        // Auto-generate random values when switching to random mode
+        if (selectedMode === 'random') {
+            this.generateRandomTauValues();
+        }
     },
 
     updateTauScopeUI() {
         const scope = this.getSelectedTauScope();
-        const descriptionEl = document.getElementById('tau-scope-description');
+        const mode = this.getSelectedTauMode();
         
-        const descriptions = {
-            'all': 'All routes in all trials use the same TAU value',
-            'per-trial': 'Each trial gets a unique TAU value (same across routes)',
-            'per-route': 'Each route gets a unique TAU value (same across trials)',
-            'per-trial-route': 'Each route in each trial gets a unique TAU value'
-        };
+        // Update visual styling for scope options
+        document.querySelectorAll('.tau-scope-option').forEach(label => {
+            const radio = label.querySelector('input[type="radio"]');
+            if (radio && radio.checked) {
+                label.classList.add('ring-2', 'ring-white', 'ring-offset-2', 'ring-offset-purple-100', 'shadow-lg');
+            } else {
+                label.classList.remove('ring-2', 'ring-white', 'ring-offset-2', 'ring-offset-purple-100', 'shadow-lg');
+            }
+        });
         
-        if (descriptionEl) {
-            descriptionEl.textContent = descriptions[scope] || descriptions['all'];
+        // Update tau inputs based on scope
+        this.updateTauInputs();
+        
+        // Auto-regenerate random values when scope changes (if in random mode)
+        if (mode === 'random') {
+            this.generateRandomTauValues();
         }
-        
-        // Update fixed value help text based on scope
-        this.updateTauFixedHelp();
     },
 
-    updateTauFixedHelp() {
+    updateTauInputs() {
         const scope = this.getSelectedTauScope();
-        const mode = document.querySelector('input[name="demo-tau-mode"]:checked')?.value || 'fixed';
-        const helpEl = document.getElementById('tau-fixed-help');
-        
-        if (!helpEl || mode !== 'fixed') return;
-        
+        const mode = this.getSelectedTauMode();
         const trials = parseInt(document.getElementById('demo-trials-count')?.value) || 1;
         const routes = this.routes.length || 1;
         
-        let helpText = '';
+        // Calculate how many inputs we need
+        let inputCount = 1;
+        let inputLabels = ['All'];
+        
         switch (scope) {
             case 'all':
-                helpText = 'Enter a single τ value (e.g., 0.5)';
+                inputCount = 1;
+                inputLabels = ['All Trials & Routes'];
                 break;
             case 'per-trial':
-                helpText = `Enter ${trials} τ value(s) for ${trials} trial(s) (e.g., ${Array(trials).fill(0).map((_, i) => (0.3 + i * 0.2).toFixed(1)).join(', ')})`;
+                inputCount = trials;
+                inputLabels = Array(trials).fill(0).map((_, i) => `Trial ${i + 1}`);
                 break;
             case 'per-route':
-                helpText = `Enter ${routes} τ value(s) for ${routes} route(s)`;
+                inputCount = routes;
+                inputLabels = this.routes.map((r, i) => `Route ${i + 1}: ${r.start?.name?.substring(0, 15) || 'Start'}...`);
                 break;
             case 'per-trial-route':
-                const total = trials * routes;
-                helpText = `Enter ${total} τ value(s) for ${trials} trial(s) × ${routes} route(s)`;
+                inputCount = trials * routes;
+                inputLabels = [];
+                for (let t = 0; t < trials; t++) {
+                    for (let r = 0; r < routes; r++) {
+                        inputLabels.push(`T${t + 1}R${r + 1}`);
+                    }
+                }
                 break;
         }
         
-        helpEl.textContent = helpText;
+        // Update help text
+        const helpEl = document.getElementById('tau-fixed-help');
+        if (helpEl) {
+            helpEl.textContent = `Enter τ values (0-1) for ${inputCount} ${scope === 'all' ? 'configuration' : 'item(s)'}`;
+        }
+        
+        // Generate dynamic inputs for fixed mode
+        if (mode === 'fixed') {
+            this.generateTauFixedInputs(inputCount, inputLabels);
+        }
+        
+        // Reset generated values display for random mode
+        if (mode === 'random') {
+            this.generatedTauValues = [];
+            document.getElementById('tau-random-generated')?.classList.add('hidden');
+        }
+    },
+
+    generateTauFixedInputs(count, labels) {
+        const container = document.getElementById('tau-fixed-inputs-container');
+        if (!container) return;
+        
+        // Get existing values to preserve them
+        const existingInputs = container.querySelectorAll('input[type="number"]');
+        const existingValues = Array.from(existingInputs).map(input => parseFloat(input.value) || 0.5);
+        
+        if (count <= 4) {
+            // Show individual inputs with labels
+            container.innerHTML = labels.map((label, i) => `
+                <div class="flex items-center gap-2">
+                    <span class="text-xs text-purple-600 w-24 truncate" title="${label}">${label}</span>
+                    <input type="number" class="tau-fixed-input flex-1 px-3 py-2 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-center"
+                           value="${existingValues[i] !== undefined ? existingValues[i] : 0.5}" 
+                           min="0" max="1" step="0.1"
+                           data-index="${i}">
+                </div>
+            `).join('');
+        } else {
+            // Show compact comma-separated input
+            const values = existingValues.length >= count 
+                ? existingValues.slice(0, count) 
+                : Array(count).fill(0.5);
+            container.innerHTML = `
+                <div class="space-y-2">
+                    <p class="text-xs text-purple-500">Enter ${count} comma-separated values:</p>
+                    <input type="text" id="demo-tau-fixed-values" 
+                           value="${values.join(', ')}"
+                           placeholder="${Array(Math.min(count, 5)).fill(0.5).join(', ')}${count > 5 ? ', ...' : ''}"
+                           class="w-full px-4 py-2 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                    <p class="text-xs text-purple-400">Format: Trial 1 Route 1, Trial 1 Route 2, Trial 2 Route 1, ...</p>
+                </div>
+            `;
+        }
+    },
+
+    generateRandomTauValues() {
+        const scope = this.getSelectedTauScope();
+        const min = parseFloat(document.getElementById('demo-tau-random-min')?.value) || 0.1;
+        const max = parseFloat(document.getElementById('demo-tau-random-max')?.value) || 0.9;
+        const trials = parseInt(document.getElementById('demo-trials-count')?.value) || 1;
+        const routes = this.routes.length || 1;
+        
+        // Calculate how many values we need
+        let count = 1;
+        switch (scope) {
+            case 'all': count = 1; break;
+            case 'per-trial': count = trials; break;
+            case 'per-route': count = routes; break;
+            case 'per-trial-route': count = trials * routes; break;
+        }
+        
+        // Generate random values
+        this.generatedTauValues = Array(count).fill(0).map(() => 
+            parseFloat((Math.random() * (max - min) + min).toFixed(2))
+        );
+        
+        // Display generated values
+        const displayEl = document.getElementById('tau-random-values-display');
+        const containerEl = document.getElementById('tau-random-generated');
+        
+        if (displayEl && containerEl) {
+            containerEl.classList.remove('hidden');
+            
+            if (count <= 10) {
+                // Show detailed view
+                let labels = [];
+                switch (scope) {
+                    case 'all': labels = ['All']; break;
+                    case 'per-trial': labels = Array(trials).fill(0).map((_, i) => `Trial ${i + 1}`); break;
+                    case 'per-route': labels = this.routes.map((r, i) => `Route ${i + 1}`); break;
+                    case 'per-trial-route':
+                        for (let t = 0; t < trials; t++) {
+                            for (let r = 0; r < routes; r++) {
+                                labels.push(`T${t + 1}R${r + 1}`);
+                            }
+                        }
+                        break;
+                }
+                displayEl.innerHTML = this.generatedTauValues.map((v, i) => 
+                    `<span class="inline-block bg-orange-200 px-2 py-0.5 rounded mr-1 mb-1">${labels[i]}: ${v}</span>`
+                ).join('');
+            } else {
+                // Show compact view
+                displayEl.innerHTML = `<span class="text-orange-700">${this.generatedTauValues.map(v => v.toFixed(2)).join(', ')}</span>`;
+            }
+        }
+        
+        showUpdateToast(`Generated ${count} random τ values`, 'success');
+    },
+
+    updateTauFixedHelp() {
+        // This is now handled in updateTauInputs()
+        this.updateTauInputs();
     },
 
     /**
@@ -2069,26 +2713,40 @@ const DemoCreator = {
      * Get the selected TAU generation scope from radio buttons
      */
     getSelectedTauScope() {
-        return document.querySelector('input[name="tau-generation-scope"]:checked')?.value || 'all';
+        return document.querySelector('input[name="tau-generation-scope"]:checked')?.value || 'per-trial-route';
+    },
+
+    getSelectedTauMode() {
+        return document.querySelector('input[name="demo-tau-mode"]:checked')?.value || 'random';
     },
 
     getTauValues() {
-        const mode = document.querySelector('input[name="demo-tau-mode"]:checked')?.value || 'fixed';
+        const mode = this.getSelectedTauMode();
         const scope = this.getSelectedTauScope();
         const trials = parseInt(document.getElementById('demo-trials-count')?.value) || 1;
         const routes = this.routes.length || 1;
         
+        // Calculate needed count
+        let needed = 1;
+        if (scope === 'per-trial') needed = trials;
+        else if (scope === 'per-route') needed = routes;
+        else if (scope === 'per-trial-route') needed = trials * routes;
+        
         switch (mode) {
             case 'fixed':
-                // Parse comma-separated fixed values
+                // First try to get from individual number inputs
+                const numberInputs = document.querySelectorAll('#tau-fixed-inputs-container input.tau-fixed-input');
+                if (numberInputs.length > 0) {
+                    const vals = Array.from(numberInputs).map(input => parseFloat(input.value) || 0.5);
+                    while (vals.length < needed) {
+                        vals.push(vals[vals.length - 1] || 0.5);
+                    }
+                    return vals.slice(0, needed);
+                }
+                
+                // Fall back to comma-separated text input
                 const fixedStr = document.getElementById('demo-tau-fixed-values')?.value || '0.5';
                 const fixedVals = fixedStr.split(',').map(v => parseFloat(v.trim())).filter(v => !isNaN(v));
-                
-                // Return appropriate number of values based on scope
-                let needed = 1;
-                if (scope === 'per-trial') needed = trials;
-                else if (scope === 'per-route') needed = routes;
-                else if (scope === 'per-trial-route') needed = trials * routes;
                 
                 // Expand values if not enough provided
                 while (fixedVals.length < needed) {
@@ -2097,16 +2755,18 @@ const DemoCreator = {
                 return fixedVals.slice(0, needed);
                 
             case 'random':
+                // Use pre-generated values if available
+                if (this.generatedTauValues && this.generatedTauValues.length === needed) {
+                    return this.generatedTauValues;
+                }
+                
+                // Otherwise generate new random values
                 const min = parseFloat(document.getElementById('demo-tau-random-min')?.value) || 0.1;
                 const max = parseFloat(document.getElementById('demo-tau-random-max')?.value) || 0.9;
                 
-                // Generate random values based on scope
-                let count = 1;
-                if (scope === 'per-trial') count = trials;
-                else if (scope === 'per-route') count = routes;
-                else if (scope === 'per-trial-route') count = trials * routes;
-                
-                return Array(count).fill(0).map(() => Math.random() * (max - min) + min);
+                return Array(needed).fill(0).map(() => 
+                    parseFloat((Math.random() * (max - min) + min).toFixed(2))
+                );
                 
             default:
                 return [0.5];
@@ -2123,53 +2783,155 @@ const DemoCreator = {
         
         const algorithm = this.getSelectedAlgorithm();
         const tauValues = this.getTauValues();
+        const tauScope = this.getSelectedTauScope();
+        const tauMode = this.getSelectedTauMode();
         const stepDelay = parseInt(document.getElementById('demo-step-delay')?.value) || 2000;
         const trials = parseInt(document.getElementById('demo-trials-count')?.value) || 1;
+        const disruptionScope = document.querySelector('input[name="disruption-generation-scope"]:checked')?.value || 'per-trial-route';
+        
+        // Build routes table with TAU values
+        let routesTableHtml = '';
+        if (this.routes.length > 0) {
+            // Determine table columns based on TAU scope
+            let tauColumns = '';
+            let tauHeaders = '';
+            
+            if (tauScope === 'all') {
+                tauHeaders = '<th class="px-2 py-1 text-left text-xs font-medium text-blue-600">τ Value</th>';
+                routesTableHtml = this.routes.map((r, i) => `
+                    <tr class="border-t border-blue-100">
+                        <td class="px-2 py-1 text-xs text-blue-800 font-medium">${i + 1}</td>
+                        <td class="px-2 py-1 text-xs text-blue-700">${r.start?.name || 'Unknown'}</td>
+                        <td class="px-2 py-1 text-xs text-blue-700">${r.end?.name || 'Unknown'}</td>
+                        <td class="px-2 py-1 text-xs text-purple-600 font-mono">${tauValues[0]?.toFixed(2) || '0.50'}</td>
+                    </tr>
+                `).join('');
+            } else if (tauScope === 'per-trial') {
+                tauHeaders = Array(trials).fill(0).map((_, t) => 
+                    `<th class="px-2 py-1 text-left text-xs font-medium text-purple-600">T${t + 1}</th>`
+                ).join('');
+                routesTableHtml = this.routes.map((r, i) => `
+                    <tr class="border-t border-blue-100">
+                        <td class="px-2 py-1 text-xs text-blue-800 font-medium">${i + 1}</td>
+                        <td class="px-2 py-1 text-xs text-blue-700">${r.start?.name || 'Unknown'}</td>
+                        <td class="px-2 py-1 text-xs text-blue-700">${r.end?.name || 'Unknown'}</td>
+                        ${Array(trials).fill(0).map((_, t) => 
+                            `<td class="px-2 py-1 text-xs text-purple-600 font-mono">${tauValues[t]?.toFixed(2) || '0.50'}</td>`
+                        ).join('')}
+                    </tr>
+                `).join('');
+            } else if (tauScope === 'per-route') {
+                tauHeaders = '<th class="px-2 py-1 text-left text-xs font-medium text-purple-600">τ Value</th>';
+                routesTableHtml = this.routes.map((r, i) => `
+                    <tr class="border-t border-blue-100">
+                        <td class="px-2 py-1 text-xs text-blue-800 font-medium">${i + 1}</td>
+                        <td class="px-2 py-1 text-xs text-blue-700">${r.start?.name || 'Unknown'}</td>
+                        <td class="px-2 py-1 text-xs text-blue-700">${r.end?.name || 'Unknown'}</td>
+                        <td class="px-2 py-1 text-xs text-purple-600 font-mono">${tauValues[i]?.toFixed(2) || '0.50'}</td>
+                    </tr>
+                `).join('');
+            } else { // per-trial-route
+                tauHeaders = Array(trials).fill(0).map((_, t) => 
+                    `<th class="px-2 py-1 text-left text-xs font-medium text-purple-600">T${t + 1}</th>`
+                ).join('');
+                routesTableHtml = this.routes.map((r, rIdx) => `
+                    <tr class="border-t border-blue-100">
+                        <td class="px-2 py-1 text-xs text-blue-800 font-medium">${rIdx + 1}</td>
+                        <td class="px-2 py-1 text-xs text-blue-700">${r.start?.name || 'Unknown'}</td>
+                        <td class="px-2 py-1 text-xs text-blue-700">${r.end?.name || 'Unknown'}</td>
+                        ${Array(trials).fill(0).map((_, tIdx) => {
+                            const valIdx = tIdx * this.routes.length + rIdx;
+                            return `<td class="px-2 py-1 text-xs text-purple-600 font-mono">${tauValues[valIdx]?.toFixed(2) || '0.50'}</td>`;
+                        }).join('')}
+                    </tr>
+                `).join('');
+            }
+            
+            routesTableHtml = `
+                <table class="w-full text-left">
+                    <thead>
+                        <tr class="text-xs text-blue-600">
+                            <th class="px-2 py-1">#</th>
+                            <th class="px-2 py-1">Start</th>
+                            <th class="px-2 py-1">End</th>
+                            ${tauHeaders}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${routesTableHtml}
+                    </tbody>
+                </table>
+            `;
+        }
+        
+        // Get algorithm display name
+        const algorithmNames = {
+            'both': 'HC2L + DHL',
+            'hc2l': 'HC2L Only',
+            'dhl': 'DHL Only'
+        };
+        
+        // Get scope display names
+        const scopeNames = {
+            'all': 'Same for All',
+            'per-trial': 'Per Trial',
+            'per-route': 'Per Route',
+            'per-trial-route': 'Per Trial & Route'
+        };
         
         container.innerHTML = `
-            <div class="space-y-4">
-                <div class="bg-blue-50 rounded-xl p-4">
-                    <h4 class="font-bold text-blue-800 mb-2">📍 Routes (${this.routes.length})</h4>
-                    <div class="space-y-2 max-h-32 overflow-y-auto">
-                        ${this.routes.map((r, i) => `
-                            <div class="text-sm text-blue-700">
-                                <span class="font-medium">${i + 1}.</span> ${r.start.name} → ${r.end.name}
-                            </div>
-                        `).join('')}
+            <div class="space-y-3">
+                <!-- Routes Table -->
+                <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200">
+                    <h4 class="font-bold text-blue-800 mb-3 flex items-center gap-2">
+                        <span>📍</span> Routes & TAU Values (${this.routes.length} routes × ${trials} trials)
+                    </h4>
+                    <div class="max-h-48 overflow-y-auto bg-white rounded-lg p-2">
+                        ${this.routes.length > 0 ? routesTableHtml : '<p class="text-sm text-blue-400 italic">No routes defined</p>'}
+                    </div>
+                    <div class="mt-2 flex gap-4 text-xs text-blue-600">
+                        <span>🎯 TAU Mode: <strong>${tauMode === 'fixed' ? 'Fixed' : 'Random'}</strong></span>
+                        <span>📐 TAU Scope: <strong>${scopeNames[tauScope]}</strong></span>
                     </div>
                 </div>
                 
-                <div class="bg-orange-50 rounded-xl p-4">
-                    <h4 class="font-bold text-orange-800 mb-2">🚦 Disruptions</h4>
-                    <p class="text-sm text-orange-700">
-                        Mode: ${this.disruptions.mode}<br>
-                        ${this.disruptions.mode.includes('random') ? `Severity range: ${this.disruptions.severityMin} - ${this.disruptions.severityMax}<br>` : ''}
-                        ${this.disruptions.mode === 'custom' ? `Custom items: ${this.disruptions.customItems.length}` : ''}
-                    </p>
+                <!-- Disruptions Summary -->
+                <div class="bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl p-4 border border-orange-200">
+                    <h4 class="font-bold text-orange-800 mb-2 flex items-center gap-2">
+                        <span>🚦</span> Disruptions
+                    </h4>
+                    <div class="grid grid-cols-2 gap-2 text-sm text-orange-700">
+                        <div>Mode: <strong>${this.disruptions.mode}</strong></div>
+                        <div>Scope: <strong>${scopeNames[disruptionScope]}</strong></div>
+                        ${this.disruptions.mode.includes('random') ? `
+                            <div>Flow Count: <strong>${this.disruptions.randomFlowCount || 50}</strong></div>
+                            <div>Incident Count: <strong>${this.disruptions.randomIncidentCount || 5}</strong></div>
+                            <div class="col-span-2">Severity: <strong>${this.disruptions.severityMin} - ${this.disruptions.severityMax}</strong></div>
+                        ` : ''}
+                        ${this.disruptions.mode === 'custom' ? `
+                            <div class="col-span-2">Custom Items: <strong>${this.disruptions.customItems.length}</strong></div>
+                        ` : ''}
+                    </div>
                 </div>
                 
-                <div class="bg-purple-50 rounded-xl p-4">
-                    <h4 class="font-bold text-purple-800 mb-2">⚙️ Sequence</h4>
-                    <p class="text-sm text-purple-700">
-                        Algorithm: ${algorithm.toUpperCase()}<br>
-                        τ values: ${tauValues.map(v => v.toFixed(2)).join(', ')}<br>
-                        Step delay: ${stepDelay}ms
-                    </p>
-                </div>
-                
-                <div class="bg-indigo-50 rounded-xl p-4">
-                    <h4 class="font-bold text-indigo-800 mb-2">🔄 Execution</h4>
-                    <p class="text-sm text-indigo-700">
-                        Trials: ${trials}<br>
-                        Total runs: ${this.routes.length * trials}
-                    </p>
+                <!-- Execution Summary -->
+                <div class="bg-gradient-to-br from-purple-50 to-violet-50 rounded-xl p-4 border border-purple-200">
+                    <h4 class="font-bold text-purple-800 mb-2 flex items-center gap-2">
+                        <span>⚙️</span> Execution Settings
+                    </h4>
+                    <div class="grid grid-cols-2 gap-2 text-sm text-purple-700">
+                        <div>Algorithm: <strong>${algorithmNames[algorithm] || algorithm}</strong></div>
+                        <div>Step Delay: <strong>${stepDelay}ms</strong></div>
+                        <div>Total Trials: <strong>${trials}</strong></div>
+                        <div>Total Runs: <strong>${this.routes.length * trials}</strong></div>
+                    </div>
                 </div>
             </div>
         `;
     },
 
     async saveForLater() {
-        const saveBtn = document.getElementById('demo-v2-save-later-btn');
+        const saveBtn = document.getElementById('demo-v2-save-btn');
         const originalContent = saveBtn?.innerHTML;
         
         // Show loading state
@@ -2192,19 +2954,56 @@ const DemoCreator = {
             const trials = parseInt(document.getElementById('demo-trials-count')?.value) || 1;
             
             // Read TAU generation scope from radio buttons
-            this.sequence.tauGenerationScope = this.getSelectedTauScope();
+            const tauScope = this.getSelectedTauScope();
+            this.sequence.tauGenerationScope = tauScope;
+            
+            // Get all TAU values - these will be distributed based on scope
+            const allTauValues = this.getTauValues();
+            
+            // Structure TAU values per route based on scope
+            const routesWithTau = this.routes.map((r, routeIdx) => {
+                let routeTauValues;
+                
+                switch (tauScope) {
+                    case 'all':
+                        // All routes get same single TAU
+                        routeTauValues = [allTauValues[0] || 0.5];
+                        break;
+                    case 'per-trial':
+                        // Each trial has different TAU, all routes in trial use same TAU
+                        // Store all trial TAUs - runner will pick correct one per trial
+                        routeTauValues = allTauValues;
+                        break;
+                    case 'per-route':
+                        // Each route has its own single TAU
+                        routeTauValues = [allTauValues[routeIdx] || 0.5];
+                        break;
+                    case 'per-trial-route':
+                        // Each route in each trial has unique TAU
+                        // For route i with T trials, values are at indices: i*T, i*T+1, ..., i*T+(T-1)
+                        const routeStart = routeIdx * trials;
+                        routeTauValues = allTauValues.slice(routeStart, routeStart + trials);
+                        if (routeTauValues.length === 0) routeTauValues = [0.5];
+                        break;
+                    default:
+                        routeTauValues = [0.5];
+                }
+                
+                return {
+                    ...r,
+                    tauValues: routeTauValues
+                };
+            });
             
             // Collect configuration
             const config = {
                 name: document.getElementById('demo-v2-name')?.value || `Custom Demo - ${new Date().toLocaleString()}`,
-                routes: this.routes.map(r => ({
-                    ...r,
-                    tauValues: this.getTauValues()
-                })),
+                routes: routesWithTau,
                 trials: trials,
                 algorithm: this.getSelectedAlgorithm(),
                 disruptions: { ...this.disruptions },
                 sequence: { ...this.sequence },
+                allTauValues: allTauValues,  // Store all TAU values for reference
                 stepDelay: parseInt(document.getElementById('demo-step-delay')?.value) || 1000
             };
             
@@ -2215,7 +3014,7 @@ const DemoCreator = {
                 showUpdateToast('Demo configuration updated!', 'success');
             } else {
                 await DemoRunner.saveConfig(config);
-                showUpdateToast('Demo configuration saved for later!', 'success');
+                showUpdateToast('Demo configuration saved!', 'success');
             }
             
             // Close the panel after saving
@@ -2236,8 +3035,102 @@ const DemoCreator = {
         }
     },
 
-    async saveAndRun() {
+    /**
+     * Run the demo without saving
+     */
+    async runOnly() {
         const runBtn = document.getElementById('demo-v2-run-btn');
+        const originalContent = runBtn?.innerHTML;
+        
+        // Show loading state
+        if (runBtn) {
+            runBtn.disabled = true;
+            runBtn.innerHTML = `
+                <svg class="animate-spin h-5 w-5 mr-2 inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Starting...
+            `;
+        }
+        
+        try {
+            // Read severity range values
+            this.disruptions.severityMin = parseFloat(document.getElementById('random-severity-min')?.value) || 0;
+            this.disruptions.severityMax = parseFloat(document.getElementById('random-severity-max')?.value) || 1;
+            
+            const trials = parseInt(document.getElementById('demo-trials-count')?.value) || 1;
+            
+            // Read TAU generation scope from radio buttons
+            const tauScope = this.getSelectedTauScope();
+            this.sequence.tauGenerationScope = tauScope;
+            
+            // Get all TAU values - these will be distributed based on scope
+            const allTauValues = this.getTauValues();
+            
+            // Structure TAU values per route based on scope
+            const routesWithTau = this.routes.map((r, routeIdx) => {
+                let routeTauValues;
+                
+                switch (tauScope) {
+                    case 'all':
+                        // All routes get same single TAU
+                        routeTauValues = [allTauValues[0] || 0.5];
+                        break;
+                    case 'per-trial':
+                        // Each trial has different TAU, all routes in trial use same TAU
+                        // Store all trial TAUs - runner will pick correct one per trial
+                        routeTauValues = allTauValues;
+                        break;
+                    case 'per-route':
+                        // Each route has its own single TAU
+                        routeTauValues = [allTauValues[routeIdx] || 0.5];
+                        break;
+                    case 'per-trial-route':
+                        // Each route in each trial has unique TAU
+                        // For route i with T trials, values are at indices: i*T, i*T+1, ..., i*T+(T-1)
+                        const routeStart = routeIdx * trials;
+                        routeTauValues = allTauValues.slice(routeStart, routeStart + trials);
+                        if (routeTauValues.length === 0) routeTauValues = [0.5];
+                        break;
+                    default:
+                        routeTauValues = [0.5];
+                }
+                
+                return {
+                    ...r,
+                    tauValues: routeTauValues
+                };
+            });
+            
+            // Collect configuration (without saving)
+            const config = {
+                name: document.getElementById('demo-v2-name')?.value || `Demo Run - ${new Date().toLocaleString()}`,
+                routes: routesWithTau,
+                trials: trials,
+                algorithm: this.getSelectedAlgorithm(),
+                disruptions: { ...this.disruptions },
+                sequence: { ...this.sequence },
+                allTauValues: allTauValues,  // Store all TAU values for reference
+                stepDelay: parseInt(document.getElementById('demo-step-delay')?.value) || 1000
+            };
+            
+            // Run demo with detailed progress in this panel
+            await this.runDemoWithProgress(config);
+        } catch (error) {
+            console.error('Error running demo:', error);
+            showUpdateToast('Error running demo: ' + error.message, 'error');
+        } finally {
+            // Restore button state
+            if (runBtn) {
+                runBtn.disabled = false;
+                runBtn.innerHTML = originalContent;
+            }
+        }
+    },
+
+    async saveAndRun() {
+        const runBtn = document.getElementById('demo-v2-save-run-btn');
         const originalContent = runBtn?.innerHTML;
         
         // Show loading state
@@ -2260,30 +3153,67 @@ const DemoCreator = {
             const trials = parseInt(document.getElementById('demo-trials-count')?.value) || 1;
             
             // Read TAU generation scope from radio buttons
-            this.sequence.tauGenerationScope = this.getSelectedTauScope();
+            const tauScope = this.getSelectedTauScope();
+            this.sequence.tauGenerationScope = tauScope;
+            
+            // Get all TAU values - these will be distributed based on scope
+            const allTauValues = this.getTauValues();
+            
+            // Structure TAU values per route based on scope
+            const routesWithTau = this.routes.map((r, routeIdx) => {
+                let routeTauValues;
+                
+                switch (tauScope) {
+                    case 'all':
+                        // All routes get same single TAU
+                        routeTauValues = [allTauValues[0] || 0.5];
+                        break;
+                    case 'per-trial':
+                        // Each trial has different TAU, all routes in trial use same TAU
+                        // Store all trial TAUs - runner will pick correct one per trial
+                        routeTauValues = allTauValues;
+                        break;
+                    case 'per-route':
+                        // Each route has its own single TAU
+                        routeTauValues = [allTauValues[routeIdx] || 0.5];
+                        break;
+                    case 'per-trial-route':
+                        // Each route in each trial has unique TAU
+                        // For route i with T trials, values are at indices: i*T, i*T+1, ..., i*T+(T-1)
+                        const routeStart = routeIdx * trials;
+                        routeTauValues = allTauValues.slice(routeStart, routeStart + trials);
+                        if (routeTauValues.length === 0) routeTauValues = [0.5];
+                        break;
+                    default:
+                        routeTauValues = [0.5];
+                }
+                
+                return {
+                    ...r,
+                    tauValues: routeTauValues
+                };
+            });
             
             // Collect configuration
             const config = {
                 name: document.getElementById('demo-v2-name')?.value || `Custom Demo - ${new Date().toLocaleString()}`,
-                routes: this.routes.map(r => ({
-                    ...r,
-                    tauValues: this.getTauValues()
-                })),
+                routes: routesWithTau,
                 trials: trials,
                 algorithm: this.getSelectedAlgorithm(),
                 disruptions: { ...this.disruptions },
                 sequence: { ...this.sequence },
+                allTauValues: allTauValues,  // Store all TAU values for reference
                 stepDelay: parseInt(document.getElementById('demo-step-delay')?.value) || 1000
             };
             
-            // If editing, update the config; otherwise save new
-            if (document.getElementById('demo-v2-save-config')?.checked) {
-                if (this.editingConfigId) {
-                    config.id = this.editingConfigId;
-                    await DemoRunner.updateConfig(config);
-                } else {
-                    await DemoRunner.saveConfig(config);
-                }
+            // Save the configuration
+            if (this.editingConfigId) {
+                config.id = this.editingConfigId;
+                await DemoRunner.updateConfig(config);
+                showUpdateToast('Demo configuration updated!', 'success');
+            } else {
+                await DemoRunner.saveConfig(config);
+                showUpdateToast('Demo configuration saved!', 'success');
             }
             
             // Run demo with detailed progress in this panel

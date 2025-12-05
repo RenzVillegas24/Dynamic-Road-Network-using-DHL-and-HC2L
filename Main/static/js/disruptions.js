@@ -460,23 +460,31 @@ function showAllDisruptionsOnMap(disruptionData) {
     // Clear existing disruption markers
     clearDisruptionMarkers();
     
-    // Add markers for each disruption type using Leaflet
+    // Add polylines (edges) for each disruption type using Leaflet - matches traffic overlay style
     for (const [incidentType, disruptions] of Object.entries(disruptionData.disruptions_by_type)) {
-      // Limit markers to prevent performance issues (show max 50 per type)
-      const markersToShow = disruptions.slice(0, 50);
+      // Limit to prevent performance issues (show max 100 per type)
+      const disruptionsToShow = disruptions.slice(0, 100);
       
-      markersToShow.forEach(disruption => {
-        const centerLat = (disruption.source_lat + disruption.target_lat) / 2;
-        const centerLng = (disruption.source_lng + disruption.target_lng) / 2;
+      disruptionsToShow.forEach(disruption => {
+        const sourceLat = disruption.source_lat;
+        const sourceLng = disruption.source_lng;
+        const targetLat = disruption.target_lat;
+        const targetLng = disruption.target_lng;
+        
+        // Skip if coordinates are invalid
+        if (!sourceLat || !sourceLng || !targetLat || !targetLng) {
+          console.warn('Skipping disruption with invalid coordinates:', disruption);
+          return;
+        }
         
         // Get fields with compatibility layer
         let severity = getDisruptionField(disruption, 'severity');
-        const incidentType = getDisruptionField(disruption, 'incident_type');
+        const disruptionType = getDisruptionField(disruption, 'incident_type') || incidentType;
         const roadName = disruption.road_name || 'Unknown Road';
-        const speedKph = getDisruptionField(disruption, 'current_speed') || 0;
-        const slowdownRatio = disruption.slowdown_ratio || (speedKph > 0 ? speedKph / 50 : 0.5);
+        const speedKph = getDisruptionField(disruption, 'current_speed') || disruption.speed_kph || 0;
+        const freeFlowKph = disruption.free_flow_kph || 50;
+        const jamFactor = disruption.jam_factor || 0;
         
-        // Get color based on severity
         // For user-reported incidents, map criticality to severity (case-insensitive)
         if (disruption.incident_criticality) {
           const criticality = disruption.incident_criticality.toLowerCase();
@@ -488,85 +496,85 @@ function showAllDisruptionsOnMap(disruptionData) {
           severity = criticalityMap[criticality] || 'Medium';
         }
         
-        const markerColor = severity === 'Heavy' ? '#ef4444' : 
-                           severity === 'Medium' ? '#f59e0b' : '#10b981';
+        // Determine color, weight, and opacity based on severity (matching traffic overlay style)
+        let color, weight, opacity;
+        switch (severity) {
+          case 'Heavy':
+            color = '#ef4444';  // Red
+            weight = 6;
+            opacity = 0.85;
+            break;
+          case 'Medium':
+            color = '#f59e0b';  // Orange
+            weight = 5;
+            opacity = 0.75;
+            break;
+          default:
+            color = '#10b981';  // Green
+            weight = 4;
+            opacity = 0.65;
+        }
         
-        // Get icon based on incident type
-        const getMarkerSymbol = (type) => {
-          const symbols = {
-            'Road Closure': '✖',
-            'Accident': '⚠',
-            'Construction': '🚧',
-            'Congestion': '🚗',
-            'Disabled Vehicle': '🔧',
-            'Mass Transit Event': '🚌',
-            'Planned Event': '📅',
-            'Road Hazard': '⚠',
-            'Lane Restriction': '🚧',
-            'Weather': '🌧'
-          };
-          return symbols[type] || '!';
-        };
-        
-        const icon = L.divIcon({
-          html: `<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="12" cy="12" r="10" fill="${markerColor}" stroke="white" stroke-width="1"/>
-                  <text x="12" y="16" text-anchor="middle" fill="white" font-size="10" font-weight="bold">${getMarkerSymbol(incidentType)}</text>
-                </svg>`,
-          className: 'disruption-marker',
-          iconSize: [24, 24],
-          iconAnchor: [12, 24]
-        });
-        
-        const marker = L.marker([centerLat, centerLng], { 
-          icon: icon,
-          title: `${incidentType} on ${roadName}`
+        // Create polyline from source to target coordinates
+        const polyline = L.polyline([
+          [sourceLat, sourceLng],
+          [targetLat, targetLng]
+        ], {
+          color: color,
+          weight: weight,
+          opacity: opacity,
+          className: `demo-disruption-edge demo-disruption-${severity.toLowerCase()}`
         }).addTo(map);
         
-        // Add popup with info
-        const getIncidentInfo = () => {
-          // For user-reported incidents (incident_criticality exists)
+        // Build popup content
+        const getPopupContent = () => {
+          // For incidents with criticality
           if (disruption.incident_criticality) {
-            // Use PopupStyles for consistent popup formatting
             return PopupStyles.createIncidentPopup({
-              road_name: disruption.road_name || 'Unknown Road',
-              incident_type: disruption.incident_type || 'Incident',
+              road_name: roadName,
+              incident_type: disruptionType,
               incident_criticality: disruption.incident_criticality,
               incident_road_closed: disruption.incident_road_closed || false,
-              incident_description: disruption.incident_description || '',
+              incident_description: disruption.incident_description || disruption.description || '',
               incident_start_time: disruption.incident_start_time || '',
               incident_end_time: disruption.incident_end_time || '',
               highway_type: disruption.highway_type || ''
             });
           }
           
-          // For HERE traffic data (severity exists)
-          const severity = getDisruptionField(disruption, 'severity');
-          const speedKph = getDisruptionField(disruption, 'current_speed') || getDisruptionField(disruption, 'speed_kph') || 0;
-          const freeFlowKph = getDisruptionField(disruption, 'free_flow_kph') || 50;
-          const slowdownRatio = disruption.slowdown_ratio || (speedKph > 0 ? (speedKph / freeFlowKph) : 0.5);
-          
-          // Use PopupStyles for consistent popup formatting
+          // For flow/congestion data
           return PopupStyles.createTrafficPopup({
-            road_name: disruption.road_name || 'Unknown Road',
-            incident_type: disruption.incident_type || 'Traffic',
+            road_name: roadName,
+            incident_type: disruptionType,
             severity: severity,
             speed_kph: speedKph,
             free_flow_kph: freeFlowKph,
-            jam_factor: getDisruptionField(disruption, 'jam_factor') || 0,
-            is_closed: false
+            jam_factor: jamFactor,
+            is_closed: disruption.is_closed || false
           });
         };
         
-        const popupContent = getIncidentInfo();
+        polyline.bindPopup(getPopupContent());
         
-        marker.bindPopup(popupContent);
+        // Add hover effect
+        polyline.on('mouseover', function() {
+          this.setStyle({
+            weight: weight + 2,
+            opacity: Math.min(opacity + 0.15, 1)
+          });
+        });
+        polyline.on('mouseout', function() {
+          this.setStyle({
+            weight: weight,
+            opacity: opacity
+          });
+        });
         
-        disruptionMarkers.push(marker);
+        disruptionMarkers.push(polyline);
       });
     }
     
-    console.log(`Added ${disruptionMarkers.length} disruption markers to map`);
+    console.log(`Added ${disruptionMarkers.length} disruption edges to map`);
 }
 
 // Function to clear the disruption markers from the map (Leaflet)
