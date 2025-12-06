@@ -322,29 +322,11 @@ function renderTrafficSegments(segments, mode, routeOnly) {
         if (!onRoute) return;
       }
 
-      let color, opacity, weight;
-      if (segment.is_closed) {
-        color = '#000000';
-        opacity = 0.9;
-        weight = 7;
-      } else {
-        switch (segment.severity) {
-          case 'Heavy':
-            color = '#ef4444';
-            opacity = 0.85;
-            weight = 6;
-            break;
-          case 'Medium':
-            color = '#f59e0b';
-            opacity = 0.75;
-            weight = 5;
-            break;
-          default:
-            color = '#10b981';
-            opacity = 0.65;
-            weight = 4;
-        }
-      }
+      // Use TrafficUtils for consistent color determination
+      const jamFactor = segment.jam_factor || 0;
+      const isClosed = segment.is_closed || false;
+      const style = TrafficUtils.getDisruptionStyle(jamFactor, isClosed);
+      const { color, weight, opacity } = style;
 
       if (!segment.geometry || !Array.isArray(segment.geometry) || segment.geometry.length < 2) {
         console.warn('   ⚠️  Skipping segment with invalid geometry:', segment);
@@ -363,20 +345,21 @@ function renderTrafficSegments(segments, mode, routeOnly) {
         color: color,
         weight: weight,
         opacity: opacity,
-        className: `traffic-segment traffic-${(segment.severity || 'light').toLowerCase()}`
+        className: `traffic-segment traffic-${TrafficUtils.getSeverityFromJamFactor(jamFactor, isClosed).toLowerCase()}`
       });
 
-      const icon = incidentIcons[segment.incident_type] || '📍';
+      const icon = TrafficUtils.getIncidentIcon(segment.incident_type);
+      const severity = TrafficUtils.getSeverityFromJamFactor(jamFactor, isClosed);
       const popup = PopupStyles.createTrafficOverlayPopup({
         incident_type: segment.incident_type,
         road_name: segment.road_name,
         highway_type: segment.highway_type,
-        severity: segment.severity,
+        severity: severity,
         speed_kph: segment.speed_kph || 0,
         free_flow_kph: segment.free_flow_kph || 0,
-        jam_factor: segment.jam_factor || 0,
+        jam_factor: jamFactor,
         length: segment.length,
-        is_closed: segment.is_closed,
+        is_closed: isClosed,
         description: segment.description
       });
 

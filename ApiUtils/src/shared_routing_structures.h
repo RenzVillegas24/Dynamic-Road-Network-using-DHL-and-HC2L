@@ -68,6 +68,10 @@ struct GPSCoordinate {
 /**
  * Traffic flow data from HERE API or other sources
  * Represents real-time traffic conditions
+ * 
+ * NOTE: color_code and flow_status have been REMOVED.
+ * Color determination is now handled entirely by the frontend (TrafficUtils.js)
+ * based on jam_factor value. This ensures consistent coloring across all displays.
  */
 struct TrafficFlowData {
     double jam_factor;              // 0.0 to 10.0 (HERE API scale)
@@ -75,14 +79,11 @@ struct TrafficFlowData {
     double free_flow_speed;         // Free-flow speed in km/h
     double speed_reduction;         // Percentage: 0.0 to 1.0
     double confidence;              // 0.0 to 1.0 (data reliability)
-    std::string flow_status;        // "free_flow", "light", "moderate", "heavy", "blocked"
-    std::string color_code;         // Hex color code for visualization
     std::string traversability;     // "open", "closed", "restricted"
     
     TrafficFlowData() 
         : jam_factor(0.0), current_speed(0.0), free_flow_speed(50.0),
-          speed_reduction(0.0), confidence(0.99),
-          flow_status("free_flow"), color_code("green"), traversability("open") {}
+          speed_reduction(0.0), confidence(0.99), traversability("open") {}
 };
 
 /**

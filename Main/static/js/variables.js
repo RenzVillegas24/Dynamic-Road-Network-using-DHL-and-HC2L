@@ -97,7 +97,6 @@ function getDisruptionField(disruption, field) {
     'speed_kph': disruption.flow?.speed_kph ?? disruption.current_speed,
     'jam_factor': disruption.flow?.jam_factor ?? disruption.jam_factor,
     'confidence': disruption.flow?.confidence ?? disruption.confidence,
-    'flow_status': disruption.flow?.status || disruption.flow_status,
     
     // Disruption metrics fields
     'severity': mapSeverityToOld(disruption.disruption_metrics?.severity_level || disruption.severity_level || disruption.severity),

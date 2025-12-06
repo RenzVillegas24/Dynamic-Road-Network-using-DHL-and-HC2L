@@ -847,14 +847,17 @@ function displayDHLRoute(routeData) {
   const pathCoords = coords.map(coord => [coord[1], coord[0]]);
   const flowInfo = segment.flow || {};
         
-  // Get color from segment (use actual color from C++ data)
-  let segmentColor = flowInfo.color || segment.color || '#8b5cf6'; // Default DHL violet
+  // Get color from TrafficUtils based on jam_factor (unified color logic)
+  const jam_factor = TrafficUtils.extractJamFactor(segment);
+  const is_closed = TrafficUtils.extractIsClosed(segment);
+  const segmentColor = TrafficUtils.getDisruptionColor(jam_factor, is_closed, TrafficUtils.COLORS.DHL_DEFAULT);
+  const segmentStyle = TrafficUtils.getDisruptionStyle(jam_factor, is_closed, TrafficUtils.COLORS.DHL_DEFAULT);
         
         // Create polyline with segment-specific color
         const polyline = L.polyline(pathCoords, {
           color: segmentColor,
-          opacity: 0.8,
-          weight: 6,
+          opacity: segmentStyle.opacity,
+          weight: segmentStyle.weight,
           className: 'route-segment-clickable'
         }).addTo(map);
         
@@ -864,23 +867,9 @@ function displayDHLRoute(routeData) {
   const highway_type = segment.highway_type || 'unknown';
   const free_flow_speed = segment.free_flow_speed_kmh ?? flowInfo.free_flow_kph ?? 0;
   const current_speed = flowInfo.speed_kph ?? segment.speed_kmh ?? free_flow_speed;
-  const jam_factor = flowInfo.jam_factor ?? segment.jam_factor ?? 0;
-  const flow_status = flowInfo.status || segment.flow_status || 'default';
-        const is_closed = segment.is_closed || false;
+  const severity = TrafficUtils.getSeverityFromJamFactor(jam_factor, is_closed);
         const incident_type = segment.incident_type || 'none';
         const incident_confidence = segment.incident_confidence || 0;
-        
-        // Determine status badge color
-        let statusColor = '#10b981'; // green for free flow
-        if (is_closed) {
-          statusColor = '#ef4444'; // red for closed
-        } else if (flow_status === 'heavy') {
-          statusColor = '#dc2626'; // dark red
-        } else if (flow_status === 'medium') {
-          statusColor = '#f59e0b'; // amber
-        } else if (flow_status === 'light') {
-          statusColor = '#fbbf24'; // yellow
-        }
         
         // Use PopupStyles for consistent route segment popup formatting
         const popupContent = PopupStyles.createRouteSegmentPopup({
@@ -889,7 +878,7 @@ function displayDHLRoute(routeData) {
           to: segment.to,
           distance_km: distance_km,
           highway_type: highway_type,
-          flow_status: flow_status,
+          severity: severity,
           current_speed: current_speed,
           free_flow_speed: free_flow_speed,
           jam_factor: jam_factor,
@@ -1102,14 +1091,17 @@ function displayDHC2LRoute(routeData) {
   const pathCoords = coords.map(coord => [coord[1], coord[0]]);
   const flowInfo = segment.flow || {};
         
-  // Get color from segment (use actual color from C++ data)
-  let segmentColor = flowInfo.color || segment.color || '#0066FF'; // Default HC2L blue
+  // Get color from TrafficUtils based on jam_factor (unified color logic)
+  const jam_factor = TrafficUtils.extractJamFactor(segment);
+  const is_closed = TrafficUtils.extractIsClosed(segment);
+  const segmentColor = TrafficUtils.getDisruptionColor(jam_factor, is_closed, TrafficUtils.COLORS.HC2L_DEFAULT);
+  const segmentStyle = TrafficUtils.getDisruptionStyle(jam_factor, is_closed, TrafficUtils.COLORS.HC2L_DEFAULT);
         
         // Create polyline with segment-specific color
         const polyline = L.polyline(pathCoords, {
           color: segmentColor,
-          opacity: 0.8,
-          weight: 6,
+          opacity: segmentStyle.opacity,
+          weight: segmentStyle.weight,
           className: 'route-segment-clickable'
         }).addTo(map);
         
@@ -1119,23 +1111,9 @@ function displayDHC2LRoute(routeData) {
   const highway_type = segment.highway_type || 'unknown';
   const free_flow_speed = segment.free_flow_speed_kmh ?? flowInfo.free_flow_kph ?? 0;
   const current_speed = flowInfo.speed_kph ?? segment.speed_kmh ?? free_flow_speed;
-  const jam_factor = flowInfo.jam_factor ?? segment.jam_factor ?? 0;
-  const flow_status = flowInfo.status || segment.flow_status || 'default';
-        const is_closed = segment.is_closed || false;
+  const severity = TrafficUtils.getSeverityFromJamFactor(jam_factor, is_closed);
         const incident_type = segment.incident_type || 'none';
         const incident_confidence = segment.incident_confidence || 0;
-        
-        // Determine status badge color
-        let statusColor = '#10b981'; // green for free flow
-        if (is_closed) {
-          statusColor = '#ef4444'; // red for closed
-        } else if (flow_status === 'heavy') {
-          statusColor = '#dc2626'; // dark red
-        } else if (flow_status === 'medium') {
-          statusColor = '#f59e0b'; // amber
-        } else if (flow_status === 'light') {
-          statusColor = '#fbbf24'; // yellow
-        }
         
         // Use PopupStyles for consistent route segment popup formatting
         const popupContent = PopupStyles.createRouteSegmentPopup({
@@ -1144,7 +1122,7 @@ function displayDHC2LRoute(routeData) {
           to: segment.to,
           distance_km: distance_km,
           highway_type: highway_type,
-          flow_status: flow_status,
+          severity: severity,
           current_speed: current_speed,
           free_flow_speed: free_flow_speed,
           jam_factor: jam_factor,

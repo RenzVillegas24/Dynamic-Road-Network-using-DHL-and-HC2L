@@ -292,15 +292,15 @@ inline string format_eta_time(double seconds) {
 }
 
 // ============================================================
-// TRAFFIC FLOW & SEVERITY FUNCTIONS
+// TRAFFIC FLOW FUNCTIONS
 // ============================================================
 
 /**
- * Determine flow status and color code from jam factor
- * Reference: HERE API jam_factor scale (0.0 = free flow, 10.0 = blocked)
- * ALIGNED with Python traffic overlay severity mapping
+ * Create TrafficFlowData from jam factor and speed values
+ * NOTE: Color determination is now handled by frontend (TrafficUtils.js)
+ * This function only populates the numeric traffic data.
  */
-inline TrafficFlowData get_flow_color(double jam_factor, double current_speed, double free_flow_speed) {
+inline TrafficFlowData create_flow_data(double jam_factor, double current_speed, double free_flow_speed) {
     TrafficFlowData flow;
     flow.jam_factor = jam_factor;
     flow.current_speed = current_speed;
@@ -312,15 +312,13 @@ inline TrafficFlowData get_flow_color(double jam_factor, double current_speed, d
         flow.speed_reduction = 0.0;
     }
     
-    if (jam_factor >= 8.0) {
-        flow.flow_status = "heavy";      // Severity: Heavy
-        flow.color_code = "#ef4444";     // Red (matches Python overlay)
-    } else if (jam_factor >= 5.0) {
-        flow.flow_status = "medium";     // Severity: Medium
-        flow.color_code = "#f59e0b";     // Orange (matches Python overlay)
+    // Determine traversability based on jam factor
+    if (jam_factor >= 10.0) {
+        flow.traversability = "closed";
+    } else if (jam_factor >= 8.0) {
+        flow.traversability = "restricted";
     } else {
-        flow.flow_status = "light";      // Severity: Light
-        flow.color_code = "#10b981";     // Green (matches Python overlay)
+        flow.traversability = "open";
     }
     
     return flow;
@@ -333,36 +331,14 @@ inline TrafficFlowData get_flow_color(double jam_factor, double current_speed, d
 
 /**
  * Get severity level based on jam factor and incident type
- * Used for JSON output classification
+ * Used for JSON output classification (not for colors - frontend handles that)
  */
 inline string get_severity_level(double jam_factor, const string& incident_type, bool is_closed) {
     if (is_closed) return "critical";
-    if (jam_factor >= 8.0) return "high";
-    if (jam_factor >= 5.0) return "medium";
+    if (jam_factor >= 7.0) return "high";
+    if (jam_factor >= 4.0) return "medium";
     if (jam_factor >= 2.0) return "low";
     return "none";
-}
-
-/**
- * Get severity level in Flow Overlay format (Heavy/Medium/Light)
- * This matches the frontend visualization logic exactly
- */
-inline string get_flow_overlay_severity(double jam_factor, bool is_closed) {
-    if (is_closed) return "Heavy";  // Closed roads are heavy disruption
-    if (jam_factor >= 8.0) return "Heavy";
-    if (jam_factor >= 5.0) return "Medium";
-    return "Light";
-}
-
-/**
- * Get color code based on jam_factor and closed status
- * This matches the frontend visualization colors
- */
-inline string get_flow_color_code(double jam_factor, bool is_closed) {
-    if (is_closed) return "#000000";  // Black for closed roads
-    if (jam_factor >= 8.0) return "#ef4444";  // Red for Heavy
-    if (jam_factor >= 5.0) return "#f59e0b";  // Orange for Medium
-    return "#10b981";  // Green for Light
 }
 
 // ============================================================
@@ -1136,7 +1112,10 @@ inline bool load_disruptions_with_cache(
                         ? fields[flow_traversability_col] : "open";
                     
                     auto edge_key = make_pair(source, target);
-                    TrafficFlowData flow = get_flow_color(jam_factor, current_speed, free_flow_speed);
+                    TrafficFlowData flow;
+                    flow.jam_factor = jam_factor;
+                    flow.current_speed = current_speed;
+                    flow.free_flow_speed = free_flow_speed;
                     flow.confidence = flow_confidence;
                     flow.traversability = flow_traversability;
                     flow_out[edge_key] = flow;

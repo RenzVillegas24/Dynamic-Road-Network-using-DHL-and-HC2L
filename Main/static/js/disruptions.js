@@ -460,129 +460,49 @@ function showAllDisruptionsOnMap(disruptionData) {
     // Clear existing disruption markers
     clearDisruptionMarkers();
     
-    // Add polylines (edges) for each disruption type using Leaflet - matches traffic overlay style
+    // Collect all flow segments and incidents from disruption data
+    const flowSegments = [];
+    const incidents = [];
+    
     for (const [incidentType, disruptions] of Object.entries(disruptionData.disruptions_by_type)) {
-      // Limit to prevent performance issues (show max 100 per type)
-      const disruptionsToShow = disruptions.slice(0, 100);
-      
-      disruptionsToShow.forEach(disruption => {
-        const sourceLat = disruption.source_lat;
-        const sourceLng = disruption.source_lng;
-        const targetLat = disruption.target_lat;
-        const targetLng = disruption.target_lng;
+        // Limit to prevent performance issues (show max 100 per type)
+        const disruptionsToShow = disruptions.slice(0, 100);
         
-        // Skip if coordinates are invalid
-        if (!sourceLat || !sourceLng || !targetLat || !targetLng) {
-          console.warn('Skipping disruption with invalid coordinates:', disruption);
-          return;
-        }
-        
-        // Get fields with compatibility layer
-        let severity = getDisruptionField(disruption, 'severity');
-        const disruptionType = getDisruptionField(disruption, 'incident_type') || incidentType;
-        const roadName = disruption.road_name || 'Unknown Road';
-        const speedKph = getDisruptionField(disruption, 'current_speed') || disruption.speed_kph || 0;
-        const freeFlowKph = disruption.free_flow_kph || 50;
-        const jamFactor = disruption.jam_factor || 0;
-        
-        // For user-reported incidents, map criticality to severity (case-insensitive)
-        if (disruption.incident_criticality) {
-          const criticality = disruption.incident_criticality.toLowerCase();
-          const criticalityMap = {
-            'critical': 'Heavy',
-            'major': 'Medium',
-            'minor': 'Light'
-          };
-          severity = criticalityMap[criticality] || 'Medium';
-        }
-        
-        // Determine color, weight, and opacity based on severity (matching traffic overlay style)
-        let color, weight, opacity;
-        switch (severity) {
-          case 'Heavy':
-            color = '#ef4444';  // Red
-            weight = 6;
-            opacity = 0.85;
-            break;
-          case 'Medium':
-            color = '#f59e0b';  // Orange
-            weight = 5;
-            opacity = 0.75;
-            break;
-          default:
-            color = '#10b981';  // Green
-            weight = 4;
-            opacity = 0.65;
-        }
-        
-        // Create polyline from source to target coordinates
-        const polyline = L.polyline([
-          [sourceLat, sourceLng],
-          [targetLat, targetLng]
-        ], {
-          color: color,
-          weight: weight,
-          opacity: opacity,
-          className: `demo-disruption-edge demo-disruption-${severity.toLowerCase()}`
-        }).addTo(map);
-        
-        // Build popup content
-        const getPopupContent = () => {
-          // For incidents with criticality
-          if (disruption.incident_criticality) {
-            return PopupStyles.createIncidentPopup({
-              road_name: roadName,
-              incident_type: disruptionType,
-              incident_criticality: disruption.incident_criticality,
-              incident_road_closed: disruption.incident_road_closed || false,
-              incident_description: disruption.incident_description || disruption.description || '',
-              incident_start_time: disruption.incident_start_time || '',
-              incident_end_time: disruption.incident_end_time || '',
-              highway_type: disruption.highway_type || ''
-            });
-          }
-          
-          // For flow/congestion data
-          return PopupStyles.createTrafficPopup({
-            road_name: roadName,
-            incident_type: disruptionType,
-            severity: severity,
-            speed_kph: speedKph,
-            free_flow_kph: freeFlowKph,
-            jam_factor: jamFactor,
-            is_closed: disruption.is_closed || false
-          });
-        };
-        
-        polyline.bindPopup(getPopupContent());
-        
-        // Add hover effect
-        polyline.on('mouseover', function() {
-          this.setStyle({
-            weight: weight + 2,
-            opacity: Math.min(opacity + 0.15, 1)
-          });
+        disruptionsToShow.forEach(disruption => {
+            // Check if this is an incident or traffic flow
+            const isIncident = disruption.incident_criticality || 
+                incidentType === 'Incident' ||
+                ['accident', 'construction', 'roadClosure', 'hazard', 'Road Closure', 'Accident', 'Construction'].includes(
+                    disruption.incident_type || disruption.type || incidentType
+                );
+            
+            if (isIncident) {
+                incidents.push({
+                    ...disruption,
+                    type: disruption.incident_type || disruption.type || incidentType,
+                    criticality: disruption.incident_criticality || disruption.criticality || 'minor'
+                });
+            } else {
+                flowSegments.push(disruption);
+            }
         });
-        polyline.on('mouseout', function() {
-          this.setStyle({
-            weight: weight,
-            opacity: opacity
-          });
-        });
-        
-        disruptionMarkers.push(polyline);
-      });
     }
     
-    console.log(`Added ${disruptionMarkers.length} disruption edges to map`);
+    // Use TrafficUtils unified display function
+    // This ensures incidents are rendered ON TOP of flow with icons inside markers
+    TrafficUtils.displayDisruptionsOnMap({
+        flowSegments: flowSegments,
+        incidents: incidents,
+        map: map,
+        layerStorage: disruptionMarkers,
+        showFlow: true,
+        showIncidents: true
+    });
 }
 
 // Function to clear the disruption markers from the map (Leaflet)
 function clearDisruptionMarkers() {
-    disruptionMarkers.forEach(marker => {
-        map.removeLayer(marker);
-    });
-    disruptionMarkers = [];
+    TrafficUtils.clearDisruptionLayers(disruptionMarkers, map);
 }
 
 // Handle new disruptions_summary format from C++ API

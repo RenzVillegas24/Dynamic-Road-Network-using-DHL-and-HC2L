@@ -2365,193 +2365,52 @@ const DemoCreator = {
     },
 
     /**
-     * Display disruption preview on the map using polylines (matching traffic overlay style)
+     * Display disruption preview on the map using unified TrafficUtils
      * Uses actual road geometry from OSM graph when available
      */
     displayDisruptionsOnMap(data) {
         // Clear existing preview markers
         this.clearDisruptionPreview(false);
         
-        // Color scheme matching traffic-visualization.js
-        const flowColors = {
-            heavy: { color: '#ef4444', weight: 6, opacity: 0.85 },   // Red - Heavy traffic
-            medium: { color: '#f59e0b', weight: 5, opacity: 0.75 },  // Amber - Medium traffic
-            light: { color: '#10b981', weight: 4, opacity: 0.65 }    // Green - Light traffic
-        };
+        // Prepare flow segments with geometry handling
+        const flowSegments = (data.flow || []).map(f => {
+            // Process geometry if available
+            let geometry = null;
+            if (f.geometry && Array.isArray(f.geometry) && f.geometry.length >= 2) {
+                geometry = f.geometry.map(coord => {
+                    if (Array.isArray(coord)) {
+                        return [parseFloat(coord[0]), parseFloat(coord[1])];
+                    }
+                    return null;
+                }).filter(c => c !== null);
+            }
+            
+            return {
+                ...f,
+                geometry: geometry,
+                source_lng: f.source_lon || f.source_lng,
+                target_lng: f.target_lon || f.target_lng
+            };
+        });
         
-        const incidentColors = {
-            critical: { color: '#dc2626', weight: 7, opacity: 0.9 },  // Dark red
-            major: { color: '#ef4444', weight: 6, opacity: 0.85 },    // Red
-            minor: { color: '#f59e0b', weight: 5, opacity: 0.75 }     // Amber
-        };
+        // Prepare incidents  
+        const incidents = (data.incidents || []).map(inc => ({
+            ...inc,
+            source_lng: inc.source_lon || inc.source_lng,
+            target_lng: inc.target_lon || inc.target_lng,
+            type: inc.type || 'Incident'
+        }));
         
-        const incidentIcons = {
-            'accident': '🚗',
-            'construction': '🏗️',
-            'roadClosure': '🚧',
-            'hazard': '⚠️',
-            'Road Closure': '🚧',
-            'Accident': '🚗',
-            'Construction': '🏗️',
-            'default': '📍'
-        };
-        
-        // Add flow disruption polylines
-        if (data.flow) {
-            data.flow.forEach((f, i) => {
-                // Use actual geometry if available, otherwise fall back to source/target
-                let geometry;
-                if (f.geometry && Array.isArray(f.geometry) && f.geometry.length >= 2) {
-                    // Use actual road geometry from OSM graph
-                    geometry = f.geometry.map(coord => {
-                        if (Array.isArray(coord)) {
-                            return [parseFloat(coord[0]), parseFloat(coord[1])];
-                        }
-                        return null;
-                    }).filter(c => c !== null);
-                }
-                
-                // Fallback to simple line if no geometry
-                if (!geometry || geometry.length < 2) {
-                    geometry = [
-                        [parseFloat(f.source_lat), parseFloat(f.source_lon)],
-                        [parseFloat(f.target_lat), parseFloat(f.target_lon)]
-                    ];
-                }
-                
-                // Determine severity based on jam_factor
-                const jamFactor = parseFloat(f.jam_factor) || 0;
-                let style;
-                let severity = f.severity || (jamFactor >= 6.0 ? 'Heavy' : jamFactor >= 3.0 ? 'Medium' : 'Light');
-                
-                switch (severity) {
-                    case 'Heavy':
-                        style = flowColors.heavy;
-                        break;
-                    case 'Medium':
-                        style = flowColors.medium;
-                        break;
-                    default:
-                        style = flowColors.light;
-                }
-                
-                const polyline = L.polyline(geometry, {
-                    color: style.color,
-                    weight: style.weight,
-                    opacity: style.opacity,
-                    className: 'disruption-preview-flow'
-                });
-                
-                // Create popup matching traffic overlay style (use PopupStyles if available)
-                const popup = typeof PopupStyles !== 'undefined' ? 
-                    PopupStyles.createTrafficOverlayPopup({
-                        road_name: f.road_name,
-                        highway_type: f.highway_type,
-                        severity: severity,
-                        jam_factor: jamFactor,
-                        is_closed: false,
-                        description: `Traffic congestion (Jam Factor: ${jamFactor.toFixed(1)})`
-                    }) :
-                    `<div class="popup-content">
-                        <b>🚦 Traffic Congestion</b><br>
-                        <b>Road:</b> ${f.road_name || 'Unknown Road'}<br>
-                        <b>Severity:</b> <span style="color: ${style.color}">${severity}</span><br>
-                        <b>Jam Factor:</b> ${jamFactor.toFixed(1)} / 10
-                    </div>`;
-                
-                polyline.bindPopup(popup);
-                
-                // Hover effects like traffic overlay
-                polyline.on('mouseover', function() {
-                    this.setStyle({ weight: style.weight + 2, opacity: Math.min(style.opacity + 0.2, 1) });
-                });
-                polyline.on('mouseout', function() {
-                    this.setStyle({ weight: style.weight, opacity: style.opacity });
-                });
-                
-                polyline.addTo(map);
-                this.disruptionPreviewMarkers.push(polyline);
-            });
-        }
-        
-        // Add incident CIRCLE MARKERS (matching Active Incidents style, NOT polylines)
-        if (data.incidents) {
-            data.incidents.forEach((inc, i) => {
-                // Calculate midpoint for circle marker position
-                const midLat = (parseFloat(inc.source_lat) + parseFloat(inc.target_lat)) / 2;
-                const midLon = (parseFloat(inc.source_lon) + parseFloat(inc.target_lon)) / 2;
-                
-                // Determine color based on criticality
-                const criticality = (inc.criticality || 'minor').toLowerCase();
-                let fillColor = '#f59e0b'; // amber - default
-                
-                if (criticality === 'critical') {
-                    fillColor = '#dc2626'; // dark red
-                } else if (criticality === 'major') {
-                    fillColor = '#ef4444'; // red
-                } else if (criticality === 'minor') {
-                    fillColor = '#f59e0b'; // amber
-                }
-                
-                // If road is closed, use black
-                if (inc.road_closed) {
-                    fillColor = '#000000';
-                }
-                
-                // Get icon for incident type
-                const incidentIcons = {
-                    'accident': '🚗',
-                    'construction': '🏗️',
-                    'roadClosure': '🚧',
-                    'hazard': '⚠️',
-                    'Road Closure': '🚧',
-                    'Accident': '🚗',
-                    'Construction': '🏗️',
-                    'default': '📍'
-                };
-                const icon = incidentIcons[inc.type] || incidentIcons.default;
-                
-                // Create circle marker like Active Incidents
-                const marker = L.circleMarker([midLat, midLon], {
-                    radius: 10,
-                    fillColor: fillColor,
-                    color: '#fff',
-                    weight: 2,
-                    opacity: 1,
-                    fillOpacity: 0.85
-                });
-                
-                // Create popup matching incident style
-                const popup = typeof PopupStyles !== 'undefined' ?
-                    PopupStyles.createIncidentPopup({
-                        road_name: inc.road_name || 'Unknown Road',
-                        incident_type: inc.type || 'Incident',
-                        incident_criticality: inc.criticality || 'Minor',
-                        incident_road_closed: inc.road_closed || false,
-                        incident_description: inc.description || `Demo ${inc.type} incident`,
-                        highway_type: inc.highway_type || ''
-                    }) :
-                    `<div class="p-3 min-w-[220px]">
-                        <div class="font-bold text-lg mb-2">${icon} ${inc.type || 'Incident'}</div>
-                        <div class="text-sm text-slate-600 mb-1">📍 ${inc.road_name || 'Unknown Road'}</div>
-                        <div class="text-sm"><b>Criticality:</b> <span style="color: ${fillColor}">${inc.criticality || 'Unknown'}</span></div>
-                        ${inc.road_closed ? '<div class="text-sm font-bold text-red-600 mt-1">🚫 Road Closed</div>' : ''}
-                    </div>`;
-                
-                marker.bindPopup(popup);
-                
-                // Hover effects
-                marker.on('mouseover', function() {
-                    this.setStyle({ radius: 12, weight: 3 });
-                });
-                marker.on('mouseout', function() {
-                    this.setStyle({ radius: 10, weight: 2 });
-                });
-                
-                marker.addTo(map);
-                this.disruptionPreviewMarkers.push(marker);
-            });
-        }
+        // Use TrafficUtils unified display function
+        // This ensures incidents are rendered ON TOP with icons inside markers
+        TrafficUtils.displayDisruptionsOnMap({
+            flowSegments: flowSegments,
+            incidents: incidents,
+            map: map,
+            layerStorage: this.disruptionPreviewMarkers,
+            showFlow: true,
+            showIncidents: true
+        });
         
         // Fit map to show all markers if we have some
         if (this.disruptionPreviewMarkers.length > 0) {
@@ -2564,13 +2423,8 @@ const DemoCreator = {
      * Clear disruption preview from map
      */
     clearDisruptionPreview(hidePanel = true) {
-        // Remove markers from map
-        this.disruptionPreviewMarkers.forEach(marker => {
-            if (map.hasLayer(marker)) {
-                map.removeLayer(marker);
-            }
-        });
-        this.disruptionPreviewMarkers = [];
+        // Use TrafficUtils to clear layers
+        TrafficUtils.clearDisruptionLayers(this.disruptionPreviewMarkers, map);
         
         // Hide panel if requested
         if (hidePanel) {

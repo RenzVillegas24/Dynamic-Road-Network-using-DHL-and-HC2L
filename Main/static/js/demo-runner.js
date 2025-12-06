@@ -1056,16 +1056,14 @@ const DemoRunner = {
                     source_lng: d.source_lon || d.source_lng,
                     target_lng: d.target_lon || d.target_lng,
                     incident_type: d.type || d.incident_type || 'Incident',
-                    severity: d.criticality === 'critical' ? 'Heavy' : 
-                              d.criticality === 'major' ? 'Medium' : 'Light'
+                    severity: TrafficUtils.getSeverityFromCriticality(d.criticality, d.road_closed)
                 })),
                 flowSegments: (disruptions.flow || []).map(d => ({
                     ...d,
                     source_lng: d.source_lon || d.source_lng,
                     target_lng: d.target_lon || d.target_lng,
                     incident_type: 'Congestion',
-                    severity: d.jam_factor > 7 ? 'Heavy' : 
-                              d.jam_factor > 4 ? 'Medium' : 'Light',
+                    severity: TrafficUtils.getSeverityFromJamFactor(d.jam_factor, d.road_closed),
                     current_speed: d.speed_kph,
                     free_flow_speed: d.free_flow_kph
                 }))
@@ -1124,16 +1122,14 @@ const DemoRunner = {
                     source_lng: d.source_lon || d.source_lng,
                     target_lng: d.target_lon || d.target_lng,
                     incident_type: d.type || d.incident_type || 'Incident',
-                    severity: d.criticality === 'critical' ? 'Heavy' : 
-                              d.criticality === 'major' ? 'Medium' : 'Light'
+                    severity: TrafficUtils.getSeverityFromCriticality(d.criticality, d.road_closed)
                 })),
                 flowSegments: (disruptions.flow || []).map(d => ({
                     ...d,
                     source_lng: d.source_lon || d.source_lng,
                     target_lng: d.target_lon || d.target_lng,
                     incident_type: 'Congestion',
-                    severity: d.jam_factor > 7 ? 'Heavy' : 
-                              d.jam_factor > 4 ? 'Medium' : 'Light',
+                    severity: TrafficUtils.getSeverityFromJamFactor(d.jam_factor, d.road_closed),
                     current_speed: d.speed_kph,
                     free_flow_speed: d.free_flow_kph
                 }))
@@ -1819,251 +1815,60 @@ const DemoRunner = {
         }
         
         console.log('✅ Map reference obtained, adding layers...');
-        
-        // Color scheme matching traffic-visualization.js
-        const flowColors = {
-            heavy: { color: '#ef4444', weight: 6, opacity: 0.85 },   // Red - Heavy traffic
-            medium: { color: '#f59e0b', weight: 5, opacity: 0.75 },  // Amber - Medium traffic
-            light: { color: '#10b981', weight: 4, opacity: 0.65 }    // Green - Light traffic
-        };
-        
-        const incidentIcons = {
-            'accident': '🚗',
-            'construction': '🏗️',
-            'roadClosure': '🚧',
-            'hazard': '⚠️',
-            'Road Closure': '🚧',
-            'Accident': '🚗',
-            'Construction': '🏗️',
-            'default': '📍'
-        };
-        
-        // Add flow disruption polylines
-        if (showFlow && this.generatedDisruptions.flowSegments && this.generatedDisruptions.flowSegments.length > 0) {
-            this.generatedDisruptions.flowSegments.forEach((f, i) => {
-                const sourceLat = parseFloat(f.source_lat);
-                const sourceLng = parseFloat(f.source_lng || f.source_lon);
-                const targetLat = parseFloat(f.target_lat);
-                const targetLng = parseFloat(f.target_lng || f.target_lon);
-                
-                if (isNaN(sourceLat) || isNaN(sourceLng) || isNaN(targetLat) || isNaN(targetLng)) {
-                    console.warn('Skipping flow segment with invalid coordinates:', f);
-                    return;
-                }
-                
-                // Determine severity
-                const jamFactor = parseFloat(f.jam_factor) || 0;
-                let severity = f.severity || (jamFactor >= 7 ? 'Heavy' : jamFactor >= 4 ? 'Medium' : 'Light');
-                
-                let style;
-                switch (severity) {
-                    case 'Heavy':
-                        style = flowColors.heavy;
-                        break;
-                    case 'Medium':
-                        style = flowColors.medium;
-                        break;
-                    default:
-                        style = flowColors.light;
-                }
-                
-                // Use actual road geometry if available (from Quezon City edges), otherwise fall back to source/target
-                let polylineCoords;
-                if (f.geometry && Array.isArray(f.geometry) && f.geometry.length >= 2) {
-                    // Use actual road geometry from OSM graph
-                    polylineCoords = f.geometry.map(coord => {
-                        // Handle both [lat, lng] and [lng, lat] formats
-                        if (Array.isArray(coord) && coord.length >= 2) {
-                            const c0 = parseFloat(coord[0]);
-                            const c1 = parseFloat(coord[1]);
-                            // If first coord looks like longitude (around 121), swap
-                            if (c0 > 100) return [c1, c0];
-                            return [c0, c1];
-                        }
-                        return null;
-                    }).filter(c => c !== null);
-                } else {
-                    // Fall back to simple source-target line
-                    polylineCoords = [
-                        [sourceLat, sourceLng],
-                        [targetLat, targetLng]
-                    ];
-                }
-                
-                const polyline = L.polyline(polylineCoords, {
-                    color: style.color,
-                    weight: style.weight,
-                    opacity: style.opacity,
-                    className: 'demo-disruption-flow'
-                });
-                
-                // Create popup
-                const popup = typeof PopupStyles !== 'undefined' ? 
-                    PopupStyles.createTrafficPopup({
-                        road_name: f.road_name || 'Unknown Road',
-                        incident_type: 'Congestion',
-                        severity: severity,
-                        speed_kph: f.speed_kph || f.current_speed || 0,
-                        free_flow_kph: f.free_flow_kph || 50,
-                        jam_factor: jamFactor,
-                        is_closed: false
-                    }) :
-                    `<div class="popup-content">
-                        <b>🚦 Traffic Congestion</b><br>
-                        <b>Road:</b> ${f.road_name || 'Unknown Road'}<br>
-                        <b>Severity:</b> <span style="color: ${style.color}">${severity}</span><br>
-                        <b>Jam Factor:</b> ${jamFactor.toFixed(1)} / 10
-                    </div>`;
-                
-                polyline.bindPopup(popup);
-                
-                // Hover effects
-                polyline.on('mouseover', function() {
-                    this.setStyle({ weight: style.weight + 2, opacity: Math.min(style.opacity + 0.2, 1) });
-                });
-                polyline.on('mouseout', function() {
-                    this.setStyle({ weight: style.weight, opacity: style.opacity });
-                });
-                
-                polyline.addTo(mapRef);
-                this.demoDisruptionLayers.push(polyline);
-            });
+
+        // Prepare flow segments with geometry handling
+        const flowSegments = (this.generatedDisruptions.flowSegments || []).map(f => {
+            // Process geometry if available
+            let geometry = null;
+            if (f.geometry && Array.isArray(f.geometry) && f.geometry.length >= 2) {
+                geometry = f.geometry.map(coord => {
+                    if (Array.isArray(coord) && coord.length >= 2) {
+                        const c0 = parseFloat(coord[0]);
+                        const c1 = parseFloat(coord[1]);
+                        // If first coord looks like longitude (around 121), swap
+                        if (c0 > 100) return [c1, c0];
+                        return [c0, c1];
+                    }
+                    return null;
+                }).filter(c => c !== null);
+            }
             
-            console.log(`✅ Added ${this.generatedDisruptions.flowSegments.length} flow segments to map`);
-        }
+            return {
+                ...f,
+                geometry: geometry,
+                source_lng: f.source_lng || f.source_lon,
+                target_lng: f.target_lng || f.target_lon
+            };
+        });
         
-        // Add incident markers with polylines
-        if (showIncidents && this.generatedDisruptions.incidents && this.generatedDisruptions.incidents.length > 0) {
-            this.generatedDisruptions.incidents.forEach((inc, i) => {
-                const sourceLat = parseFloat(inc.source_lat);
-                const sourceLng = parseFloat(inc.source_lng || inc.source_lon);
-                const targetLat = parseFloat(inc.target_lat);
-                const targetLng = parseFloat(inc.target_lng || inc.target_lon);
-                
-                if (isNaN(sourceLat) || isNaN(sourceLng) || isNaN(targetLat) || isNaN(targetLng)) {
-                    console.warn('Skipping incident with invalid coordinates:', inc);
-                    return;
-                }
-                
-                // Determine color based on criticality
-                const criticality = (inc.criticality || inc.incident_criticality || 'minor').toLowerCase();
-                let fillColor = '#f59e0b'; // amber - default
-                let severity = 'Medium';
-                
-                if (criticality === 'critical') {
-                    fillColor = '#dc2626'; // dark red
-                    severity = 'Heavy';
-                } else if (criticality === 'major') {
-                    fillColor = '#ef4444'; // red
-                    severity = 'Medium';
-                } else {
-                    fillColor = '#f59e0b'; // amber
-                    severity = 'Light';
-                }
-                
-                // Use actual road geometry if available (from Quezon City edges), otherwise fall back to source/target
-                let polylineCoords;
-                if (inc.geometry && Array.isArray(inc.geometry) && inc.geometry.length >= 2) {
-                    // Use actual road geometry from OSM graph
-                    polylineCoords = inc.geometry.map(coord => {
-                        // Handle both [lat, lng] and [lng, lat] formats
-                        if (Array.isArray(coord) && coord.length >= 2) {
-                            const c0 = parseFloat(coord[0]);
-                            const c1 = parseFloat(coord[1]);
-                            // If first coord looks like longitude (around 121), swap
-                            if (c0 > 100) return [c1, c0];
-                            return [c0, c1];
-                        }
-                        return null;
-                    }).filter(c => c !== null);
-                } else {
-                    // Fall back to simple source-target line
-                    polylineCoords = [
-                        [sourceLat, sourceLng],
-                        [targetLat, targetLng]
-                    ];
-                }
-                
-                // Draw polyline for incident edge
-                const polyline = L.polyline(polylineCoords, {
-                    color: fillColor,
-                    weight: 5,
-                    opacity: 0.8,
-                    dashArray: '10, 5',
-                    className: 'demo-disruption-incident'
-                });
-                
-                // Create popup
-                const incidentType = inc.incident_type || inc.type || 'Incident';
-                const popup = typeof PopupStyles !== 'undefined' ? 
-                    PopupStyles.createIncidentPopup({
-                        road_name: inc.road_name || 'Unknown Road',
-                        incident_type: incidentType,
-                        incident_criticality: criticality,
-                        incident_road_closed: inc.incident_road_closed || false,
-                        incident_description: inc.incident_description || inc.description || '',
-                        highway_type: inc.highway_type || ''
-                    }) :
-                    `<div class="popup-content">
-                        <b>${incidentIcons[incidentType] || incidentIcons.default} ${incidentType}</b><br>
-                        <b>Road:</b> ${inc.road_name || 'Unknown Road'}<br>
-                        <b>Criticality:</b> <span style="color: ${fillColor}">${criticality}</span>
-                    </div>`;
-                
-                polyline.bindPopup(popup);
-                
-                // Hover effects
-                polyline.on('mouseover', function() {
-                    this.setStyle({ weight: 7, opacity: 0.95 });
-                });
-                polyline.on('mouseout', function() {
-                    this.setStyle({ weight: 5, opacity: 0.8 });
-                });
-                
-                polyline.addTo(mapRef);
-                this.demoDisruptionLayers.push(polyline);
-                
-                // Add small circle marker at midpoint
-                const midLat = (sourceLat + targetLat) / 2;
-                const midLng = (sourceLng + targetLng) / 2;
-                
-                const icon = incidentIcons[incidentType] || incidentIcons.default;
-                const marker = L.marker([midLat, midLng], {
-                    icon: L.divIcon({
-                        className: 'demo-incident-icon',
-                        html: `<div style="background: ${fillColor}; color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">${icon}</div>`,
-                        iconSize: [24, 24],
-                        iconAnchor: [12, 12]
-                    })
-                });
-                
-                marker.bindPopup(popup);
-                marker.addTo(mapRef);
-                this.demoDisruptionLayers.push(marker);
-            });
-            
-            console.log(`✅ Added ${this.generatedDisruptions.incidents.length} incidents to map`);
-        }
+        // Prepare incidents
+        const incidents = (this.generatedDisruptions.incidents || []).map(inc => ({
+            ...inc,
+            source_lng: inc.source_lng || inc.source_lon,
+            target_lng: inc.target_lng || inc.target_lon,
+            type: inc.incident_type || inc.type || 'Incident',
+            criticality: inc.incident_criticality || inc.criticality || 'minor'
+        }));
+        
+        // Use TrafficUtils unified display function
+        // This ensures incidents are rendered ON TOP with icons inside markers
+        TrafficUtils.displayDisruptionsOnMap({
+            flowSegments: flowSegments,
+            incidents: incidents,
+            map: mapRef,
+            layerStorage: this.demoDisruptionLayers,
+            showFlow: showFlow,
+            showIncidents: showIncidents
+        });
         
         console.log(`📊 Total demo disruption layers: ${this.demoDisruptionLayers.length}`);
     },
     
     // Clear demo disruption layers from map
     clearDemoDisruptionLayers() {
-        if (this.demoDisruptionLayers && this.demoDisruptionLayers.length > 0) {
-            const mapRef = window.map || (typeof map !== 'undefined' ? map : null);
-            this.demoDisruptionLayers.forEach(layer => {
-                if (mapRef) {
-                    try {
-                        mapRef.removeLayer(layer);
-                    } catch (e) {
-                        console.debug('Could not remove layer:', e);
-                    }
-                }
-            });
-            this.demoDisruptionLayers = [];
-            console.log('🧹 Cleared demo disruption layers');
-        }
+        const mapRef = window.map || (typeof map !== 'undefined' ? map : null);
+        TrafficUtils.clearDisruptionLayers(this.demoDisruptionLayers, mapRef);
+        console.log('🧹 Cleared demo disruption layers');
     },
     
     /**
@@ -2201,7 +2006,7 @@ const DemoRunner = {
             html += `<div class="space-y-1 mb-2">`;
             flow.slice(0, 10).forEach((f, i) => {
                 const jamFactor = parseFloat(f.jam_factor) || 0;
-                const severityColor = jamFactor >= 7 ? 'text-red-600' : jamFactor >= 4 ? 'text-amber-600' : 'text-green-600';
+                const severityColor = TrafficUtils.getSeverityTextClass(jamFactor);
                 html += `
                     <div class="flex items-center justify-between bg-orange-50 rounded px-2 py-1 text-xs cursor-pointer hover:bg-orange-100"
                          onclick="DemoRunner.focusDisruption('flow', ${i})">

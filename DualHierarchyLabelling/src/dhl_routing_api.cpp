@@ -211,7 +211,7 @@ vector<NodeID> find_shortest_path(
             
             if (flow_data.count(edge_key)) {
                 const auto& flow = flow_data.at(edge_key);
-                cerr << "Jam=" << flow.jam_factor << " Status=" << flow.flow_status;
+                cerr << "Jam=" << flow.jam_factor << " Traversability=" << flow.traversability;
             }
             
             cerr << endl;
@@ -716,8 +716,6 @@ void output_json_response(bool success, const string& error_message = "",
                 }
             }
             cout << "]," << endl;
-            cout << "        \"color\": \"#8b5cf6\"," << endl;
-            cout << "        \"flow_status\": \"default\"," << endl;
             cout << "        \"jam_factor\": 0.0," << endl;
             cout << "        \"speed_kmh\": 0.0," << endl;
             cout << "        \"speed_reduction\": 0.0," << endl;
@@ -924,22 +922,16 @@ void output_json_response(bool success, const string& error_message = "",
             cout << "        }," << endl;
             
             // 9. Output separated traffic flow data (pure CSV data)
+            // NOTE: Color and flow_status are NO LONGER output from C++
+            // Frontend (TrafficUtils.js) handles all color determination based on jam_factor
             cout << "        \"flow\": {" << endl;
             if (flow_ptr) {
-                // CRITICAL FIX: Use Flow Overlay logic - jam_factor determines severity and color
-                string flow_severity = get_flow_overlay_severity(flow_ptr->jam_factor, is_closed);
-                string flow_color = get_flow_color_code(flow_ptr->jam_factor, is_closed);
-                
                 cout << "          \"speed_kph\": " << fixed << setprecision(1) << sanitize_json_number(flow_ptr->current_speed) << "," << endl;
                 cout << "          \"free_flow_kph\": " << fixed << setprecision(1) << sanitize_json_number(flow_ptr->free_flow_speed) << "," << endl;
                 cout << "          \"jam_factor\": " << fixed << setprecision(2) << sanitize_json_number(flow_ptr->jam_factor) << "," << endl;
                 cout << "          \"confidence\": " << fixed << setprecision(3) << sanitize_json_number(flow_ptr->confidence) << "," << endl;
                 cout << "          \"traversability\": \"" << escape_json_string(flow_ptr->traversability) << "\"," << endl;
-                cout << "          \"status\": \"" << escape_json_string(flow_ptr->flow_status) << "\"," << endl;
-                // CRITICAL FIX: Output severity matching Flow Overlay format (Heavy/Medium/Light)
-                cout << "          \"severity\": \"" << flow_severity << "\"," << endl;
-                // CRITICAL FIX: Output color based on jam_factor, not on computed metrics
-                cout << "          \"color\": \"" << flow_color << "\"" << endl;
+                cout << "          \"speed_reduction\": " << fixed << setprecision(3) << sanitize_json_number(flow_ptr->speed_reduction) << endl;
             } else {
                 // Default flow data - use free-flow values when no meaningful disruption
                 cout << "          \"speed_kph\": " << fixed << setprecision(1) << free_flow_speed << "," << endl;
@@ -947,8 +939,7 @@ void output_json_response(bool success, const string& error_message = "",
                 cout << "          \"jam_factor\": 0.0," << endl;
                 cout << "          \"confidence\": 0.99," << endl;
                 cout << "          \"traversability\": \"open\"," << endl;
-                cout << "          \"status\": \"default\"," << endl;
-                cout << "          \"color\": \"#8b5cf6\"" << endl;
+                cout << "          \"speed_reduction\": 0.0" << endl;
             }
             cout << "        }," << endl;
             
@@ -1005,8 +996,6 @@ void output_json_response(bool success, const string& error_message = "",
                 cout << "[" << fixed << setprecision(6) << dest_snap_lng << ", " << dest_snap_lat << "]";
             }
             cout << "]," << endl;
-            cout << "        \"color\": \"#8b5cf6\"," << endl;
-            cout << "        \"flow_status\": \"default\"," << endl;
             cout << "        \"jam_factor\": 0.0," << endl;
             cout << "        \"speed_kmh\": 0.0," << endl;
             cout << "        \"speed_reduction\": 0.0," << endl;
@@ -1213,13 +1202,12 @@ void output_json_response(bool success, const string& error_message = "",
             }
             cout << "        }," << endl;
             
+            // NOTE: Color determination moved to frontend (TrafficUtils.js)
             cout << "        \"flow\": {" << endl;
             if (flow_ptr) {
-                cout << "          \"status\": \"" << escape_json_string(flow_ptr->flow_status) << "\"," << endl;
                 cout << "          \"speed_kph\": " << fixed << setprecision(1) << sanitize_json_number(flow_ptr->current_speed) << "," << endl;
                 cout << "          \"jam_factor\": " << fixed << setprecision(2) << sanitize_json_number(flow_ptr->jam_factor) << endl;
             } else {
-                cout << "          \"status\": \"default\"," << endl;
                 cout << "          \"speed_kph\": 0.0," << endl;
                 cout << "          \"jam_factor\": 0.0" << endl;
             }
