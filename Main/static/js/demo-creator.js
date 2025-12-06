@@ -2995,7 +2995,7 @@ const DemoCreator = {
                     <h4 class="font-bold text-blue-800 mb-3 flex items-center gap-2">
                         <span>📍</span> Routes & TAU Values (${this.routes.length} routes × ${trials} trials)
                     </h4>
-                    <div class="max-h-48 overflow-y-auto bg-white rounded-lg p-2">
+                    <div class="overflow-y-auto bg-white rounded-lg p-2">
                         ${this.routes.length > 0 ? routesTableHtml : '<p class="text-sm text-blue-400 italic">No routes defined</p>'}
                     </div>
                     <div class="mt-2 flex gap-4 text-xs text-blue-600">

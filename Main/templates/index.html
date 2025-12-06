@@ -1436,7 +1436,7 @@
     <!-- DEMO RUNNER PANEL - Run Demo, Load Config, Random Demo -->
     <!-- ============================================================ -->
     <div id="demo-runner-panel"
-      class="fixed top-0 right-0 w-[38rem] h-full glass-effect shadow-2xl transform translate-x-full transition-transform duration-300 overflow-y-auto z-50 border-l border-slate-200/50">
+      class="fixed top-0 right-0 w-[32rem] h-full glass-effect shadow-2xl transform translate-x-full transition-transform duration-300 overflow-y-auto z-50 border-l border-slate-200/50">
       
       <!-- Header -->
       <div class="p-5 bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 text-white flex justify-between items-center sticky top-0 z-10">
@@ -1680,7 +1680,7 @@
     <!-- DEMO CREATOR V2 PANEL - Reimagined Custom Demo Creation -->
     <!-- ============================================================ -->
     <div id="demo-creator-panel"
-      class="fixed top-0 right-0 w-[42rem] h-full glass-effect shadow-2xl transform translate-x-full transition-transform duration-300 z-50 border-l border-slate-200/50 flex flex-col">
+      class="fixed top-0 right-0 w-[32rem] h-full glass-effect shadow-2xl transform translate-x-full transition-transform duration-300 z-50 border-l border-slate-200/50 flex flex-col">
       
       <!-- Header -->
       <div class="p-5 bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600 text-white flex justify-between items-center flex-shrink-0">
@@ -2322,6 +2322,16 @@
 
       <!-- Sticky Navigation Footer -->
       <div class="flex-shrink-0 p-5 bg-white border-t border-gray-200 shadow-lg">
+        <div class="flex-1 flex gap-2" id="demo-v2-save-buttons">
+            <button id="demo-v2-save-btn" onclick="DemoCreator.saveForLater()"
+                    class="hidden flex-1 py-3 bg-indigo-500 hover:bg-indigo-600 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 mb-2">
+              💾 Save Demo
+            </button>
+            <button id="demo-v2-save-run-btn" onclick="DemoCreator.saveAndRun()"
+                    class="hidden flex-1 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 mb-2">
+              🚀 Save & Run
+            </button>
+          </div>
         <div class="flex gap-2" id="demo-v2-nav-buttons">
           <button id="demo-v2-prev-btn" onclick="DemoCreator.prevStep()"
                   class="hidden flex-1 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded-xl transition-all">
@@ -2331,18 +2341,11 @@
                   class="flex-1 py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl transition-all">
             Next →
           </button>
-          <button id="demo-v2-save-btn" onclick="DemoCreator.saveForLater()"
-                  class="hidden flex-1 py-3 bg-indigo-500 hover:bg-indigo-600 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2">
-            💾 Save Demo
-          </button>
           <button id="demo-v2-run-btn" onclick="DemoCreator.runOnly()"
                   class="hidden flex-1 py-3 bg-green-500 hover:bg-green-600 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2">
             ▶️ Run Demo
           </button>
-          <button id="demo-v2-save-run-btn" onclick="DemoCreator.saveAndRun()"
-                  class="hidden flex-1 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2">
-            🚀 Save & Run
-          </button>
+          
         </div>
       </div>
     </div>
