@@ -13,6 +13,8 @@
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <!-- <script src="https://cdn.tailwindcss.com"></script> -->
   <script src="https://unpkg.com/tailwindcss-cdn@3.4.10/tailwindcss.js"></script>
+  <!-- Chart.js for performance visualizations -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
 </head>
 
@@ -1468,13 +1470,41 @@
             </button>
           </div>
 
-          <!-- Saved Configurations -->
-          <div class="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
-            <h3 class="font-bold text-gray-800 mb-3 flex items-center">
-              <span class="mr-2">💾</span> Saved Configurations
-            </h3>
-            <div id="saved-configs-list" class="space-y-3">
-              <!-- Configs will be rendered here -->
+          <!-- Tab Navigation for Configurations/Results -->
+          <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <!-- Tab Headers -->
+            <div class="flex border-b border-gray-200">
+              <button id="tab-btn-configs" onclick="DemoRunner.switchDataTab('configs')"
+                      class="flex-1 py-3 px-4 text-sm font-semibold text-center transition-all bg-indigo-50 text-indigo-700 border-b-2 border-indigo-500">
+                <span class="mr-1">💾</span> Configurations
+              </button>
+              <button id="tab-btn-saved-results" onclick="DemoRunner.switchDataTab('saved-results')"
+                      class="flex-1 py-3 px-4 text-sm font-semibold text-center transition-all text-gray-500 hover:text-gray-700 hover:bg-gray-50">
+                <span class="mr-1">📊</span> Saved Results
+              </button>
+            </div>
+            
+            <!-- Tab Content: Configurations -->
+            <div id="data-tab-configs" class="p-4">
+              <div id="saved-configs-list" class="space-y-3">
+                <!-- Configs will be rendered here -->
+              </div>
+            </div>
+            
+            <!-- Tab Content: Saved Results -->
+            <div id="data-tab-saved-results" class="p-4 hidden">
+              <div class="flex items-center justify-end mb-2">
+                <button onclick="DemoRunner.refreshSavedResults()" 
+                        class="text-xs text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                  </svg>
+                  Refresh
+                </button>
+              </div>
+              <div id="saved-results-list" class="space-y-3">
+                <p class="text-gray-500 text-sm text-center py-4">Loading saved results...</p>
+              </div>
             </div>
           </div>
         </div>
@@ -1648,6 +1678,44 @@
               <!-- Stats will be rendered here by JavaScript -->
             </div>
 
+            <!-- Best Performer Highlight -->
+            <div id="demo-results-best-performer" class="hidden">
+              <!-- Will be populated by JS -->
+            </div>
+
+            <!-- Performance Charts Section -->
+            <div id="demo-results-charts" class="space-y-4">
+              <!-- Algorithm Comparison Chart -->
+              <div class="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
+                <h4 class="font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <span>📈</span> Algorithm Comparison
+                </h4>
+                <div class="h-48">
+                  <canvas id="chart-algorithm-comparison"></canvas>
+                </div>
+              </div>
+              
+              <!-- Query Time by Trial Chart -->
+              <div class="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
+                <h4 class="font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <span>⏱️</span> Query Time Trend
+                </h4>
+                <div class="h-40">
+                  <canvas id="chart-query-time-trend"></canvas>
+                </div>
+              </div>
+              
+              <!-- Metrics Radar Chart -->
+              <div class="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
+                <h4 class="font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <span>🎯</span> Performance Radar
+                </h4>
+                <div class="h-56">
+                  <canvas id="chart-performance-radar"></canvas>
+                </div>
+              </div>
+            </div>
+
             <!-- All Results List -->
             <div class="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
               <h4 class="font-semibold text-gray-700 mb-3 flex items-center gap-2">
@@ -1662,13 +1730,13 @@
           <!-- Fixed Action Buttons at Bottom -->
           <div class="flex-shrink-0 border-t border-gray-200 bg-gray-50 p-4 -mx-4 -mb-4">
             <div class="flex gap-3">
-              <button onclick="DemoRunner.exportResults()" 
+              <button onclick="DemoRunner.exportResultsLocally()" 
                       class="flex-1 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg">
-                <span>📥</span> Export Results
+                <span>💾</span> Save to Server
               </button>
-              <button onclick="DemoRunner.showTab('main')" 
-                      class="flex-1 py-3 bg-gray-300 hover:bg-gray-400 text-gray-700 font-bold rounded-xl transition-all shadow">
-                Close
+              <button onclick="DemoRunner.downloadResultsAsFile()" 
+                      class="flex-1 py-3 bg-gray-300 hover:bg-gray-400 text-gray-700 font-bold rounded-xl transition-all shadow flex items-center justify-center gap-2">
+                <span>📥</span> Download JSON
               </button>
             </div>
           </div>

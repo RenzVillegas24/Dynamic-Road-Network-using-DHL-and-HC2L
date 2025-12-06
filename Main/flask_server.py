@@ -2938,6 +2938,116 @@ def get_demo_results(config_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/demo/results', methods=['GET'])
+def list_all_demo_results():
+    """
+    List all saved demo results across all configurations.
+    
+    Returns:
+    {
+        "success": true,
+        "results": [
+            {
+                "configId": "...",
+                "filename": "...",
+                "savedAt": "...",
+                "demoName": "...",
+                "totalRoutes": ...,
+                "filePath": "..."
+            },
+            ...
+        ]
+    }
+    """
+    try:
+        if not DEMO_RESULTS_DIR.exists():
+            return jsonify({
+                'success': True,
+                'results': [],
+                'count': 0
+            })
+        
+        all_results = []
+        
+        # Iterate through all config directories
+        for config_dir in sorted(DEMO_RESULTS_DIR.iterdir(), reverse=True):
+            if not config_dir.is_dir():
+                continue
+            
+            config_id = config_dir.name
+            
+            # Get all results files in this config
+            for results_file in sorted(config_dir.glob('results_*.json'), reverse=True):
+                try:
+                    with open(results_file, 'r') as f:
+                        result = json.load(f)
+                    
+                    # Extract summary info
+                    summary = {
+                        'configId': config_id,
+                        'filename': results_file.name,
+                        'savedAt': result.get('savedAt', result.get('exportedAt', '')),
+                        'demoName': result.get('demoName', 'Unknown Demo'),
+                        'totalRoutes': len(result.get('results', [])),
+                        'filePath': str(results_file),
+                        'summary': result.get('summary', {})
+                    }
+                    all_results.append(summary)
+                except Exception as e:
+                    console_logger.warning(f"Error loading result {results_file}: {e}")
+        
+        return jsonify({
+            'success': True,
+            'results': all_results,
+            'count': len(all_results)
+        })
+    except Exception as e:
+        console_logger.error(f"Error listing all results: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/demo/results/load', methods=['POST'])
+def load_demo_result_file():
+    """
+    Load a specific saved result file by path.
+    
+    Request body:
+    {
+        "filePath": "..."
+    }
+    
+    Returns: The full result object
+    """
+    try:
+        data = request.json
+        file_path = data.get('filePath', '')
+        
+        if not file_path:
+            return jsonify({'success': False, 'error': 'filePath is required'}), 400
+        
+        result_path = Path(file_path)
+        
+        # Security check: ensure the path is within DEMO_RESULTS_DIR
+        try:
+            result_path.resolve().relative_to(DEMO_RESULTS_DIR.resolve())
+        except ValueError:
+            return jsonify({'success': False, 'error': 'Invalid file path'}), 400
+        
+        if not result_path.exists():
+            return jsonify({'success': False, 'error': 'File not found'}), 404
+        
+        with open(result_path, 'r') as f:
+            result = json.load(f)
+        
+        return jsonify({
+            'success': True,
+            'result': result
+        })
+    except Exception as e:
+        console_logger.error(f"Error loading result file: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/search_location', methods=['POST'])
 def search_location():
     """
