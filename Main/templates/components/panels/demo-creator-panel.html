@@ -1,0 +1,249 @@
+<!-- Demo Creator Panel Component -->
+<div class="panel panel--lg" id="demo-creator-panel" data-panel="demo-creator">
+    <!-- Header -->
+    <div class="panel__header" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white;">
+        <div class="panel__icon">
+            <i data-lucide="plus-circle"></i>
+        </div>
+        <div class="panel__title-group">
+            <h2 class="panel__title">Create Demo</h2>
+            <p class="panel__subtitle">Build a new demonstration scenario</p>
+        </div>
+        <button class="panel__close" onclick="closePanel('demo-creator')" title="Close panel">
+            <i data-lucide="x"></i>
+        </button>
+    </div>
+    
+    <!-- Body -->
+    <div class="panel__body">
+        <form id="demo-creator-form" onsubmit="createDemo(event)">
+            <!-- Basic Info -->
+            <div class="panel__section">
+                <h4 class="panel__section-title">
+                    <i data-lucide="file-text" class="panel__section-icon"></i>
+                    Basic Information
+                </h4>
+                
+                <div class="form-group">
+                    <label class="form-label form-label--required">Demo Name</label>
+                    <input type="text" 
+                           class="form-input" 
+                           id="demo-creator-name" 
+                           placeholder="e.g., Highway Construction Scenario"
+                           required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <textarea class="form-textarea" 
+                              id="demo-creator-description" 
+                              rows="2"
+                              placeholder="Describe what this demo demonstrates..."></textarea>
+                </div>
+            </div>
+            
+            <!-- Route Configuration -->
+            <div class="panel__section">
+                <h4 class="panel__section-title">
+                    <i data-lucide="route" class="panel__section-icon"></i>
+                    Route Configuration
+                </h4>
+                
+                <div class="form-group">
+                    <label class="form-label form-label--required">Algorithm</label>
+                    <select class="form-select" id="demo-creator-algorithm" required>
+                        <option value="lazydhl">LazyDHL</option>
+                        <option value="lazyhc2l">LazyHC2L</option>
+                        <option value="dijkstra">Dijkstra</option>
+                        <option value="astar">A* Search</option>
+                    </select>
+                </div>
+                
+                <!-- Start/End Points -->
+                <div class="form-row form-row--2">
+                    <div class="form-group">
+                        <label class="form-label form-label--required">Start Point</label>
+                        <div class="form-input-addon">
+                            <input type="text" class="form-input form-input--sm" id="demo-creator-start" placeholder="Click map..." readonly>
+                            <button type="button" class="btn btn--success btn--sm" onclick="enableDemoStartPicker()">
+                                <i data-lucide="map-pin"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label form-label--required">End Point</label>
+                        <div class="form-input-addon">
+                            <input type="text" class="form-input form-input--sm" id="demo-creator-end" placeholder="Click map..." readonly>
+                            <button type="button" class="btn btn--error btn--sm" onclick="enableDemoEndPicker()">
+                                <i data-lucide="flag"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <input type="hidden" id="demo-creator-start-lat">
+                <input type="hidden" id="demo-creator-start-lng">
+                <input type="hidden" id="demo-creator-end-lat">
+                <input type="hidden" id="demo-creator-end-lng">
+            </div>
+            
+            <!-- Disruptions -->
+            <div class="panel__section">
+                <h4 class="panel__section-title">
+                    <i data-lucide="alert-triangle" class="panel__section-icon"></i>
+                    Disruptions
+                    <button type="button" class="btn btn--ghost btn--xs ml-auto" onclick="addDemoDisruption()">
+                        <i data-lucide="plus" class="btn__icon"></i>
+                        Add
+                    </button>
+                </h4>
+                
+                <div id="demo-disruptions-container">
+                    <div class="alert alert--info alert--inline">
+                        <i data-lucide="info" class="alert__icon"></i>
+                        <span>No disruptions added. Click "Add" to include disruptions in this demo.</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Steps/Timeline -->
+            <div class="panel__section">
+                <h4 class="panel__section-title">
+                    <i data-lucide="list" class="panel__section-icon"></i>
+                    Demo Steps
+                    <button type="button" class="btn btn--ghost btn--xs ml-auto" onclick="addDemoStep()">
+                        <i data-lucide="plus" class="btn__icon"></i>
+                        Add Step
+                    </button>
+                </h4>
+                
+                <div id="demo-steps-container">
+                    <!-- Default steps -->
+                    <div class="card card--flat mb-2" data-step="1">
+                        <div class="card__body card__body--compact">
+                            <div class="d-flex items-center gap-3">
+                                <span class="badge badge--primary">1</span>
+                                <div class="flex-1">
+                                    <span class="text-sm font-medium">Show initial route</span>
+                                    <p class="text-xs text-muted">Display the original calculated route</p>
+                                </div>
+                                <button type="button" class="btn btn--ghost btn--icon btn--sm" onclick="removeDemoStep(this)">
+                                    <i data-lucide="x"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="alert alert--warning alert--inline mt-3">
+                    <i data-lucide="info" class="alert__icon"></i>
+                    <span>Steps will execute in order during demo playback</span>
+                </div>
+            </div>
+            
+            <!-- Timing -->
+            <div class="panel__section">
+                <h4 class="panel__section-title">
+                    <i data-lucide="clock" class="panel__section-icon"></i>
+                    Timing
+                </h4>
+                
+                <div class="form-group">
+                    <label class="form-label">Delay Between Steps (seconds)</label>
+                    <input type="number" 
+                           class="form-input form-input--sm" 
+                           id="demo-creator-delay" 
+                           value="2"
+                           min="0.5"
+                           max="10"
+                           step="0.5">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-switch">
+                        <input type="checkbox" class="form-switch__input" id="demo-creator-loop">
+                        <span class="form-switch__label">Loop demo continuously</span>
+                    </label>
+                </div>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Footer -->
+    <div class="panel__footer panel__footer--spread">
+        <button type="button" class="btn btn--ghost btn--sm" onclick="resetDemoCreator()">
+            <i data-lucide="rotate-ccw" class="btn__icon"></i>
+            Reset
+        </button>
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn--surface btn--sm" onclick="previewDemo()">
+                <i data-lucide="eye" class="btn__icon"></i>
+                Preview
+            </button>
+            <button type="submit" form="demo-creator-form" class="btn btn--warning btn--sm">
+                <i data-lucide="save" class="btn__icon"></i>
+                Save Demo
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Demo Disruption Template -->
+<template id="demo-disruption-template">
+    <div class="card card--flat mb-2 demo-disruption-item">
+        <div class="card__body card__body--compact">
+            <div class="d-flex items-start gap-3">
+                <div class="flex-1">
+                    <div class="form-row form-row--2 mb-2">
+                        <input type="text" class="form-input form-input--sm disruption-road" placeholder="Road name">
+                        <select class="form-select form-select--sm disruption-severity">
+                            <option value="low">Low</option>
+                            <option value="moderate" selected>Moderate</option>
+                            <option value="high">High</option>
+                            <option value="critical">Critical</option>
+                        </select>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <select class="form-select form-select--sm disruption-type flex-1">
+                            <option value="accident">Accident</option>
+                            <option value="construction">Construction</option>
+                            <option value="closure">Closure</option>
+                            <option value="traffic">Heavy Traffic</option>
+                        </select>
+                        <button type="button" class="btn btn--surface btn--sm" onclick="pickDisruptionLocation(this)">
+                            <i data-lucide="map-pin"></i>
+                        </button>
+                    </div>
+                </div>
+                <button type="button" class="btn btn--ghost btn--icon btn--sm" onclick="removeDemoDisruption(this)">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</template>
+
+<!-- Demo Step Template -->
+<template id="demo-step-template">
+    <div class="card card--flat mb-2 demo-step-item" data-step="">
+        <div class="card__body card__body--compact">
+            <div class="d-flex items-center gap-3">
+                <span class="badge badge--primary step-number">1</span>
+                <div class="flex-1">
+                    <select class="form-select form-select--sm step-action mb-1">
+                        <option value="show-route">Show route</option>
+                        <option value="add-disruption">Add disruption</option>
+                        <option value="remove-disruption">Remove disruption</option>
+                        <option value="recalculate">Recalculate route</option>
+                        <option value="zoom">Zoom to location</option>
+                        <option value="annotation">Show annotation</option>
+                    </select>
+                    <input type="text" class="form-input form-input--sm step-description" placeholder="Step description...">
+                </div>
+                <button type="button" class="btn btn--ghost btn--icon btn--sm" onclick="removeDemoStep(this)">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</template>

@@ -1,0 +1,165 @@
+<!-- Metrics Panel Component -->
+<div class="panel" id="metrics-panel" data-panel="metrics">
+    <!-- Header -->
+    <div class="panel__header" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white;">
+        <div class="panel__icon">
+            <i data-lucide="activity"></i>
+        </div>
+        <div class="panel__title-group">
+            <h2 class="panel__title">Route Metrics</h2>
+            <p class="panel__subtitle">Performance and analytics</p>
+        </div>
+        <button class="panel__close" onclick="closePanel('metrics')" title="Close panel">
+            <i data-lucide="x"></i>
+        </button>
+    </div>
+    
+    <!-- Body -->
+    <div class="panel__body">
+        <!-- Summary Stats -->
+        <div class="panel__section">
+            <h4 class="panel__section-title">
+                <i data-lucide="bar-chart-2" class="panel__section-icon"></i>
+                Performance Summary
+            </h4>
+            
+            <div class="card-grid card-grid--2">
+                <div class="stat-card">
+                    <div class="stat-card__header">
+                        <div class="stat-card__icon">
+                            <i data-lucide="zap"></i>
+                        </div>
+                        <span class="stat-card__badge stat-card__badge--up" id="metrics-speed-change">
+                            <i data-lucide="trending-up" style="width: 12px; height: 12px;"></i>
+                            +15%
+                        </span>
+                    </div>
+                    <div class="stat-card__value" id="metrics-avg-query-time">--</div>
+                    <div class="stat-card__label">Avg Query Time</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card__header">
+                        <div class="stat-card__icon">
+                            <i data-lucide="route"></i>
+                        </div>
+                    </div>
+                    <div class="stat-card__value" id="metrics-total-routes">--</div>
+                    <div class="stat-card__label">Routes Calculated</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Chart Section -->
+        <div class="panel__section">
+            <h4 class="panel__section-title">
+                <i data-lucide="trending-up" class="panel__section-icon"></i>
+                Query Time History
+            </h4>
+            
+            <div class="card">
+                <div class="card__body" style="height: 200px;">
+                    <canvas id="metrics-query-chart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Algorithm Comparison -->
+        <div class="panel__section">
+            <h4 class="panel__section-title">
+                <i data-lucide="git-compare" class="panel__section-icon"></i>
+                Algorithm Performance
+            </h4>
+            
+            <div class="d-flex flex-column gap-3">
+                <!-- DHL -->
+                <div class="metric-card">
+                    <div class="metric-card__icon" style="background: linear-gradient(135deg, #3b82f6, #2563eb); color: white;">
+                        <i data-lucide="zap"></i>
+                    </div>
+                    <div class="metric-card__content flex-1">
+                        <div class="d-flex justify-between items-center">
+                            <span class="metric-card__label">LazyDHL</span>
+                            <span class="metric-card__value" id="metrics-dhl-time">--</span>
+                        </div>
+                        <div class="w-full bg-alt rounded-full mt-1" style="height: 4px;">
+                            <div class="bg-primary rounded-full" id="metrics-dhl-bar" style="width: 0%; height: 100%;"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- HC2L -->
+                <div class="metric-card">
+                    <div class="metric-card__icon" style="background: linear-gradient(135deg, #10b981, #059669); color: white;">
+                        <i data-lucide="network"></i>
+                    </div>
+                    <div class="metric-card__content flex-1">
+                        <div class="d-flex justify-between items-center">
+                            <span class="metric-card__label">LazyHC2L</span>
+                            <span class="metric-card__value" id="metrics-hc2l-time">--</span>
+                        </div>
+                        <div class="w-full bg-alt rounded-full mt-1" style="height: 4px;">
+                            <div class="bg-success rounded-full" id="metrics-hc2l-bar" style="width: 0%; height: 100%;"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Dijkstra -->
+                <div class="metric-card">
+                    <div class="metric-card__icon" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white;">
+                        <i data-lucide="git-branch"></i>
+                    </div>
+                    <div class="metric-card__content flex-1">
+                        <div class="d-flex justify-between items-center">
+                            <span class="metric-card__label">Dijkstra</span>
+                            <span class="metric-card__value" id="metrics-dijkstra-time">--</span>
+                        </div>
+                        <div class="w-full bg-alt rounded-full mt-1" style="height: 4px;">
+                            <div class="rounded-full" id="metrics-dijkstra-bar" style="width: 0%; height: 100%; background: #8b5cf6;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Latest Route Details -->
+        <div class="panel__section">
+            <h4 class="panel__section-title">
+                <i data-lucide="info" class="panel__section-icon"></i>
+                Latest Route Details
+            </h4>
+            
+            <div class="panel__info-row">
+                <span class="panel__info-label">Algorithm</span>
+                <span class="panel__info-value" id="metrics-last-algo">--</span>
+            </div>
+            <div class="panel__info-row">
+                <span class="panel__info-label">Query Time</span>
+                <span class="panel__info-value" id="metrics-last-time">--</span>
+            </div>
+            <div class="panel__info-row">
+                <span class="panel__info-label">Distance</span>
+                <span class="panel__info-value" id="metrics-last-distance">--</span>
+            </div>
+            <div class="panel__info-row">
+                <span class="panel__info-label">Nodes in Path</span>
+                <span class="panel__info-value" id="metrics-last-nodes">--</span>
+            </div>
+            <div class="panel__info-row">
+                <span class="panel__info-label">Disruptions Avoided</span>
+                <span class="panel__info-value" id="metrics-last-disruptions">--</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Footer -->
+    <div class="panel__footer panel__footer--end">
+        <button class="btn btn--ghost btn--sm" onclick="clearMetrics()">
+            <i data-lucide="trash-2" class="btn__icon"></i>
+            Clear History
+        </button>
+        <button class="btn btn--primary btn--sm" onclick="exportMetrics()">
+            <i data-lucide="download" class="btn__icon"></i>
+            Export
+        </button>
+    </div>
+</div>

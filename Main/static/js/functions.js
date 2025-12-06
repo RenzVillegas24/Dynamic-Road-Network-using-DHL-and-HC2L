@@ -1,10 +1,24 @@
 
 // Function to show update toast messages
+// Now uses the new Toast module when available, falls back to DOM element
 function showUpdateToast(message, type = 'info') {
+    // Use new Toast system if available
+    if (typeof Toast !== 'undefined' && Toast.show) {
+        Toast.show({
+            message: message,
+            type: type,
+            duration: 4000
+        });
+        return;
+    }
+    
+    // Fallback to original implementation
     const toast = document.getElementById("update-toast");
     const msg = document.getElementById("update-toast-message");
 
-    toast.classList.remove("border-orange-500", "text-orange-700", "border-emerald-500", "text-emerald-700", "border-blue-500", "text-blue-700");
+    if (!toast || !msg) return;
+
+    toast.classList.remove("border-orange-500", "text-orange-700", "border-emerald-500", "text-emerald-700", "border-blue-500", "text-blue-700", "border-red-500", "text-red-700");
 
     toast.classList.remove("hidden");
     msg.textContent = message;
@@ -13,6 +27,8 @@ function showUpdateToast(message, type = 'info') {
         toast.classList.add("border-orange-500", "text-orange-700");
     } else if (type === 'success') {
         toast.classList.add("border-emerald-500", "text-emerald-700");
+    } else if (type === 'error') {
+        toast.classList.add("border-red-500", "text-red-700");
     } else {
         toast.classList.add("border-blue-500", "text-blue-700");
     }

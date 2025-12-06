@@ -1,0 +1,123 @@
+<!-- Sidebar Navigation Component -->
+<aside class="sidebar" id="app-sidebar">
+    <!-- Toggle Button -->
+    <button class="sidebar__toggle" onclick="toggleSidebar()" title="Toggle sidebar">
+        <i data-lucide="chevron-left"></i>
+    </button>
+    
+    <!-- Navigation -->
+    <nav class="sidebar__nav">
+        <!-- Main Navigation -->
+        <div class="sidebar__section">
+            <div class="sidebar__section-title">Navigation</div>
+            <ul class="sidebar__nav-list">
+                <li class="sidebar__nav-item active" data-panel="route" onclick="navigateToPanel('route')">
+                    <div class="sidebar__nav-icon">
+                        <i data-lucide="route"></i>
+                    </div>
+                    <span class="sidebar__label">Route Details</span>
+                    <span class="sidebar__tooltip">Route Details</span>
+                </li>
+                <li class="sidebar__nav-item" data-panel="disruptions" onclick="navigateToPanel('disruptions')">
+                    <div class="sidebar__nav-icon">
+                        <i data-lucide="alert-triangle"></i>
+                    </div>
+                    <span class="sidebar__label">Disruptions</span>
+                    <span class="sidebar__badge" id="disruption-count" style="display: none;">0</span>
+                    <span class="sidebar__tooltip">Disruptions</span>
+                </li>
+                <li class="sidebar__nav-item" data-panel="metrics" onclick="navigateToPanel('metrics')">
+                    <div class="sidebar__nav-icon">
+                        <i data-lucide="activity"></i>
+                    </div>
+                    <span class="sidebar__label">Metrics</span>
+                    <span class="sidebar__tooltip">Metrics</span>
+                </li>
+                <li class="sidebar__nav-item" data-panel="comparison" onclick="navigateToPanel('comparison')">
+                    <div class="sidebar__nav-icon">
+                        <i data-lucide="git-compare"></i>
+                    </div>
+                    <span class="sidebar__label">Compare Algorithms</span>
+                    <span class="sidebar__tooltip">Compare Algorithms</span>
+                </li>
+            </ul>
+        </div>
+        
+        <div class="sidebar__divider"></div>
+        
+        <!-- Tools Section -->
+        <div class="sidebar__section">
+            <div class="sidebar__section-title">Tools</div>
+            <ul class="sidebar__nav-list">
+                <li class="sidebar__nav-item" data-panel="report" onclick="navigateToPanel('report')">
+                    <div class="sidebar__nav-icon">
+                        <i data-lucide="file-text"></i>
+                    </div>
+                    <span class="sidebar__label">Report Disruption</span>
+                    <span class="sidebar__tooltip">Report Disruption</span>
+                </li>
+                <li class="sidebar__nav-item" data-panel="demo-runner" onclick="navigateToPanel('demo-runner')">
+                    <div class="sidebar__nav-icon">
+                        <i data-lucide="play-circle"></i>
+                    </div>
+                    <span class="sidebar__label">Run Demo</span>
+                    <span class="sidebar__tooltip">Run Demo</span>
+                </li>
+                <li class="sidebar__nav-item" data-panel="demo-creator" onclick="navigateToPanel('demo-creator')">
+                    <div class="sidebar__nav-icon">
+                        <i data-lucide="plus-circle"></i>
+                    </div>
+                    <span class="sidebar__label">Create Demo</span>
+                    <span class="sidebar__tooltip">Create Demo</span>
+                </li>
+            </ul>
+        </div>
+        
+        <div class="sidebar__divider"></div>
+        
+        <!-- Admin Section -->
+        <div class="sidebar__section">
+            <div class="sidebar__section-title">Administration</div>
+            <ul class="sidebar__nav-list">
+                <li class="sidebar__nav-item" data-panel="admin" onclick="navigateToPanel('admin')">
+                    <div class="sidebar__nav-icon">
+                        <i data-lucide="shield"></i>
+                    </div>
+                    <span class="sidebar__label">Admin Panel</span>
+                    <span class="sidebar__tooltip">Admin Panel</span>
+                </li>
+                <li class="sidebar__nav-item" data-panel="developer" onclick="navigateToPanel('developer')">
+                    <div class="sidebar__nav-icon">
+                        <i data-lucide="code"></i>
+                    </div>
+                    <span class="sidebar__label">Developer View</span>
+                    <span class="sidebar__tooltip">Developer View</span>
+                </li>
+            </ul>
+        </div>
+        
+        <!-- System Status -->
+        <div class="sidebar__status mt-auto">
+            <span class="sidebar__status-dot" id="connection-status-dot"></span>
+            <span class="sidebar__label" id="connection-status-text">Connected</span>
+        </div>
+    </nav>
+    
+    <!-- Footer -->
+    <div class="sidebar__footer">
+        <div class="sidebar__footer-item" onclick="showSettingsModal()">
+            <div class="sidebar__footer-icon">
+                <i data-lucide="settings"></i>
+            </div>
+            <span class="sidebar__footer-text">Settings</span>
+            <span class="sidebar__tooltip">Settings</span>
+        </div>
+        <div class="sidebar__footer-item" onclick="showHelpModal()">
+            <div class="sidebar__footer-icon">
+                <i data-lucide="help-circle"></i>
+            </div>
+            <span class="sidebar__footer-text">Help</span>
+            <span class="sidebar__tooltip">Help</span>
+        </div>
+    </div>
+</aside>

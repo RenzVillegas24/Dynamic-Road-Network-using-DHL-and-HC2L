@@ -1,0 +1,157 @@
+<!-- Route Panel Component -->
+<div class="panel active" id="route-panel" data-panel="route">
+    <!-- Header -->
+    <div class="panel__header panel__header--gradient">
+        <div class="panel__icon">
+            <i data-lucide="route"></i>
+        </div>
+        <div class="panel__title-group">
+            <h2 class="panel__title">Route Details</h2>
+            <p class="panel__subtitle">Current navigation information</p>
+        </div>
+        <button class="panel__close" onclick="closePanel('route')" title="Close panel">
+            <i data-lucide="x"></i>
+        </button>
+    </div>
+    
+    <!-- Body -->
+    <div class="panel__body">
+        <!-- Empty State (shown when no route) -->
+        <div class="panel__empty" id="route-empty-state">
+            <div class="panel__empty-icon">
+                <i data-lucide="map"></i>
+            </div>
+            <h3 class="panel__empty-title">No Route Selected</h3>
+            <p class="panel__empty-text">Enter start and destination locations in the search bar above, or click on the map to set points.</p>
+        </div>
+        
+        <!-- Route Content (hidden when no route) -->
+        <div id="route-content" style="display: none;">
+            <!-- Route Summary Card -->
+            <div class="card card--accent mb-4">
+                <div class="card__header">
+                    <div class="card__title-group">
+                        <div class="card__icon">
+                            <i data-lucide="navigation"></i>
+                        </div>
+                        <div>
+                            <h3 class="card__title" id="route-algo-name">Route</h3>
+                            <p class="card__subtitle" id="route-status">Ready</p>
+                        </div>
+                    </div>
+                    <span class="badge badge--success" id="route-badge">Active</span>
+                </div>
+                <div class="card__body">
+                    <!-- Stats Grid -->
+                    <div class="card-grid card-grid--2">
+                        <div class="stat-card">
+                            <div class="stat-card__header">
+                                <div class="stat-card__icon">
+                                    <i data-lucide="milestone"></i>
+                                </div>
+                            </div>
+                            <div class="stat-card__value" id="route-distance">--</div>
+                            <div class="stat-card__label">Distance</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-card__header">
+                                <div class="stat-card__icon">
+                                    <i data-lucide="clock"></i>
+                                </div>
+                            </div>
+                            <div class="stat-card__value" id="route-time">--</div>
+                            <div class="stat-card__label">Est. Time</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Location Details -->
+            <div class="panel__section">
+                <h4 class="panel__section-title">
+                    <i data-lucide="map-pin" class="panel__section-icon"></i>
+                    Locations
+                </h4>
+                
+                <!-- Start Location -->
+                <div class="metric-card mb-3">
+                    <div class="metric-card__icon" style="background: var(--color-success-light); color: var(--color-success);">
+                        <i data-lucide="circle-dot"></i>
+                    </div>
+                    <div class="metric-card__content">
+                        <div class="metric-card__label">Start</div>
+                        <div class="metric-card__value truncate" id="route-start-name">Not set</div>
+                    </div>
+                </div>
+                
+                <!-- End Location -->
+                <div class="metric-card">
+                    <div class="metric-card__icon" style="background: var(--color-error-light); color: var(--color-error);">
+                        <i data-lucide="flag"></i>
+                    </div>
+                    <div class="metric-card__content">
+                        <div class="metric-card__label">Destination</div>
+                        <div class="metric-card__value truncate" id="route-end-name">Not set</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Route Disruptions -->
+            <div class="panel__section">
+                <h4 class="panel__section-title">
+                    <i data-lucide="alert-triangle" class="panel__section-icon"></i>
+                    Route Disruptions
+                </h4>
+                
+                <div id="route-disruptions-list">
+                    <div class="alert alert--info alert--inline">
+                        <i data-lucide="info" class="alert__icon"></i>
+                        <span>No disruptions on current route</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Performance -->
+            <div class="panel__section">
+                <h4 class="panel__section-title">
+                    <i data-lucide="zap" class="panel__section-icon"></i>
+                    Performance
+                </h4>
+                
+                <div class="panel__info-row">
+                    <span class="panel__info-label">Query Time</span>
+                    <span class="panel__info-value" id="route-query-time">--</span>
+                </div>
+                <div class="panel__info-row">
+                    <span class="panel__info-label">Nodes Explored</span>
+                    <span class="panel__info-value" id="route-nodes-explored">--</span>
+                </div>
+                <div class="panel__info-row">
+                    <span class="panel__info-label">Path Nodes</span>
+                    <span class="panel__info-value" id="route-path-nodes">--</span>
+                </div>
+            </div>
+            
+            <!-- Alternative Routes -->
+            <div class="panel__section" id="alternative-routes-section" style="display: none;">
+                <h4 class="panel__section-title">
+                    <i data-lucide="git-branch" class="panel__section-icon"></i>
+                    Alternative Routes
+                </h4>
+                <div id="alternative-routes-list"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Footer -->
+    <div class="panel__footer panel__footer--spread">
+        <button class="btn btn--ghost btn--sm" onclick="zoomToRoute()" id="zoom-to-route-btn" disabled>
+            <i data-lucide="maximize-2" class="btn__icon"></i>
+            Zoom to Route
+        </button>
+        <button class="btn btn--primary btn--sm" onclick="recalculateRoute()" id="recalculate-btn" disabled>
+            <i data-lucide="refresh-cw" class="btn__icon"></i>
+            Recalculate
+        </button>
+    </div>
+</div>

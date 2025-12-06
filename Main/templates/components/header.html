@@ -1,0 +1,112 @@
+<!-- Header Component -->
+<header class="header" id="app-header">
+    <!-- Logo Section -->
+    <div class="header__logo">
+        <div class="header__logo-icon">
+            <i data-lucide="route"></i>
+        </div>
+        <div class="header__brand">
+            <span class="header__title">Dynamic Road Network</span>
+            <span class="header__subtitle">DHL & HC2L Routing</span>
+        </div>
+    </div>
+    
+    <!-- Search Section -->
+    <div class="header__search">
+        <!-- Start Location -->
+        <div class="header__search-input" id="start-search-container">
+            <button class="header__search-btn start" type="button" title="Pick start on map" onclick="enableStartPicker()">
+                <i data-lucide="circle-dot"></i>
+            </button>
+            <input type="text" 
+                   id="start-search" 
+                   placeholder="Enter start location..." 
+                   autocomplete="off"
+                   onkeyup="debounceSearch(this.value, 'start')"
+                   onfocus="showSearchDropdown('start')"
+                   onblur="hideSearchDropdownDelayed('start')">
+        </div>
+        
+        <!-- Arrow -->
+        <div class="header__search-arrow">
+            <i data-lucide="arrow-right"></i>
+        </div>
+        
+        <!-- End Location -->
+        <div class="header__search-input" id="end-search-container">
+            <button class="header__search-btn end" type="button" title="Pick end on map" onclick="enableEndPicker()">
+                <i data-lucide="flag"></i>
+            </button>
+            <input type="text" 
+                   id="end-search" 
+                   placeholder="Enter destination..." 
+                   autocomplete="off"
+                   onkeyup="debounceSearch(this.value, 'end')"
+                   onfocus="showSearchDropdown('end')"
+                   onblur="hideSearchDropdownDelayed('end')">
+        </div>
+        
+        <!-- Go Button -->
+        <button class="header__go-btn" onclick="calculateRoute()" id="go-button">
+            <span>GO</span>
+            <div class="header__go-btn-icon">
+                <i data-lucide="send"></i>
+            </div>
+        </button>
+    </div>
+    
+    <!-- Actions Section -->
+    <div class="header__actions">
+        <!-- Algorithm Selector -->
+        <div class="dropdown" id="algo-dropdown">
+            <button class="header__action-btn" onclick="toggleAlgorithmDropdown()">
+                <div class="header__action-btn-icon">
+                    <i data-lucide="cpu"></i>
+                </div>
+                <span id="selected-algo-label">LazyDHL</span>
+                <i data-lucide="chevron-down"></i>
+            </button>
+            <div class="dropdown__menu dropdown__menu--right" id="algo-dropdown-menu">
+                <div class="dropdown__header">Select Algorithm</div>
+                <div class="dropdown__item" data-algo="lazydhl" onclick="selectAlgorithm('lazydhl')">
+                    <i data-lucide="zap"></i>
+                    <span>LazyDHL</span>
+                    <span class="badge badge--primary badge--sm ml-auto">Recommended</span>
+                </div>
+                <div class="dropdown__item" data-algo="lazyhc2l" onclick="selectAlgorithm('lazyhc2l')">
+                    <i data-lucide="network"></i>
+                    <span>LazyHC2L</span>
+                </div>
+                <div class="dropdown__divider"></div>
+                <div class="dropdown__item" data-algo="dijkstra" onclick="selectAlgorithm('dijkstra')">
+                    <i data-lucide="git-branch"></i>
+                    <span>Dijkstra</span>
+                </div>
+                <div class="dropdown__item" data-algo="astar" onclick="selectAlgorithm('astar')">
+                    <i data-lucide="star"></i>
+                    <span>A* Search</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Clear Button -->
+        <button class="header__action-btn" onclick="clearRoutes()" title="Clear all routes">
+            <div class="header__action-btn-icon">
+                <i data-lucide="trash-2"></i>
+            </div>
+            <span>Clear</span>
+        </button>
+        
+        <!-- Refresh Button -->
+        <button class="header__action-btn" onclick="refreshDisruptions()" title="Refresh disruption data">
+            <div class="header__action-btn-icon">
+                <i data-lucide="refresh-cw"></i>
+            </div>
+            <span>Refresh</span>
+        </button>
+    </div>
+</header>
+
+<!-- Search Dropdowns (positioned via JS) -->
+<div class="search-dropdown hidden" id="start-search-dropdown"></div>
+<div class="search-dropdown hidden" id="end-search-dropdown"></div>

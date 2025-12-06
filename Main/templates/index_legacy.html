@@ -4,126 +4,29 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>REACT - Dynamic Navigator</title>
-  
-  <!-- Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  
-  <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-  
-  <!-- Leaflet CSS & JS -->
+  <title>Dynamic Navigator - OpenStreetMap</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    
-  <!-- Tailwind CSS -->
-  <script src="https://unpkg.com/tailwindcss-cdn@3.4.10/tailwindcss.js"></script>
-  
-  <!-- Chart.js for performance visualizations -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  
-  <!-- Custom CSS (New Modular System) -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/popup-styles.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <!-- <script src="https://cdn.tailwindcss.com"></script> -->
+  <script src="https://unpkg.com/tailwindcss-cdn@3.4.10/tailwindcss.js"></script>
+  <!-- Chart.js for performance visualizations -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
 </head>
 
-<body class="app-body">
-  <!-- Left Sidebar Navigation -->
-  <aside class="sidebar" id="sidebar">
-    <!-- Sidebar Header -->
-    <div class="sidebar-header">
-      <div class="sidebar-logo">
-        <div class="sidebar-logo-icon">
-          <i data-lucide="navigation"></i>
-        </div>
-        <div class="sidebar-logo-text">
-          <span class="sidebar-logo-title">REACT</span>
-          <span class="sidebar-logo-subtitle">Navigation</span>
-        </div>
-      </div>
-      <button class="sidebar-toggle" id="sidebar-toggle" title="Toggle Sidebar">
-        <i data-lucide="chevrons-left"></i>
-      </button>
+<body class="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+
+  <div class="h-screen w-full flex flex-col relative">
+
+    <!-- Update Mode Toast Notification -->
+    <div id="update-toast"
+      class="fixed top-24 left-6 glass-effect border-2 shadow-2xl rounded-2xl px-6 py-4 text-sm font-semibold hidden z-50 transition-all transform hover:scale-105">
+      <span id="update-toast-message"></span>
     </div>
-
-    <!-- Navigation -->
-    <nav class="sidebar-nav">
-        <!-- Main Navigation -->
-      <div class="nav-group">
-        <div class="nav-group-label">Main</div>
-        <a class="nav-item active" data-panel="route-finder" title="Route Finder">
-          <i data-lucide="navigation"></i>
-          <span>Route Finder</span>
-        </a>
-        <a class="nav-item" data-panel="current-route" title="Current Route">
-          <i data-lucide="route"></i>
-          <span>Current Route</span>
-        </a>
-        <a class="nav-item" data-panel="report" title="Report Disruption">
-          <i data-lucide="alert-triangle"></i>
-          <span>Report Disruption</span>
-        </a>
-        <a class="nav-item" data-panel="disruptions" title="Active Disruptions">
-          <i data-lucide="list"></i>
-          <span>Active Disruptions</span>
-          <span class="nav-badge disruption-badge" id="disruption-count-badge">0</span>
-        </a>
-      </div>
-
-      <!-- Analysis Group -->
-      <div class="nav-group">
-        <div class="nav-group-label">Analysis</div>
-        <a class="nav-item" data-panel="metrics" title="Route Metrics">
-          <i data-lucide="activity"></i>
-          <span>Route Metrics</span>
-        </a>
-        <a class="nav-item" data-panel="comparison" title="Algorithm Comparison">
-          <i data-lucide="git-compare"></i>
-          <span>Algorithm Comparison</span>
-        </a>
-        <a class="nav-item" data-panel="developer" title="Developer Tools">
-          <i data-lucide="code"></i>
-          <span>Developer Tools</span>
-        </a>
-      </div>
-
-      <!-- Tools Group -->
-      <div class="nav-group">
-        <div class="nav-group-label">Tools</div>
-        <a class="nav-item" data-panel="demo-runner" title="Demo Runner">
-          <i data-lucide="play-circle"></i>
-          <span>Demo Runner</span>
-        </a>
-        <a class="nav-item" data-panel="demo-creator" title="Demo Creator">
-          <i data-lucide="plus-circle"></i>
-          <span>Demo Creator</span>
-        </a>
-      </div>
-    </nav>
-
-    <!-- Sidebar Footer -->
-    <div class="sidebar-footer">
-      <div class="sidebar-footer-info">
-        <span class="sidebar-version">v2.0</span>
-      </div>
-    </div>
-  </aside>
-
-  <!-- Main Content Wrapper -->
-  <div class="main-wrapper" id="main-wrapper">
-    <div class="h-screen w-full flex flex-col relative">
-
-      <!-- Update Mode Toast Notification -->
-      <div id="update-toast"
-        class="fixed top-24 left-6 glass-effect border-2 shadow-2xl rounded-2xl px-6 py-4 text-sm font-semibold hidden z-50 transition-all transform hover:scale-105">
-        <span id="update-toast-message"></span>
-      </div>
 
     <!-- Top Navigation Bar -->
     <div class="glass-effect shadow-md px-6 py-4 flex items-center justify-between border-b border-slate-300">
@@ -2887,6 +2790,342 @@
 
       </div>
     </div>
+
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- EXPERIMENT AUTOMATION WIZARD PANEL -->
+  <!-- ============================================================ -->
+  <div id="experiment-wizard-panel"
+    class="fixed top-0 right-0 w-[42rem] h-full glass-effect shadow-2xl transform translate-x-full transition-transform duration-300 overflow-y-auto z-50 border-l border-slate-200/50">
+    
+    <!-- Header -->
+    <div class="p-6 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white flex justify-between items-center sticky top-0 z-10">
+      <div>
+        <h2 class="font-bold text-2xl mb-1">🧪 Experiment Automation</h2>
+        <p class="text-emerald-100 text-sm">Configure and run automated benchmarks</p>
+      </div>
+      <button data-close-experiment-wizard class="hover:bg-white/20 rounded-xl p-2 transition-all">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Step Indicators -->
+    <div class="p-4 bg-slate-50 border-b border-slate-200">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2 cursor-pointer" data-experiment-step="1">
+          <div class="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm">1</div>
+          <span class="text-sm font-semibold">Locations</span>
+        </div>
+        <div class="flex-1 h-0.5 bg-gray-300 mx-2"></div>
+        <div class="flex items-center gap-2 cursor-pointer" data-experiment-step="2">
+          <div class="w-10 h-10 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center font-bold text-sm">2</div>
+          <span class="text-sm font-semibold">Traffic</span>
+        </div>
+        <div class="flex-1 h-0.5 bg-gray-300 mx-2"></div>
+        <div class="flex items-center gap-2 cursor-pointer" data-experiment-step="3">
+          <div class="w-10 h-10 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center font-bold text-sm">3</div>
+          <span class="text-sm font-semibold">Sequence</span>
+        </div>
+        <div class="flex-1 h-0.5 bg-gray-300 mx-2"></div>
+        <div class="flex items-center gap-2 cursor-pointer" data-experiment-step="4">
+          <div class="w-10 h-10 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center font-bold text-sm">4</div>
+          <span class="text-sm font-semibold">Review</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="p-6">
+      <!-- Step 1: Locations -->
+      <div id="experiment-step-1" class="space-y-5">
+        <h3 class="font-bold text-lg text-slate-800 mb-4">📍 Configure Locations</h3>
+        
+        <!-- Location Mode Selection -->
+        <div class="space-y-3">
+          <label class="block text-sm font-medium text-gray-700">Location Source</label>
+          <select id="exp-location-mode" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 bg-white">
+            <option value="preset">Use Preset Locations (Quezon City)</option>
+            <option value="custom">Custom Start/Destination</option>
+          </select>
+        </div>
+
+        <!-- Preset Inputs -->
+        <div id="exp-preset-inputs" class="space-y-3">
+          <div class="bg-emerald-50 p-4 rounded-xl">
+            <p class="text-sm text-emerald-700">
+              <strong>Preset Mode:</strong> Random location pairs will be selected from Quezon City landmarks for each trial.
+            </p>
+          </div>
+          <select id="exp-preset-name" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 bg-white">
+            <option value="quezon_city_presets">Quezon City Presets</option>
+            <option value="manila_presets">Manila Presets</option>
+          </select>
+        </div>
+
+        <!-- Custom Inputs (hidden by default) -->
+        <div id="exp-custom-inputs" class="hidden space-y-3">
+          <div class="bg-blue-50 p-4 rounded-xl">
+            <label class="block text-sm font-medium text-blue-800 mb-2">Start Location</label>
+            <input type="text" id="exp-start-location" 
+                   class="w-full px-3 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                   placeholder="Click on map or enter coordinates">
+          </div>
+          <div class="bg-red-50 p-4 rounded-xl">
+            <label class="block text-sm font-medium text-red-800 mb-2">Destination</label>
+            <input type="text" id="exp-dest-location" 
+                   class="w-full px-3 py-2 border border-red-200 rounded-lg focus:ring-2 focus:ring-red-500"
+                   placeholder="Click on map or enter coordinates">
+          </div>
+        </div>
+
+        <!-- Saved Configurations -->
+        <div class="bg-gray-50 p-4 rounded-xl">
+          <h4 class="font-semibold text-gray-700 mb-3">💾 Saved Configurations</h4>
+          <div id="exp-saved-configs" class="space-y-2 max-h-32 overflow-y-auto">
+            <p class="text-gray-500 text-sm italic">Loading...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2: Traffic -->
+      <div id="experiment-step-2" class="hidden space-y-5">
+        <h3 class="font-bold text-lg text-slate-800 mb-4">🚦 Traffic Configuration</h3>
+        
+        <!-- Traffic Mode -->
+        <div class="space-y-3">
+          <label class="block text-sm font-medium text-gray-700">Traffic Data Mode</label>
+          <select id="exp-traffic-mode" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 bg-white">
+            <option value="none">No Traffic Data (Baseline)</option>
+            <option value="flow">Traffic Flow Only</option>
+            <option value="incidents">Incidents Only</option>
+            <option value="both" selected>Flow + Incidents (Recommended)</option>
+          </select>
+        </div>
+
+        <!-- Disruption Settings -->
+        <div class="bg-orange-50 p-4 rounded-xl space-y-4">
+          <h4 class="font-semibold text-orange-800">Disruption Generation</h4>
+          
+          <div>
+            <label class="block text-sm text-orange-700 mb-1">Disruptions per Trial</label>
+            <input type="number" id="exp-disruption-count" 
+                   class="w-full px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-500"
+                   value="3" min="0" max="20">
+          </div>
+
+          <div>
+            <label class="block text-sm text-orange-700 mb-1">Severity Range</label>
+            <div class="flex gap-2 items-center">
+              <input type="number" id="exp-severity-min" 
+                     class="w-24 px-3 py-2 border border-orange-200 rounded-lg"
+                     value="0.1" min="0" max="1" step="0.1">
+              <span class="text-orange-600">to</span>
+              <input type="number" id="exp-severity-max" 
+                     class="w-24 px-3 py-2 border border-orange-200 rounded-lg"
+                     value="1.0" min="0" max="1" step="0.1">
+            </div>
+          </div>
+
+          <label class="flex items-center gap-2">
+            <input type="checkbox" id="exp-dynamic-disruptions" checked class="w-4 h-4 text-orange-600">
+            <span class="text-sm text-orange-700">Generate dynamic disruptions during trials</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Step 3: Sequence -->
+      <div id="experiment-step-3" class="hidden space-y-5">
+        <h3 class="font-bold text-lg text-slate-800 mb-4">🔢 Experiment Sequence</h3>
+        
+        <!-- Batch Configuration -->
+        <div class="bg-purple-50 p-4 rounded-xl space-y-4">
+          <h4 class="font-semibold text-purple-800">Batch Configuration</h4>
+          
+          <div>
+            <label class="block text-sm text-purple-700 mb-1">Number of Batches (X)</label>
+            <input type="number" id="exp-num-batches" 
+                   class="w-full px-3 py-2 border border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-500"
+                   value="3" min="1" max="10">
+          </div>
+
+          <div>
+            <label class="block text-sm text-purple-700 mb-2">Disruptions per Batch (Y)</label>
+            <div id="exp-disruptions-per-batch" class="space-y-2">
+              <!-- Dynamic inputs will be inserted here -->
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm text-purple-700 mb-1">Trials per Disruption (Z)</label>
+            <input type="number" id="exp-trials-per-disruption" 
+                   class="w-full px-3 py-2 border border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-500"
+                   value="5" min="1" max="100">
+          </div>
+        </div>
+
+        <!-- TAU Values -->
+        <div class="bg-cyan-50 p-4 rounded-xl space-y-3">
+          <h4 class="font-semibold text-cyan-800">TAU (τ) Threshold Values</h4>
+          <div class="flex flex-wrap gap-2">
+            <label class="flex items-center gap-1 bg-white px-3 py-1 rounded-lg border border-cyan-200">
+              <input type="checkbox" value="0.1" checked class="exp-tau-value"> 0.1
+            </label>
+            <label class="flex items-center gap-1 bg-white px-3 py-1 rounded-lg border border-cyan-200">
+              <input type="checkbox" value="0.3" checked class="exp-tau-value"> 0.3
+            </label>
+            <label class="flex items-center gap-1 bg-white px-3 py-1 rounded-lg border border-cyan-200">
+              <input type="checkbox" value="0.5" checked class="exp-tau-value"> 0.5
+            </label>
+            <label class="flex items-center gap-1 bg-white px-3 py-1 rounded-lg border border-cyan-200">
+              <input type="checkbox" value="0.7" checked class="exp-tau-value"> 0.7
+            </label>
+            <label class="flex items-center gap-1 bg-white px-3 py-1 rounded-lg border border-cyan-200">
+              <input type="checkbox" value="0.9" checked class="exp-tau-value"> 0.9
+            </label>
+          </div>
+        </div>
+
+        <!-- Algorithms -->
+        <div class="bg-indigo-50 p-4 rounded-xl space-y-3">
+          <h4 class="font-semibold text-indigo-800">Algorithms to Compare</h4>
+          <div class="flex gap-4">
+            <label class="flex items-center gap-2">
+              <input type="checkbox" value="hc2l" checked class="exp-algorithm w-5 h-5 text-cyan-600">
+              <span class="font-medium text-cyan-700">HC2L</span>
+            </label>
+            <label class="flex items-center gap-2">
+              <input type="checkbox" value="dhl" checked class="exp-algorithm w-5 h-5 text-purple-600">
+              <span class="font-medium text-purple-700">DHL</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Total Calculation -->
+        <div id="exp-total-calculation" class="bg-slate-100 p-4 rounded-xl text-center">
+          <!-- Calculated totals will appear here -->
+        </div>
+      </div>
+
+      <!-- Step 4: Review -->
+      <div id="experiment-step-4" class="hidden space-y-5">
+        <h3 class="font-bold text-lg text-slate-800 mb-4">📋 Review & Launch</h3>
+        <div id="exp-review-summary">
+          <!-- Summary will be populated by JavaScript -->
+        </div>
+      </div>
+
+      <!-- Navigation Buttons -->
+      <div class="flex justify-between mt-8 pt-4 border-t border-gray-200">
+        <button id="experiment-prev-btn" 
+                class="hidden px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-bold transition-all">
+          ← Previous
+        </button>
+        <div class="flex-1"></div>
+        <button id="experiment-next-btn" 
+                class="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all shadow-lg">
+          Next →
+        </button>
+        <button id="experiment-start-btn" 
+                class="hidden px-8 py-3 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-white rounded-xl font-bold transition-all shadow-lg">
+          🚀 Start Experiment
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- EXPERIMENT PROGRESS PANEL (Right side, shows during experiment) -->
+  <!-- ============================================================ -->
+  <div id="experiment-progress-panel"
+    class="fixed top-0 right-0 w-[28rem] h-full glass-effect shadow-2xl transform translate-x-full transition-transform duration-300 overflow-y-auto z-50 border-l border-slate-200/50">
+    
+    <!-- Header -->
+    <div class="p-4 bg-gradient-to-r from-emerald-600 to-cyan-600 text-white flex justify-between items-center sticky top-0 z-10">
+      <div>
+        <h2 class="font-bold text-xl">🧪 Experiment Running</h2>
+        <p id="exp-status" class="text-emerald-100 text-sm">Initializing...</p>
+      </div>
+      <button onclick="ExperimentWizard.closeProgressPanel()" class="hover:bg-white/20 rounded-xl p-2 transition-all">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+
+    <div class="p-4 space-y-4">
+      <!-- Progress Bar -->
+      <div class="bg-gray-200 rounded-full h-4 overflow-hidden">
+        <div id="exp-progress-bar" class="bg-gradient-to-r from-emerald-500 to-cyan-500 h-full transition-all duration-300" style="width: 0%"></div>
+      </div>
+      <div class="text-center">
+        <span id="exp-progress-text" class="text-2xl font-bold text-emerald-600">0%</span>
+      </div>
+
+      <!-- Counters -->
+      <div class="grid grid-cols-3 gap-2 text-center">
+        <div class="bg-purple-50 p-3 rounded-xl">
+          <div id="exp-batch-counter" class="font-bold text-purple-700">Batch 0/0</div>
+          <div class="text-xs text-purple-500">Batches</div>
+        </div>
+        <div class="bg-orange-50 p-3 rounded-xl">
+          <div id="exp-disruption-counter" class="font-bold text-orange-700">0/0</div>
+          <div class="text-xs text-orange-500">Disruptions</div>
+        </div>
+        <div class="bg-blue-50 p-3 rounded-xl">
+          <div id="exp-trial-counter" class="font-bold text-blue-700">0/0</div>
+          <div class="text-xs text-blue-500">Trials</div>
+        </div>
+      </div>
+
+      <!-- Current Algorithm -->
+      <div class="bg-slate-100 p-3 rounded-xl text-center">
+        <span class="text-sm text-gray-600">Current Algorithm: </span>
+        <span id="exp-current-algorithm" class="font-bold text-cyan-600">--</span>
+      </div>
+
+      <!-- Live Metrics -->
+      <div id="exp-live-metrics" class="bg-white border border-gray-200 rounded-xl p-3">
+        <div class="text-center text-gray-400 text-sm">Waiting for data...</div>
+      </div>
+
+      <!-- Control Buttons -->
+      <div class="flex gap-2">
+        <button id="exp-pause-btn" onclick="pauseExperiment()"
+                class="flex-1 px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-semibold transition-all">
+          ⏸️ Pause
+        </button>
+        <button id="exp-resume-btn" onclick="resumeExperiment()"
+                class="flex-1 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg font-semibold transition-all hidden">
+          ▶️ Resume
+        </button>
+        <button onclick="stopExperiment()"
+                class="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg font-semibold transition-all">
+          ⏹️ Stop
+        </button>
+      </div>
+
+      <!-- Export Buttons (disabled until complete) -->
+      <div class="flex gap-2">
+        <button id="exp-export-csv-btn" onclick="exportExperimentCSV()" disabled
+                class="flex-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+          📊 Export CSV
+        </button>
+        <button id="exp-export-appendix-btn" onclick="exportExperimentAppendix()" disabled
+                class="flex-1 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+          📑 Appendix
+        </button>
+      </div>
+
+      <!-- Log Window -->
+      <div class="bg-gray-900 rounded-xl p-3 h-48 overflow-y-auto">
+        <div class="text-xs text-gray-400 mb-2 font-semibold">Experiment Log</div>
+        <div id="exp-log" class="text-green-400 font-mono text-xs space-y-1">
+          <div class="text-gray-500">Waiting for experiment to start...</div>
+        </div>
+      </div>
+    </div>
   </div>
 
 
@@ -2913,6 +3152,7 @@
   <script src="{{ url_for('static', filename='js/csv-export.js') }}"></script>
   <!-- demo-automation.js removed - redundant with demo-runner.js -->
   <script src="{{ url_for('static', filename='js/logging-system.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/experiment-wizard.js') }}"></script>
   <script src="{{ url_for('static', filename='js/demo-runner.js') }}"></script>
   <script src="{{ url_for('static', filename='js/demo-creator.js') }}"></script>
 
@@ -4879,98 +5119,6 @@
 
   <!-- Traffic Visualization Module -->
   <script src="{{ url_for('static', filename='js/traffic-visualization.js') }}"></script>
-
-  </div><!-- Close main-wrapper -->
-
-  <!-- New Core UI Modules -->
-  <script src="{{ url_for('static', filename='js/icons.js') }}"></script>
-  <script src="{{ url_for('static', filename='js/core/panel-manager.js') }}"></script>
-  <script src="{{ url_for('static', filename='js/core/sidebar.js') }}"></script>
-  <script src="{{ url_for('static', filename='js/core/toast.js') }}"></script>
-  <script src="{{ url_for('static', filename='js/core/modal.js') }}"></script>
-  <script src="{{ url_for('static', filename='js/core/app.js') }}"></script>
-
-  <!-- Initialize Lucide Icons -->
-  <script>
-    document.addEventListener('DOMContentLoaded', function() {
-      // Initialize Lucide icons
-      if (typeof lucide !== 'undefined') {
-        lucide.createIcons();
-      }
-      
-      // Bridge between new sidebar and existing panels
-       document.querySelectorAll('.nav-item[data-panel]').forEach(item => {
-        item.addEventListener('click', function(e) {
-          e.preventDefault();
-          const panelKey = this.dataset.panel;
-          
-          // Close any currently open panel first (slide out)
-          const allPanels = [
-            'admin-panel', 'current-path-panel', 'report-panel', 
-            'disruptions-panel', 'route-metrics-panel', 'algorithm-comparison-panel',
-            'developer-view-panel', 'demo-runner-panel', 'demo-creator-panel'
-          ];
-          allPanels.forEach(id => {
-            const p = document.getElementById(id);
-            if (p) p.classList.add('translate-x-full');
-          });
-          
-          // Map panel keys to existing panel functions
-          const panelActions = {
-            'route-finder': () => {
-              // Open admin panel (now Route Finder)
-              const panel = document.getElementById('admin-panel');
-              if (panel) panel.classList.remove('translate-x-full');
-            },
-            'current-route': () => {
-              // Open current-path-panel
-              const panel = document.getElementById('current-path-panel');
-              if (panel) panel.classList.remove('translate-x-full');
-            },
-            'report': () => {
-              // Open report-panel
-              const panel = document.getElementById('report-panel');
-              if (panel) panel.classList.remove('translate-x-full');
-            },
-            'disruptions': () => {
-              const panel = document.getElementById('disruptions-panel');
-              if (panel) panel.classList.remove('translate-x-full');
-            },
-            'metrics': () => {
-              const panel = document.getElementById('route-metrics-panel');
-              if (panel) panel.classList.remove('translate-x-full');
-            },
-            'comparison': () => {
-              const panel = document.getElementById('algorithm-comparison-panel');
-              if (panel) panel.classList.remove('translate-x-full');
-            },
-            'developer': () => {
-              const panel = document.getElementById('developer-view-panel');
-              if (panel) panel.classList.remove('translate-x-full');
-            },
-            'demo-runner': () => {
-              const panel = document.getElementById('demo-runner-panel');
-              if (panel) panel.classList.remove('translate-x-full');
-            },
-            'demo-creator': () => {
-              const panel = document.getElementById('demo-creator-panel');
-              if (panel) panel.classList.remove('translate-x-full');
-            }
-          };
-          
-          // Execute panel action
-          if (panelActions[panelKey]) {
-            panelActions[panelKey]();
-          }
-          
-          // Update active state
-          document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
-          this.classList.add('active');
-        });
-      });
-      
-    });
-  </script>
 
 </body>
 

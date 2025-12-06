@@ -1,0 +1,252 @@
+<!-- Developer View Panel Component -->
+<div class="panel panel--lg" id="developer-panel" data-panel="developer">
+    <!-- Header -->
+    <div class="panel__header" style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color: white;">
+        <div class="panel__icon">
+            <i data-lucide="code"></i>
+        </div>
+        <div class="panel__title-group">
+            <h2 class="panel__title">Developer View</h2>
+            <p class="panel__subtitle">Technical information and debugging</p>
+        </div>
+        <button class="panel__close" onclick="closePanel('developer')" title="Close panel">
+            <i data-lucide="x"></i>
+        </button>
+    </div>
+    
+    <!-- Tabs -->
+    <div class="panel__tabs">
+        <div class="panel__tab active" data-tab="graph" onclick="switchDevTab('graph')">Graph</div>
+        <div class="panel__tab" data-tab="api" onclick="switchDevTab('api')">API</div>
+        <div class="panel__tab" data-tab="state" onclick="switchDevTab('state')">State</div>
+        <div class="panel__tab" data-tab="logs" onclick="switchDevTab('logs')">Logs</div>
+    </div>
+    
+    <!-- Body -->
+    <div class="panel__body">
+        <!-- Graph Tab -->
+        <div class="dev-tab-content" id="dev-tab-graph">
+            <div class="panel__section">
+                <h4 class="panel__section-title">
+                    <i data-lucide="database" class="panel__section-icon"></i>
+                    Graph Statistics
+                </h4>
+                
+                <div class="card-grid card-grid--3 mb-4">
+                    <div class="metric-card">
+                        <div class="metric-card__icon">
+                            <i data-lucide="circle"></i>
+                        </div>
+                        <div class="metric-card__content">
+                            <div class="metric-card__label">Nodes</div>
+                            <div class="metric-card__value" id="dev-node-count">--</div>
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-card__icon">
+                            <i data-lucide="git-branch"></i>
+                        </div>
+                        <div class="metric-card__content">
+                            <div class="metric-card__label">Edges</div>
+                            <div class="metric-card__value" id="dev-edge-count">--</div>
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-card__icon">
+                            <i data-lucide="layers"></i>
+                        </div>
+                        <div class="metric-card__content">
+                            <div class="metric-card__label">Hierarchy Levels</div>
+                            <div class="metric-card__value" id="dev-hierarchy-levels">--</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="panel__info-row">
+                    <span class="panel__info-label">Graph Source</span>
+                    <span class="panel__info-value" id="dev-graph-source">--</span>
+                </div>
+                <div class="panel__info-row">
+                    <span class="panel__info-label">Last Updated</span>
+                    <span class="panel__info-value" id="dev-graph-updated">--</span>
+                </div>
+                <div class="panel__info-row">
+                    <span class="panel__info-label">Memory Usage</span>
+                    <span class="panel__info-value" id="dev-memory-usage">--</span>
+                </div>
+            </div>
+            
+            <div class="panel__section">
+                <h4 class="panel__section-title">
+                    <i data-lucide="cpu" class="panel__section-icon"></i>
+                    Algorithm State
+                </h4>
+                
+                <div class="panel__info-row">
+                    <span class="panel__info-label">DHL Index Status</span>
+                    <span class="panel__info-value">
+                        <span class="status-badge status-badge--active" id="dev-dhl-status">
+                            <span class="status-badge__dot"></span>
+                            Ready
+                        </span>
+                    </span>
+                </div>
+                <div class="panel__info-row">
+                    <span class="panel__info-label">HC2L Index Status</span>
+                    <span class="panel__info-value">
+                        <span class="status-badge status-badge--active" id="dev-hc2l-status">
+                            <span class="status-badge__dot"></span>
+                            Ready
+                        </span>
+                    </span>
+                </div>
+                <div class="panel__info-row">
+                    <span class="panel__info-label">DHL Label Size</span>
+                    <span class="panel__info-value" id="dev-dhl-label-size">--</span>
+                </div>
+                <div class="panel__info-row">
+                    <span class="panel__info-label">HC2L Label Size</span>
+                    <span class="panel__info-value" id="dev-hc2l-label-size">--</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- API Tab -->
+        <div class="dev-tab-content hidden" id="dev-tab-api">
+            <div class="panel__section">
+                <h4 class="panel__section-title">
+                    <i data-lucide="server" class="panel__section-icon"></i>
+                    API Endpoints
+                </h4>
+                
+                <div class="d-flex flex-column gap-2">
+                    <div class="card card--flat">
+                        <div class="card__body card__body--compact">
+                            <div class="d-flex items-center gap-2">
+                                <span class="badge badge--success badge--sm">GET</span>
+                                <code class="text-xs flex-1">/api/route</code>
+                                <button class="btn btn--ghost btn--xs" onclick="testApiEndpoint('/api/route')">
+                                    <i data-lucide="play"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card card--flat">
+                        <div class="card__body card__body--compact">
+                            <div class="d-flex items-center gap-2">
+                                <span class="badge badge--success badge--sm">GET</span>
+                                <code class="text-xs flex-1">/api/disruptions</code>
+                                <button class="btn btn--ghost btn--xs" onclick="testApiEndpoint('/api/disruptions')">
+                                    <i data-lucide="play"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card card--flat">
+                        <div class="card__body card__body--compact">
+                            <div class="d-flex items-center gap-2">
+                                <span class="badge badge--info badge--sm">POST</span>
+                                <code class="text-xs flex-1">/api/report-disruption</code>
+                                <button class="btn btn--ghost btn--xs" onclick="testApiEndpoint('/api/report-disruption')">
+                                    <i data-lucide="play"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card card--flat">
+                        <div class="card__body card__body--compact">
+                            <div class="d-flex items-center gap-2">
+                                <span class="badge badge--success badge--sm">GET</span>
+                                <code class="text-xs flex-1">/api/graph-stats</code>
+                                <button class="btn btn--ghost btn--xs" onclick="testApiEndpoint('/api/graph-stats')">
+                                    <i data-lucide="play"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="panel__section">
+                <h4 class="panel__section-title">
+                    <i data-lucide="terminal" class="panel__section-icon"></i>
+                    API Response
+                </h4>
+                
+                <div class="card card--flat" style="max-height: 300px; overflow: auto;">
+                    <div class="card__body card__body--compact">
+                        <pre class="text-xs font-mono" id="dev-api-response" style="white-space: pre-wrap; word-break: break-all;">No API call made yet. Click a play button above to test an endpoint.</pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- State Tab -->
+        <div class="dev-tab-content hidden" id="dev-tab-state">
+            <div class="panel__section">
+                <h4 class="panel__section-title">
+                    <i data-lucide="box" class="panel__section-icon"></i>
+                    Application State
+                </h4>
+                
+                <button class="btn btn--surface btn--block btn--sm mb-3" onclick="refreshDevState()">
+                    <i data-lucide="refresh-cw" class="btn__icon"></i>
+                    Refresh State
+                </button>
+                
+                <div class="card card--flat" style="max-height: 400px; overflow: auto;">
+                    <div class="card__body card__body--compact">
+                        <pre class="text-xs font-mono" id="dev-app-state" style="white-space: pre-wrap;">Loading state...</pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Logs Tab -->
+        <div class="dev-tab-content hidden" id="dev-tab-logs">
+            <div class="panel__section">
+                <h4 class="panel__section-title">
+                    <i data-lucide="file-text" class="panel__section-icon"></i>
+                    Console Logs
+                    <button class="btn btn--ghost btn--xs ml-auto" onclick="clearDevLogs()">
+                        <i data-lucide="trash-2"></i>
+                        Clear
+                    </button>
+                </h4>
+                
+                <div class="d-flex gap-2 mb-3">
+                    <label class="form-check">
+                        <input type="checkbox" class="form-check__input" id="dev-log-info" checked>
+                        <span class="badge badge--info badge--sm">INFO</span>
+                    </label>
+                    <label class="form-check">
+                        <input type="checkbox" class="form-check__input" id="dev-log-warn" checked>
+                        <span class="badge badge--warning badge--sm">WARN</span>
+                    </label>
+                    <label class="form-check">
+                        <input type="checkbox" class="form-check__input" id="dev-log-error" checked>
+                        <span class="badge badge--error badge--sm">ERROR</span>
+                    </label>
+                </div>
+                
+                <div class="card card--flat" style="max-height: 400px; overflow: auto; background: #0f172a;">
+                    <div class="card__body card__body--compact">
+                        <div id="dev-logs" class="text-xs font-mono" style="color: #e2e8f0;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Footer -->
+    <div class="panel__footer panel__footer--spread">
+        <span class="text-xs text-muted">
+            <i data-lucide="clock" style="width: 12px; height: 12px; display: inline;"></i>
+            Session: <span id="dev-session-time">00:00:00</span>
+        </span>
+        <button class="btn btn--primary btn--sm" onclick="exportDevData()">
+            <i data-lucide="download" class="btn__icon"></i>
+            Export Debug Info
+        </button>
+    </div>
+</div>

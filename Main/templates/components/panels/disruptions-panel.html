@@ -1,0 +1,124 @@
+<!-- Disruptions Panel Component -->
+<div class="panel" id="disruptions-panel" data-panel="disruptions">
+    <!-- Header -->
+    <div class="panel__header panel__header--error">
+        <div class="panel__icon">
+            <i data-lucide="alert-triangle"></i>
+        </div>
+        <div class="panel__title-group">
+            <h2 class="panel__title">Disruptions</h2>
+            <p class="panel__subtitle">Active road incidents and alerts</p>
+        </div>
+        <button class="panel__close" onclick="closePanel('disruptions')" title="Close panel">
+            <i data-lucide="x"></i>
+        </button>
+    </div>
+    
+    <!-- Tabs -->
+    <div class="panel__tabs">
+        <div class="panel__tab active" data-tab="all" onclick="filterDisruptions('all')">
+            All
+            <span class="count-badge count-badge--muted ml-2" id="disruptions-count-all">0</span>
+        </div>
+        <div class="panel__tab" data-tab="critical" onclick="filterDisruptions('critical')">
+            Critical
+            <span class="count-badge ml-2" id="disruptions-count-critical">0</span>
+        </div>
+        <div class="panel__tab" data-tab="on-route" onclick="filterDisruptions('on-route')">
+            On Route
+        </div>
+    </div>
+    
+    <!-- Body -->
+    <div class="panel__body">
+        <!-- Filters -->
+        <div class="d-flex gap-2 mb-4">
+            <div class="form-input-group form-input-group--icon-left flex-1">
+                <span class="form-input-group__icon">
+                    <i data-lucide="search"></i>
+                </span>
+                <input type="text" 
+                       class="form-input form-input--sm" 
+                       id="disruption-search"
+                       placeholder="Search disruptions..."
+                       oninput="searchDisruptions(this.value)">
+            </div>
+            <button class="btn btn--surface btn--sm" onclick="refreshDisruptions()">
+                <i data-lucide="refresh-cw" class="btn__icon"></i>
+            </button>
+        </div>
+        
+        <!-- Disruptions List -->
+        <div id="disruptions-list">
+            <!-- Loading State -->
+            <div class="panel__loading" id="disruptions-loading" style="display: none;">
+                <div class="panel__loading-spinner"></div>
+                <p class="panel__loading-text">Loading disruptions...</p>
+            </div>
+            
+            <!-- Empty State -->
+            <div class="panel__empty" id="disruptions-empty">
+                <div class="panel__empty-icon">
+                    <i data-lucide="check-circle"></i>
+                </div>
+                <h3 class="panel__empty-title">No Active Disruptions</h3>
+                <p class="panel__empty-text">All roads are currently clear. We'll notify you when new incidents are reported.</p>
+            </div>
+            
+            <!-- Disruption Items (populated by JS) -->
+            <div id="disruption-items" class="d-flex flex-column gap-3"></div>
+        </div>
+    </div>
+    
+    <!-- Footer -->
+    <div class="panel__footer panel__footer--spread">
+        <span class="text-sm text-muted" id="disruptions-last-update">Last updated: --</span>
+        <button class="btn btn--ghost btn--sm" onclick="navigateToPanel('report')">
+            <i data-lucide="plus" class="btn__icon"></i>
+            Report New
+        </button>
+    </div>
+</div>
+
+<!-- Disruption Item Template (for JS to clone) -->
+<template id="disruption-item-template">
+    <div class="card card--clickable disruption-item" data-disruption-id="">
+        <div class="card__body card__body--compact">
+            <div class="d-flex items-start gap-3">
+                <!-- Severity Icon -->
+                <div class="card__icon disruption-severity-icon">
+                    <i data-lucide="alert-triangle"></i>
+                </div>
+                
+                <!-- Content -->
+                <div class="flex-1 min-w-0">
+                    <!-- Header row -->
+                    <div class="d-flex items-center justify-between mb-1">
+                        <h4 class="text-sm font-semibold truncate disruption-title">Disruption Title</h4>
+                        <span class="severity-badge disruption-severity-badge">Severity</span>
+                    </div>
+                    
+                    <!-- Location -->
+                    <p class="text-xs text-muted mb-2 truncate disruption-location">
+                        <i data-lucide="map-pin" style="width: 12px; height: 12px; display: inline;"></i>
+                        <span class="disruption-road">Road Name</span>
+                    </p>
+                    
+                    <!-- Meta -->
+                    <div class="d-flex items-center gap-3 text-xs text-muted">
+                        <span class="d-flex items-center gap-1">
+                            <i data-lucide="clock" style="width: 12px; height: 12px;"></i>
+                            <span class="disruption-time">2 hours ago</span>
+                        </span>
+                        <span class="disruption-type-badge badge badge--default badge--sm">Type</span>
+                    </div>
+                </div>
+                
+                <!-- Actions -->
+                <button class="btn btn--ghost btn--icon btn--sm disruption-zoom" title="Zoom to location">
+                    <i data-lucide="maximize-2"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</template>

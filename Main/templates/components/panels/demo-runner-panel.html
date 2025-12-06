@@ -1,0 +1,172 @@
+<!-- Demo Runner Panel Component -->
+<div class="panel" id="demo-runner-panel" data-panel="demo-runner">
+    <!-- Header -->
+    <div class="panel__header" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white;">
+        <div class="panel__icon">
+            <i data-lucide="play-circle"></i>
+        </div>
+        <div class="panel__title-group">
+            <h2 class="panel__title">Run Demo</h2>
+            <p class="panel__subtitle">Execute demonstration scenarios</p>
+        </div>
+        <button class="panel__close" onclick="closePanel('demo-runner')" title="Close panel">
+            <i data-lucide="x"></i>
+        </button>
+    </div>
+    
+    <!-- Body -->
+    <div class="panel__body">
+        <!-- Demo Selection -->
+        <div class="panel__section">
+            <h4 class="panel__section-title">
+                <i data-lucide="folder" class="panel__section-icon"></i>
+                Select Demo
+            </h4>
+            
+            <div class="form-group">
+                <select class="form-select" id="demo-select" onchange="loadDemoDetails()">
+                    <option value="">Choose a demo scenario...</option>
+                    <!-- Options populated by JS -->
+                </select>
+            </div>
+            
+            <button class="btn btn--surface btn--block btn--sm" onclick="refreshDemoList()">
+                <i data-lucide="refresh-cw" class="btn__icon"></i>
+                Refresh Demo List
+            </button>
+        </div>
+        
+        <!-- Demo Details (shown when demo selected) -->
+        <div class="panel__section" id="demo-details" style="display: none;">
+            <h4 class="panel__section-title">
+                <i data-lucide="info" class="panel__section-icon"></i>
+                Demo Details
+            </h4>
+            
+            <div class="card card--flat">
+                <div class="card__body card__body--compact">
+                    <h5 class="font-semibold mb-2" id="demo-name">Demo Name</h5>
+                    <p class="text-sm text-muted mb-3" id="demo-description">Demo description will appear here.</p>
+                    
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        <span class="badge badge--primary" id="demo-route-count">0 Routes</span>
+                        <span class="badge badge--warning" id="demo-disruption-count">0 Disruptions</span>
+                        <span class="badge badge--default" id="demo-step-count">0 Steps</span>
+                    </div>
+                    
+                    <div class="panel__info-row">
+                        <span class="panel__info-label">Algorithm</span>
+                        <span class="panel__info-value" id="demo-algorithm">--</span>
+                    </div>
+                    <div class="panel__info-row">
+                        <span class="panel__info-label">Duration</span>
+                        <span class="panel__info-value" id="demo-duration">--</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Demo Controls -->
+        <div class="panel__section" id="demo-controls" style="display: none;">
+            <h4 class="panel__section-title">
+                <i data-lucide="settings" class="panel__section-icon"></i>
+                Run Settings
+            </h4>
+            
+            <div class="form-group">
+                <label class="form-label">Playback Speed</label>
+                <select class="form-select form-select--sm" id="demo-speed">
+                    <option value="0.5">0.5x (Slow)</option>
+                    <option value="1" selected>1x (Normal)</option>
+                    <option value="2">2x (Fast)</option>
+                    <option value="4">4x (Very Fast)</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-switch">
+                    <input type="checkbox" class="form-switch__input" id="demo-auto-zoom" checked>
+                    <span class="form-switch__label">Auto-zoom to actions</span>
+                </label>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-switch">
+                    <input type="checkbox" class="form-switch__input" id="demo-show-annotations" checked>
+                    <span class="form-switch__label">Show annotations</span>
+                </label>
+            </div>
+        </div>
+        
+        <!-- Demo Progress -->
+        <div class="panel__section" id="demo-progress" style="display: none;">
+            <h4 class="panel__section-title">
+                <i data-lucide="loader-2" class="panel__section-icon"></i>
+                Progress
+            </h4>
+            
+            <div class="card card--flat">
+                <div class="card__body card__body--compact">
+                    <!-- Progress Bar -->
+                    <div class="mb-3">
+                        <div class="d-flex justify-between items-center mb-1">
+                            <span class="text-sm font-medium" id="demo-current-step">Step 0 of 0</span>
+                            <span class="text-sm text-muted" id="demo-progress-percent">0%</span>
+                        </div>
+                        <div class="w-full bg-alt rounded-full" style="height: 8px;">
+                            <div class="bg-success rounded-full transition-all" id="demo-progress-bar" style="width: 0%; height: 100%;"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Current Action -->
+                    <div class="alert alert--info alert--inline" id="demo-current-action">
+                        <i data-lucide="info" class="alert__icon"></i>
+                        <span id="demo-action-text">Waiting to start...</span>
+                    </div>
+                    
+                    <!-- Playback Controls -->
+                    <div class="d-flex justify-center gap-2 mt-4">
+                        <button class="btn btn--surface btn--icon" onclick="demoPrevStep()" id="demo-prev-btn" disabled>
+                            <i data-lucide="skip-back"></i>
+                        </button>
+                        <button class="btn btn--success btn--icon btn--lg" onclick="demoTogglePlay()" id="demo-play-btn">
+                            <i data-lucide="play" id="demo-play-icon"></i>
+                        </button>
+                        <button class="btn btn--surface btn--icon" onclick="demoNextStep()" id="demo-next-btn" disabled>
+                            <i data-lucide="skip-forward"></i>
+                        </button>
+                        <button class="btn btn--ghost btn--icon" onclick="demoStop()" id="demo-stop-btn">
+                            <i data-lucide="square"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Demo Log -->
+        <div class="panel__section" id="demo-log-section" style="display: none;">
+            <h4 class="panel__section-title">
+                <i data-lucide="list" class="panel__section-icon"></i>
+                Activity Log
+            </h4>
+            
+            <div class="card card--flat" style="max-height: 200px; overflow-y: auto;">
+                <div class="card__body card__body--compact p-0">
+                    <div id="demo-log" class="text-xs font-mono"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Footer -->
+    <div class="panel__footer panel__footer--spread">
+        <button class="btn btn--ghost btn--sm" onclick="demoReset()" id="demo-reset-btn" disabled>
+            <i data-lucide="rotate-ccw" class="btn__icon"></i>
+            Reset
+        </button>
+        <button class="btn btn--success btn--sm" onclick="startDemo()" id="demo-start-btn" disabled>
+            <i data-lucide="play" class="btn__icon"></i>
+            Start Demo
+        </button>
+    </div>
+</div>

@@ -1,0 +1,32 @@
+/**
+ * Main CSS Entry Point
+ * Imports all modular CSS files in correct order
+ */
+
+/* 1. Design Tokens & Variables */
+@import url('variables.css');
+
+/* 2. Base Styles */
+@import url('base/reset.css');
+@import url('base/typography.css');
+
+/* 3. Layout */
+@import url('layout/structure.css');
+@import url('layout/header.css');
+@import url('layout/sidebar.css');
+
+/* 4. Components */
+@import url('components/buttons.css');
+@import url('components/cards.css');
+@import url('components/forms.css');
+@import url('components/panels.css');
+@import url('components/badges.css');
+@import url('components/toasts.css');
+@import url('components/modals.css');
+
+/* 5. Effects */
+@import url('effects/animations.css');
+@import url('effects/transitions.css');
+
+/* 6. Utilities (load last to allow overrides) */
+@import url('utilities.css');

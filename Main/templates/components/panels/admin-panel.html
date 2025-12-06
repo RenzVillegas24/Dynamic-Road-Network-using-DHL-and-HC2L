@@ -1,0 +1,201 @@
+<!-- Admin Panel Component -->
+<div class="panel" id="admin-panel" data-panel="admin">
+    <!-- Header -->
+    <div class="panel__header" style="background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); color: white;">
+        <div class="panel__icon">
+            <i data-lucide="shield"></i>
+        </div>
+        <div class="panel__title-group">
+            <h2 class="panel__title">Admin Panel</h2>
+            <p class="panel__subtitle">System controls and management</p>
+        </div>
+        <button class="panel__close" onclick="closePanel('admin')" title="Close panel">
+            <i data-lucide="x"></i>
+        </button>
+    </div>
+    
+    <!-- Body -->
+    <div class="panel__body">
+        <!-- System Status -->
+        <div class="panel__section">
+            <h4 class="panel__section-title">
+                <i data-lucide="activity" class="panel__section-icon"></i>
+                System Status
+            </h4>
+            
+            <div class="card-grid card-grid--2 mb-4">
+                <div class="stat-card">
+                    <div class="stat-card__header">
+                        <div class="stat-card__icon" style="background: var(--color-success);">
+                            <i data-lucide="server"></i>
+                        </div>
+                        <span class="status-badge status-badge--active">
+                            <span class="status-badge__dot"></span>
+                            Online
+                        </span>
+                    </div>
+                    <div class="stat-card__value" id="admin-server-status">Active</div>
+                    <div class="stat-card__label">Server Status</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card__header">
+                        <div class="stat-card__icon" style="background: var(--color-info);">
+                            <i data-lucide="database"></i>
+                        </div>
+                    </div>
+                    <div class="stat-card__value" id="admin-graph-nodes">--</div>
+                    <div class="stat-card__label">Graph Nodes</div>
+                </div>
+            </div>
+            
+            <div class="card-grid card-grid--2">
+                <div class="metric-card">
+                    <div class="metric-card__icon">
+                        <i data-lucide="git-branch"></i>
+                    </div>
+                    <div class="metric-card__content">
+                        <div class="metric-card__label">Graph Edges</div>
+                        <div class="metric-card__value" id="admin-graph-edges">--</div>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-card__icon">
+                        <i data-lucide="alert-triangle"></i>
+                    </div>
+                    <div class="metric-card__content">
+                        <div class="metric-card__label">Active Disruptions</div>
+                        <div class="metric-card__value" id="admin-active-disruptions">--</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Quick Actions -->
+        <div class="panel__section">
+            <h4 class="panel__section-title">
+                <i data-lucide="zap" class="panel__section-icon"></i>
+                Quick Actions
+            </h4>
+            
+            <div class="d-flex flex-column gap-2">
+                <button class="btn btn--surface btn--block" onclick="refreshAllData()">
+                    <i data-lucide="refresh-cw" class="btn__icon"></i>
+                    Refresh All Data
+                </button>
+                <button class="btn btn--surface btn--block" onclick="clearAllDisruptions()">
+                    <i data-lucide="trash-2" class="btn__icon"></i>
+                    Clear All Disruptions
+                </button>
+                <button class="btn btn--surface btn--block" onclick="reloadGraph()">
+                    <i data-lucide="rotate-ccw" class="btn__icon"></i>
+                    Reload Graph
+                </button>
+            </div>
+        </div>
+        
+        <!-- Traffic Data -->
+        <div class="panel__section">
+            <h4 class="panel__section-title">
+                <i data-lucide="traffic-cone" class="panel__section-icon"></i>
+                Traffic Data
+            </h4>
+            
+            <div class="form-group">
+                <label class="form-switch">
+                    <input type="checkbox" class="form-switch__input" id="auto-refresh-toggle" checked>
+                    <span class="form-switch__label">Auto-refresh Traffic Data</span>
+                </label>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Refresh Interval</label>
+                <select class="form-select form-select--sm" id="refresh-interval">
+                    <option value="30">30 seconds</option>
+                    <option value="60" selected>1 minute</option>
+                    <option value="120">2 minutes</option>
+                    <option value="300">5 minutes</option>
+                </select>
+            </div>
+            
+            <button class="btn btn--info btn--block btn--sm mt-3" onclick="fetchTrafficData()">
+                <i data-lucide="download" class="btn__icon"></i>
+                Fetch Latest Traffic Data
+            </button>
+        </div>
+        
+        <!-- Disruption Sources -->
+        <div class="panel__section">
+            <h4 class="panel__section-title">
+                <i data-lucide="database" class="panel__section-icon"></i>
+                Disruption Sources
+            </h4>
+            
+            <div class="d-flex flex-column gap-2">
+                <label class="form-check">
+                    <input type="checkbox" class="form-check__input" id="source-tomtom" checked>
+                    <div>
+                        <span class="form-check__label">TomTom Traffic API</span>
+                        <p class="form-check__hint">Real-time traffic incidents</p>
+                    </div>
+                </label>
+                <label class="form-check">
+                    <input type="checkbox" class="form-check__input" id="source-user" checked>
+                    <div>
+                        <span class="form-check__label">User Reports</span>
+                        <p class="form-check__hint">Community-reported incidents</p>
+                    </div>
+                </label>
+                <label class="form-check">
+                    <input type="checkbox" class="form-check__input" id="source-historical">
+                    <div>
+                        <span class="form-check__label">Historical Data</span>
+                        <p class="form-check__hint">Past disruption patterns</p>
+                    </div>
+                </label>
+            </div>
+        </div>
+        
+        <!-- Algorithm Settings -->
+        <div class="panel__section">
+            <h4 class="panel__section-title">
+                <i data-lucide="cpu" class="panel__section-icon"></i>
+                Algorithm Settings
+            </h4>
+            
+            <div class="form-group">
+                <label class="form-label">Default Algorithm</label>
+                <select class="form-select form-select--sm" id="default-algorithm">
+                    <option value="lazydhl" selected>LazyDHL</option>
+                    <option value="lazyhc2l">LazyHC2L</option>
+                    <option value="dijkstra">Dijkstra</option>
+                    <option value="astar">A* Search</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-switch">
+                    <input type="checkbox" class="form-switch__input" id="show-alternatives" checked>
+                    <span class="form-switch__label">Show Alternative Routes</span>
+                </label>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-switch">
+                    <input type="checkbox" class="form-switch__input" id="avoid-disruptions" checked>
+                    <span class="form-switch__label">Auto-avoid Disruptions</span>
+                </label>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Footer -->
+    <div class="panel__footer panel__footer--spread">
+        <button class="btn btn--ghost btn--sm" onclick="resetAdminSettings()">
+            Reset to Defaults
+        </button>
+        <button class="btn btn--primary btn--sm" onclick="saveAdminSettings()">
+            <i data-lucide="save" class="btn__icon"></i>
+            Save Settings
+        </button>
+    </div>
+</div>
