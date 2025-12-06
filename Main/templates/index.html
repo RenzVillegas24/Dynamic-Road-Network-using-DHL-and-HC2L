@@ -1695,6 +1695,16 @@
                 </div>
               </div>
               
+              <!-- Process Time by Algorithm Chart -->
+              <div class="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
+                <h4 class="font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <span>🚀</span> Process Time Comparison
+                </h4>
+                <div class="h-40">
+                  <canvas id="chart-process-time"></canvas>
+                </div>
+              </div>
+              
               <!-- Query Time by Trial Chart -->
               <div class="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
                 <h4 class="font-semibold text-gray-700 mb-3 flex items-center gap-2">
@@ -1730,9 +1740,17 @@
           <!-- Fixed Action Buttons at Bottom -->
           <div class="flex-shrink-0 border-t border-gray-200 bg-gray-50 p-4 -mx-4 -mb-4">
             <div class="flex gap-3">
-              <button onclick="DemoRunner.exportResultsLocally()" 
+              <!-- Save to Server button (shown when not saved) -->
+              <button id="btn-save-to-server"
+                      onclick="DemoRunner.exportResultsLocally()" 
                       class="flex-1 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg">
                 <span>💾</span> Save to Server
+              </button>
+              <!-- Delete from Server button (shown when already saved) -->
+              <button id="btn-delete-from-server"
+                      onclick="DemoRunner.deleteFromServer()" 
+                      class="hidden flex-1 py-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg">
+                <span>🗑️</span> Delete from Server
               </button>
               <button onclick="DemoRunner.downloadResultsAsFile()" 
                       class="flex-1 py-3 bg-gray-300 hover:bg-gray-400 text-gray-700 font-bold rounded-xl transition-all shadow flex items-center justify-center gap-2">

@@ -3048,6 +3048,57 @@ def load_demo_result_file():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/demo/results/delete', methods=['POST'])
+def delete_demo_result_file():
+    """
+    Delete a specific saved result file by path.
+    
+    Request body:
+    {
+        "filePath": "..."
+    }
+    
+    Returns: { "success": true }
+    """
+    try:
+        data = request.json
+        file_path = data.get('filePath', '')
+        
+        if not file_path:
+            return jsonify({'success': False, 'error': 'filePath is required'}), 400
+        
+        result_path = Path(file_path)
+        
+        # Security check: ensure the path is within DEMO_RESULTS_DIR
+        try:
+            result_path.resolve().relative_to(DEMO_RESULTS_DIR.resolve())
+        except ValueError:
+            return jsonify({'success': False, 'error': 'Invalid file path'}), 400
+        
+        if not result_path.exists():
+            return jsonify({'success': False, 'error': 'File not found'}), 404
+        
+        # Delete the file
+        result_path.unlink()
+        console_logger.success(f"Deleted demo result file: {result_path}")
+        
+        # If the parent directory is now empty, remove it too
+        parent_dir = result_path.parent
+        if parent_dir != DEMO_RESULTS_DIR and parent_dir.exists():
+            remaining_files = list(parent_dir.glob('*.json'))
+            if len(remaining_files) == 0:
+                parent_dir.rmdir()
+                console_logger.info(f"Removed empty directory: {parent_dir}")
+        
+        return jsonify({
+            'success': True,
+            'deleted': str(result_path)
+        })
+    except Exception as e:
+        console_logger.error(f"Error deleting result file: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/search_location', methods=['POST'])
 def search_location():
     """

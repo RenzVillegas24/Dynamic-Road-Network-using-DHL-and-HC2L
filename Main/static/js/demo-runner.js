@@ -12,6 +12,10 @@ const DemoRunner = {
     isPaused: false,
     currentDemo: null,
     savedConfigs: [],
+    
+    // Track if current results are saved to server
+    currentResultsSavedPath: null,  // Path to saved file, null if not saved
+    
     randomDemoSettings: {
         trials: 1,
         routeCount: 1,
@@ -670,34 +674,72 @@ const DemoRunner = {
             return;
         }
 
-        container.innerHTML = this.savedResults.map((result, idx) => {
-            const savedDate = result.savedAt ? new Date(result.savedAt) : null;
-            const dateStr = savedDate ? savedDate.toLocaleDateString() : 'Unknown date';
-            const timeStr = savedDate ? savedDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
-            const summary = result.summary || {};
-            
-            return `
-                <div class="bg-gray-50 rounded-lg p-3 border border-gray-200 hover:border-indigo-300 transition-all cursor-pointer"
-                     onclick="DemoRunner.viewSavedResult('${result.filePath.replace(/'/g, "\\'")}')">
-                    <div class="flex items-start justify-between">
-                        <div class="flex-1 min-w-0">
-                            <h5 class="font-medium text-gray-800 truncate text-sm">${result.demoName || 'Demo Results'}</h5>
-                            <p class="text-xs text-gray-500">${dateStr} ${timeStr}</p>
-                        </div>
-                        <div class="flex flex-col items-end text-xs gap-1">
-                            <span class="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded">
-                                ${result.totalRoutes || 0} routes
-                            </span>
-                        </div>
+        // Group results by configId/demoName
+        const grouped = {};
+        this.savedResults.forEach(result => {
+            const groupKey = result.configId || result.demoName || 'Other';
+            if (!grouped[groupKey]) {
+                grouped[groupKey] = {
+                    name: result.demoName || result.configId || 'Unknown Demo',
+                    configId: result.configId,
+                    results: []
+                };
+            }
+            grouped[groupKey].results.push(result);
+        });
+
+        // Render grouped results
+        let html = '';
+        Object.entries(grouped).forEach(([key, group]) => {
+            html += `
+                <div class="mb-4">
+                    <div class="flex items-center gap-2 mb-2 pb-1 border-b border-gray-200">
+                        <span class="text-sm font-semibold text-gray-700">📁 ${group.name}</span>
+                        <span class="text-xs text-gray-400">(${group.results.length} run${group.results.length !== 1 ? 's' : ''})</span>
                     </div>
-                    ${summary.queryTime?.avg ? `
-                    <div class="mt-2 flex gap-2 text-xs">
-                        <span class="text-gray-500">Avg Query: <span class="font-medium text-gray-700">${summary.queryTime.avg.toFixed(2)}ms</span></span>
+                    <div class="space-y-2 pl-2">
+                        ${group.results.map((result, idx) => {
+                            const savedDate = result.savedAt ? new Date(result.savedAt) : null;
+                            const dateStr = savedDate ? savedDate.toLocaleDateString() : 'Unknown';
+                            const timeStr = savedDate ? savedDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
+                            const summary = result.summary || {};
+                            
+                            // Format duration
+                            const duration = summary.executionDurationSeconds;
+                            const durationStr = duration ? (duration >= 60 ? `${(duration/60).toFixed(1)}m` : `${duration.toFixed(1)}s`) : '--';
+                            
+                            // Format process time
+                            const processTime = summary.processTime?.avg;
+                            const processTimeStr = processTime ? `${processTime.toFixed(0)}ms` : '--';
+                            
+                            // Algorithm breakdown
+                            const algos = summary.algorithmBreakdown || {};
+                            const algoStr = [];
+                            if (algos.hc2l > 0) algoStr.push(`🔵${algos.hc2l}`);
+                            if (algos.dhl > 0) algoStr.push(`🟢${algos.dhl}`);
+                            
+                            return `
+                                <div class="bg-gray-50 rounded-lg p-3 border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/30 transition-all cursor-pointer"
+                                     onclick="DemoRunner.viewSavedResult('${result.filePath.replace(/'/g, "\\'")}')">
+                                    <div class="flex items-center justify-between mb-1">
+                                        <span class="text-xs text-gray-500">${dateStr} ${timeStr}</span>
+                                        <span class="text-xs font-medium text-indigo-600">${result.totalRoutes || 0} routes</span>
+                                    </div>
+                                    <div class="flex flex-wrap gap-2 text-xs">
+                                        ${summary.trialsCompleted ? `<span class="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">🔄 ${summary.trialsCompleted} trial${summary.trialsCompleted !== 1 ? 's' : ''}</span>` : ''}
+                                        <span class="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded">⏱️ ${durationStr}</span>
+                                        <span class="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded">⚡ ${processTimeStr}</span>
+                                        ${algoStr.length > 0 ? `<span class="px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded">${algoStr.join(' ')}</span>` : ''}
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
                     </div>
-                    ` : ''}
                 </div>
             `;
-        }).join('');
+        });
+
+        container.innerHTML = html;
     },
 
     async viewSavedResult(filePath) {
@@ -717,7 +759,10 @@ const DemoRunner = {
                     name: data.result.demoName,
                     id: data.result.demoId || data.result.configId
                 };
+                // Mark as already saved (since we loaded from server)
+                this.currentResultsSavedPath = filePath;
                 this.showResultsSummary();
+                this.updateResultsActionButtons();
                 showUpdateToast('Loaded saved result', 'success');
             } else {
                 throw new Error(data.error || 'Failed to load result');
@@ -838,6 +883,9 @@ const DemoRunner = {
         this.isPaused = false;
         this.currentDemo = config;
         this.currentDemoId = null;  // Track demoId for cleanup
+        
+        // Reset saved state for new demo run
+        this.currentResultsSavedPath = null;
         
         // Read from settings block (new format) with fallbacks
         const trials = config.settings?.trials || config.trials || 1;
@@ -1449,20 +1497,24 @@ const DemoRunner = {
 
                 await this.delay(300);
 
-                // Calculate route
+                // Calculate route with timing
+                const calcStartTime = performance.now();
                 if (typeof computeRouteBasedOnSelection === 'function') {
                     await computeRouteBasedOnSelection();
                 }
+                const calcEndTime = performance.now();
+                const processTimeMs = calcEndTime - calcStartTime;
 
-                // Capture result with the effective tau used
+                // Capture result with the effective tau used and process time
                 await this.delay(500);
-                const result = this.captureCurrentResult(algo, effectiveTau, route, trialIndex);
+                const result = this.captureCurrentResult(algo, effectiveTau, route, trialIndex, processTimeMs);
                 if (result) {
                     console.log(`✅ Captured ${algo.toUpperCase()} result:`, {
                         distance: result.metrics.displayDistance,
                         distanceKm: result.metrics.distanceKm,
                         tau: result.tau,
-                        route: result.route
+                        route: result.route,
+                        processTime: result.processTimeMs
                     });
                     this.currentProgress.lastResult = result;
                     this.currentProgress.results.push(result);
@@ -1475,7 +1527,7 @@ const DemoRunner = {
         }
     },
 
-    captureCurrentResult(algorithm, tau, route, trialIndex) {
+    captureCurrentResult(algorithm, tau, route, trialIndex, processTimeMs = null) {
         try {
             const result = {
                 trial: trialIndex + 1,
@@ -1483,6 +1535,7 @@ const DemoRunner = {
                 algorithm: algorithm.toUpperCase(),
                 tau: tau,
                 timestamp: new Date().toISOString(),
+                processTimeMs: processTimeMs,  // Server request + response time
                 metrics: {}
             };
 
@@ -2662,6 +2715,31 @@ const DemoRunner = {
             `;
         }
 
+        // Process Time (full server round-trip)
+        if (stats.processTime?.avg !== null && stats.processTime?.count > 0) {
+            statsHTML += `
+                <div class="bg-cyan-50 rounded-xl p-3 border border-cyan-200">
+                    <h4 class="font-bold text-cyan-700 mb-2 flex items-center gap-1 text-xs">
+                        <span>🚀</span> Process Time
+                    </h4>
+                    <div class="space-y-1 text-xs">
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Average</span>
+                            <span class="font-semibold text-cyan-800">${stats.processTime.avg.toFixed(0)} ms</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Min / Max</span>
+                            <span class="font-medium text-gray-700">${stats.processTime.min.toFixed(0)} / ${stats.processTime.max.toFixed(0)}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Total</span>
+                            <span class="font-medium text-gray-700">${(stats.processTime.total / 1000).toFixed(1)}s</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
         // Row 3: Graph Metrics
         if (stats.pathLength.avg !== null || stats.edgeCount.avg !== null) {
             statsHTML += `
@@ -3052,11 +3130,82 @@ const DemoRunner = {
         // Render Algorithm Comparison Bar Chart
         this.renderAlgorithmComparisonChart(results, stats);
         
+        // Render Process Time Chart
+        this.renderProcessTimeChart(results);
+        
         // Render Query Time Trend Line Chart
         this.renderQueryTimeTrendChart(results);
         
         // Render Performance Radar Chart
         this.renderPerformanceRadarChart(results, stats);
+    },
+
+    /**
+     * Render bar chart comparing process time by algorithm
+     */
+    renderProcessTimeChart(results) {
+        const ctx = document.getElementById('chart-process-time');
+        if (!ctx) return;
+
+        // Separate results by algorithm
+        const hc2lResults = results.filter(r => (r.algorithm || '').toUpperCase() === 'HC2L');
+        const dhlResults = results.filter(r => (r.algorithm || '').toUpperCase() === 'DHL');
+
+        // Get process times
+        const getProcessTimes = (arr) => arr.map(r => r.processTimeMs).filter(v => v !== null && v !== undefined && v > 0);
+        const hc2lTimes = getProcessTimes(hc2lResults);
+        const dhlTimes = getProcessTimes(dhlResults);
+        
+        const avg = arr => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+        const min = arr => arr.length > 0 ? Math.min(...arr) : 0;
+        const max = arr => arr.length > 0 ? Math.max(...arr) : 0;
+
+        this.chartInstances.processTime = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Average', 'Min', 'Max'],
+                datasets: [
+                    {
+                        label: 'HC2L',
+                        data: [avg(hc2lTimes), min(hc2lTimes), max(hc2lTimes)],
+                        backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                        borderColor: 'rgba(59, 130, 246, 1)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'DHL',
+                        data: [avg(dhlTimes), min(dhlTimes), max(dhlTimes)],
+                        backgroundColor: 'rgba(34, 197, 94, 0.7)',
+                        borderColor: 'rgba(34, 197, 94, 1)',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: { font: { size: 10 } }
+                    },
+                    title: {
+                        display: true,
+                        text: 'Process Time (ms) - Full Server Round-trip',
+                        font: { size: 11 }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { font: { size: 9 } }
+                    },
+                    x: {
+                        ticks: { font: { size: 9 } }
+                    }
+                }
+            }
+        });
     },
 
     /**
@@ -3431,8 +3580,13 @@ const DemoRunner = {
 
             const data = await response.json();
             if (data.success) {
+                // Track that current results are now saved
+                this.currentResultsSavedPath = data.results_file;
+                this.updateResultsActionButtons();
                 showUpdateToast('Results saved to server!', 'success');
                 console.log('📁 Results saved:', data.results_file);
+                // Refresh saved results list
+                this.loadSavedResults();
             } else {
                 throw new Error(data.error || 'Unknown error');
             }
@@ -3462,6 +3616,62 @@ const DemoRunner = {
         a.click();
         URL.revokeObjectURL(url);
         showUpdateToast('Results downloaded!', 'success');
+    },
+
+    /**
+     * Update the action buttons (Save/Delete) based on current save state
+     */
+    updateResultsActionButtons() {
+        const saveBtn = document.getElementById('btn-save-to-server');
+        const deleteBtn = document.getElementById('btn-delete-from-server');
+        
+        if (this.currentResultsSavedPath) {
+            // Already saved - show Delete button
+            if (saveBtn) saveBtn.classList.add('hidden');
+            if (deleteBtn) deleteBtn.classList.remove('hidden');
+        } else {
+            // Not saved - show Save button
+            if (saveBtn) saveBtn.classList.remove('hidden');
+            if (deleteBtn) deleteBtn.classList.add('hidden');
+        }
+    },
+
+    /**
+     * Delete current results from server
+     */
+    async deleteFromServer() {
+        if (!this.currentResultsSavedPath) {
+            showUpdateToast('No saved results to delete', 'warning');
+            return;
+        }
+
+        if (!confirm('Are you sure you want to delete this saved result from the server?')) {
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/demo/results/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filePath: this.currentResultsSavedPath })
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                this.currentResultsSavedPath = null;
+                this.updateResultsActionButtons();
+                showUpdateToast('Results deleted from server!', 'success');
+                // Refresh saved results list
+                this.loadSavedResults();
+                // Go back to main menu
+                this.showTab('main');
+            } else {
+                throw new Error(data.error || 'Unknown error');
+            }
+        } catch (error) {
+            console.error('Error deleting results:', error);
+            showUpdateToast('Failed to delete results: ' + error.message, 'error');
+        }
     },
 
     /**
@@ -3514,6 +3724,9 @@ const DemoRunner = {
         const nodesRepaired = results.map(r => getNumeric(r.metrics, 'nodesRepairedNum', 'nodesRepaired')).filter(v => v !== null && v >= 0);
         const impactScores = results.map(r => getNumeric(r.metrics, 'impactScoreNum', 'impactScore')).filter(v => v !== null && v >= 0);
         const tauThresholds = results.map(r => getNumeric(r.metrics, 'tauThresholdNum', 'tauThreshold')).filter(v => v !== null && v >= 0);
+        
+        // Process time (server request + response time)
+        const processTimes = results.map(r => r.processTimeMs).filter(v => v !== null && v !== undefined && v > 0);
 
         // Calculate statistics
         const calcStats = (arr) => {
@@ -3600,6 +3813,8 @@ const DemoRunner = {
             disruptedEdges: calcStats(disruptedEdges),
             labelingSize: calcStats(labelingSizes),
             labelingTime: calcStats(labelingTimes),
+            // Process time (full server round-trip)
+            processTime: calcStats(processTimes),
             // Update Phase stats
             lazyRepairTime: calcStats(lazyRepairTimes),
             dirtyNodes: calcStats(dirtyNodes),
