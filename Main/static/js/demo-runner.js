@@ -686,11 +686,19 @@ const DemoRunner = {
         this.currentDemo = config;
         this.currentDemoId = null;  // Track demoId for cleanup
         
-        const trials = config.trials || 1;
+        // Read from settings block (new format) with fallbacks
+        const trials = config.settings?.trials || config.trials || 1;
         const routes = config.routes || [];
+        const algorithm = config.settings?.algorithm || config.algorithm || 'hc2l';
+        const stepDelay = config.settings?.stepDelay || config.stepDelay || 2000;
         
-        // Check if this is a saved config with pre-generated disruptions (in-memory)
-        const configDisruptionSets = config.disruptions?.disruptionSets || {};
+        // Store algorithm in config for processRouteWithProgress
+        config.algorithm = algorithm;
+        config.stepDelay = stepDelay;
+        
+        // Check if this is a saved config with pre-generated disruptions
+        // Flask saves as 'savedSets', but in-memory configs may use 'disruptionSets'
+        const configDisruptionSets = config.disruptions?.savedSets || config.disruptions?.disruptionSets || {};
         const hasConfigDisruptions = Object.keys(configDisruptionSets).length > 0;
         
         // Initialize detailed progress
@@ -722,18 +730,20 @@ const DemoRunner = {
             // Reset map
             await this.resetMap();
             
-            // Get disruption config
+            // Get disruption config - use new format paths with fallbacks
             const disruptions = config.disruptions || {};
-            const generationScope = disruptions.generationScope || 'all';
+            const generationScope = disruptions.scope || disruptions.generationScope || 'all';
+            const disruptionKey = config.disruptionKey || null;  // For loading saved disruption CSVs
             
             // Handle disruption setup
             this.disruptionSets = {};  // Store disruption sets by key
             this.currentDemoId = `demo_${Date.now()}`;
             
             if (hasConfigDisruptions) {
-                // Use saved disruption sets from config - write to temp files for routing
+                // Use saved disruption sets from config - load from CSV files
+                console.log(`📂 Loading ${Object.keys(configDisruptionSets).length} saved disruption sets (key: ${disruptionKey})`);
                 for (const [setKey, setData] of Object.entries(configDisruptionSets)) {
-                    await this.activateConfigDisruptionSet(setKey, setData, this.currentDemoId);
+                    await this.activateConfigDisruptionSet(setKey, setData, this.currentDemoId, disruptionKey);
                 }
             } else {
                 // Generate new disruptions based on scope
@@ -781,10 +791,27 @@ const DemoRunner = {
                     }
                     
                     // Set active disruptions based on scope
-                    await this.activateDisruptionSet(generationScope, trial, i);
+                    // NEW FORMAT: route.trials[trial].disruption is just the setKey string
+                    const trialData = route.trials?.[trial];
+                    let setKey = null;
+                    
+                    if (trialData?.disruption) {
+                        // Handle both formats:
+                        // - New format: disruption is just the setKey string
+                        // - Old format: disruption is an object with setKey property
+                        setKey = typeof trialData.disruption === 'string' 
+                            ? trialData.disruption 
+                            : trialData.disruption.setKey;
+                    }
+                    
+                    if (setKey) {
+                        await this.activateDisruptionSetByKey(setKey);
+                    } else {
+                        await this.activateDisruptionSet(generationScope, trial, i);
+                    }
                     
                     await this.processRouteWithProgress(route, config, trial);
-                    await this.delay(config.stepDelay || 2000);
+                    await this.delay(config.stepDelay || config.settings?.stepDelay || 2000);
                 }
             }
 
@@ -933,43 +960,125 @@ const DemoRunner = {
     },
     
     /**
-     * Activate a disruption set from config - writes to temp files and stores in disruptionSets
+     * Activate a disruption set from config - loads from saved CSV files or writes new temp files
      * @param {string} setKey - The disruption set key (e.g., 'set_all', 'set_trial_0', etc.)
-     * @param {Object} setData - The disruption data { flow: [...], incidents: [...] }
+     * @param {Object} setData - The disruption data. Can be:
+     *   - savedSets format: { disruption_dir: "...", flow_count: N, incident_count: M }
+     *   - in-memory format: { flow: [...], incidents: [...] }
      * @param {string} demoId - The demo ID for file naming
+     * @param {string} disruptionKey - The config's disruptionKey for loading from savedSets
      */
-    async activateConfigDisruptionSet(setKey, setData, demoId) {
+    async activateConfigDisruptionSet(setKey, setData, demoId, disruptionKey = null) {
         try {
-            // Write the disruption data to temp files via API
-            const response = await fetch('/api/demo/disruptions', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    demo_id: `${demoId}_${setKey}`,
-                    use_random_edges: false,  // Use custom locations from config
-                    flow_data: setData.flow || [],
-                    incident_data: setData.incidents || []
-                })
-            });
-            
-            const result = await response.json();
-            
-            if (result.success) {
-                // Store in our runtime disruption sets
-                this.disruptionSets[setKey] = {
-                    disruptionDir: result.disruption_dir,
-                    demoId: `${demoId}_${setKey}`,
-                    disruptions: {
-                        flow: setData.flow || [],
-                        incidents: setData.incidents || []
-                    }
-                };
-                console.log(`📦 Activated config disruption set: ${setKey} -> ${result.disruption_dir}`);
+            // Check if this is a savedSets entry (has disruption_dir path)
+            if (setData.disruption_dir && disruptionKey) {
+                // Load disruption data from saved CSV files via API
+                console.log(`📂 Loading saved disruption set: ${disruptionKey}/${setKey}`);
+                
+                const response = await fetch(`/api/demo/disruption-data/${disruptionKey}/${setKey}`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Store in our runtime disruption sets - using the existing saved CSV path
+                    this.disruptionSets[setKey] = {
+                        disruptionDir: result.disruption_dir,
+                        demoId: demoId,
+                        disruptions: {
+                            flow: result.flowSegments || [],
+                            incidents: result.incidents || []
+                        },
+                        flowCount: setData.flow_count || result.flowSegments?.length || 0,
+                        incidentCount: setData.incident_count || result.incidents?.length || 0
+                    };
+                    console.log(`📦 Loaded saved disruption set: ${setKey} -> ${result.disruption_dir}`);
+                    console.log(`   Incidents: ${result.incidents?.length || 0}, Flow: ${result.flowSegments?.length || 0}`);
+                } else {
+                    console.warn(`⚠️ Failed to load saved disruption set ${setKey}:`, result.error);
+                }
+            } else if (setData.flow || setData.incidents) {
+                // In-memory format - write to temp files via API
+                const response = await fetch('/api/demo/disruptions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        demo_id: `${demoId}_${setKey}`,
+                        use_random_edges: false,  // Use custom locations from config
+                        flow_data: setData.flow || [],
+                        incident_data: setData.incidents || []
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Store in our runtime disruption sets
+                    this.disruptionSets[setKey] = {
+                        disruptionDir: result.disruption_dir,
+                        demoId: `${demoId}_${setKey}`,
+                        disruptions: {
+                            flow: setData.flow || [],
+                            incidents: setData.incidents || []
+                        }
+                    };
+                    console.log(`📦 Activated in-memory disruption set: ${setKey} -> ${result.disruption_dir}`);
+                } else {
+                    console.warn(`⚠️ Failed to activate config disruption set ${setKey}:`, result.error);
+                }
             } else {
-                console.warn(`⚠️ Failed to activate config disruption set ${setKey}:`, result.error);
+                console.warn(`⚠️ Unknown disruption set format for ${setKey}:`, setData);
             }
         } catch (error) {
             console.error(`❌ Error activating config disruption set ${setKey}:`, error);
+        }
+    },
+    
+    /**
+     * Activate a disruption set by its key directly
+     * Used when route.trials[trial].disruption.setKey is available
+     * @param {string} setKey - The disruption set key (e.g., 'set_trial_0_route_1')
+     */
+    async activateDisruptionSetByKey(setKey) {
+        if (!this.disruptionSets) {
+            console.warn(`⚠️ No disruption sets loaded, cannot activate ${setKey}`);
+            return;
+        }
+        
+        const disruptionSet = this.disruptionSets[setKey];
+        if (disruptionSet) {
+            this.demoDisruptionDir = disruptionSet.disruptionDir;
+            window.demoDisruptionDir = disruptionSet.disruptionDir;
+            
+            // Convert API format to display format
+            const disruptions = disruptionSet.disruptions || {};
+            this.generatedDisruptions = {
+                incidents: (disruptions.incidents || []).map(d => ({
+                    ...d,
+                    source_lng: d.source_lon || d.source_lng,
+                    target_lng: d.target_lon || d.target_lng,
+                    incident_type: d.type || d.incident_type || 'Incident',
+                    severity: d.criticality === 'critical' ? 'Heavy' : 
+                              d.criticality === 'major' ? 'Medium' : 'Light'
+                })),
+                flowSegments: (disruptions.flow || []).map(d => ({
+                    ...d,
+                    source_lng: d.source_lon || d.source_lng,
+                    target_lng: d.target_lon || d.target_lng,
+                    incident_type: 'Congestion',
+                    severity: d.jam_factor > 7 ? 'Heavy' : 
+                              d.jam_factor > 4 ? 'Medium' : 'Light',
+                    current_speed: d.speed_kph,
+                    free_flow_speed: d.free_flow_kph
+                }))
+            };
+            
+            console.log(`🔄 Activated disruption set by key: ${setKey}`);
+            console.log(`   Incidents: ${this.generatedDisruptions.incidents.length}, Flow: ${this.generatedDisruptions.flowSegments.length}`);
+            
+            this.currentPreviewSet = setKey;
+            this.refreshDisruptionDisplay();  // Respect checkbox states
+            this.showDisruptionSetsPreview();
+        } else {
+            console.warn(`⚠️ Disruption set not found for key: ${setKey}`);
         }
     },
     
@@ -1036,8 +1145,8 @@ const DemoRunner = {
             // Update current preview set and refresh UI
             this.currentPreviewSet = setKey;
             
-            // Update map visualization to show current disruptions
-            this.showGeneratedDisruptions(true, true);
+            // Update map visualization respecting checkbox states
+            this.refreshDisruptionDisplay();
             
             // Update the disruption preview panel
             this.showDisruptionSetsPreview();
@@ -1117,24 +1226,34 @@ const DemoRunner = {
         await this.delay(500);
 
         // Determine TAU values to test based on scope
-        const tauScope = config.sequence?.tauGenerationScope || 'all';
+        const tauScope = config.tau?.scope || config.sequence?.tauGenerationScope || 'all';
         let tauValuesToTest;
         
-        switch (tauScope) {
-            case 'per-trial':
-                // For per-trial, route has all trial TAUs, pick the one for this trial
-                tauValuesToTest = [(route.tauValues || [])[trialIndex] || 0.5];
-                break;
-            case 'per-trial-route':
-                // For per-trial-route, route has TAUs for each trial, pick the one for this trial
-                tauValuesToTest = [(route.tauValues || [])[trialIndex] || 0.5];
-                break;
-            case 'all':
-            case 'per-route':
-            default:
-                // For 'all' and 'per-route', route has single TAU, use all values provided
-                tauValuesToTest = route.tauValues || [0.5];
-                break;
+        // NEW FORMAT: Use route.trials[trialIndex].tau if available
+        const trialData = route.trials?.[trialIndex];
+        if (trialData && trialData.tau !== undefined) {
+            // New format: route has trials[] array with tau per trial
+            tauValuesToTest = [trialData.tau];
+            console.log(`📊 Using saved tau from route.trials[${trialIndex}].tau: ${trialData.tau}`);
+        } else {
+            // Legacy format: fallback - generate tau based on config template
+            const tauMode = config.tau?.mode || config.sequence?.tauMode || 'fixed';
+            let tau = 0.5;
+            
+            if (tauMode === 'fixed') {
+                tau = config.tau?.fixed || config.sequence?.tauFixed || 0.5;
+            } else if (tauMode === 'random') {
+                const min = config.tau?.randomMin || config.sequence?.tauRandomMin || 0.1;
+                const max = config.tau?.randomMax || config.sequence?.tauRandomMax || 0.9;
+                tau = min + Math.random() * (max - min);
+            } else if (tauMode === 'sequence') {
+                const seq = config.tau?.sequence || config.sequence?.tauSequence || [0.5];
+                const idx = trialIndex % seq.length;
+                tau = seq[idx];
+            }
+            
+            tauValuesToTest = [tau];
+            console.log(`📊 Generated tau (no saved value): ${tau}`);
         }
         
         this.currentProgress.totalTaus = tauValuesToTest.length;
@@ -1322,7 +1441,7 @@ const DemoRunner = {
                 </div>
 
                 <!-- Detailed Progress Grid - Compact -->
-                <div class="grid grid-cols-4 gap-2">
+                <div class="grid ${(p.algorithm || '').toUpperCase() === 'DHL' ? 'grid-cols-3' : 'grid-cols-4'} gap-2">
                     <div class="bg-blue-50 rounded-lg p-2 border border-blue-200 text-center">
                         <div class="text-[10px] text-blue-600 uppercase">Trial</div>
                         <div class="text-sm font-bold text-blue-800">${p.trial}/${p.totalTrials}</div>
@@ -1335,10 +1454,12 @@ const DemoRunner = {
                         <div class="text-[10px] text-violet-600 uppercase">Algo</div>
                         <div class="text-sm font-bold text-violet-800">${p.algorithm || '-'}</div>
                     </div>
+                    ${(p.algorithm || '').toUpperCase() !== 'DHL' ? `
                     <div class="bg-rose-50 rounded-lg p-2 border border-rose-200 text-center">
                         <div class="text-[10px] text-rose-600 uppercase">τ</div>
                         <div class="text-sm font-bold text-rose-800">${p.currentTau ? p.currentTau.toFixed(2) : '-'}</div>
                     </div>
+                    ` : ''}
                 </div>
 
                 <!-- Last Result - Full Algorithm Metrics -->
@@ -1352,7 +1473,7 @@ const DemoRunner = {
                     <!-- Key Metrics Grid -->
                     <div class="grid grid-cols-2 gap-1 mb-2">
                         ${renderMetric('Algorithm', p.lastResult.algorithm, 'text-blue-700')}
-                        ${renderMetric('τ Value', p.lastResult.tau.toFixed(2), 'text-rose-700')}
+                        ${(p.lastResult.algorithm || '').toUpperCase() !== 'DHL' ? renderMetric('τ Value', p.lastResult.tau.toFixed(2), 'text-rose-700') : ''}
                         ${renderMetric('Query Time', p.lastResult.metrics.queryTime, 'text-purple-700')}
                         ${renderMetric('Distance', p.lastResult.metrics.displayDistance || p.lastResult.metrics.calculatedDistance || p.lastResult.metrics.distance, 'text-green-700')}
                         ${renderMetric('Baseline ETA', p.lastResult.metrics.baselineEta, 'text-emerald-700')}
@@ -1367,6 +1488,42 @@ const DemoRunner = {
                 </div>
                 ` : ''}
 
+                <!-- Update Phase Metrics Card -->
+                ${p.lastResult ? `
+                <div class="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-xl p-3 border border-amber-200">
+                    <div class="flex justify-between items-center mb-2">
+                        <h4 class="text-xs font-bold text-amber-700">🔄 Update Phase</h4>
+                        <span class="text-[10px] text-amber-600">${(p.lastResult.algorithm || '').toUpperCase() === 'HC2L' ? 'Lazy Update' : 'Immediate Update'}</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-1">
+                        ${renderMetric('Lazy Update Time', p.lastResult.metrics.lazyUpdateTime || 'N/A', 'text-amber-700')}
+                        ${renderMetric('Threshold Rebuild', p.lastResult.metrics.thresholdRebuildTime || 'N/A', 'text-orange-700')}
+                        ${renderMetric('Peak Label Size', p.lastResult.metrics.peakLabelSize || p.lastResult.metrics.labelingSize || 'N/A', 'text-yellow-700')}
+                        ${renderMetric('Label Size Δ', p.lastResult.metrics.labelSizeChange || 'N/A', 'text-amber-600')}
+                        ${renderMetric('Dirty Nodes', p.lastResult.metrics.dirtyNodes || 'N/A', 'text-orange-600')}
+                        ${renderMetric('Impact Score', p.lastResult.metrics.impactScore || 'N/A', 'text-red-600')}
+                    </div>
+                </div>
+                ` : ''}
+
+                <!-- Query Phase Metrics Card -->
+                ${p.lastResult ? `
+                <div class="bg-gradient-to-br from-purple-50 to-violet-50 rounded-xl p-3 border border-purple-200">
+                    <div class="flex justify-between items-center mb-2">
+                        <h4 class="text-xs font-bold text-purple-700">⚡ Query Phase</h4>
+                        <span class="text-[10px] text-purple-600">Per Batch (1,000 OD)</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-1">
+                        ${renderMetric('Avg Query Time', p.lastResult.metrics.queryTime || 'N/A', 'text-purple-700')}
+                        ${renderMetric('Std Dev', p.lastResult.metrics.queryTimeStdDev || 'N/A', 'text-violet-700')}
+                        ${renderMetric('Min Query Time', p.lastResult.metrics.minQueryTime || 'N/A', 'text-indigo-600')}
+                        ${renderMetric('Max Query Time', p.lastResult.metrics.maxQueryTime || 'N/A', 'text-purple-600')}
+                        ${renderMetric('P95 Latency', p.lastResult.metrics.p95Latency || 'N/A', 'text-fuchsia-600')}
+                        ${renderMetric('Queries Count', p.lastResult.metrics.queriesProcessed || '1', 'text-pink-600')}
+                    </div>
+                </div>
+                ` : ''}
+
                 <!-- Results History - All Results -->
                 ${p.results && p.results.length > 0 ? `
                 <div class="bg-white rounded-xl p-3 border border-gray-200">
@@ -1375,7 +1532,7 @@ const DemoRunner = {
                         ${p.results.slice().reverse().map((r, i) => `
                             <div class="text-xs p-2 ${i === 0 ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-100'} rounded border">
                                 <div class="flex justify-between items-center">
-                                    <span class="font-semibold text-gray-800">${r.algorithm} τ=${r.tau.toFixed(2)}</span>
+                                    <span class="font-semibold text-gray-800">${r.algorithm}${(r.algorithm || '').toUpperCase() !== 'DHL' ? ` τ=${r.tau.toFixed(2)}` : ''}</span>
                                     <span class="text-gray-500">T${r.trial}</span>
                                 </div>
                                 <div class="text-gray-600 truncate text-[10px]">${r.route}</div>
@@ -1710,10 +1867,30 @@ const DemoRunner = {
                         style = flowColors.light;
                 }
                 
-                const polyline = L.polyline([
-                    [sourceLat, sourceLng],
-                    [targetLat, targetLng]
-                ], {
+                // Use actual road geometry if available (from Quezon City edges), otherwise fall back to source/target
+                let polylineCoords;
+                if (f.geometry && Array.isArray(f.geometry) && f.geometry.length >= 2) {
+                    // Use actual road geometry from OSM graph
+                    polylineCoords = f.geometry.map(coord => {
+                        // Handle both [lat, lng] and [lng, lat] formats
+                        if (Array.isArray(coord) && coord.length >= 2) {
+                            const c0 = parseFloat(coord[0]);
+                            const c1 = parseFloat(coord[1]);
+                            // If first coord looks like longitude (around 121), swap
+                            if (c0 > 100) return [c1, c0];
+                            return [c0, c1];
+                        }
+                        return null;
+                    }).filter(c => c !== null);
+                } else {
+                    // Fall back to simple source-target line
+                    polylineCoords = [
+                        [sourceLat, sourceLng],
+                        [targetLat, targetLng]
+                    ];
+                }
+                
+                const polyline = L.polyline(polylineCoords, {
                     color: style.color,
                     weight: style.weight,
                     opacity: style.opacity,
@@ -1784,11 +1961,31 @@ const DemoRunner = {
                     severity = 'Light';
                 }
                 
+                // Use actual road geometry if available (from Quezon City edges), otherwise fall back to source/target
+                let polylineCoords;
+                if (inc.geometry && Array.isArray(inc.geometry) && inc.geometry.length >= 2) {
+                    // Use actual road geometry from OSM graph
+                    polylineCoords = inc.geometry.map(coord => {
+                        // Handle both [lat, lng] and [lng, lat] formats
+                        if (Array.isArray(coord) && coord.length >= 2) {
+                            const c0 = parseFloat(coord[0]);
+                            const c1 = parseFloat(coord[1]);
+                            // If first coord looks like longitude (around 121), swap
+                            if (c0 > 100) return [c1, c0];
+                            return [c0, c1];
+                        }
+                        return null;
+                    }).filter(c => c !== null);
+                } else {
+                    // Fall back to simple source-target line
+                    polylineCoords = [
+                        [sourceLat, sourceLng],
+                        [targetLat, targetLng]
+                    ];
+                }
+                
                 // Draw polyline for incident edge
-                const polyline = L.polyline([
-                    [sourceLat, sourceLng],
-                    [targetLat, targetLng]
-                ], {
+                const polyline = L.polyline(polylineCoords, {
                     color: fillColor,
                     weight: 5,
                     opacity: 0.8,
@@ -2087,7 +2284,29 @@ const DemoRunner = {
         // Also update the preview panel
         this.updateDisruptionPreview();
     },
-    
+
+    /**
+     * Get current checkbox states for disruption display toggles
+     * @returns {{showIncidents: boolean, showFlow: boolean}}
+     */
+    getDisruptionCheckboxStates() {
+        return {
+            showIncidents: document.getElementById('demo-show-incidents')?.checked ?? true,
+            showFlow: document.getElementById('demo-show-flow')?.checked ?? true
+        };
+    },
+
+    /**
+     * Refresh disruption display respecting current checkbox states
+     * Use this instead of showGeneratedDisruptions(true, true) to respect user preferences
+     */
+    refreshDisruptionDisplay() {
+        const { showIncidents, showFlow } = this.getDisruptionCheckboxStates();
+        console.log(`📍 Refreshing disruption display: incidents=${showIncidents}, flow=${showFlow}`);
+        this.showGeneratedDisruptions(showIncidents, showFlow);
+        this.updateDisruptionPreview();
+    },
+
     /**
      * Update the disruption preview panel based on current checkbox states
      */
@@ -2292,19 +2511,95 @@ const DemoRunner = {
 
     pauseDemo() {
         this.isPaused = true;
+        this.updatePlayPauseButton();
         showUpdateToast('Demo paused', 'info');
     },
 
     resumeDemo() {
         this.isPaused = false;
+        this.updatePlayPauseButton();
         showUpdateToast('Demo resumed', 'info');
+    },
+
+    /**
+     * Toggle between pause and resume states
+     */
+    togglePauseResume() {
+        if (this.isPaused) {
+            this.resumeDemo();
+        } else {
+            this.pauseDemo();
+        }
+    },
+
+    /**
+     * Update the play/pause button appearance based on current state
+     */
+    updatePlayPauseButton() {
+        const btn = document.getElementById('demo-play-pause-btn');
+        if (!btn) return;
+
+        if (this.isPaused) {
+            // Show "Resume" state - green button with play icon
+            btn.innerHTML = '▶️ Resume';
+            btn.classList.remove('bg-yellow-500', 'hover:bg-yellow-600');
+            btn.classList.add('bg-green-500', 'hover:bg-green-600');
+        } else {
+            // Show "Pause" state - yellow button with pause icon
+            btn.innerHTML = '⏸️ Pause';
+            btn.classList.remove('bg-green-500', 'hover:bg-green-600');
+            btn.classList.add('bg-yellow-500', 'hover:bg-yellow-600');
+        }
     },
 
     stopDemo() {
         this.isRunning = false;
         this.isPaused = false;
+        this.updatePlayPauseButton();  // Reset button to pause state
+        
+        // Clear all routes, disruptions, and markers using the same reset logic as Admin Panel
+        this.performFullReset();
+        
         showUpdateToast('Demo stopped', 'warning');
         this.showTab('main');
+    },
+
+    /**
+     * Perform a full reset of the map - clears routes, disruptions, and markers
+     * This is the same reset used by the Admin Panel's Reset button
+     */
+    performFullReset() {
+        // Clear all routes (including start/end markers)
+        if (typeof clearRoutes === 'function') {
+            clearRoutes();
+        }
+        // Clear disruption markers
+        if (typeof clearDisruptionMarkers === 'function') {
+            clearDisruptionMarkers();
+        }
+        // Clear our demo-specific disruption layers
+        this.clearDemoDisruptionLayers();
+        this.hideGeneratedDisruptions();
+        
+        // Clear Google Maps route
+        if (typeof clearGoogleMapsRoute === 'function') {
+            clearGoogleMapsRoute();
+        }
+        // Clear update regions
+        if (typeof clearUpdateRegions === 'function') {
+            clearUpdateRegions();
+        }
+        // Clear export data buffer
+        if (typeof clearExportData === 'function') {
+            clearExportData();
+        }
+        
+        // Reset internal disruption state
+        this.generatedDisruptions = { incidents: [], flowSegments: [] };
+        this.disruptionSets = {};
+        this.currentPreviewSet = null;
+        
+        console.log('🧹 Full reset performed: all routes and disruptions cleared');
     },
 
     // ==========================================================================
@@ -2457,6 +2752,10 @@ const DemoRunner = {
             const disruptedEdges = getDisplayValue('disruptedEdges');
             const timeImpact = getDisplayValue('timeImpact');
             
+            // Determine if we should show tau (hide for DHL)
+            const isDHL = (r.algorithm || '').toUpperCase() === 'DHL';
+            const tauBadge = !isDHL ? `<span class="text-xs bg-${algoColor}-100 text-${algoColor}-700 px-2 py-0.5 rounded">τ = ${r.tau?.toFixed(2) || 'N/A'}</span>` : '';
+            
             return `
                 <div class="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden result-item" data-result-index="${i}">
                     <!-- Header (clickable to expand) -->
@@ -2465,7 +2764,7 @@ const DemoRunner = {
                         <div class="flex items-center gap-2">
                             <span class="text-lg">${algoIcon}</span>
                             <span class="font-medium text-gray-800">#${i + 1} ${r.algorithm || 'Unknown'}</span>
-                            <span class="text-xs bg-${algoColor}-100 text-${algoColor}-700 px-2 py-0.5 rounded">τ = ${r.tau?.toFixed(2) || 'N/A'}</span>
+                            ${tauBadge}
                         </div>
                         <div class="flex items-center gap-3">
                             <span class="text-sm text-gray-600 font-medium">📏 ${distance}</span>
@@ -2523,6 +2822,68 @@ const DemoRunner = {
                                 <div class="font-semibold text-amber-800">${timeImpact}</div>
                             </div>
                             ` : ''}
+                        </div>
+                        
+                        <!-- Update Phase Metrics -->
+                        <div class="mt-3 bg-amber-50 rounded-lg p-2 border border-amber-200">
+                            <div class="text-xs font-bold text-amber-700 mb-1">🔄 Update Phase</div>
+                            <div class="grid grid-cols-3 gap-1 text-xs">
+                                <div class="bg-white/50 rounded p-1">
+                                    <div class="text-amber-600 text-[10px]">Lazy Update</div>
+                                    <div class="font-semibold text-amber-800">${metrics.lazyUpdateTime || 'N/A'}</div>
+                                </div>
+                                <div class="bg-white/50 rounded p-1">
+                                    <div class="text-amber-600 text-[10px]">Rebuild Time</div>
+                                    <div class="font-semibold text-amber-800">${metrics.thresholdRebuildTime || 'N/A'}</div>
+                                </div>
+                                <div class="bg-white/50 rounded p-1">
+                                    <div class="text-amber-600 text-[10px]">Peak Size</div>
+                                    <div class="font-semibold text-amber-800">${metrics.peakLabelSize || labelingSize}</div>
+                                </div>
+                                <div class="bg-white/50 rounded p-1">
+                                    <div class="text-amber-600 text-[10px]">Size Δ</div>
+                                    <div class="font-semibold text-amber-800">${metrics.labelSizeChange || 'N/A'}</div>
+                                </div>
+                                <div class="bg-white/50 rounded p-1">
+                                    <div class="text-amber-600 text-[10px]">Dirty Nodes</div>
+                                    <div class="font-semibold text-amber-800">${metrics.dirtyNodes || 'N/A'}</div>
+                                </div>
+                                <div class="bg-white/50 rounded p-1">
+                                    <div class="text-amber-600 text-[10px]">Impact</div>
+                                    <div class="font-semibold text-amber-800">${metrics.impactScore || 'N/A'}</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Query Phase Metrics -->
+                        <div class="mt-2 bg-purple-50 rounded-lg p-2 border border-purple-200">
+                            <div class="text-xs font-bold text-purple-700 mb-1">⚡ Query Phase</div>
+                            <div class="grid grid-cols-3 gap-1 text-xs">
+                                <div class="bg-white/50 rounded p-1">
+                                    <div class="text-purple-600 text-[10px]">Avg Time</div>
+                                    <div class="font-semibold text-purple-800">${queryTime}</div>
+                                </div>
+                                <div class="bg-white/50 rounded p-1">
+                                    <div class="text-purple-600 text-[10px]">Std Dev</div>
+                                    <div class="font-semibold text-purple-800">${metrics.queryTimeStdDev || 'N/A'}</div>
+                                </div>
+                                <div class="bg-white/50 rounded p-1">
+                                    <div class="text-purple-600 text-[10px]">Min Time</div>
+                                    <div class="font-semibold text-purple-800">${metrics.minQueryTime || 'N/A'}</div>
+                                </div>
+                                <div class="bg-white/50 rounded p-1">
+                                    <div class="text-purple-600 text-[10px]">Max Time</div>
+                                    <div class="font-semibold text-purple-800">${metrics.maxQueryTime || 'N/A'}</div>
+                                </div>
+                                <div class="bg-white/50 rounded p-1">
+                                    <div class="text-purple-600 text-[10px]">P95 Latency</div>
+                                    <div class="font-semibold text-purple-800">${metrics.p95Latency || 'N/A'}</div>
+                                </div>
+                                <div class="bg-white/50 rounded p-1">
+                                    <div class="text-purple-600 text-[10px]">Queries</div>
+                                    <div class="font-semibold text-purple-800">${metrics.queriesProcessed || '1'}</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

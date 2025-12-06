@@ -19,7 +19,7 @@ const DemoCreator = {
             mode: 'random-both',
             generationScope: 'per-trial-route',
             flowCount: 1500,
-            incidentCount: 3,
+            incidentCount: 5,
             severityMin: 0.1,
             severityMax: 0.7,
         },
@@ -58,7 +58,7 @@ const DemoCreator = {
         mode: 'random-both', // 'none', 'random-flow', 'random-incidents', 'random-both', 'custom'
         generationScope: 'per-trial-route', // 'all', 'per-trial', 'per-route', 'per-trial-route'
         randomFlowCount: 1500,
-        randomIncidentCount: 3,
+        randomIncidentCount: 5,
         severityMin: 0.1,
         severityMax: 0.7,
         customItems: [],
@@ -135,6 +135,86 @@ const DemoCreator = {
         { name: 'Project 6', lat: 14.6450, lng: 121.0350, type: 'area' },
         { name: 'Teacher\'s Village', lat: 14.6400, lng: 121.0500, type: 'area' }
     ],
+
+    // ==========================================================================
+    // GUI SYNC HELPERS
+    // ==========================================================================
+
+    /**
+     * Sync disruption settings from GUI inputs into this.disruptions state.
+     * Call this before reading from this.disruptions to ensure values match GUI.
+     */
+    syncDisruptionsFromGUI() {
+        // Read disruption mode from radio
+        const modeRadio = document.querySelector('input[name="disruption-type"]:checked');
+        if (modeRadio) {
+            this.disruptions.mode = modeRadio.value;
+        }
+
+        // Read generation scope
+        const scopeRadio = document.querySelector('input[name="disruption-generation-scope"]:checked');
+        if (scopeRadio) {
+            this.disruptions.generationScope = scopeRadio.value;
+        }
+
+        // Read flow count from GUI
+        const flowCountEl = document.getElementById('random-flow-count');
+        if (flowCountEl) {
+            this.disruptions.randomFlowCount = parseInt(flowCountEl.value) || 1500;
+        }
+
+        // Read incident count from GUI
+        const incidentCountEl = document.getElementById('random-incident-count');
+        if (incidentCountEl) {
+            this.disruptions.randomIncidentCount = parseInt(incidentCountEl.value) || 5;
+        }
+
+        // Read severity min/max from GUI
+        const severityMinEl = document.getElementById('random-severity-min');
+        if (severityMinEl) {
+            this.disruptions.severityMin = parseFloat(severityMinEl.value) || 0.1;
+        }
+
+        const severityMaxEl = document.getElementById('random-severity-max');
+        if (severityMaxEl) {
+            this.disruptions.severityMax = parseFloat(severityMaxEl.value) || 0.7;
+        }
+    },
+
+    /**
+     * Sync TAU settings from GUI inputs into this.sequence state.
+     * Call this before reading from this.sequence to ensure values match GUI.
+     */
+    syncTauFromGUI() {
+        // Read TAU mode
+        const tauModeRadio = document.querySelector('input[name="demo-tau-mode"]:checked');
+        if (tauModeRadio) {
+            this.sequence.tauMode = tauModeRadio.value;
+        }
+
+        // Read TAU scope
+        const tauScopeRadio = document.querySelector('input[name="tau-generation-scope"]:checked');
+        if (tauScopeRadio) {
+            this.sequence.tauGenerationScope = tauScopeRadio.value;
+        }
+
+        // Read TAU random min/max
+        const tauMinEl = document.getElementById('demo-tau-random-min');
+        if (tauMinEl) {
+            this.sequence.tauRandomMin = parseFloat(tauMinEl.value) || 0.1;
+        }
+
+        const tauMaxEl = document.getElementById('demo-tau-random-max');
+        if (tauMaxEl) {
+            this.sequence.tauRandomMax = parseFloat(tauMaxEl.value) || 0.9;
+        }
+
+        // Read trials count
+        const trialsEl = document.getElementById('demo-trials-count');
+        if (trialsEl) {
+            this.sequence.trials = parseInt(trialsEl.value) || 1;
+        }
+    },
 
     // ==========================================================================
     // INITIALIZATION
@@ -495,30 +575,37 @@ const DemoCreator = {
         });
     },
 
-    loadConfig(config) {
+    async loadConfig(config) {
         console.log('📝 Loading config for editing:', config.name);
         
         // Store editing state
         this.editingConfigId = config.id;
         this.mode = 'edit';
         
-        // Load routes
+        // Load routes (preserve trials[] array if present)
         this.routes = config.routes ? config.routes.map(r => ({
             id: r.id || `route-${Date.now()}-${Math.random()}`,
             start: r.start,
-            end: r.end
+            end: r.end,
+            distance: r.distance,
+            trials: r.trials,  // Preserve trials array if present
+            tauValues: r.tauValues  // Keep legacy for backward compat
         })) : [];
         
-        // Load disruptions
+        // Load disruptions - check both disruptionSets and savedSets
         if (config.disruptions) {
+            // Use savedSets if available (Flask format), otherwise disruptionSets (in-memory format)
+            const loadedSets = config.disruptions.savedSets || config.disruptions.disruptionSets || {};
+            
             this.disruptions = {
                 mode: config.disruptions.mode || config.disruptionMode || 'none',
-                randomFlowCount: config.disruptions.randomFlowCount || 5,
-                randomIncidentCount: config.disruptions.randomIncidentCount || 3,
+                generationScope: config.disruptions.scope || config.disruptions.generationScope || 'per-trial-route',
+                randomFlowCount: config.disruptions.flowCount || config.disruptions.randomFlowCount || 1500,
+                randomIncidentCount: config.disruptions.incidentCount || config.disruptions.randomIncidentCount || 5,
                 severityMin: config.disruptions.severityMin || 0.3,
                 severityMax: config.disruptions.severityMax || 0.9,
                 customItems: config.disruptions.customItems || [],
-                disruptionSets: config.disruptions.disruptionSets || {}
+                disruptionSets: loadedSets  // Unified: use whichever exists
             };
         } else {
             // Handle legacy config format
@@ -530,25 +617,52 @@ const DemoCreator = {
         const hasExistingDisruptions = Object.keys(this.disruptions.disruptionSets || {}).length > 0;
         this.disruptionsNeedGeneration = !hasExistingDisruptions;
         
-        // Load sequence settings
-        this.sequence.algorithm = config.algorithm || 'both';
-        this.sequence.trials = config.trials || 1;
-        this.sequence.stepDelay = config.stepDelay || 2000;
+        // Load sequence settings - check both legacy and new format
+        this.sequence.algorithm = config.settings?.algorithm || config.algorithm || 'both';
+        this.sequence.trials = config.settings?.trials || config.trials || 1;
+        this.sequence.stepDelay = config.settings?.stepDelay || config.stepDelay || 2000;
         
-        // Load tau settings from first route if available
-        if (config.routes && config.routes[0] && config.routes[0].tauValues) {
+        // Load tau settings from config.tau or from first route
+        if (config.tau) {
+            this.sequence.tauMode = config.tau.mode || 'random';
+            this.sequence.tauFixed = config.tau.fixed || 0.5;
+            this.sequence.tauRandomMin = config.tau.randomMin || 0.1;
+            this.sequence.tauRandomMax = config.tau.randomMax || 0.9;
+            this.sequence.tauGenerationScope = config.tau.scope || 'per-trial-route';
+            this.sequence.tauSequence = config.tau.sequence || [];
+        } else if (config.routes && config.routes[0]) {
+            // Load tau settings from first route if available (legacy format)
             const tauValues = config.routes[0].tauValues;
-            if (tauValues.length === 1) {
+            if (tauValues && tauValues.length === 1) {
                 this.sequence.tauMode = 'fixed';
                 this.sequence.tauFixed = tauValues[0];
-            } else {
-                this.sequence.tauMode = 'sequence';
-                this.sequence.tauSequence = tauValues;
+            } else if (tauValues && tauValues.length > 1) {
+                this.sequence.tauMode = 'random';  // Or sequence, depending on scope
             }
+        }
+        
+        // Preserve TAU values during UI update (don't regenerate saved values)
+        // Only preserve if we have saved TAU sequence or if routes have trial data with tau
+        const hasExistingTau = (this.sequence.tauSequence && this.sequence.tauSequence.length > 0) ||
+                               this.routes.some(r => r.trials && r.trials.some(t => t.tau !== undefined));
+        this._preserveTauValues = hasExistingTau;
+        
+        // CRITICAL: Populate generatedTauValues from saved sequence to prevent regeneration
+        // when entering the Sequence Configuration step later
+        if (hasExistingTau && this.sequence.tauSequence && this.sequence.tauSequence.length > 0) {
+            this.generatedTauValues = [...this.sequence.tauSequence];
+            // Set the last generated counts so we don't detect a "change" later
+            this.lastGeneratedTauTrials = this.sequence.trials;
+            this.lastGeneratedTauRoutes = this.routes.length;
+            this.tauNeedsGeneration = false;
+            console.log(`🔒 Preserved ${this.generatedTauValues.length} TAU values from saved config`);
         }
         
         // Update UI elements
         this.updateUIFromState();
+        
+        // Clear the preserve flag after UI update
+        this._preserveTauValues = false;
         
         // Show routes on map
         this.clearAllRouteMarkers();
@@ -572,8 +686,19 @@ const DemoCreator = {
         if (setKeys.length > 0) {
             console.log(`📦 Loaded ${setKeys.length} disruption sets:`, setKeys);
             this.currentPreviewSet = setKeys[0];
+            
+            // Check if this is savedSets format (has disruption_dir) or in-memory format (has flow/incidents)
+            const firstSet = disruptionSets[setKeys[0]];
+            if (firstSet.disruption_dir && config.disruptionKey) {
+                // savedSets format - load ALL disruption sets from API
+                await this.loadAllSavedDisruptionSets(config.disruptionKey, setKeys);
+            } else if (firstSet.flow || firstSet.incidents) {
+                // In-memory format - display directly
+                this.displayDisruptionsOnMap(firstSet);
+            }
+            
+            // Show preview after loading
             this.showDisruptionSetsPreview();
-            this.displayDisruptionsOnMap(disruptionSets[setKeys[0]]);
             
             // Update the disruption set status text
             const statusEl = document.getElementById('disruption-sets-status');
@@ -583,6 +708,130 @@ const DemoCreator = {
         }
         
         showUpdateToast(`Loaded: ${config.name}`, 'info');
+    },
+
+    /**
+     * Load all saved disruption sets and convert them to in-memory format for editing.
+     * @param {string} disruptionKey - The main disruption key
+     * @param {string[]} setKeys - Array of set keys to load
+     */
+    async loadAllSavedDisruptionSets(disruptionKey, setKeys) {
+        console.log(`📂 Loading ${setKeys.length} saved disruption sets from ${disruptionKey}...`);
+        
+        for (const setKey of setKeys) {
+            try {
+                const response = await fetch(`/api/demo/disruption-data/${disruptionKey}/${setKey}`);
+                if (!response.ok) {
+                    console.warn(`Failed to load disruption set ${setKey}`);
+                    continue;
+                }
+                
+                const data = await response.json();
+                if (data.success) {
+                    // Convert savedSets format to in-memory disruptionSets format
+                    this.disruptions.disruptionSets[setKey] = {
+                        flow: (data.flowSegments || []).map(f => ({
+                            edge_id: f.edge_id,
+                            osm_id: f.osm_id,
+                            road_name: f.road_name || 'Unknown Road',
+                            source_lat: f.source_lat,
+                            source_lon: f.source_lon || f.source_lng,
+                            target_lat: f.target_lat,
+                            target_lon: f.target_lon || f.target_lng,
+                            speed_kph: f.current_speed || f.speed_kph,
+                            free_flow_kph: f.free_flow_speed || f.free_flow_kph,
+                            jam_factor: f.jam_factor || (10 - ((f.current_speed || 30) / (f.free_flow_speed || 50)) * 10)
+                        })),
+                        incidents: (data.incidents || []).map(i => ({
+                            edge_id: i.edge_id,
+                            osm_id: i.osm_id,
+                            road_name: i.road_name || 'Unknown Road',
+                            source_lat: i.source_lat,
+                            source_lon: i.source_lon || i.source_lng,
+                            target_lat: i.target_lat,
+                            target_lon: i.target_lon || i.target_lng,
+                            type: i.type || i.incident_type || 'Incident',
+                            criticality: i.criticality || i.severity || 'minor',
+                            description: i.description || ''
+                        }))
+                    };
+                    console.log(`   ✅ Loaded ${setKey}: ${data.flowSegments?.length || 0} flow, ${data.incidents?.length || 0} incidents`);
+                }
+            } catch (error) {
+                console.error(`Error loading disruption set ${setKey}:`, error);
+            }
+        }
+        
+        // Display the first set on map
+        const firstSet = this.disruptions.disruptionSets[setKeys[0]];
+        if (firstSet) {
+            this.displayDisruptionsOnMap(firstSet);
+        }
+    },
+
+    /**
+     * Load and display disruption data from a saved disruption set.
+     * This fetches the actual disruption data from CSV files stored on the server.
+     * @param {string} disruptionKey - The main disruption key (e.g., "disruption_20250608_123456")
+     * @param {string} setKey - The specific set key (e.g., "global" or "route_0_trial_0")
+     */
+    async loadAndDisplaySavedDisruptionSet(disruptionKey, setKey) {
+        try {
+            const response = await fetch(`/api/demo/disruption-data/${disruptionKey}/${setKey}`);
+            if (!response.ok) {
+                console.warn(`Failed to load disruption set ${setKey} from ${disruptionKey}`);
+                return;
+            }
+            
+            const data = await response.json();
+            
+            // Store the loaded disruption data
+            this.disruptions.loadedSetKey = setKey;
+            this.disruptions.loadedDisruptionKey = disruptionKey;
+            
+            // Populate the customItems with loaded data for display
+            this.disruptions.customItems = [];
+            
+            // Add flows
+            if (data.flows && Array.isArray(data.flows)) {
+                data.flows.forEach(flow => {
+                    this.disruptions.customItems.push({
+                        type: 'flow',
+                        edgeId: flow.edge_id,
+                        osmId: flow.osm_id,
+                        source: flow.source,
+                        target: flow.target,
+                        speed: flow.speed,
+                        freeFlowSpeed: flow.free_flow_speed,
+                        lat: flow.lat || 0,
+                        lon: flow.lon || 0
+                    });
+                });
+            }
+            
+            // Add incidents
+            if (data.incidents && Array.isArray(data.incidents)) {
+                data.incidents.forEach(incident => {
+                    this.disruptions.customItems.push({
+                        type: 'incident',
+                        edgeId: incident.edge_id,
+                        osmId: incident.osm_id,
+                        severity: incident.severity,
+                        description: incident.description || 'Loaded incident',
+                        lat: incident.lat || 0,
+                        lon: incident.lon || 0
+                    });
+                });
+            }
+            
+            // Update UI to show loaded disruptions
+            this.updateDisruptionList();
+            this.visualizeDisruptions();
+            
+            console.log(`Loaded disruption set: ${setKey} (${this.disruptions.customItems.length} items)`);
+        } catch (error) {
+            console.error('Error loading saved disruption set:', error);
+        }
     },
 
     updateUIFromState() {
@@ -1851,8 +2100,8 @@ const DemoCreator = {
      * Preview disruptions on the map - generates all sets based on scope
      */
     async previewDisruptions() {
-        const flowCount = parseInt(document.getElementById('random-flow-count')?.value) || 5;
-        const incidentCount = parseInt(document.getElementById('random-incident-count')?.value) || 3;
+        const flowCount = parseInt(document.getElementById('random-flow-count')?.value) || 1500;
+        const incidentCount = parseInt(document.getElementById('random-incident-count')?.value) || 5;
         const severityMin = parseFloat(document.getElementById('random-severity-min')?.value) || 0;
         const severityMax = parseFloat(document.getElementById('random-severity-max')?.value) || 1;
         const scope = document.getElementById('disruption-generation-scope')?.value || 'per-trial-route';
@@ -2511,7 +2760,8 @@ const DemoCreator = {
         this.updateTauInputs();
         
         // Auto-generate random values when switching to random mode
-        if (selectedMode === 'random') {
+        // But skip if we're loading saved TAU values in edit mode
+        if (selectedMode === 'random' && !this._preserveTauValues) {
             this.generateRandomTauValues();
         }
     },
@@ -2534,7 +2784,8 @@ const DemoCreator = {
         this.updateTauInputs();
         
         // Auto-regenerate random values when scope changes (if in random mode)
-        if (mode === 'random') {
+        // But skip if we're loading saved TAU values in edit mode
+        if (mode === 'random' && !this._preserveTauValues) {
             this.generateRandomTauValues();
         }
     },
@@ -2781,6 +3032,10 @@ const DemoCreator = {
         const container = document.getElementById('demo-v2-review-summary');
         if (!container) return;
         
+        // Sync state from GUI before reading values
+        this.syncDisruptionsFromGUI();
+        this.syncTauFromGUI();
+        
         const algorithm = this.getSelectedAlgorithm();
         const tauValues = this.getTauValues();
         const tauScope = this.getSelectedTauScope();
@@ -2930,6 +3185,137 @@ const DemoCreator = {
         `;
     },
 
+    /**
+     * Build demo configuration object in the new format.
+     * Creates routes with trials[] array containing tau and disruption metadata per trial.
+     * @param {string} name - Demo name
+     * @returns {Object} Config object ready for saving or running
+     */
+    /**
+     * Build demo configuration object
+     * 
+     * SIMPLIFIED FORMAT (per FIX GUIDE):
+     * - route.trials[].disruption is just the setKey string (metadata is in savedSets)
+     * - No duplicate root-level fields
+     * - settings, tau, disruptions are the main config blocks
+     */
+    buildDemoConfig(name = null) {
+        // Sync all values from GUI before building config
+        this.syncDisruptionsFromGUI();
+        this.syncTauFromGUI();
+        
+        const trials = parseInt(document.getElementById('demo-trials-count')?.value) || 1;
+        
+        // Read TAU generation scope from radio buttons
+        const tauScope = this.getSelectedTauScope();
+        this.sequence.tauGenerationScope = tauScope;
+        
+        // Get all TAU values - these will be distributed based on scope
+        const allTauValues = this.getTauValues();
+        
+        // Get disruption scope
+        const disruptionScope = this.getSelectedDisruptionScope();
+        
+        // Build routes with trials[] array - SIMPLIFIED: disruption is just setKey
+        const routesWithTrials = this.routes.map((r, routeIdx) => {
+            const trialsArray = [];
+            
+            for (let t = 0; t < trials; t++) {
+                // Determine tau for this trial/route based on scope
+                let tau;
+                switch (tauScope) {
+                    case 'all':
+                        tau = allTauValues[0] || 0.5;
+                        break;
+                    case 'per-trial':
+                        tau = allTauValues[t] || 0.5;
+                        break;
+                    case 'per-route':
+                        tau = allTauValues[routeIdx] || 0.5;
+                        break;
+                    case 'per-trial-route':
+                        const idx = routeIdx * trials + t;
+                        tau = allTauValues[idx] || 0.5;
+                        break;
+                    default:
+                        tau = 0.5;
+                }
+                
+                // Determine disruption set key for this trial/route based on scope
+                let setKey;
+                switch (disruptionScope) {
+                    case 'all':
+                        setKey = 'set_all';
+                        break;
+                    case 'per-trial':
+                        setKey = `set_trial_${t}`;
+                        break;
+                    case 'per-route':
+                        setKey = `set_route_${routeIdx}`;
+                        break;
+                    case 'per-trial-route':
+                        setKey = `set_trial_${t}_route_${routeIdx}`;
+                        break;
+                    default:
+                        setKey = 'set_all';
+                }
+                
+                // SIMPLIFIED: disruption is just the setKey string
+                // Metadata (flowCount, incidentCount, disruption_dir) is stored in savedSets
+                trialsArray.push({
+                    trial: t,
+                    tau: tau,
+                    disruption: setKey  // Just the key, not an object
+                });
+            }
+            
+            return {
+                id: r.id,
+                start: r.start,
+                end: r.end,
+                distance: r.distance,
+                trials: trialsArray
+            };
+        });
+        
+        // Build configuration object - CLEAN FORMAT (no duplicates)
+        const config = {
+            name: name || document.getElementById('demo-v2-name')?.value || `Custom Demo - ${new Date().toLocaleString()}`,
+            routes: routesWithTrials,
+            
+            // Settings block
+            settings: {
+                algorithm: this.getSelectedAlgorithm(),
+                trials: trials,
+                stepDelay: parseInt(document.getElementById('demo-step-delay')?.value) || 1000
+            },
+            
+            // TAU configuration (template for regeneration/editing)
+            tau: {
+                mode: this.sequence.tauMode,
+                scope: tauScope,
+                fixed: this.sequence.tauFixed,
+                randomMin: this.sequence.tauRandomMin,
+                randomMax: this.sequence.tauRandomMax,
+                sequence: this.sequence.tauSequence || []
+            },
+            
+            // Disruption configuration (template settings + generated sets)
+            disruptions: {
+                mode: this.disruptions.mode,
+                scope: disruptionScope,
+                flowCount: this.disruptions.randomFlowCount,
+                incidentCount: this.disruptions.randomIncidentCount,
+                severityMin: this.disruptions.severityMin,
+                severityMax: this.disruptions.severityMax,
+                // Include the generated disruption sets for saving (will be converted to savedSets by Flask)
+                disruptionSets: this.disruptions.disruptionSets || {}
+            }
+        };
+        
+        return config;
+    },
+
     async saveForLater() {
         const saveBtn = document.getElementById('demo-v2-save-btn');
         const originalContent = saveBtn?.innerHTML;
@@ -2947,65 +3333,8 @@ const DemoCreator = {
         }
         
         try {
-            // Read severity range values
-            this.disruptions.severityMin = parseFloat(document.getElementById('random-severity-min')?.value) || 0;
-            this.disruptions.severityMax = parseFloat(document.getElementById('random-severity-max')?.value) || 1;
-            
-            const trials = parseInt(document.getElementById('demo-trials-count')?.value) || 1;
-            
-            // Read TAU generation scope from radio buttons
-            const tauScope = this.getSelectedTauScope();
-            this.sequence.tauGenerationScope = tauScope;
-            
-            // Get all TAU values - these will be distributed based on scope
-            const allTauValues = this.getTauValues();
-            
-            // Structure TAU values per route based on scope
-            const routesWithTau = this.routes.map((r, routeIdx) => {
-                let routeTauValues;
-                
-                switch (tauScope) {
-                    case 'all':
-                        // All routes get same single TAU
-                        routeTauValues = [allTauValues[0] || 0.5];
-                        break;
-                    case 'per-trial':
-                        // Each trial has different TAU, all routes in trial use same TAU
-                        // Store all trial TAUs - runner will pick correct one per trial
-                        routeTauValues = allTauValues;
-                        break;
-                    case 'per-route':
-                        // Each route has its own single TAU
-                        routeTauValues = [allTauValues[routeIdx] || 0.5];
-                        break;
-                    case 'per-trial-route':
-                        // Each route in each trial has unique TAU
-                        // For route i with T trials, values are at indices: i*T, i*T+1, ..., i*T+(T-1)
-                        const routeStart = routeIdx * trials;
-                        routeTauValues = allTauValues.slice(routeStart, routeStart + trials);
-                        if (routeTauValues.length === 0) routeTauValues = [0.5];
-                        break;
-                    default:
-                        routeTauValues = [0.5];
-                }
-                
-                return {
-                    ...r,
-                    tauValues: routeTauValues
-                };
-            });
-            
-            // Collect configuration
-            const config = {
-                name: document.getElementById('demo-v2-name')?.value || `Custom Demo - ${new Date().toLocaleString()}`,
-                routes: routesWithTau,
-                trials: trials,
-                algorithm: this.getSelectedAlgorithm(),
-                disruptions: { ...this.disruptions },
-                sequence: { ...this.sequence },
-                allTauValues: allTauValues,  // Store all TAU values for reference
-                stepDelay: parseInt(document.getElementById('demo-step-delay')?.value) || 1000
-            };
+            // Build config using helper function
+            const config = this.buildDemoConfig();
             
             // If editing, update the config; otherwise save new
             if (this.editingConfigId) {
@@ -3055,65 +3384,8 @@ const DemoCreator = {
         }
         
         try {
-            // Read severity range values
-            this.disruptions.severityMin = parseFloat(document.getElementById('random-severity-min')?.value) || 0;
-            this.disruptions.severityMax = parseFloat(document.getElementById('random-severity-max')?.value) || 1;
-            
-            const trials = parseInt(document.getElementById('demo-trials-count')?.value) || 1;
-            
-            // Read TAU generation scope from radio buttons
-            const tauScope = this.getSelectedTauScope();
-            this.sequence.tauGenerationScope = tauScope;
-            
-            // Get all TAU values - these will be distributed based on scope
-            const allTauValues = this.getTauValues();
-            
-            // Structure TAU values per route based on scope
-            const routesWithTau = this.routes.map((r, routeIdx) => {
-                let routeTauValues;
-                
-                switch (tauScope) {
-                    case 'all':
-                        // All routes get same single TAU
-                        routeTauValues = [allTauValues[0] || 0.5];
-                        break;
-                    case 'per-trial':
-                        // Each trial has different TAU, all routes in trial use same TAU
-                        // Store all trial TAUs - runner will pick correct one per trial
-                        routeTauValues = allTauValues;
-                        break;
-                    case 'per-route':
-                        // Each route has its own single TAU
-                        routeTauValues = [allTauValues[routeIdx] || 0.5];
-                        break;
-                    case 'per-trial-route':
-                        // Each route in each trial has unique TAU
-                        // For route i with T trials, values are at indices: i*T, i*T+1, ..., i*T+(T-1)
-                        const routeStart = routeIdx * trials;
-                        routeTauValues = allTauValues.slice(routeStart, routeStart + trials);
-                        if (routeTauValues.length === 0) routeTauValues = [0.5];
-                        break;
-                    default:
-                        routeTauValues = [0.5];
-                }
-                
-                return {
-                    ...r,
-                    tauValues: routeTauValues
-                };
-            });
-            
-            // Collect configuration (without saving)
-            const config = {
-                name: document.getElementById('demo-v2-name')?.value || `Demo Run - ${new Date().toLocaleString()}`,
-                routes: routesWithTau,
-                trials: trials,
-                algorithm: this.getSelectedAlgorithm(),
-                disruptions: { ...this.disruptions },
-                sequence: { ...this.sequence },
-                allTauValues: allTauValues,  // Store all TAU values for reference
-                stepDelay: parseInt(document.getElementById('demo-step-delay')?.value) || 1000
-            };
+            // Build config using helper function
+            const config = this.buildDemoConfig(`Demo Run - ${new Date().toLocaleString()}`);
             
             // Run demo with detailed progress in this panel
             await this.runDemoWithProgress(config);
@@ -3146,65 +3418,8 @@ const DemoCreator = {
         }
         
         try {
-            // Read severity range values
-            this.disruptions.severityMin = parseFloat(document.getElementById('random-severity-min')?.value) || 0;
-            this.disruptions.severityMax = parseFloat(document.getElementById('random-severity-max')?.value) || 1;
-            
-            const trials = parseInt(document.getElementById('demo-trials-count')?.value) || 1;
-            
-            // Read TAU generation scope from radio buttons
-            const tauScope = this.getSelectedTauScope();
-            this.sequence.tauGenerationScope = tauScope;
-            
-            // Get all TAU values - these will be distributed based on scope
-            const allTauValues = this.getTauValues();
-            
-            // Structure TAU values per route based on scope
-            const routesWithTau = this.routes.map((r, routeIdx) => {
-                let routeTauValues;
-                
-                switch (tauScope) {
-                    case 'all':
-                        // All routes get same single TAU
-                        routeTauValues = [allTauValues[0] || 0.5];
-                        break;
-                    case 'per-trial':
-                        // Each trial has different TAU, all routes in trial use same TAU
-                        // Store all trial TAUs - runner will pick correct one per trial
-                        routeTauValues = allTauValues;
-                        break;
-                    case 'per-route':
-                        // Each route has its own single TAU
-                        routeTauValues = [allTauValues[routeIdx] || 0.5];
-                        break;
-                    case 'per-trial-route':
-                        // Each route in each trial has unique TAU
-                        // For route i with T trials, values are at indices: i*T, i*T+1, ..., i*T+(T-1)
-                        const routeStart = routeIdx * trials;
-                        routeTauValues = allTauValues.slice(routeStart, routeStart + trials);
-                        if (routeTauValues.length === 0) routeTauValues = [0.5];
-                        break;
-                    default:
-                        routeTauValues = [0.5];
-                }
-                
-                return {
-                    ...r,
-                    tauValues: routeTauValues
-                };
-            });
-            
-            // Collect configuration
-            const config = {
-                name: document.getElementById('demo-v2-name')?.value || `Custom Demo - ${new Date().toLocaleString()}`,
-                routes: routesWithTau,
-                trials: trials,
-                algorithm: this.getSelectedAlgorithm(),
-                disruptions: { ...this.disruptions },
-                sequence: { ...this.sequence },
-                allTauValues: allTauValues,  // Store all TAU values for reference
-                stepDelay: parseInt(document.getElementById('demo-step-delay')?.value) || 1000
-            };
+            // Build config using helper function
+            const config = this.buildDemoConfig();
             
             // Save the configuration
             if (this.editingConfigId) {
@@ -3244,7 +3459,7 @@ const DemoCreator = {
         this.isRunning = true;
         this.isPaused = false;
         
-        const trials = config.trials || 1;
+        const trials = config.trials || config.settings?.trials || 1;
         const routes = config.routes || [];
         
         // Initialize progress
@@ -3697,7 +3912,7 @@ const DemoCreator = {
     generateDemoDisruptions(config) {
         const mode = config.disruptions?.mode || config.disruptionMode || 'none';
         const incidentCount = config.disruptions?.randomIncidentCount || this.disruptions.randomIncidentCount || 5;
-        const flowCount = config.disruptions?.randomFlowCount || this.disruptions.randomFlowCount || 5;
+        const flowCount = config.disruptions?.randomFlowCount || this.disruptions.randomFlowCount || 1500;
         const severityMin = config.disruptions?.severityMin || this.disruptions.severityMin || 0.3;
         const severityMax = config.disruptions?.severityMax || this.disruptions.severityMax || 0.9;
         

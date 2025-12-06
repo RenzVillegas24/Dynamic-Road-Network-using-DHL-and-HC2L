@@ -2689,6 +2689,7 @@ def get_demo_disruption_data(disruption_key, set_key):
     """
     Load disruption data from saved CSV files for map visualization.
     Returns the data in the format expected by showGeneratedDisruptions.
+    Includes geometry from the OSM graph edges for proper road visualization.
     
     Args:
         disruption_key: The unique disruption folder key (UUID)
@@ -2713,6 +2714,15 @@ def get_demo_disruption_data(disruption_key, set_key):
                 'error': f'Disruption folder not found: {disruption_key}/{set_key}'
             }), 404
         
+        # Load edge geometry lookup for adding road geometries
+        edge_geometry_lookup = {}
+        try:
+            _, edge_lookup = load_edges_with_cache()
+            if edge_lookup:
+                edge_geometry_lookup = edge_lookup
+        except Exception as e:
+            console_logger.warning(f"Could not load edge geometry lookup: {e}")
+        
         incidents = []
         flow_segments = []
         
@@ -2729,6 +2739,19 @@ def get_demo_disruption_data(disruption_key, set_key):
                             source_lng = float(row.get('source_lon', row.get('source_lng', 0)))
                             target_lat = float(row.get('target_lat', source_lat))
                             target_lng = float(row.get('target_lon', row.get('target_lng', source_lng)))
+                            
+                            # Get geometry from edge lookup
+                            source = row.get('source')
+                            target = row.get('target')
+                            geometry = None
+                            if source and target:
+                                try:
+                                    edge_key = (int(source), int(target))
+                                    edge_data = edge_geometry_lookup.get(edge_key)
+                                    if edge_data:
+                                        geometry = edge_data.get('geometry')
+                                except (ValueError, TypeError):
+                                    pass
                             
                             # Determine severity
                             severity_value = float(row.get('incident_severity', row.get('severity_value', 0.5)))
@@ -2747,6 +2770,8 @@ def get_demo_disruption_data(disruption_key, set_key):
                                 'source_lng': source_lng,
                                 'target_lat': target_lat,
                                 'target_lng': target_lng,
+                                'source': source,
+                                'target': target,
                                 'severity': severity,
                                 'severity_value': severity_value,
                                 'road_name': row.get('road_name', 'Unknown Road'),
@@ -2754,7 +2779,8 @@ def get_demo_disruption_data(disruption_key, set_key):
                                 'criticality': row.get('incident_criticality', 'minor'),
                                 'incident_criticality': row.get('incident_criticality', 'minor'),
                                 'incident_road_closed': row.get('incident_road_closed', 'False').lower() == 'true',
-                                'incident_description': row.get('incident_description', row.get('description', ''))
+                                'incident_description': row.get('incident_description', row.get('description', '')),
+                                'geometry': geometry
                             }
                             incidents.append(incident)
                 except Exception as e:
@@ -2774,6 +2800,19 @@ def get_demo_disruption_data(disruption_key, set_key):
                             target_lat = float(row.get('target_lat', source_lat))
                             target_lng = float(row.get('target_lon', row.get('target_lng', source_lng)))
                             
+                            # Get geometry from edge lookup
+                            source = row.get('source')
+                            target = row.get('target')
+                            geometry = None
+                            if source and target:
+                                try:
+                                    edge_key = (int(source), int(target))
+                                    edge_data = edge_geometry_lookup.get(edge_key)
+                                    if edge_data:
+                                        geometry = edge_data.get('geometry')
+                                except (ValueError, TypeError):
+                                    pass
+                            
                             # Calculate severity from jam factor
                             jam_factor = float(row.get('flow_jam_factor', row.get('jam_factor', 0)))
                             severity_value = min(jam_factor / 10.0, 1.0)  # Normalize to 0-1
@@ -2792,12 +2831,15 @@ def get_demo_disruption_data(disruption_key, set_key):
                                 'source_lng': source_lng,
                                 'target_lat': target_lat,
                                 'target_lng': target_lng,
+                                'source': source,
+                                'target': target,
                                 'severity': severity,
                                 'severity_value': severity_value,
                                 'jam_factor': jam_factor,
                                 'speed_kph': float(row.get('flow_speed_kph', row.get('speed_kph', 0))),
                                 'free_flow_kph': float(row.get('flow_free_flow_kph', row.get('free_flow_kph', 0))),
-                                'road_name': row.get('road_name', 'Unknown Road')
+                                'road_name': row.get('road_name', 'Unknown Road'),
+                                'geometry': geometry
                             }
                             flow_segments.append(flow_segment)
                 except Exception as e:
