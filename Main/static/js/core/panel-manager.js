@@ -11,54 +11,65 @@ const PanelManager = (function() {
     'route-finder': {
       id: 'admin-panel',
       title: 'Route Finder',
-      icon: 'navigation'
+      icon: 'navigation',
+      size: 'md'
     },
     'current-route': {
       id: 'current-path-panel',
       title: 'Current Route',
-      icon: 'route'
+      icon: 'route',
+      size: 'sm'
     },
     'report': {
       id: 'report-panel',
       title: 'Report Disruption',
-      icon: 'alert-triangle'
+      icon: 'alert-triangle',
+      size: 'md'
     },
     'disruptions': {
       id: 'disruptions-panel',
       title: 'Active Disruptions',
-      icon: 'list'
+      icon: 'list',
+      size: 'lg'
     },
     'metrics': {
       id: 'route-metrics-panel',
       title: 'Route Metrics',
-      icon: 'activity'
+      icon: 'activity',
+      size: 'lg'
     },
     'comparison': {
       id: 'algorithm-comparison-panel',
       title: 'Algorithm Comparison',
-      icon: 'git-compare'
+      icon: 'git-compare',
+      size: 'xxl'
     },
     'developer': {
       id: 'developer-view-panel',
       title: 'Developer Tools',
-      icon: 'code'
+      icon: 'code',
+      size: 'lg'
     },
     'demo-runner': {
       id: 'demo-runner-panel',
       title: 'Demo Runner',
-      icon: 'play-circle'
+      icon: 'play-circle',
+      size: 'md'
     },
     'demo-creator': {
       id: 'demo-creator-panel',
       title: 'Demo Creator',
-      icon: 'plus-circle'
+      icon: 'plus-circle',
+      size: 'lg'
     }
   };
 
   // State
-  let activePanel = 'route-finder';
+  let activePanel = null;
   let panelHistory = [];
   let listeners = [];
+  let isRightPanelOpen = false;
+  let navigationSource = 'sidebar'; // 'sidebar' or 'panel'
 
   /**
    * Initialize panel manager
@@ -67,13 +78,52 @@ const PanelManager = (function() {
     // Set up event delegation for panel triggers
     document.addEventListener('click', handlePanelTrigger);
     
-    // Show default panel
-    showPanel(activePanel);
+    // Set up close/back button handlers
+    setupCloseBackButtons();
     
     // Listen for keyboard shortcuts
     document.addEventListener('keydown', handleKeyboardShortcuts);
     
     console.log('[PanelManager] Initialized');
+  }
+
+  /**
+   * Set up close and back button handlers
+   */
+  function setupCloseBackButtons() {
+    // Handle all panel close buttons
+    document.querySelectorAll('.panel__close').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // Only go back if navigation came from within the panel
+        if (panelHistory.length > 0 && navigationSource === 'panel') {
+          goBack();
+        } else {
+          closeRightPanel();
+        }
+      });
+    });
+  }
+
+  /**
+   * Update close button to show back or close icon
+   */
+  function updateCloseBackButton(panelElement) {
+    const closeBtn = panelElement?.querySelector('.panel__close');
+    if (!closeBtn) return;
+    
+    const icon = closeBtn.querySelector('[data-lucide]');
+    if (icon) {
+      // Show back arrow only if there's history AND navigation came from within panel
+      const showBack = panelHistory.length > 0 && navigationSource === 'panel';
+      const iconName = showBack ? 'arrow-left' : 'x';
+      icon.setAttribute('data-lucide', iconName);
+      if (typeof lucide !== 'undefined') {
+        lucide.createIcons({ nodes: [closeBtn] });
+      }
+    }
   }
 
   /**
@@ -84,7 +134,18 @@ const PanelManager = (function() {
     if (trigger) {
       e.preventDefault();
       const panelKey = trigger.dataset.panel;
-      showPanel(panelKey);
+      
+      // Determine if this trigger is from sidebar or from within a panel
+      const isFromSidebar = trigger.closest('#sidebar') || trigger.closest('.nav-item');
+      const isFromPanel = trigger.closest('.panel') || trigger.closest('#right-panel-container');
+      
+      if (isFromPanel && !isFromSidebar) {
+        // Navigation from within a panel - add to history
+        showPanel(panelKey, 'panel');
+      } else {
+        // Navigation from sidebar - clear history
+        showPanel(panelKey, 'sidebar');
+      }
     }
   }
 
@@ -92,11 +153,17 @@ const PanelManager = (function() {
    * Handle keyboard shortcuts
    */
   function handleKeyboardShortcuts(e) {
-    // Escape to close modals/overlays
+    // Escape to close modals/overlays or go back
     if (e.key === 'Escape') {
       const modal = document.querySelector('.modal.active');
       if (modal) {
         closeModal(modal);
+      } else if (isRightPanelOpen) {
+        if (panelHistory.length > 0 && navigationSource === 'panel') {
+          goBack();
+        } else {
+          closeRightPanel();
+        }
       }
     }
 
@@ -106,7 +173,7 @@ const PanelManager = (function() {
       const index = parseInt(e.key) - 1;
       if (index < panelKeys.length) {
         e.preventDefault();
-        showPanel(panelKeys[index]);
+        showPanel(panelKeys[index], 'sidebar');
       }
     }
   }
@@ -114,8 +181,9 @@ const PanelManager = (function() {
   /**
    * Show a panel by key
    * @param {string} panelKey - Panel identifier
+   * @param {string} source - Navigation source ('sidebar' or 'panel')
    */
-  function showPanel(panelKey) {
+  function showPanel(panelKey, source = 'sidebar') {
     const panelConfig = panels[panelKey];
     if (!panelConfig) {
       console.warn(`[PanelManager] Unknown panel: ${panelKey}`);
@@ -128,8 +196,16 @@ const PanelManager = (function() {
       return;
     }
 
-    // Hide all panels
-    hideAllPanels();
+    // Update navigation source
+    navigationSource = source;
+
+    // If navigation is from sidebar, clear history
+    if (source === 'sidebar') {
+      panelHistory = [];
+    }
+
+    // Hide all panels (but don't close the container)
+    hideAllPanelsInternal();
 
     // Show target panel with animation
     panelElement.classList.remove('hidden');
@@ -138,11 +214,31 @@ const PanelManager = (function() {
     // Add slide-in animation
     panelElement.style.animation = 'slideInRight 0.3s ease-out';
 
+    // Add panel-open class to main content area for layout adjustments
+    const mainContentArea = document.getElementById('main-content-area');
+    if (mainContentArea) {
+      mainContentArea.classList.add('panel-open');
+    }
+
+    // Open the split-view secondary container
+    const rightPanelContainer = document.getElementById('right-panel-container');
+    if (rightPanelContainer) {
+      rightPanelContainer.classList.add('open');
+      isRightPanelOpen = true;
+      
+      // Set the width based on panel size
+      const panelWidth = panelConfig.size || 'md';
+      rightPanelContainer.classList.remove('split-view__secondary--sm', 'split-view__secondary--md', 'split-view__secondary--lg', 'split-view__secondary--xl', 'split-view__secondary--xxl');
+      if (panelWidth !== 'md') {
+        rightPanelContainer.classList.add(`split-view__secondary--${panelWidth}`);
+      }
+    }
+
     // Update sidebar active state
     updateSidebarActive(panelKey);
 
-    // Track history
-    if (activePanel !== panelKey) {
+    // Track history only if navigating from within a panel
+    if (source === 'panel' && activePanel && activePanel !== panelKey) {
       panelHistory.push(activePanel);
       // Keep history manageable
       if (panelHistory.length > 10) {
@@ -154,21 +250,25 @@ const PanelManager = (function() {
     const previousPanel = activePanel;
     activePanel = panelKey;
 
+    // Update close/back button icon
+    updateCloseBackButton(panelElement);
+
     // Notify listeners
     notifyListeners({
       type: 'panel-changed',
       from: previousPanel,
       to: panelKey,
-      panelConfig
+      panelConfig,
+      source
     });
 
-    console.log(`[PanelManager] Switched to panel: ${panelKey}`);
+    console.log(`[PanelManager] Switched to panel: ${panelKey} (source: ${source})`);
   }
 
   /**
-   * Hide all panels
+   * Hide all panels internally (without closing the container)
    */
-  function hideAllPanels() {
+  function hideAllPanelsInternal() {
     Object.values(panels).forEach(config => {
       const panel = document.getElementById(config.id);
       if (panel) {
@@ -176,6 +276,48 @@ const PanelManager = (function() {
         panel.classList.remove('active');
       }
     });
+  }
+
+  /**
+   * Hide all panels and close the right panel container
+   */
+  function hideAllPanels() {
+    hideAllPanelsInternal();
+    closeRightPanel();
+  }
+
+  /**
+   * Close the right panel container
+   */
+  function closeRightPanel() {
+    // Remove panel-open class from main content area
+    const mainContentArea = document.getElementById('main-content-area');
+    if (mainContentArea) {
+      mainContentArea.classList.remove('panel-open', 'panel-lg');
+    }
+    
+    // Close the split-view secondary container
+    const rightPanelContainer = document.getElementById('right-panel-container');
+    if (rightPanelContainer) {
+      rightPanelContainer.classList.remove('open');
+      rightPanelContainer.classList.remove('split-view__secondary--sm', 'split-view__secondary--md', 'split-view__secondary--lg', 'split-view__secondary--xl', 'split-view__secondary--xxl');
+    }
+
+    // Reset state
+    isRightPanelOpen = false;
+    activePanel = null;
+    panelHistory = [];
+    navigationSource = 'sidebar';
+
+    // Remove active from all nav items
+    document.querySelectorAll('.nav-item').forEach(item => {
+      item.classList.remove('active');
+    });
+
+    // Hide all panels
+    hideAllPanelsInternal();
+
+    console.log('[PanelManager] Right panel closed');
   }
 
   /**
@@ -201,6 +343,8 @@ const PanelManager = (function() {
     if (panelHistory.length > 0) {
       const previousPanel = panelHistory.pop();
       showPanel(previousPanel);
+    } else {
+      closeRightPanel();
     }
   }
 
@@ -296,6 +440,7 @@ const PanelManager = (function() {
     init,
     showPanel,
     hideAllPanels,
+    closeRightPanel,
     goBack,
     getActivePanel,
     getPanelConfig,

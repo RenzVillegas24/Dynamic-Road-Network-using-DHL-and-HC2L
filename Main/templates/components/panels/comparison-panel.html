@@ -1,173 +1,92 @@
-<!-- Algorithm Comparison Panel Component -->
-<div class="panel panel--lg" id="comparison-panel" data-panel="comparison">
-    <!-- Header -->
-    <div class="panel__header" style="background: linear-gradient(135deg, #ec4899 0%, #d946ef 100%); color: white;">
-        <div class="panel__icon">
-            <i data-lucide="git-compare"></i>
-        </div>
-        <div class="panel__title-group">
-            <h2 class="panel__title">Algorithm Comparison</h2>
-            <p class="panel__subtitle">Compare routing algorithms side by side</p>
-        </div>
-        <button class="panel__close" onclick="closePanel('comparison')" title="Close panel">
-            <i data-lucide="x"></i>
-        </button>
+<!-- Algorithm Comparison Panel -->
+<div id="algorithm-comparison-panel" class="panel panel--xxl flex flex-col overflow-hidden">
+  <div class="panel__header panel__header--primary flex-shrink-0">
+    <div class="panel__icon">
+      <i data-lucide="git-compare" class="w-6 h-6"></i>
     </div>
-    
-    <!-- Body -->
-    <div class="panel__body">
-        <!-- Run Comparison -->
-        <div class="panel__section">
-            <h4 class="panel__section-title">
-                <i data-lucide="play" class="panel__section-icon"></i>
-                Run Comparison
-            </h4>
-            
-            <div class="alert alert--info alert--inline mb-3">
-                <i data-lucide="info" class="alert__icon"></i>
-                <span>Set start and end points in the header, then run comparison to see how different algorithms perform.</span>
-            </div>
-            
-            <div class="form-group">
-                <label class="form-label">Algorithms to Compare</label>
-                <div class="d-flex flex-wrap gap-2">
-                    <label class="form-check">
-                        <input type="checkbox" class="form-check__input" id="compare-dhl" checked>
-                        <span class="algo-badge algo-badge--dhl">LazyDHL</span>
-                    </label>
-                    <label class="form-check">
-                        <input type="checkbox" class="form-check__input" id="compare-hc2l" checked>
-                        <span class="algo-badge algo-badge--hc2l">LazyHC2L</span>
-                    </label>
-                    <label class="form-check">
-                        <input type="checkbox" class="form-check__input" id="compare-dijkstra">
-                        <span class="algo-badge algo-badge--dijkstra">Dijkstra</span>
-                    </label>
-                    <label class="form-check">
-                        <input type="checkbox" class="form-check__input" id="compare-astar">
-                        <span class="algo-badge algo-badge--astar">A*</span>
-                    </label>
-                </div>
-            </div>
-            
-            <button class="btn btn--primary btn--block" onclick="runComparison()" id="run-comparison-btn">
-                <i data-lucide="play" class="btn__icon"></i>
-                Run Comparison
-            </button>
-        </div>
-        
-        <!-- Results -->
-        <div class="panel__section" id="comparison-results" style="display: none;">
-            <h4 class="panel__section-title">
-                <i data-lucide="bar-chart-2" class="panel__section-icon"></i>
-                Results
-            </h4>
-            
-            <!-- Summary Cards -->
-            <div class="d-flex flex-column gap-3 mb-4" id="comparison-cards"></div>
-            
-            <!-- Comparison Chart -->
-            <div class="card">
-                <div class="card__header">
-                    <h5 class="card__title">Performance Comparison</h5>
-                </div>
-                <div class="card__body" style="height: 250px;">
-                    <canvas id="comparison-chart"></canvas>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Detailed Comparison -->
-        <div class="panel__section" id="comparison-details" style="display: none;">
-            <h4 class="panel__section-title">
-                <i data-lucide="list" class="panel__section-icon"></i>
-                Detailed Comparison
-            </h4>
-            
-            <div class="card card--flat" style="overflow-x: auto;">
-                <table class="w-full text-sm" id="comparison-table">
-                    <thead>
-                        <tr class="border-b">
-                            <th class="text-left p-3 font-semibold">Metric</th>
-                            <!-- Algorithm columns added dynamically -->
-                        </tr>
-                    </thead>
-                    <tbody id="comparison-table-body">
-                        <!-- Rows added dynamically -->
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        
-        <!-- Route Visualization -->
-        <div class="panel__section" id="comparison-routes" style="display: none;">
-            <h4 class="panel__section-title">
-                <i data-lucide="layers" class="panel__section-icon"></i>
-                Route Visualization
-            </h4>
-            
-            <p class="text-sm text-muted mb-3">Toggle routes to show/hide on map:</p>
-            
-            <div class="d-flex flex-column gap-2" id="comparison-route-toggles"></div>
-        </div>
-        
-        <!-- Empty State -->
-        <div class="panel__empty" id="comparison-empty">
-            <div class="panel__empty-icon">
-                <i data-lucide="git-compare"></i>
-            </div>
-            <h3 class="panel__empty-title">No Comparison Yet</h3>
-            <p class="panel__empty-text">Select algorithms and run a comparison to see how they differ in performance and route selection.</p>
-        </div>
+    <div class="panel__title-group">
+      <h2 class="panel__title">Algorithm Comparison</h2>
+      <p class="panel__subtitle">Compare routing algorithms side-by-side</p>
     </div>
-    
-    <!-- Footer -->
-    <div class="panel__footer panel__footer--spread">
-        <button class="btn btn--ghost btn--sm" onclick="clearComparison()" id="clear-comparison-btn" disabled>
-            <i data-lucide="trash-2" class="btn__icon"></i>
-            Clear
-        </button>
-        <button class="btn btn--primary btn--sm" onclick="exportComparison()" id="export-comparison-btn" disabled>
-            <i data-lucide="download" class="btn__icon"></i>
-            Export Results
-        </button>
-    </div>
-</div>
+    <button onclick="closeComparisonPanel()" class="panel__close">
+      <i data-lucide="x" class="w-6 h-6"></i>
+    </button>
+  </div>
 
-<!-- Comparison Card Template -->
-<template id="comparison-card-template">
-    <div class="card comparison-result-card">
-        <div class="card__header">
-            <div class="card__title-group">
-                <div class="card__icon algo-icon">
-                    <i data-lucide="zap"></i>
-                </div>
-                <div>
-                    <h4 class="card__title algo-name">Algorithm</h4>
-                    <p class="card__subtitle algo-status">Status</p>
-                </div>
-            </div>
-            <span class="badge algo-rank">Rank</span>
+  <div class="panel__body flex-grow overflow-y-auto space-y-5">
+    <!-- Algorithm Selector -->
+    <div class="section-card">
+      <div class="section-card__header">
+        <div class="section-card__icon section-card__icon--primary">
+          <i data-lucide="check-circle" class="w-5 h-5"></i>
         </div>
-        <div class="card__body card__body--compact">
-            <div class="d-flex justify-between text-sm mb-2">
-                <span class="text-muted">Query Time</span>
-                <span class="font-semibold algo-time">--</span>
-            </div>
-            <div class="d-flex justify-between text-sm mb-2">
-                <span class="text-muted">Distance</span>
-                <span class="font-semibold algo-distance">--</span>
-            </div>
-            <div class="d-flex justify-between text-sm">
-                <span class="text-muted">Path Nodes</span>
-                <span class="font-semibold algo-nodes">--</span>
-            </div>
-        </div>
-        <div class="card__footer">
-            <button class="btn btn--ghost btn--sm btn--block toggle-route-btn">
-                <i data-lucide="eye" class="btn__icon"></i>
-                Show on Map
-            </button>
-        </div>
+        <h3 class="section-card__title">Select Algorithms to Compare</h3>
+      </div>
+      <div class="section-card__body space-y-3">
+        <label class="compare-option compare-option--warning">
+          <div class="compare-option__content">
+            <input type="checkbox" id="compare-google" class="compare-option__input">
+            <span class="compare-option__label">Google Maps</span>
+          </div>
+          <div class="compare-option__dot compare-option__dot--warning"></div>
+        </label>
+        <label class="compare-option compare-option--primary">
+          <div class="compare-option__content">
+            <input type="checkbox" id="compare-dhl" class="compare-option__input" checked>
+            <span class="compare-option__label">DHL (Dual-Hierarchy Labeling)</span>
+          </div>
+          <div class="compare-option__dot compare-option__dot--primary"></div>
+        </label>
+        <label class="compare-option compare-option--info">
+          <div class="compare-option__content">
+            <input type="checkbox" id="compare-hc2l" class="compare-option__input" checked>
+            <span class="compare-option__label">HC2L (Hierarchical Cut 2-Hop)</span>
+          </div>
+          <div class="compare-option__dot compare-option__dot--info"></div>
+        </label>
+      </div>
+      <button onclick="runComparison()" class="btn btn--primary btn--lg btn--block mt-4">
+        Run Comparison
+      </button>
     </div>
-</template>
+
+    <!-- Metrics Comparison Table -->
+    <div id="comparison-metrics-container" class="hidden">
+      <div class="section-card">
+        <div class="section-card__header">
+          <div class="section-card__icon section-card__icon--purple">
+            <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
+          </div>
+          <h3 class="section-card__title">Performance Comparison</h3>
+        </div>
+        <div id="comparison-metrics-table" class="section-card__body overflow-x-auto">
+          <!-- Comparison table will be inserted here -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Route Details Expandable Sections -->
+    <div id="comparison-route-details" class="hidden space-y-3">
+      <!-- Route details cards will be inserted here -->
+    </div>
+
+    <!-- Color Legend -->
+    <div class="legend-card">
+      <h4 class="legend-card__title">Color Legend</h4>
+      <div class="legend-card__items">
+        <div class="legend-item">
+          <div class="legend-item__dot legend-item__dot--warning"></div>
+          <span class="legend-item__label">Google Maps</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-item__dot legend-item__dot--primary"></div>
+          <span class="legend-item__label">DHL</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-item__dot legend-item__dot--info"></div>
+          <span class="legend-item__label">HC2L</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

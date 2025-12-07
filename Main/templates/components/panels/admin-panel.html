@@ -1,201 +1,208 @@
-<!-- Admin Panel Component -->
-<div class="panel" id="admin-panel" data-panel="admin">
-    <!-- Header -->
-    <div class="panel__header" style="background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); color: white;">
-        <div class="panel__icon">
-            <i data-lucide="shield"></i>
-        </div>
-        <div class="panel__title-group">
-            <h2 class="panel__title">Admin Panel</h2>
-            <p class="panel__subtitle">System controls and management</p>
-        </div>
-        <button class="panel__close" onclick="closePanel('admin')" title="Close panel">
-            <i data-lucide="x"></i>
-        </button>
+<!-- Admin Panel -->
+<div id="admin-panel" class="panel panel--md">
+
+  <div class="panel__header panel__header--dark">
+    <div class="panel__icon">
+      <i data-lucide="settings" class="w-6 h-6"></i>
     </div>
-    
-    <!-- Body -->
-    <div class="panel__body">
-        <!-- System Status -->
-        <div class="panel__section">
-            <h4 class="panel__section-title">
-                <i data-lucide="activity" class="panel__section-icon"></i>
-                System Status
-            </h4>
-            
-            <div class="card-grid card-grid--2 mb-4">
-                <div class="stat-card">
-                    <div class="stat-card__header">
-                        <div class="stat-card__icon" style="background: var(--color-success);">
-                            <i data-lucide="server"></i>
-                        </div>
-                        <span class="status-badge status-badge--active">
-                            <span class="status-badge__dot"></span>
-                            Online
-                        </span>
-                    </div>
-                    <div class="stat-card__value" id="admin-server-status">Active</div>
-                    <div class="stat-card__label">Server Status</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-card__header">
-                        <div class="stat-card__icon" style="background: var(--color-info);">
-                            <i data-lucide="database"></i>
-                        </div>
-                    </div>
-                    <div class="stat-card__value" id="admin-graph-nodes">--</div>
-                    <div class="stat-card__label">Graph Nodes</div>
-                </div>
-            </div>
-            
-            <div class="card-grid card-grid--2">
-                <div class="metric-card">
-                    <div class="metric-card__icon">
-                        <i data-lucide="git-branch"></i>
-                    </div>
-                    <div class="metric-card__content">
-                        <div class="metric-card__label">Graph Edges</div>
-                        <div class="metric-card__value" id="admin-graph-edges">--</div>
-                    </div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-card__icon">
-                        <i data-lucide="alert-triangle"></i>
-                    </div>
-                    <div class="metric-card__content">
-                        <div class="metric-card__label">Active Disruptions</div>
-                        <div class="metric-card__value" id="admin-active-disruptions">--</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Quick Actions -->
-        <div class="panel__section">
-            <h4 class="panel__section-title">
-                <i data-lucide="zap" class="panel__section-icon"></i>
-                Quick Actions
-            </h4>
-            
-            <div class="d-flex flex-column gap-2">
-                <button class="btn btn--surface btn--block" onclick="refreshAllData()">
-                    <i data-lucide="refresh-cw" class="btn__icon"></i>
-                    Refresh All Data
-                </button>
-                <button class="btn btn--surface btn--block" onclick="clearAllDisruptions()">
-                    <i data-lucide="trash-2" class="btn__icon"></i>
-                    Clear All Disruptions
-                </button>
-                <button class="btn btn--surface btn--block" onclick="reloadGraph()">
-                    <i data-lucide="rotate-ccw" class="btn__icon"></i>
-                    Reload Graph
-                </button>
-            </div>
-        </div>
-        
-        <!-- Traffic Data -->
-        <div class="panel__section">
-            <h4 class="panel__section-title">
-                <i data-lucide="traffic-cone" class="panel__section-icon"></i>
-                Traffic Data
-            </h4>
-            
-            <div class="form-group">
-                <label class="form-switch">
-                    <input type="checkbox" class="form-switch__input" id="auto-refresh-toggle" checked>
-                    <span class="form-switch__label">Auto-refresh Traffic Data</span>
-                </label>
-            </div>
-            
-            <div class="form-group">
-                <label class="form-label">Refresh Interval</label>
-                <select class="form-select form-select--sm" id="refresh-interval">
-                    <option value="30">30 seconds</option>
-                    <option value="60" selected>1 minute</option>
-                    <option value="120">2 minutes</option>
-                    <option value="300">5 minutes</option>
-                </select>
-            </div>
-            
-            <button class="btn btn--info btn--block btn--sm mt-3" onclick="fetchTrafficData()">
-                <i data-lucide="download" class="btn__icon"></i>
-                Fetch Latest Traffic Data
-            </button>
-        </div>
-        
-        <!-- Disruption Sources -->
-        <div class="panel__section">
-            <h4 class="panel__section-title">
-                <i data-lucide="database" class="panel__section-icon"></i>
-                Disruption Sources
-            </h4>
-            
-            <div class="d-flex flex-column gap-2">
-                <label class="form-check">
-                    <input type="checkbox" class="form-check__input" id="source-tomtom" checked>
-                    <div>
-                        <span class="form-check__label">TomTom Traffic API</span>
-                        <p class="form-check__hint">Real-time traffic incidents</p>
-                    </div>
-                </label>
-                <label class="form-check">
-                    <input type="checkbox" class="form-check__input" id="source-user" checked>
-                    <div>
-                        <span class="form-check__label">User Reports</span>
-                        <p class="form-check__hint">Community-reported incidents</p>
-                    </div>
-                </label>
-                <label class="form-check">
-                    <input type="checkbox" class="form-check__input" id="source-historical">
-                    <div>
-                        <span class="form-check__label">Historical Data</span>
-                        <p class="form-check__hint">Past disruption patterns</p>
-                    </div>
-                </label>
-            </div>
-        </div>
-        
-        <!-- Algorithm Settings -->
-        <div class="panel__section">
-            <h4 class="panel__section-title">
-                <i data-lucide="cpu" class="panel__section-icon"></i>
-                Algorithm Settings
-            </h4>
-            
-            <div class="form-group">
-                <label class="form-label">Default Algorithm</label>
-                <select class="form-select form-select--sm" id="default-algorithm">
-                    <option value="lazydhl" selected>LazyDHL</option>
-                    <option value="lazyhc2l">LazyHC2L</option>
-                    <option value="dijkstra">Dijkstra</option>
-                    <option value="astar">A* Search</option>
-                </select>
-            </div>
-            
-            <div class="form-group">
-                <label class="form-switch">
-                    <input type="checkbox" class="form-switch__input" id="show-alternatives" checked>
-                    <span class="form-switch__label">Show Alternative Routes</span>
-                </label>
-            </div>
-            
-            <div class="form-group">
-                <label class="form-switch">
-                    <input type="checkbox" class="form-switch__input" id="avoid-disruptions" checked>
-                    <span class="form-switch__label">Auto-avoid Disruptions</span>
-                </label>
-            </div>
-        </div>
+    <div class="panel__title-group">
+      <h2 class="panel__title">Admin Panel</h2>
+      <p class="panel__subtitle">System configuration & metrics</p>
     </div>
-    
-    <!-- Footer -->
-    <div class="panel__footer panel__footer--spread">
-        <button class="btn btn--ghost btn--sm" onclick="resetAdminSettings()">
-            Reset to Defaults
+    <button id="admin-close" class="panel__close">
+      <i data-lucide="x" class="w-6 h-6"></i>
+    </button>
+  </div>
+
+  <div class="panel__body">
+    <!-- System Controls -->
+    <div class="section-card section-card--slate mb-5">
+      <h3 class="section-card__title">
+        <div class="section-card__icon section-card__icon--primary">
+          <i data-lucide="play-circle" class="w-5 h-5"></i>
+        </div>
+        System Controls
+      </h3>
+      <div class="grid grid-cols-2 gap-3">
+        <button id="admin-start-btn" class="btn btn--success btn--icon col-span-2">
+          <i data-lucide="play" class="w-5 h-5"></i>
+          Route
         </button>
-        <button class="btn btn--primary btn--sm" onclick="saveAdminSettings()">
-            <i data-lucide="save" class="btn__icon"></i>
-            Save Settings
+        <button id="admin-reset-btn" class="btn btn--secondary">Reset</button>
+        <button id="admin-export-btn" class="btn btn--secondary">Export</button>
+        <button id="admin-google-compare-btn" onclick="compareWithGoogleMaps()" class="btn btn--warning btn--icon col-span-2" disabled>
+          <i data-lucide="map" class="w-5 h-5"></i>
+          Compare Route Algorithms
         </button>
+        <button onclick="openDisruptionsPanel()" class="btn btn--error btn--icon col-span-2">
+          <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+          Network Disruptions
+        </button>
+        <button id="open-experiment-wizard-btn" onclick="openExperimentWizard()" class="btn btn--teal btn--icon col-span-2">
+          <i data-lucide="monitor" class="w-5 h-5"></i>
+          <i data-lucide="flask-conical" class="w-4 h-4 inline"></i> Experiment Automation
+        </button>
+      </div>
     </div>
+
+    <!-- Algorithm & Dataset Selection -->
+    <div class="section-card section-card--slate mb-5">
+      <h3 class="section-card__title">Algorithm Selection</h3>
+      <div class="mb-4">
+        <label class="selection-option selection-option--cyan mb-3">
+          <input type="radio" name="algorithm" value="hc2l" class="selection-option__input" checked>
+          <div class="selection-option__content">
+            <span class="selection-option__title">HC2L (Hierarchical Cut 2-Hop Labeling)</span>
+            <p class="selection-option__desc">Advanced lazy update algorithm</p>
+          </div>
+        </label>
+        <label class="selection-option selection-option--purple">
+          <input type="radio" name="algorithm" value="dhl" class="selection-option__input">
+          <div class="selection-option__content">
+            <span class="selection-option__title">DHL (Dual-Hierarchy Labeling)</span>
+            <p class="selection-option__desc">Traditional dual-hierarchy approach</p>
+          </div>
+        </label>
+      </div>
+      <div class="mt-4 pt-4 border-t border-slate-300">
+        <label class="block text-sm font-bold text-slate-700 mb-3">Dataset Selection</label>
+        <label class="selection-option selection-option--slate mb-3">
+          <input type="radio" name="dataset" value="none" class="selection-option__input" checked>
+          <div class="selection-option__content">
+            <span class="selection-option__title"><i data-lucide="ban" class="w-4 h-4 inline"></i> None</span>
+            <p class="selection-option__desc">No traffic data (shortest path only)</p>
+          </div>
+        </label>
+        <label class="selection-option selection-option--rose">
+          <input type="radio" name="dataset" value="both" class="selection-option__input">
+          <div class="selection-option__content">
+            <span class="selection-option__title"><i data-lucide="traffic-cone" class="w-4 h-4 inline"></i> With Traffic</span>
+            <p class="selection-option__desc">Real-time traffic from HERE API (flow + incidents)</p>
+          </div>
+        </label>
+      </div>
+    </div>
+
+    <!-- Auto-Disruption Update Interval -->
+    <div class="section-card section-card--purple mb-5">
+      <h3 class="section-card__title">Update Interval</h3>
+      <p class="text-sm text-purple-700 mb-3">Control how often the auto-disruption service polls HERE traffic (1-30 minutes).</p>
+      <div class="flex items-center gap-3">
+        <input id="auto-update-interval-slider" type="range" min="1" max="30" value="2" class="flex-1">
+        <div class="text-3xl font-bold text-purple-900">
+          <span id="auto-update-interval-display">2</span>
+          <span class="text-base"> min</span>
+        </div>
+      </div>
+      <button id="auto-update-interval-set" class="btn btn--purple btn--block mt-4">
+        Apply Interval
+      </button>
+      <p id="auto-update-interval-status" class="mt-2 text-xs text-purple-700/80">Current interval: 2 minutes</p>
+    </div>
+
+    <!-- Threshold (τ) with Input -->
+    <div id="threshold-container" class="section-card section-card--slate mb-5">
+      <h3 class="section-card__title">Threshold (τ) - HC2L Only</h3>
+      <div class="bg-purple-50 border-l-4 border-purple-500 p-3 rounded-lg mb-4">
+        <p class="text-xs text-purple-900 font-medium">
+          <i data-lucide="zap" class="w-4 h-4 inline"></i> LazyHC2L Feature: Threshold controls when to update labels. DHL does not use lazy updates.
+        </p>
+      </div>
+      <div class="mb-4">
+        <label class="input-group__label">Enter Threshold Value</label>
+        <input type="number" id="threshold-input" min="0" max="1" step="0.01" value="0.5" class="form-input form-input--lg" placeholder="0.00 - 1.00">
+      </div>
+      <div class="mb-3">
+        <label class="input-group__label">Quick Select</label>
+        <div class="grid grid-cols-4 gap-2">
+          <button class="quick-threshold-btn btn btn--outline-sm" data-value="0.25">0.25</button>
+          <button class="quick-threshold-btn btn btn--outline-sm btn--active" data-value="0.5">0.5</button>
+          <button class="quick-threshold-btn btn btn--outline-sm" data-value="0.75">0.75</button>
+          <button class="quick-threshold-btn btn btn--outline-sm" data-value="1.0">1.0</button>
+        </div>
+      </div>
+      <div class="flex items-center justify-between bg-white rounded-xl p-4 border border-slate-300 shadow-sm">
+        <span class="text-sm font-medium text-slate-600">Current τ:</span>
+        <span id="threshold-value" class="font-bold text-2xl text-blue-600">0.5</span>
+      </div>
+    </div>
+
+    <!-- Graph Options -->
+    <div class="section-card section-card--purple mb-5">
+      <h3 class="section-card__title">
+        <i data-lucide="bar-chart-2" class="w-5 h-5 mr-2"></i>
+        Graph Options
+      </h3>
+      <label class="toggle-row">
+        <span class="toggle-row__label">Show OSM Graph</span>
+        <input type="checkbox" id="show-osm-graph" class="toggle-checkbox">
+      </label>
+      <label class="toggle-row">
+        <span class="toggle-row__label">Show Nodes</span>
+        <input type="checkbox" id="show-nodes" class="toggle-checkbox">
+      </label>
+      <label class="toggle-row">
+        <div>
+          <span class="toggle-row__label">Show Active Incidents</span>
+          <p class="toggle-row__desc">Accidents, closures, hazards (excludes flow)</p>
+        </div>
+        <input type="checkbox" id="show-active-incidents" class="toggle-checkbox">
+      </label>
+      <label class="toggle-row">
+        <div>
+          <span class="toggle-row__label">Show Flow Overlay</span>
+          <p class="toggle-row__desc">Real-time flow and congestion data</p>
+        </div>
+        <input type="checkbox" id="show-traffic-overlay" class="toggle-checkbox">
+      </label>
+      <label class="toggle-row">
+        <div>
+          <span class="toggle-row__label">Show Alternative Routes</span>
+          <p class="toggle-row__desc">Display alternative routes on map (transparent overlay)</p>
+        </div>
+        <input type="checkbox" id="show-alternative-routes" class="toggle-checkbox" checked>
+      </label>
+    </div>
+
+    <!-- Update Mode Status -->
+    <div class="section-card section-card--amber mb-5">
+      <h3 class="section-card__title">
+        <div class="section-card__icon section-card__icon--amber">
+          <i data-lucide="zap" class="w-5 h-5"></i>
+        </div>
+        Update Mode Status
+      </h3>
+      <div class="bg-white rounded-xl p-4 border border-slate-300 shadow-sm">
+        <div class="flex items-center justify-between">
+          <span class="text-sm font-bold text-slate-700">Current Mode:</span>
+          <span id="update-mode-badge" class="badge badge--warning">Immediate Update</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Performance Metrics -->
+    <div class="section-card section-card--slate mb-5">
+      <h3 class="section-card__title">Performance Metrics</h3>
+      <div class="space-y-3">
+        <div class="metric-row">
+          <span class="metric-row__label">Labeling Time</span>
+          <span id="perf-labeling-time" class="metric-row__value metric-row__value--success">-</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row__label">Labeling Size</span>
+          <span id="perf-labeling-size" class="metric-row__value metric-row__value--primary">-</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row__label">Query Response Time</span>
+          <span id="perf-query-time" class="metric-row__value metric-row__value--purple">-</span>
+        </div>
+      </div>
+      <div id="comparison-buttons" class="mt-5 space-y-3 hidden">
+        <button id="show-comparison-summary" class="btn btn--primary btn--block btn--icon">
+          <i data-lucide="bar-chart-3" class="w-6 h-6"></i>
+          View Algorithm Comparison
+        </button>
+      </div>
+    </div>
+  </div>
 </div>

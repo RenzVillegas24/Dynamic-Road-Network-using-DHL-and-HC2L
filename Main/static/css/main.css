@@ -1,32 +1,70 @@
 /**
- * Main CSS Entry Point
- * Imports all modular CSS files in correct order
+ * Dynamic Road Network CSS Framework
+ * Main Entry Point
+ * 
+ * This file imports all CSS modules in the correct order.
+ * Import this single file to include the entire design system.
+ * 
+ * Architecture:
+ * 1. Variables (Design Tokens)
+ * 2. Base (Reset, Typography, Forms)
+ * 3. Layout (Grid, Flexbox, Spacing, Display)
+ * 4. Components (UI Elements)
+ * 5. Effects (Animations, Transitions)
+ * 6. Utilities (Helper Classes)
  */
 
-/* 1. Design Tokens & Variables */
-@import url('variables.css');
+/* =====================
+   DESIGN TOKENS
+   ===================== */
+@import 'variables.css';
 
-/* 2. Base Styles */
-@import url('base/reset.css');
-@import url('base/typography.css');
+/* =====================
+   BASE STYLES
+   ===================== */
+@import 'base/reset.css';
+@import 'base/typography.css';
+@import 'base/form-reset.css';
 
-/* 3. Layout */
-@import url('layout/structure.css');
-@import url('layout/header.css');
-@import url('layout/sidebar.css');
+/* =====================
+   LAYOUT
+   ===================== */
+@import 'layout/grid.css';
+@import 'layout/flexbox.css';
+@import 'layout/spacing.css';
+@import 'layout/display.css';
+@import 'layout/app-layout.css';
 
-/* 4. Components */
-@import url('components/buttons.css');
-@import url('components/cards.css');
-@import url('components/forms.css');
-@import url('components/panels.css');
-@import url('components/badges.css');
-@import url('components/toasts.css');
-@import url('components/modals.css');
+/* =====================
+   COMPONENTS
+   ===================== */
+@import 'components/buttons.css';
+@import 'components/cards.css';
+@import 'components/panels.css';
+@import 'components/inputs.css';
+@import 'components/selections.css';
+@import 'components/badges.css';
+@import 'components/toasts.css';
+@import 'components/modals.css';
+@import 'components/tables.css';
+@import 'components/stat-cards.css';
+@import 'components/dropdowns.css';
+@import 'components/tabs.css';
+@import 'components/tooltips.css';
+@import 'components/loaders.css';
+@import 'components/header.css';
+@import 'components/sidebar.css';
+@import 'components/search.css';
+@import 'components/developer.css';
 
-/* 5. Effects */
-@import url('effects/animations.css');
-@import url('effects/transitions.css');
+/* =====================
+   EFFECTS
+   ===================== */
+@import 'effects/animations.css';
+@import 'effects/transitions.css';
+@import 'effects/gradients.css';
 
-/* 6. Utilities (load last to allow overrides) */
-@import url('utilities.css');
+/* =====================
+   UTILITIES
+   ===================== */
+@import 'utilities.css';

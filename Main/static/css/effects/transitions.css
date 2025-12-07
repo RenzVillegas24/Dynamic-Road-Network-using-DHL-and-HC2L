@@ -1,53 +1,86 @@
 /**
  * Transitions
- * Smooth state transitions and hover effects
+ * Transition utilities and effects
  */
 
-/* Base transitions */
+/* =====================
+   TRANSITION PROPERTIES
+   ===================== */
+
+.transition-none {
+  transition-property: none;
+}
+
 .transition-all {
   transition-property: all;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: var(--transition-normal);
+  transition-duration: 200ms;
 }
 
-.transition-fast {
-  transition-duration: var(--transition-fast) !important;
-}
-
-.transition-normal {
-  transition-duration: var(--transition-normal) !important;
-}
-
-.transition-slow {
-  transition-duration: var(--transition-slow) !important;
-}
-
-/* Property-specific transitions */
 .transition-colors {
   transition-property: color, background-color, border-color, fill, stroke;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: var(--transition-fast);
+  transition-duration: 200ms;
 }
 
 .transition-opacity {
   transition-property: opacity;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: var(--transition-normal);
+  transition-duration: 200ms;
 }
 
 .transition-shadow {
   transition-property: box-shadow;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: var(--transition-normal);
+  transition-duration: 200ms;
 }
 
 .transition-transform {
   transition-property: transform;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: var(--transition-normal);
+  transition-duration: 200ms;
 }
 
-/* Easing functions */
+/* =====================
+   TRANSITION DURATIONS
+   ===================== */
+
+.duration-75 {
+  transition-duration: 75ms;
+}
+
+.duration-100 {
+  transition-duration: 100ms;
+}
+
+.duration-150 {
+  transition-duration: 150ms;
+}
+
+.duration-200 {
+  transition-duration: 200ms;
+}
+
+.duration-300 {
+  transition-duration: 300ms;
+}
+
+.duration-500 {
+  transition-duration: 500ms;
+}
+
+.duration-700 {
+  transition-duration: 700ms;
+}
+
+.duration-1000 {
+  transition-duration: 1000ms;
+}
+
+/* =====================
+   TRANSITION TIMING
+   ===================== */
+
 .ease-linear {
   transition-timing-function: linear;
 }
@@ -68,329 +101,397 @@
   transition-timing-function: cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 
-/* Hover transforms */
-.hover-lift {
+.ease-elastic {
+  transition-timing-function: cubic-bezier(0.68, -0.6, 0.32, 1.6);
+}
+
+/* =====================
+   TRANSITION DELAYS
+   ===================== */
+
+.delay-75 {
+  transition-delay: 75ms;
+}
+
+.delay-100 {
+  transition-delay: 100ms;
+}
+
+.delay-150 {
+  transition-delay: 150ms;
+}
+
+.delay-200 {
+  transition-delay: 200ms;
+}
+
+.delay-300 {
+  transition-delay: 300ms;
+}
+
+.delay-500 {
+  transition-delay: 500ms;
+}
+
+.delay-1000 {
+  transition-delay: 1000ms;
+}
+
+/* =====================
+   HOVER EFFECTS
+   ===================== */
+
+/* Lift on hover */
+.hover\:lift {
   transition: transform var(--transition-fast), box-shadow var(--transition-fast);
 }
 
-.hover-lift:hover {
-  transform: translateY(-4px);
+.hover\:lift:hover {
+  transform: translateY(-2px);
   box-shadow: var(--shadow-lg);
 }
 
-.hover-scale {
+/* Scale on hover */
+.hover\:scale {
   transition: transform var(--transition-fast);
 }
 
-.hover-scale:hover {
-  transform: scale(1.05);
-}
-
-.hover-scale-sm {
-  transition: transform var(--transition-fast);
-}
-
-.hover-scale-sm:hover {
+.hover\:scale:hover {
   transform: scale(1.02);
 }
 
-.hover-scale-lg {
-  transition: transform var(--transition-fast);
+.hover\:scale-lg:hover {
+  transform: scale(1.05);
 }
 
-.hover-scale-lg:hover {
-  transform: scale(1.1);
+/* Brightness on hover */
+.hover\:brighten {
+  transition: filter var(--transition-fast);
 }
 
-.hover-rotate {
-  transition: transform var(--transition-fast);
+.hover\:brighten:hover {
+  filter: brightness(1.1);
 }
 
-.hover-rotate:hover {
-  transform: rotate(5deg);
+/* Dim on hover */
+.hover\:dim {
+  transition: opacity var(--transition-fast);
 }
 
-.hover-rotate-reverse {
-  transition: transform var(--transition-fast);
-}
-
-.hover-rotate-reverse:hover {
-  transform: rotate(-5deg);
-}
-
-/* Hover colors */
-.hover-primary:hover {
-  color: var(--color-primary);
-}
-
-.hover-bg-primary:hover {
-  background-color: var(--color-primary-light);
-}
-
-.hover-border-primary:hover {
-  border-color: var(--color-primary);
-}
-
-/* Opacity transitions */
-.hover-opacity:hover {
+.hover\:dim:hover {
   opacity: 0.8;
 }
 
-.hover-opacity-strong:hover {
-  opacity: 0.6;
-}
-
-/* Fade visibility */
-.fade-enter {
-  opacity: 0;
-}
-
-.fade-enter-active {
-  opacity: 1;
-  transition: opacity var(--transition-normal);
-}
-
-.fade-exit {
-  opacity: 1;
-}
-
-.fade-exit-active {
-  opacity: 0;
-  transition: opacity var(--transition-normal);
-}
-
-/* Slide visibility */
-.slide-right-enter {
-  transform: translateX(100%);
-  opacity: 0;
-}
-
-.slide-right-enter-active {
-  transform: translateX(0);
-  opacity: 1;
-  transition: transform var(--transition-normal), opacity var(--transition-normal);
-}
-
-.slide-right-exit {
-  transform: translateX(0);
-  opacity: 1;
-}
-
-.slide-right-exit-active {
-  transform: translateX(100%);
-  opacity: 0;
-  transition: transform var(--transition-normal), opacity var(--transition-normal);
-}
-
-.slide-left-enter {
-  transform: translateX(-100%);
-  opacity: 0;
-}
-
-.slide-left-enter-active {
-  transform: translateX(0);
-  opacity: 1;
-  transition: transform var(--transition-normal), opacity var(--transition-normal);
-}
-
-.slide-left-exit {
-  transform: translateX(0);
-  opacity: 1;
-}
-
-.slide-left-exit-active {
-  transform: translateX(-100%);
-  opacity: 0;
-  transition: transform var(--transition-normal), opacity var(--transition-normal);
-}
-
-/* Collapse transitions */
-.collapse-enter {
-  max-height: 0;
-  opacity: 0;
-  overflow: hidden;
-}
-
-.collapse-enter-active {
-  max-height: 500px;
-  opacity: 1;
-  transition: max-height var(--transition-slow), opacity var(--transition-normal);
-}
-
-.collapse-exit {
-  max-height: 500px;
-  opacity: 1;
-  overflow: hidden;
-}
-
-.collapse-exit-active {
-  max-height: 0;
-  opacity: 0;
-  transition: max-height var(--transition-slow), opacity var(--transition-normal);
-}
-
-/* Show/Hide utilities with transitions */
-.show {
-  opacity: 1;
-  visibility: visible;
-  transition: opacity var(--transition-normal), visibility 0s;
-}
-
-.hide {
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity var(--transition-normal), visibility 0s var(--transition-normal);
-}
-
-/* Interactive state indicators */
-.interactive {
-  transition: all var(--transition-fast);
-  cursor: pointer;
-}
-
-.interactive:hover {
-  background-color: var(--color-bg-alt);
-}
-
-.interactive:active {
-  transform: scale(0.98);
-}
-
-.interactive-border:hover {
-  border-color: var(--color-border-dark);
-}
-
-/* Focus ring transition */
-.focus-ring {
+/* Glow on hover */
+.hover\:glow {
   transition: box-shadow var(--transition-fast);
 }
 
-.focus-ring:focus {
+.hover\:glow:hover {
+  box-shadow: 0 0 20px hsla(222, 100%, 61%, 0.4);
+}
+
+/* Rotate on hover */
+.hover\:rotate {
+  transition: transform var(--transition-fast);
+}
+
+.hover\:rotate:hover {
+  transform: rotate(5deg);
+}
+
+.hover\:rotate-90:hover {
+  transform: rotate(90deg);
+}
+
+.hover\:rotate-180:hover {
+  transform: rotate(180deg);
+}
+
+/* =====================
+   FOCUS EFFECTS
+   ===================== */
+
+.focus\:ring:focus {
   outline: none;
-  box-shadow: 0 0 0 3px var(--color-primary-light);
+  box-shadow: 0 0 0 3px hsla(222, 100%, 61%, 0.3);
 }
 
-/* Gradient shift on hover */
-.gradient-shift {
-  background-size: 200% 200%;
-  background-position: 0% 50%;
-  transition: background-position var(--transition-slow);
+.focus\:ring-inset:focus {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--color-primary);
 }
 
-.gradient-shift:hover {
-  background-position: 100% 50%;
+.focus\:scale:focus {
+  transform: scale(1.02);
 }
 
-/* Text reveal */
-.text-reveal {
-  background: linear-gradient(90deg, 
-    var(--color-text) 0%, 
-    var(--color-text) 50%, 
-    var(--color-primary) 50%, 
-    var(--color-primary) 100%
-  );
-  background-size: 200% 100%;
-  background-position: 0% 0%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  transition: background-position var(--transition-normal);
+/* =====================
+   ACTIVE EFFECTS
+   ===================== */
+
+.active\:scale-down:active {
+  transform: scale(0.98);
 }
 
-.text-reveal:hover {
-  background-position: 100% 0%;
+.active\:press:active {
+  transform: translateY(1px);
 }
 
-/* Underline animation */
-.underline-hover {
-  position: relative;
+/* =====================
+   GROUP HOVER EFFECTS
+   ===================== */
+
+.group:hover .group-hover\:visible {
+  opacity: 1;
+  visibility: visible;
 }
 
-.underline-hover::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 0;
-  height: 2px;
-  background: var(--color-primary);
-  transition: width var(--transition-normal);
+.group:hover .group-hover\:translate-x {
+  transform: translateX(4px);
 }
 
-.underline-hover:hover::after {
-  width: 100%;
+.group:hover .group-hover\:translate-y {
+  transform: translateY(-4px);
 }
 
-.underline-hover-center::after {
-  left: 50%;
-  transform: translateX(-50%);
+.group:hover .group-hover\:scale {
+  transform: scale(1.05);
 }
 
-/* Border animation */
-.border-animate {
-  position: relative;
-  border: none !important;
+.group:hover .group-hover\:rotate {
+  transform: rotate(5deg);
 }
 
-.border-animate::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border: 2px solid transparent;
-  border-radius: inherit;
-  transition: border-color var(--transition-normal);
-}
+/* =====================
+   COLLAPSE/EXPAND
+   ===================== */
 
-.border-animate:hover::before {
-  border-color: var(--color-primary);
-}
-
-/* Morphing button */
-.morph-button {
-  transition: 
-    width var(--transition-normal),
-    border-radius var(--transition-normal),
-    background-color var(--transition-fast);
-}
-
-/* Loading state transition */
-.loading-transition {
-  position: relative;
+.collapse {
+  max-height: 0;
   overflow: hidden;
+  transition: max-height var(--transition-base) ease-out;
 }
 
-.loading-transition::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.4),
-    transparent
-  );
-  transform: translateX(-100%);
-  transition: transform 0s;
+.collapse.is-open {
+  max-height: 1000px;
+  transition: max-height var(--transition-slow) ease-in;
 }
 
-.loading-transition.loading::after {
-  transform: translateX(100%);
-  transition: transform 1.5s ease-in-out infinite;
+.collapse-fade {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height var(--transition-base) ease-out,
+              opacity var(--transition-base) ease-out;
 }
 
-/* Disable transitions (for reduced motion) */
+.collapse-fade.is-open {
+  max-height: 1000px;
+  opacity: 1;
+  transition: max-height var(--transition-slow) ease-in,
+              opacity var(--transition-base) ease-in;
+}
+
+/* =====================
+   REVEAL EFFECTS
+   ===================== */
+
+.reveal-up {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity var(--transition-base), transform var(--transition-base);
+}
+
+.reveal-up.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.reveal-left {
+  opacity: 0;
+  transform: translateX(-20px);
+  transition: opacity var(--transition-base), transform var(--transition-base);
+}
+
+.reveal-left.is-visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.reveal-right {
+  opacity: 0;
+  transform: translateX(20px);
+  transition: opacity var(--transition-base), transform var(--transition-base);
+}
+
+.reveal-right.is-visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.reveal-scale {
+  opacity: 0;
+  transform: scale(0.9);
+  transition: opacity var(--transition-base), transform var(--transition-base);
+}
+
+.reveal-scale.is-visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* =====================
+   STAGGER ANIMATIONS
+   ===================== */
+
+.stagger > * {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity var(--transition-base), transform var(--transition-base);
+}
+
+.stagger.is-visible > *:nth-child(1) { transition-delay: 0ms; opacity: 1; transform: translateY(0); }
+.stagger.is-visible > *:nth-child(2) { transition-delay: 50ms; opacity: 1; transform: translateY(0); }
+.stagger.is-visible > *:nth-child(3) { transition-delay: 100ms; opacity: 1; transform: translateY(0); }
+.stagger.is-visible > *:nth-child(4) { transition-delay: 150ms; opacity: 1; transform: translateY(0); }
+.stagger.is-visible > *:nth-child(5) { transition-delay: 200ms; opacity: 1; transform: translateY(0); }
+.stagger.is-visible > *:nth-child(6) { transition-delay: 250ms; opacity: 1; transform: translateY(0); }
+.stagger.is-visible > *:nth-child(7) { transition-delay: 300ms; opacity: 1; transform: translateY(0); }
+.stagger.is-visible > *:nth-child(8) { transition-delay: 350ms; opacity: 1; transform: translateY(0); }
+
+/* =====================
+   REDUCED MOTION
+   ===================== */
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+    transition-delay: 0ms !important;
+  }
+  
+  .hover\:lift:hover,
+  .hover\:scale:hover,
+  .hover\:scale-lg:hover,
+  .hover\:rotate:hover {
+    transform: none;
   }
 }
 
-/* No transition utility */
-.no-transition {
-  transition: none !important;
-}
+/* =====================
+   TAILWIND TRANSFORM UTILITIES
+   ===================== */
+
+.transform { transform: translateX(0); }
+.transform-none { transform: none; }
+.transform-gpu { transform: translateZ(0); }
+
+/* Scale */
+.scale-0 { transform: scale(0); }
+.scale-50 { transform: scale(0.5); }
+.scale-75 { transform: scale(0.75); }
+.scale-90 { transform: scale(0.9); }
+.scale-95 { transform: scale(0.95); }
+.scale-100 { transform: scale(1); }
+.scale-105 { transform: scale(1.05); }
+.scale-110 { transform: scale(1.1); }
+.scale-125 { transform: scale(1.25); }
+.scale-150 { transform: scale(1.5); }
+
+/* Hover Scale */
+.hover\:scale-100:hover { transform: scale(1); }
+.hover\:scale-105:hover { transform: scale(1.05); }
+.hover\:scale-110:hover { transform: scale(1.1); }
+
+/* Hover Shadow */
+.hover\:shadow-md:hover { box-shadow: var(--shadow-md); }
+.hover\:shadow-lg:hover { box-shadow: var(--shadow-lg); }
+.hover\:shadow-xl:hover { box-shadow: var(--shadow-xl); }
+.hover\:shadow-2xl:hover { box-shadow: var(--shadow-2xl); }
+
+/* Hover Background Colors */
+.hover\:bg-white\/20:hover { background-color: rgba(255, 255, 255, 0.2); }
+.hover\:bg-white\/10:hover { background-color: rgba(255, 255, 255, 0.1); }
+.hover\:bg-slate-50:hover { background-color: #f8fafc; }
+.hover\:bg-slate-100:hover { background-color: #f1f5f9; }
+.hover\:bg-slate-200:hover { background-color: #e2e8f0; }
+.hover\:bg-gray-100:hover { background-color: #f3f4f6; }
+.hover\:bg-gray-200:hover { background-color: #e5e7eb; }
+.hover\:bg-red-100:hover { background-color: #fee2e2; }
+.hover\:bg-red-600:hover { background-color: #dc2626; }
+.hover\:bg-red-700:hover { background-color: #b91c1c; }
+.hover\:bg-green-100:hover { background-color: #dcfce7; }
+.hover\:bg-green-600:hover { background-color: #16a34a; }
+.hover\:bg-green-700:hover { background-color: #15803d; }
+.hover\:bg-emerald-100:hover { background-color: #d1fae5; }
+.hover\:bg-emerald-600:hover { background-color: #059669; }
+.hover\:bg-emerald-700:hover { background-color: #047857; }
+.hover\:bg-blue-100:hover { background-color: #dbeafe; }
+.hover\:bg-blue-600:hover { background-color: #2563eb; }
+.hover\:bg-blue-700:hover { background-color: #1d4ed8; }
+.hover\:bg-blue-800:hover { background-color: #1e40af; }
+.hover\:bg-indigo-100:hover { background-color: #e0e7ff; }
+.hover\:bg-indigo-600:hover { background-color: #4f46e5; }
+.hover\:bg-indigo-700:hover { background-color: #4338ca; }
+.hover\:bg-purple-100:hover { background-color: #f3e8ff; }
+.hover\:bg-purple-600:hover { background-color: #9333ea; }
+.hover\:bg-purple-700:hover { background-color: #7e22ce; }
+.hover\:bg-rose-100:hover { background-color: #ffe4e6; }
+.hover\:bg-rose-600:hover { background-color: #e11d48; }
+.hover\:bg-rose-700:hover { background-color: #be123c; }
+
+/* Hover From (for gradients) */
+.hover\:from-blue-700:hover { --tw-gradient-from: #1d4ed8; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, transparent); }
+.hover\:from-blue-800:hover { --tw-gradient-from: #1e40af; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, transparent); }
+.hover\:to-blue-800:hover { --tw-gradient-to: #1e40af; }
+
+/* Hover Text Colors */
+.hover\:text-white:hover { color: #ffffff; }
+.hover\:text-slate-900:hover { color: #0f172a; }
+.hover\:text-blue-600:hover { color: #2563eb; }
+.hover\:text-blue-700:hover { color: #1d4ed8; }
+
+/* Rotate */
+.rotate-0 { transform: rotate(0deg); }
+.rotate-45 { transform: rotate(45deg); }
+.rotate-90 { transform: rotate(90deg); }
+.rotate-180 { transform: rotate(180deg); }
+.-rotate-45 { transform: rotate(-45deg); }
+.-rotate-90 { transform: rotate(-90deg); }
+.-rotate-180 { transform: rotate(-180deg); }
+
+/* Translate */
+.translate-x-0 { transform: translateX(0); }
+.translate-x-1 { transform: translateX(0.25rem); }
+.translate-x-2 { transform: translateX(0.5rem); }
+.translate-x-4 { transform: translateX(1rem); }
+.translate-x-full { transform: translateX(100%); }
+.-translate-x-1 { transform: translateX(-0.25rem); }
+.-translate-x-2 { transform: translateX(-0.5rem); }
+.-translate-x-4 { transform: translateX(-1rem); }
+.-translate-x-full { transform: translateX(-100%); }
+.-translate-x-1\/2 { transform: translateX(-50%); }
+
+.translate-y-0 { transform: translateY(0); }
+.translate-y-1 { transform: translateY(0.25rem); }
+.translate-y-2 { transform: translateY(0.5rem); }
+.translate-y-4 { transform: translateY(1rem); }
+.translate-y-full { transform: translateY(100%); }
+.-translate-y-1 { transform: translateY(-0.25rem); }
+.-translate-y-2 { transform: translateY(-0.5rem); }
+.-translate-y-4 { transform: translateY(-1rem); }
+.-translate-y-full { transform: translateY(-100%); }
+.-translate-y-1\/2 { transform: translateY(-50%); }
+
+/* Origin */
+.origin-center { transform-origin: center; }
+.origin-top { transform-origin: top; }
+.origin-top-right { transform-origin: top right; }
+.origin-right { transform-origin: right; }
+.origin-bottom-right { transform-origin: bottom right; }
+.origin-bottom { transform-origin: bottom; }
+.origin-bottom-left { transform-origin: bottom left; }
+.origin-left { transform-origin: left; }
+.origin-top-left { transform-origin: top left; }

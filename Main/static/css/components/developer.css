@@ -1,0 +1,255 @@
+/**
+ * Developer Panel Components
+ * Log viewer and debugging UI elements
+ */
+
+/* =====================
+   LOG CONTROLS
+   ===================== */
+
+.log-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+  padding: var(--spacing-4);
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.log-controls__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-2);
+}
+
+/* =====================
+   TOGGLE LABEL
+   ===================== */
+
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  cursor: pointer;
+}
+
+.toggle-label__text {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--color-text);
+}
+
+.toggle-label__text--info {
+  color: var(--color-info);
+}
+
+.toggle-label__text--success {
+  color: var(--color-success);
+}
+
+.toggle-label__text--warning {
+  color: var(--color-warning);
+}
+
+.toggle-label__text--error {
+  color: var(--color-danger);
+}
+
+.toggle-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+/* =====================
+   LOG SOURCES
+   ===================== */
+
+.log-sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-4);
+}
+
+.log-source {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.log-source__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-text-muted);
+}
+
+.log-source--info .log-source__dot {
+  background: var(--color-info);
+}
+
+.log-source--success .log-source__dot {
+  background: var(--color-success);
+}
+
+.log-source--warning .log-source__dot {
+  background: var(--color-warning);
+}
+
+.log-source--error .log-source__dot {
+  background: var(--color-danger);
+}
+
+.log-source__label {
+  font-weight: var(--font-medium);
+}
+
+/* =====================
+   LOG FILTERS
+   ===================== */
+
+.log-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2);
+}
+
+.filter-checkbox {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-1);
+  padding: var(--spacing-1) var(--spacing-2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.filter-checkbox:hover {
+  border-color: var(--color-border-dark);
+  background: var(--color-surface-hover);
+}
+
+.filter-checkbox:has(input:checked) {
+  border-color: var(--color-primary);
+  background: var(--color-primary-50);
+}
+
+.filter-checkbox input {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+.filter-checkbox__label {
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-1);
+}
+
+/* =====================
+   LOG ENTRIES
+   ===================== */
+
+.log-entries {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--color-gray-900);
+  font-family: 'JetBrains Mono', 'Fira Code', 'Monaco', monospace;
+  font-size: var(--text-xs);
+  padding: var(--spacing-4);
+}
+
+.log-entry {
+  display: flex;
+  gap: var(--spacing-3);
+  padding: var(--spacing-2) 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  color: var(--color-gray-300);
+}
+
+.log-entry:last-child {
+  border-bottom: none;
+}
+
+.log-entry__time {
+  color: var(--color-gray-500);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.log-entry__level {
+  padding: 0 var(--spacing-1);
+  border-radius: var(--radius-sm);
+  font-weight: var(--font-semibold);
+  flex-shrink: 0;
+  text-transform: uppercase;
+  font-size: 10px;
+}
+
+.log-entry__level--debug {
+  background: var(--color-gray-700);
+  color: var(--color-gray-300);
+}
+
+.log-entry__level--info {
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+}
+
+.log-entry__level--success {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+}
+
+.log-entry__level--warning {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+}
+
+.log-entry__level--error {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+}
+
+.log-entry__level--query {
+  background: rgba(168, 85, 247, 0.2);
+  color: #c084fc;
+}
+
+.log-entry__level--update {
+  background: rgba(6, 182, 212, 0.2);
+  color: #22d3ee;
+}
+
+.log-entry__message {
+  flex: 1;
+  word-break: break-word;
+  line-height: 1.5;
+}
+
+.log-entry__source {
+  padding: 0 var(--spacing-1);
+  border-radius: var(--radius-sm);
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.log-entry__source--console {
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+}
+
+.log-entry__source--backend {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+}

@@ -22,7 +22,10 @@ const Sidebar = (function() {
    */
   function init() {
     sidebarElement = document.getElementById('sidebar');
-    toggleButton = document.querySelector('.sidebar-toggle');
+    // Look for toggle button by ID first, then by class
+    toggleButton = document.getElementById('sidebar-toggle') || 
+                   document.querySelector('.header-sidebar-toggle') ||
+                   document.querySelector('.header__toggle');
     mainWrapper = document.getElementById('main-wrapper');
     
     if (!sidebarElement) {
@@ -175,16 +178,16 @@ const Sidebar = (function() {
     if (!sidebarElement) return;
 
     isCollapsed = true;
-    sidebarElement.classList.add('collapsed');
+    sidebarElement.classList.add('sidebar--collapsed');
+    document.body.setAttribute('data-sidebar-collapsed', 'true');
     
     // Update toggle button icon
     updateToggleIcon();
 
     // Save state
     localStorage.setItem('sidebar-collapsed', 'true');
-
-    // Update main content
-    document.documentElement.style.setProperty('--sidebar-width', '64px');
+    
+    console.log('[Sidebar] Collapsed');
   }
 
   /**
@@ -195,16 +198,16 @@ const Sidebar = (function() {
     if (!sidebarElement) return;
 
     isCollapsed = false;
-    sidebarElement.classList.remove('collapsed');
+    sidebarElement.classList.remove('sidebar--collapsed');
+    document.body.removeAttribute('data-sidebar-collapsed');
     
     // Update toggle button icon
     updateToggleIcon();
 
     // Save state
     localStorage.setItem('sidebar-collapsed', 'false');
-
-    // Update main content
-    document.documentElement.style.setProperty('--sidebar-width', '280px');
+    
+    console.log('[Sidebar] Expanded');
   }
 
   /**

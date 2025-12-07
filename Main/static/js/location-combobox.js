@@ -30,7 +30,7 @@ function initializeLocationCombobox() {
       currentFocusIndex = -1; // Reset focus
       
       if (query.length < 2) {
-        document.getElementById('start-dropdown-results').classList.add('hidden');
+        document.getElementById('start-location-dropdown').classList.add('hidden');
         return;
       }
       
@@ -48,8 +48,8 @@ function initializeLocationCombobox() {
     // Close dropdown when clicking outside
     document.addEventListener('click', (e) => {
       if (!e.target.closest('#start-location-input') && 
-          !e.target.closest('#start-dropdown-results')) {
-        document.getElementById('start-dropdown-results').classList.add('hidden');
+          !e.target.closest('#start-location-dropdown')) {
+        document.getElementById('start-location-dropdown').classList.add('hidden');
       }
     });
     
@@ -65,7 +65,7 @@ function initializeLocationCombobox() {
       currentFocusIndex = -1; // Reset focus
       
       if (query.length < 2) {
-        document.getElementById('dest-dropdown-results').classList.add('hidden');
+        document.getElementById('dest-location-dropdown').classList.add('hidden');
         return;
       }
       
@@ -83,8 +83,8 @@ function initializeLocationCombobox() {
     // Close dropdown when clicking outside
     document.addEventListener('click', (e) => {
       if (!e.target.closest('#dest-location-input') && 
-          !e.target.closest('#dest-dropdown-results')) {
-        document.getElementById('dest-dropdown-results').classList.add('hidden');
+          !e.target.closest('#dest-location-dropdown')) {
+        document.getElementById('dest-location-dropdown').classList.add('hidden');
       }
     });
     
@@ -94,50 +94,42 @@ function initializeLocationCombobox() {
   // Pin button handlers (existing behavior)
   const startPinBtn = document.getElementById('start-location-pin-btn');
   if (startPinBtn) {
-    // Get the button element inside the container
-    const btn = startPinBtn.querySelector('button');
-    if (btn) {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        console.log('Start pin button clicked');
-        pinningMode = 'start';
-        if (map && map.getContainer) {
-          map.getContainer().style.cursor = 'crosshair';
-        }
-        showUpdateToast('Click on map to pin start location', 'info');
-        // Close dropdown
-        document.getElementById('start-dropdown-results').classList.add('hidden');
-      });
-      console.log('✅ Start pin button handler registered');
-    }
+    startPinBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      console.log('Start pin button clicked');
+      pinningMode = 'start';
+      if (map && map.getContainer) {
+        map.getContainer().style.cursor = 'crosshair';
+      }
+      showUpdateToast('Click on map to pin start location', 'info');
+      // Close dropdown
+      document.getElementById('start-location-dropdown').classList.add('hidden');
+    });
+    console.log('✅ Start pin button handler registered');
   }
   
   const destPinBtn = document.getElementById('dest-location-pin-btn');
   if (destPinBtn) {
-    // Get the button element inside the container
-    const btn = destPinBtn.querySelector('button');
-    if (btn) {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        console.log('Dest pin button clicked');
-        pinningMode = 'dest';
-        if (map && map.getContainer) {
-          map.getContainer().style.cursor = 'crosshair';
-        }
-        showUpdateToast('Click on map to pin destination', 'info');
-        // Close dropdown
-        document.getElementById('dest-dropdown-results').classList.add('hidden');
-      });
-      console.log('✅ Dest pin button handler registered');
-    }
+    destPinBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      console.log('Dest pin button clicked');
+      pinningMode = 'dest';
+      if (map && map.getContainer) {
+        map.getContainer().style.cursor = 'crosshair';
+      }
+      showUpdateToast('Click on map to pin destination', 'info');
+      // Close dropdown
+      document.getElementById('dest-location-dropdown').classList.add('hidden');
+    });
+    console.log('✅ Dest pin button handler registered');
   }
   
   console.log('✅ Location combobox fully initialized');
   
   // Reposition dropdowns on window resize or scroll
   window.addEventListener('resize', () => {
-    const startDropdown = document.getElementById('start-dropdown-results');
-    const destDropdown = document.getElementById('dest-dropdown-results');
+    const startDropdown = document.getElementById('start-location-dropdown');
+    const destDropdown = document.getElementById('dest-location-dropdown');
     const startInput = document.getElementById('start-location-input');
     const destInput = document.getElementById('dest-location-input');
     
@@ -150,8 +142,8 @@ function initializeLocationCombobox() {
   });
   
   window.addEventListener('scroll', () => {
-    const startDropdown = document.getElementById('start-dropdown-results');
-    const destDropdown = document.getElementById('dest-dropdown-results');
+    const startDropdown = document.getElementById('start-location-dropdown');
+    const destDropdown = document.getElementById('dest-location-dropdown');
     const startInput = document.getElementById('start-location-input');
     const destInput = document.getElementById('dest-location-input');
     
@@ -166,7 +158,7 @@ function initializeLocationCombobox() {
 
 // Handle keyboard navigation (arrow keys, Enter, Escape)
 function handleKeyboardNavigation(e, type) {
-  const dropdownId = type === 'start' ? 'start-dropdown-results' : 'dest-dropdown-results';
+  const dropdownId = type === 'start' ? 'start-location-dropdown' : 'dest-location-dropdown';
   const dropdown = document.getElementById(dropdownId);
   const items = dropdown.querySelectorAll('.dropdown-item');
   
@@ -202,17 +194,17 @@ function handleKeyboardNavigation(e, type) {
 function updateFocus(items) {
   items.forEach((item, index) => {
     if (index === currentFocusIndex) {
-      item.classList.add('bg-slate-100');
+      item.classList.add('selected');
       item.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     } else {
-      item.classList.remove('bg-slate-100');
+      item.classList.remove('selected');
     }
   });
 }
 
 // Perform location search and show dropdown results
 async function performLocationSearch(query, type) {
-  const dropdownId = type === 'start' ? 'start-dropdown-results' : 'dest-dropdown-results';
+  const dropdownId = type === 'start' ? 'start-location-dropdown' : 'dest-location-dropdown';
   const inputId = type === 'start' ? 'start-location-input' : 'dest-location-input';
   const dropdown = document.getElementById(dropdownId);
   const input = document.getElementById(inputId);
@@ -222,11 +214,12 @@ async function performLocationSearch(query, type) {
   // Position dropdown below the input field
   positionDropdown(input, dropdown);
   
-  // Show loading state
+  // Show loading state with framework classes
+  const iconVariant = type === 'start' ? 'search-result__icon--start' : 'search-result__icon--dest';
   dropdown.innerHTML = `
-    <div class="p-4 text-center">
-      <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-${type === 'start' ? 'emerald' : 'rose'}-600"></div>
-      <p class="mt-2 text-sm text-slate-600">Searching...</p>
+    <div class="search-loading">
+      <div class="search-loading__spinner ${type === 'start' ? 'search-loading__spinner--start' : 'search-loading__spinner--dest'}"></div>
+      <p class="search-loading__text">Searching...</p>
     </div>
   `;
   dropdown.classList.remove('hidden');
@@ -245,56 +238,54 @@ async function performLocationSearch(query, type) {
     
     if (!data.success) {
       dropdown.innerHTML = `
-        <div class="p-4 text-center text-slate-500">
-          <svg class="w-10 h-10 mx-auto mb-2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-          </svg>
-          <p class="text-sm font-medium">${data.error || 'Search failed'}</p>
+        <div class="search-empty">
+          <div class="search-empty__icon">
+            <i data-lucide="alert-circle"></i>
+          </div>
+          <p class="search-empty__title">${data.error || 'Search failed'}</p>
         </div>
       `;
+      if (typeof lucide !== 'undefined') lucide.createIcons();
       return;
     }
     
     if (data.results.length === 0) {
       dropdown.innerHTML = `
-        <div class="p-4 text-center text-slate-500">
-          <svg class="w-10 h-10 mx-auto mb-2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M12 12h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-          </svg>
-          <p class="text-sm font-medium">No locations found</p>
-          <p class="text-xs text-slate-400">Try a different search</p>
+        <div class="search-empty">
+          <div class="search-empty__icon">
+            <i data-lucide="search-x"></i>
+          </div>
+          <p class="search-empty__title">No locations found</p>
+          <p class="search-empty__subtitle">Try a different search</p>
         </div>
       `;
+      if (typeof lucide !== 'undefined') lucide.createIcons();
       return;
     }
     
-    // Display results as dropdown items
-    const resultColor = type === 'start' ? 'emerald' : 'rose';
+    // Display results using framework search-result classes
     const resultHTML = data.results.map((result, index) => `
-      <div class="dropdown-item px-4 py-3 hover:bg-${resultColor}-50 cursor-pointer border-b border-slate-100 last:border-b-0 transition-colors"
+      <div class="search-result dropdown-item"
            data-lat="${result.lat}" 
            data-lng="${result.lng}" 
            data-type="${type}"
            data-name="${result.name.replace(/"/g, '&quot;')}">
-        <div class="flex items-start gap-3">
-          <div class="bg-gradient-to-br from-${resultColor}-500 to-${resultColor}-600 rounded-lg p-2 flex-shrink-0 mt-0.5">
-            <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-              <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"></path>
-            </svg>
-          </div>
-          <div class="flex-1 min-w-0">
-            <h4 class="font-bold text-slate-900 text-sm truncate">${result.name.split(',')[0]}</h4>
-            <p class="text-xs text-slate-600 mt-0.5 line-clamp-1">${result.name}</p>
-            <div class="flex items-center gap-2 mt-1">
-              <span class="px-2 py-0.5 bg-${resultColor}-100 text-${resultColor}-700 rounded text-xs font-semibold">${result.type}</span>
-              <span class="text-xs text-slate-500">${result.lat.toFixed(4)}, ${result.lng.toFixed(4)}</span>
-            </div>
+        <div class="search-result__icon ${iconVariant}">
+          <i data-lucide="map-pin"></i>
+        </div>
+        <div class="search-result__content">
+          <h4 class="search-result__title">${result.name.split(',')[0]}</h4>
+          <p class="search-result__subtitle">${result.name}</p>
+          <div class="search-result__meta">
+            <span class="search-result__tag search-result__tag--${type}">${result.type}</span>
+            <span class="search-result__coords">${result.lat.toFixed(4)}, ${result.lng.toFixed(4)}</span>
           </div>
         </div>
       </div>
     `).join('');
     
     dropdown.innerHTML = resultHTML;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
     console.log(`✅ Displayed ${data.results.length} results`);
     
     // Add click handlers to results - use setTimeout to ensure DOM is updated
@@ -331,9 +322,9 @@ async function performLocationSearch(query, type) {
           
           // Set location
           if (locType === 'start') {
-            handleOSMStartLocationPin(lat, lng, name);
+            handleStartLocationPin(lat, lng, name);
           } else {
-            handleOSMDestLocationPin(lat, lng, name);
+            handleDestLocationPin(lat, lng, name);
           }
           
           // Pan map to location

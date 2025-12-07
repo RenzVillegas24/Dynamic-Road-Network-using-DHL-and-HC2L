@@ -1,33 +1,70 @@
 /**
- * CSS Reset / Normalize
- * Consistent baseline across browsers
+ * CSS Reset
+ * Consistent cross-browser behavior and normalization
  */
 
+/* Box sizing rules */
 *,
 *::before,
 *::after {
   box-sizing: border-box;
+}
+
+/* Remove default margin and padding */
+* {
   margin: 0;
   padding: 0;
 }
 
+/* Prevent font size inflation */
 html {
+  -moz-text-size-adjust: none;
+  -webkit-text-size-adjust: none;
+  text-size-adjust: none;
   font-size: 16px;
-  -webkit-text-size-adjust: 100%;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
   scroll-behavior: smooth;
 }
 
+/* Core body defaults */
 body {
+  min-height: 100vh;
+  line-height: var(--leading-normal);
   font-family: var(--font-family);
   font-size: var(--text-base);
-  line-height: var(--leading-normal);
   color: var(--color-text);
-  background: var(--color-bg);
-  min-height: 100vh;
+  background-color: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
+/* Remove list styles on ul, ol elements with a list role */
+ul[role='list'],
+ol[role='list'] {
+  list-style: none;
+}
+
+/* Set core root defaults */
+html:focus-within {
+  scroll-behavior: smooth;
+}
+
+/* A elements that don't have a class get default styles */
+a:not([class]) {
+  text-decoration-skip-ink: auto;
+  color: var(--color-primary);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: none;
+}
+
+/* Make images easier to work with */
 img,
 picture,
 video,
@@ -35,8 +72,10 @@ canvas,
 svg {
   display: block;
   max-width: 100%;
+  height: auto;
 }
 
+/* Inherit fonts for inputs and buttons */
 input,
 button,
 textarea,
@@ -45,43 +84,57 @@ select {
   color: inherit;
 }
 
+/* Remove all animations, transitions and smooth scroll for people that prefer not to see them */
+@media (prefers-reduced-motion: reduce) {
+  html:focus-within {
+    scroll-behavior: auto;
+  }
+  
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Remove default button styles */
 button {
-  cursor: pointer;
   background: none;
   border: none;
+  cursor: pointer;
+  font: inherit;
 }
 
-a {
-  color: inherit;
-  text-decoration: none;
+/* Avoid text overflows */
+p,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  overflow-wrap: break-word;
 }
 
-ul,
-ol {
-  list-style: none;
+/* Create a root stacking context */
+#root,
+#__next {
+  isolation: isolate;
 }
 
-h1, h2, h3, h4, h5, h6 {
-  font-weight: var(--font-bold);
-  line-height: var(--leading-tight);
+/* Improve table defaults */
+table {
+  border-collapse: collapse;
+  border-spacing: 0;
 }
 
-p {
-  margin-bottom: var(--spacing-4);
-}
-
-p:last-child {
-  margin-bottom: 0;
-}
-
-/* Remove default focus styles and apply consistent ones */
-:focus {
-  outline: none;
-}
-
-:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 2px;
+/* Selection styling */
+::selection {
+  background-color: var(--color-primary-light);
+  color: var(--color-primary-dark);
 }
 
 /* Scrollbar styling */
@@ -96,34 +149,37 @@ p:last-child {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--color-border-dark);
+  background: var(--color-gray-300);
   border-radius: var(--radius-full);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-text-muted);
+  background: var(--color-gray-400);
 }
 
-/* Selection styling */
-::selection {
-  background: var(--color-primary-light);
-  color: var(--color-primary-dark);
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-gray-300) var(--color-bg-alt);
 }
 
-/* Hidden utility */
+/* Remove outline on focus for mouse users, keep for keyboard */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Hidden attribute */
 [hidden] {
   display: none !important;
 }
 
-/* SR only */
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
+/* Prevent user selection on UI elements */
+[data-no-select] {
+  user-select: none;
+  -webkit-user-select: none;
 }

@@ -50,10 +50,7 @@ const App = (function() {
 
       // Show welcome toast
       if (window.Toast) {
-        Toast.success('Application ready', { 
-          title: 'Welcome',
-          duration: 3000 
-        });
+        Toast.success('Application ready');
       }
     } catch (error) {
       console.error('[App] Initialization error:', error);

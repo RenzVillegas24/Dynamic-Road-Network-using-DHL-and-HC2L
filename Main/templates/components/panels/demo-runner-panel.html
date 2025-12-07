@@ -1,172 +1,266 @@
-<!-- Demo Runner Panel Component -->
-<div class="panel" id="demo-runner-panel" data-panel="demo-runner">
-    <!-- Header -->
-    <div class="panel__header" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white;">
-        <div class="panel__icon">
-            <i data-lucide="play-circle"></i>
-        </div>
-        <div class="panel__title-group">
-            <h2 class="panel__title">Run Demo</h2>
-            <p class="panel__subtitle">Execute demonstration scenarios</p>
-        </div>
-        <button class="panel__close" onclick="closePanel('demo-runner')" title="Close panel">
-            <i data-lucide="x"></i>
-        </button>
+<!-- Demo Runner Panel -->
+<div id="demo-runner-panel" class="panel panel--lg">
+  <div class="panel__header panel__header--amber">
+    <div class="panel__icon">
+      <i data-lucide="clapperboard" class="w-6 h-6"></i>
     </div>
-    
-    <!-- Body -->
-    <div class="panel__body">
-        <!-- Demo Selection -->
-        <div class="panel__section">
-            <h4 class="panel__section-title">
-                <i data-lucide="folder" class="panel__section-icon"></i>
-                Select Demo
-            </h4>
-            
-            <div class="form-group">
-                <select class="form-select" id="demo-select" onchange="loadDemoDetails()">
-                    <option value="">Choose a demo scenario...</option>
-                    <!-- Options populated by JS -->
-                </select>
-            </div>
-            
-            <button class="btn btn--surface btn--block btn--sm" onclick="refreshDemoList()">
-                <i data-lucide="refresh-cw" class="btn__icon"></i>
-                Refresh Demo List
+    <div class="panel__title-group">
+      <h2 class="panel__title">Demo Runner</h2>
+      <p class="panel__subtitle">Run, load, or create demos</p>
+    </div>
+    <button onclick="closeDemoRunner()" class="panel__close">
+      <i data-lucide="x" class="w-6 h-6"></i>
+    </button>
+  </div>
+
+  <div class="panel__body">
+    <!-- Main Tab -->
+    <div id="demo-runner-tab-main" class="space-y-4">
+      <!-- Quick Actions -->
+      <div class="grid grid-cols-2 gap-3">
+        <button onclick="DemoRunner.openRandomSettings()" class="action-card action-card--warning">
+          <span class="action-card__icon"><i data-lucide="shuffle" class="w-6 h-6"></i></span>
+          <span class="action-card__text">Random Demo</span>
+        </button>
+        <button onclick="openDemoCreator()" class="action-card action-card--primary">
+          <span class="action-card__icon"><i data-lucide="sparkles" class="w-6 h-6"></i></span>
+          <span class="action-card__text">Custom Demo</span>
+        </button>
+      </div>
+
+      <!-- Tab Navigation for Configurations/Results -->
+      <div class="section-card">
+        <div class="tab-nav">
+          <button id="tab-btn-configs" onclick="DemoRunner.switchDataTab('configs')" class="tab-nav__btn tab-nav__btn--active">
+            <i data-lucide="save" class="w-4 h-4 mr-1"></i> Configurations
+          </button>
+          <button id="tab-btn-saved-results" onclick="DemoRunner.switchDataTab('saved-results')" class="tab-nav__btn">
+            <i data-lucide="bar-chart-3" class="w-4 h-4 mr-1"></i> Saved Results
+          </button>
+        </div>
+
+        <!-- Tab Content: Configurations -->
+        <div id="data-tab-configs" class="section-card__body">
+          <div id="saved-configs-list" class="space-y-3"></div>
+        </div>
+
+        <!-- Tab Content: Saved Results -->
+        <div id="data-tab-saved-results" class="section-card__body hidden">
+          <div class="flex items-center justify-end mb-2">
+            <button onclick="DemoRunner.refreshSavedResults()" class="utility-btn utility-btn--link flex items-center gap-1">
+              <i data-lucide="refresh-cw" class="w-3 h-3"></i>
+              Refresh
             </button>
+          </div>
+          <div id="saved-results-list" class="space-y-3">
+            <p class="text-muted text-center py-4">Loading saved results...</p>
+          </div>
         </div>
-        
-        <!-- Demo Details (shown when demo selected) -->
-        <div class="panel__section" id="demo-details" style="display: none;">
-            <h4 class="panel__section-title">
-                <i data-lucide="info" class="panel__section-icon"></i>
-                Demo Details
-            </h4>
-            
-            <div class="card card--flat">
-                <div class="card__body card__body--compact">
-                    <h5 class="font-semibold mb-2" id="demo-name">Demo Name</h5>
-                    <p class="text-sm text-muted mb-3" id="demo-description">Demo description will appear here.</p>
-                    
-                    <div class="d-flex flex-wrap gap-2 mb-3">
-                        <span class="badge badge--primary" id="demo-route-count">0 Routes</span>
-                        <span class="badge badge--warning" id="demo-disruption-count">0 Disruptions</span>
-                        <span class="badge badge--default" id="demo-step-count">0 Steps</span>
-                    </div>
-                    
-                    <div class="panel__info-row">
-                        <span class="panel__info-label">Algorithm</span>
-                        <span class="panel__info-value" id="demo-algorithm">--</span>
-                    </div>
-                    <div class="panel__info-row">
-                        <span class="panel__info-label">Duration</span>
-                        <span class="panel__info-value" id="demo-duration">--</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Demo Controls -->
-        <div class="panel__section" id="demo-controls" style="display: none;">
-            <h4 class="panel__section-title">
-                <i data-lucide="settings" class="panel__section-icon"></i>
-                Run Settings
-            </h4>
-            
-            <div class="form-group">
-                <label class="form-label">Playback Speed</label>
-                <select class="form-select form-select--sm" id="demo-speed">
-                    <option value="0.5">0.5x (Slow)</option>
-                    <option value="1" selected>1x (Normal)</option>
-                    <option value="2">2x (Fast)</option>
-                    <option value="4">4x (Very Fast)</option>
-                </select>
-            </div>
-            
-            <div class="form-group">
-                <label class="form-switch">
-                    <input type="checkbox" class="form-switch__input" id="demo-auto-zoom" checked>
-                    <span class="form-switch__label">Auto-zoom to actions</span>
-                </label>
-            </div>
-            
-            <div class="form-group">
-                <label class="form-switch">
-                    <input type="checkbox" class="form-switch__input" id="demo-show-annotations" checked>
-                    <span class="form-switch__label">Show annotations</span>
-                </label>
-            </div>
-        </div>
-        
-        <!-- Demo Progress -->
-        <div class="panel__section" id="demo-progress" style="display: none;">
-            <h4 class="panel__section-title">
-                <i data-lucide="loader-2" class="panel__section-icon"></i>
-                Progress
-            </h4>
-            
-            <div class="card card--flat">
-                <div class="card__body card__body--compact">
-                    <!-- Progress Bar -->
-                    <div class="mb-3">
-                        <div class="d-flex justify-between items-center mb-1">
-                            <span class="text-sm font-medium" id="demo-current-step">Step 0 of 0</span>
-                            <span class="text-sm text-muted" id="demo-progress-percent">0%</span>
-                        </div>
-                        <div class="w-full bg-alt rounded-full" style="height: 8px;">
-                            <div class="bg-success rounded-full transition-all" id="demo-progress-bar" style="width: 0%; height: 100%;"></div>
-                        </div>
-                    </div>
-                    
-                    <!-- Current Action -->
-                    <div class="alert alert--info alert--inline" id="demo-current-action">
-                        <i data-lucide="info" class="alert__icon"></i>
-                        <span id="demo-action-text">Waiting to start...</span>
-                    </div>
-                    
-                    <!-- Playback Controls -->
-                    <div class="d-flex justify-center gap-2 mt-4">
-                        <button class="btn btn--surface btn--icon" onclick="demoPrevStep()" id="demo-prev-btn" disabled>
-                            <i data-lucide="skip-back"></i>
-                        </button>
-                        <button class="btn btn--success btn--icon btn--lg" onclick="demoTogglePlay()" id="demo-play-btn">
-                            <i data-lucide="play" id="demo-play-icon"></i>
-                        </button>
-                        <button class="btn btn--surface btn--icon" onclick="demoNextStep()" id="demo-next-btn" disabled>
-                            <i data-lucide="skip-forward"></i>
-                        </button>
-                        <button class="btn btn--ghost btn--icon" onclick="demoStop()" id="demo-stop-btn">
-                            <i data-lucide="square"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Demo Log -->
-        <div class="panel__section" id="demo-log-section" style="display: none;">
-            <h4 class="panel__section-title">
-                <i data-lucide="list" class="panel__section-icon"></i>
-                Activity Log
-            </h4>
-            
-            <div class="card card--flat" style="max-height: 200px; overflow-y: auto;">
-                <div class="card__body card__body--compact p-0">
-                    <div id="demo-log" class="text-xs font-mono"></div>
-                </div>
-            </div>
-        </div>
+      </div>
     </div>
-    
-    <!-- Footer -->
-    <div class="panel__footer panel__footer--spread">
-        <button class="btn btn--ghost btn--sm" onclick="demoReset()" id="demo-reset-btn" disabled>
-            <i data-lucide="rotate-ccw" class="btn__icon"></i>
-            Reset
-        </button>
-        <button class="btn btn--success btn--sm" onclick="startDemo()" id="demo-start-btn" disabled>
-            <i data-lucide="play" class="btn__icon"></i>
-            Start Demo
-        </button>
+
+    <!-- Random Settings Tab -->
+    <div id="demo-runner-tab-random-settings" class="hidden space-y-4">
+      <button onclick="DemoRunner.showTab('main')" class="btn btn--ghost text-sm">
+        <i data-lucide="arrow-left" class="w-4 h-4"></i>
+        Back
+      </button>
+
+      <h3 class="section-title"><i data-lucide="shuffle" class="w-5 h-5 inline-block"></i> Random Demo Settings</h3>
+
+      <!-- Number of Trials -->
+      <div class="form-card form-card--info">
+        <label class="form-card__label"><i data-lucide="repeat" class="w-4 h-4 inline-block"></i> Number of Trials</label>
+        <input type="number" id="random-trials-count" value="1" min="1" max="100" class="form-input">
+        <p class="form-card__help">Times to repeat the entire demo</p>
+      </div>
+
+      <!-- Route Count -->
+      <div class="form-card">
+        <label class="form-card__label">Number of Routes</label>
+        <input type="number" id="random-route-count" value="1" min="1" max="10" class="form-input">
+      </div>
+
+      <!-- Algorithm -->
+      <div class="form-card">
+        <label class="form-card__label">Algorithm</label>
+        <select id="random-algorithm" class="form-input form-input--select">
+          <option value="both">Both (HC2L & DHL)</option>
+          <option value="hc2l">HC2L Only</option>
+          <option value="dhl">DHL Only</option>
+        </select>
+      </div>
+
+      <!-- TAU Mode -->
+      <div class="form-card">
+        <label class="form-card__label">TAU (τ) Mode</label>
+        <select id="random-tau-mode" class="form-input form-input--select mb-3">
+          <option value="fixed">Fixed Value</option>
+          <option value="random">Random</option>
+          <option value="sequence">Test Sequence</option>
+        </select>
+
+        <div id="tau-fixed-container">
+          <input type="number" id="random-tau-fixed" value="0.5" min="0" max="1" step="0.1" class="form-input">
+        </div>
+        <div id="tau-random-container" class="hidden grid grid-cols-2 gap-2">
+          <input type="number" id="random-tau-min" value="0.1" min="0" max="1" step="0.1" placeholder="Min" class="form-input">
+          <input type="number" id="random-tau-max" value="0.9" min="0" max="1" step="0.1" placeholder="Max" class="form-input">
+        </div>
+        <div id="tau-sequence-container" class="hidden">
+          <input type="text" id="random-tau-sequence" value="0.1, 0.3, 0.5, 0.7, 0.9" class="form-input" placeholder="0.1, 0.3, 0.5...">
+        </div>
+      </div>
+
+      <!-- Disruptions -->
+      <div class="form-card">
+        <label class="form-card__label">Disruptions</label>
+        <select id="random-disruption-mode" class="form-input form-input--select">
+          <option value="both">Flow + Incidents</option>
+          <option value="flow">Flow Only</option>
+          <option value="incidents">Incidents Only</option>
+          <option value="none">No Disruptions</option>
+        </select>
+      </div>
+
+      <!-- Step Delay -->
+      <div class="form-card">
+        <label class="form-card__label">Step Delay (ms)</label>
+        <input type="number" id="random-step-delay" value="2000" min="500" max="10000" step="500" class="form-input">
+      </div>
+
+      <!-- Start Button -->
+      <button onclick="DemoRunner.startRandomDemo()" class="btn btn--warning btn--lg btn--block">
+        <i data-lucide="rocket" class="w-5 h-5"></i> Start Random Demo
+      </button>
     </div>
+
+    <!-- Running Tab -->
+    <div id="demo-runner-tab-running" class="hidden flex flex-col h-full">
+      <div class="flex-1 overflow-y-auto space-y-3 pb-4">
+        <h3 class="section-title"><i data-lucide="play" class="w-5 h-5 inline-block"></i> Demo Running</h3>
+
+        <!-- Disruption Preview Panel -->
+        <div class="form-card form-card--warning">
+          <div class="flex items-center justify-between mb-2">
+            <h4 class="info-label text-amber-800"><i data-lucide="traffic-cone" class="w-4 h-4 inline-block"></i> Disruption Display</h4>
+            <div class="flex gap-2">
+              <label class="filter-checkbox">
+                <input type="checkbox" id="demo-show-incidents" checked onchange="DemoRunner.toggleIncidents(this.checked)">
+                <span>Incidents</span>
+              </label>
+              <label class="filter-checkbox">
+                <input type="checkbox" id="demo-show-flow" checked onchange="DemoRunner.toggleFlowOverlay(this.checked)">
+                <span>Flow</span>
+              </label>
+            </div>
+          </div>
+
+          <div id="demo-runner-disruption-sets" class="mb-2 hidden">
+            <div class="info-label text-amber-700 mb-1"><i data-lucide="package" class="w-4 h-4 inline-block"></i> Disruption Sets</div>
+            <div id="demo-runner-set-buttons" class="flex flex-wrap gap-1"></div>
+          </div>
+
+          <div id="demo-runner-disruption-preview" class="max-h-48 overflow-y-auto">
+            <div class="text-muted text-center py-2">No disruptions loaded</div>
+          </div>
+        </div>
+
+        <!-- Detailed Progress Display -->
+        <div id="demo-runner-progress-detail" class="space-y-3"></div>
+      </div>
+
+      <!-- Fixed Controls at Bottom -->
+      <div class="panel__footer">
+        <div class="flex gap-2">
+          <button id="demo-play-pause-btn" onclick="DemoRunner.togglePauseResume()" class="btn btn--warning flex-1">
+            <i data-lucide="pause" class="w-4 h-4"></i> Pause
+          </button>
+          <button onclick="DemoRunner.stopDemo()" class="btn btn--danger flex-1">
+            <i data-lucide="square" class="w-4 h-4"></i> Stop
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Results Tab -->
+    <div id="demo-runner-tab-results" class="hidden flex flex-col h-full">
+      <div class="flex-1 overflow-y-auto space-y-4 pb-4">
+        <button onclick="DemoRunner.showTab('main')" class="btn btn--ghost text-sm">
+          <i data-lucide="arrow-left" class="w-4 h-4"></i>
+          Back to Main
+        </button>
+
+        <div class="alert-card alert-card--primary">
+          <div class="alert-card__icon">
+            <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
+          </div>
+          <div class="alert-card__content">
+            <h3 class="alert-card__title">Demo Results Summary</h3>
+            <p id="demo-results-demo-name" class="alert-card__description">Results from your demo run</p>
+          </div>
+        </div>
+
+        <!-- Statistics Cards -->
+        <div id="demo-results-stats" class="grid grid-cols-2 gap-3"></div>
+
+        <!-- Best Performer Highlight -->
+        <div id="demo-results-best-performer" class="hidden"></div>
+
+        <!-- Performance Charts Section -->
+        <div id="demo-results-charts" class="space-y-4">
+          <div class="form-card">
+            <h4 class="form-card__title flex items-center gap-2">
+              <i data-lucide="trending-up" class="w-5 h-5"></i> Algorithm Comparison
+            </h4>
+            <div class="h-48"><canvas id="chart-algorithm-comparison"></canvas></div>
+          </div>
+
+          <div class="form-card">
+            <h4 class="form-card__title flex items-center gap-2">
+              <i data-lucide="rocket" class="w-5 h-5"></i> Process Time Comparison
+            </h4>
+            <div class="h-40"><canvas id="chart-process-time"></canvas></div>
+          </div>
+
+          <div class="form-card">
+            <h4 class="form-card__title flex items-center gap-2">
+              <i data-lucide="timer" class="w-5 h-5"></i> Query Time Trend
+            </h4>
+            <div class="h-40"><canvas id="chart-query-time-trend"></canvas></div>
+          </div>
+
+          <div class="form-card">
+            <h4 class="form-card__title flex items-center gap-2">
+              <i data-lucide="target" class="w-5 h-5"></i> Performance Radar
+            </h4>
+            <div class="h-56"><canvas id="chart-performance-radar"></canvas></div>
+          </div>
+        </div>
+
+        <!-- All Results List -->
+        <div class="form-card">
+          <h4 class="form-card__title flex items-center gap-2">
+            <i data-lucide="clipboard-list" class="w-5 h-5"></i> All Results <span id="demo-results-count" class="text-muted">(0 total)</span>
+          </h4>
+          <div id="demo-results-list" class="space-y-2"></div>
+        </div>
+      </div>
+
+      <!-- Fixed Action Buttons at Bottom -->
+      <div class="panel__footer">
+        <div class="flex gap-3">
+          <button id="btn-save-to-server" onclick="DemoRunner.exportResultsLocally()" class="btn btn--primary flex-1">
+            <i data-lucide="save" class="w-4 h-4"></i> Save to Server
+          </button>
+          <button id="btn-delete-from-server" onclick="DemoRunner.deleteFromServer()" class="btn btn--danger flex-1 hidden">
+            <i data-lucide="trash-2" class="w-4 h-4"></i> Delete from Server
+          </button>
+          <button onclick="DemoRunner.downloadResultsAsFile()" class="btn btn--secondary flex-1">
+            <i data-lucide="download" class="w-4 h-4"></i> Download JSON
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>

@@ -1,6 +1,6 @@
 /**
  * Toast Notification System
- * Provides user feedback through animated toast notifications
+ * Provides user feedback through animated toast notifications with stacking support
  */
 
 const Toast = (function() {
@@ -8,9 +8,10 @@ const Toast = (function() {
 
   // Configuration
   const config = {
-    duration: 4000,
-    maxToasts: 5,
-    position: 'bottom-right'
+    duration: 5000,
+    maxToasts: 4,
+    position: 'bottom-left',
+    animation: 'bottom' // 'top', 'bottom', 'left', 'right', 'center'
   };
 
   // Toast container
@@ -36,7 +37,7 @@ const Toast = (function() {
     if (!container) {
       container = document.createElement('div');
       container.id = 'toast-container';
-      container.className = `toast-container ${config.position}`;
+      container.className = `toast-container toast-container--${config.position}`;
       document.body.appendChild(container);
     }
   }
@@ -46,20 +47,22 @@ const Toast = (function() {
    * @param {Object} options - Toast options
    * @param {string} options.message - Toast message
    * @param {string} options.type - Toast type (success, error, warning, info)
-   * @param {string} options.title - Optional title
    * @param {number} options.duration - Duration in ms (0 for persistent)
    * @param {string} options.icon - Custom icon name
    * @param {Array} options.actions - Action buttons
+   * @param {string} options.position - Toast position
+   * @param {string} options.animation - Animation type (top, bottom, left, center)
    * @returns {Object} Toast instance
    */
   function show(options) {
     const {
       message,
       type = 'info',
-      title = null,
       duration = config.duration,
       icon = null,
-      actions = []
+      actions = [],
+      position = null,
+      animation = null
     } = typeof options === 'string' ? { message: options } : options;
 
     // Ensure container exists
@@ -67,30 +70,44 @@ const Toast = (function() {
       createContainer();
     }
 
+    // Update container position if specified
+    if (position && position !== config.position) {
+      config.position = position;
+      container.className = `toast-container toast-container--${config.position}`;
+    }
+
+    // Update animation if specified
+    if (animation) {
+      config.animation = animation;
+    }
+
     // Remove oldest toast if at max
     if (activeToasts.length >= config.maxToasts) {
-      dismiss(activeToasts[0].id);
+      dismiss(activeToasts[activeToasts.length - 1].id);
     }
 
     // Create toast element
     const toast = createToastElement({
       message,
       type,
-      title,
       icon,
       actions
     });
 
-    // Add to container
-    container.appendChild(toast);
+    // Prepend to container (newest first for proper stacking)
+    if (container.firstChild) {
+      container.insertBefore(toast, container.firstChild);
+    } else {
+      container.appendChild(toast);
+    }
 
-    // Track toast
+    // Track toast (newest at beginning of array)
     const toastObj = {
       id: toast.id,
       element: toast,
       timeoutId: null
     };
-    activeToasts.push(toastObj);
+    activeToasts.unshift(toastObj);
 
     // Trigger entrance animation
     requestAnimationFrame(() => {
@@ -113,10 +130,10 @@ const Toast = (function() {
   /**
    * Create toast DOM element
    */
-  function createToastElement({ message, type, title, icon, actions }) {
+  function createToastElement({ message, type, icon, actions }) {
     const toast = document.createElement('div');
     toast.id = `toast-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    toast.className = `toast toast-${type}`;
+    toast.className = `toast toast--${type}`;
     toast.setAttribute('role', 'alert');
     toast.setAttribute('aria-live', 'polite');
 
@@ -131,12 +148,12 @@ const Toast = (function() {
     const iconName = icon || iconMap[type] || 'info';
 
     toast.innerHTML = `
-      <div class="toast-icon">
-        <i data-lucide="${iconName}"></i>
-      </div>
       <div class="toast-content">
-        ${title ? `<div class="toast-title">${escapeHtml(title)}</div>` : ''}
+        ${iconName ? `<div class="toast-icon"><i data-lucide="${iconName}"></i></div>` : ''}
         <div class="toast-message">${escapeHtml(message)}</div>
+        <button class="toast-dismiss" aria-label="Dismiss">
+          <i data-lucide="x"></i>
+        </button>
         ${actions.length > 0 ? `
           <div class="toast-actions">
             ${actions.map(action => `
@@ -147,9 +164,6 @@ const Toast = (function() {
           </div>
         ` : ''}
       </div>
-      <button class="toast-dismiss" aria-label="Dismiss">
-        <i data-lucide="x"></i>
-      </button>
     `;
 
     // Bind dismiss button
@@ -304,8 +318,9 @@ const Toast = (function() {
   function configure(newConfig) {
     Object.assign(config, newConfig);
     
-    if (container && newConfig.position) {
-      container.className = `toast-container ${newConfig.position}`;
+    if (container && (newConfig.position || newConfig.animation)) {
+      const posClass = newConfig.position || config.position;
+      container.className = `toast-container toast-container--${posClass}`;
     }
   }
 

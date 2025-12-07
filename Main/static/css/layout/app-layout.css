@@ -1,0 +1,270 @@
+/**
+ * App Layout Styles
+ * Main application structure with split-screen panels
+ */
+
+/* =====================
+   APP BODY
+   ===================== */
+
+.app-body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--color-bg);
+  font-family: var(--font-family);
+}
+
+/* =====================
+   MAIN WRAPPER
+   ===================== */
+
+.main-wrapper {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* =====================
+   APP LAYOUT (with split panels)
+   ===================== */
+
+.app-layout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app-layout__sidebar {
+  flex-shrink: 0;
+  height: 100%;
+  z-index: var(--z-sidebar);
+}
+
+.app-layout__main {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  position: relative;
+  transition: width var(--transition-normal);
+  display: flex;
+  flex-direction: column;
+}
+
+.app-layout__content {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Panel container that sits beside content */
+.app-layout__panel {
+  flex-shrink: 0;
+  width: 0;
+  height: 100%;
+  overflow: hidden;
+  transition: width var(--transition-normal);
+  border-left: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.app-layout__panel.open {
+  width: var(--panel-width);
+}
+
+.app-layout__panel--sm.open { width: var(--panel-width-sm); }
+.app-layout__panel--md.open { width: var(--panel-width-md); }
+.app-layout__panel--lg.open { width: var(--panel-width-lg); }
+.app-layout__panel--xl.open { width: var(--panel-width-xl); }
+.app-layout__panel--xxl.open { width: var(--panel-width-xxl); }
+
+/* =====================
+   CONTENT AREA
+   ===================== */
+
+.content-area {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+.content-area__main {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  transition: margin-right var(--transition-normal);
+}
+
+/* When panel is active, shrink main content */
+.content-area--with-panel .content-area__main {
+  flex: 1;
+  overflow: hidden;
+}
+
+.content-area__panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: 0;
+  overflow: hidden;
+  background: var(--color-surface);
+  border-left: 1px solid var(--color-border);
+  box-shadow: var(--shadow-xl);
+  transition: width var(--transition-normal);
+  z-index: var(--z-panel);
+}
+
+.content-area__panel.open {
+  width: var(--panel-width);
+}
+
+/* =====================
+   SPLIT VIEW
+   ===================== */
+
+.split-view {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.split-view__primary {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  position: relative;
+  transition: flex var(--transition-normal);
+}
+
+.split-view__secondary {
+  width: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--color-surface);
+  border-left: 1px solid var(--color-border);
+  transition: width var(--transition-normal);
+}
+
+.split-view__secondary.open {
+  width: var(--panel-width);
+}
+
+/* Size variants */
+.split-view__secondary--sm.open { width: var(--panel-width-sm); }
+.split-view__secondary--md.open { width: var(--panel-width-md); }
+.split-view__secondary--lg.open { width: var(--panel-width-lg); }
+.split-view__secondary--xl.open { width: var(--panel-width-xl); }
+.split-view__secondary--xxl.open { width: var(--panel-width-xxl); }
+
+/* =====================
+   MAP CONTAINER
+   ===================== */
+
+.map-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
+
+.map-container__map {
+  position: absolute;
+  inset: 0;
+}
+
+.map-container__overlay {
+  position: absolute;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.map-container__overlay > * {
+  pointer-events: auto;
+}
+
+/* =====================
+   PANEL SLIDE-IN (Overlay mode - alternative)
+   ===================== */
+
+.panel-overlay {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100vh;
+  width: var(--panel-width);
+  max-width: 100%;
+  background: var(--color-surface);
+  border-left: 1px solid var(--color-border);
+  box-shadow: var(--shadow-2xl);
+  transform: translateX(100%);
+  transition: transform var(--transition-normal);
+  z-index: var(--z-panel);
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-overlay.open {
+  transform: translateX(0);
+}
+
+.panel-overlay--sm { width: var(--panel-width-sm); }
+.panel-overlay--md { width: var(--panel-width-md); }
+.panel-overlay--lg { width: var(--panel-width-lg); }
+.panel-overlay--xl { width: var(--panel-width-xl); }
+.panel-overlay--xxl { width: var(--panel-width-xxl); }
+
+/* =====================
+   TOAST CONTAINER
+   ===================== */
+
+.toast-container {
+  position: fixed;
+  top: var(--spacing-6);
+  right: var(--spacing-6);
+  z-index: var(--z-toast);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+  pointer-events: none;
+}
+
+.toast-container > * {
+  pointer-events: auto;
+}
+
+/* =====================
+   RESPONSIVE
+   ===================== */
+
+@media (max-width: 1024px) {
+  .app-layout__panel.open,
+  .content-area__panel.open,
+  .split-view__secondary.open {
+    width: 100%;
+    max-width: var(--panel-width-lg);
+  }
+  
+  .panel-overlay {
+    width: 100%;
+    max-width: var(--panel-width-lg);
+  }
+}
+
+@media (max-width: 768px) {
+  .app-layout__panel.open,
+  .content-area__panel.open,
+  .split-view__secondary.open,
+  .panel-overlay {
+    width: 100%;
+    max-width: 100%;
+  }
+}

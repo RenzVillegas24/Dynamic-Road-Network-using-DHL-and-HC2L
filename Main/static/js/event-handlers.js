@@ -279,11 +279,6 @@ function initializeEventHandlers() {
           reportPanel.classList.add("translate-x-full");
           currentPathPanel.classList.remove("translate-x-full");
           
-          // Adjust map container to make room for the panel
-          const mapContainer = document.getElementById("map-container");
-          if (mapContainer) {
-              mapContainer.style.marginRight = "28rem";
-          }
           
           // Trigger map resize to adjust to new container size
           if (map) {

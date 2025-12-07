@@ -1,152 +1,138 @@
-<!-- Report Disruption Panel Component -->
-<div class="panel" id="report-panel" data-panel="report">
-    <!-- Header -->
-    <div class="panel__header panel__header--warning">
-        <div class="panel__icon">
-            <i data-lucide="file-text"></i>
+<!-- Report Incident Panel -->
+<div id="report-panel" class="panel panel--sm">
+  <div class="panel__header panel__header--purple">
+    <div class="panel__icon">
+      <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+    </div>
+    <div class="panel__title-group">
+      <h2 class="panel__title">Report Disruption</h2>
+      <p class="panel__subtitle">Help others navigate better</p>
+    </div>
+    <button id="report-close" class="panel__close">
+      <i data-lucide="x" class="w-6 h-6"></i>
+    </button>
+  </div>
+
+  <div class="panel__body">
+    <form class="space-y-5" id="report-form">
+      <!-- Incident Location -->
+      <div class="input-group">
+        <label class="input-group__label">Incident Location</label>
+        <button type="button" id="pin-disruption-btn" class="pin-button">
+          <i data-lucide="map-pin" class="pin-button__icon"></i>
+          <span id="pin-disruption-text">Click to pin location on map</span>
+        </button>
+        <div id="disruption-coords" class="text-xs text-center font-semibold hidden mt-3 p-2 bg-alt rounded-xl"></div>
+      </div>
+
+      <!-- Incident Type -->
+      <div class="input-group">
+        <label class="input-group__label">Incident Type</label>
+        <select id="disruption-type" class="select">
+          <option value="">Select incident type...</option>
+          <option value="accident">Accident</option>
+          <option value="construction">Construction Work</option>
+          <option value="congestion">Heavy Congestion</option>
+          <option value="disabled-vehicle">Disabled Vehicle</option>
+          <option value="mass-transit">Mass Transit Event</option>
+          <option value="planned-event">Planned Event</option>
+          <option value="road-hazard">Road Hazard</option>
+          <option value="road-closure">Road Closure</option>
+          <option value="weather">Severe Weather</option>
+          <option value="lane-restriction">Lane Restriction</option>
+        </select>
+      </div>
+
+      <!-- Incident Criticality -->
+      <div class="input-group">
+        <label class="input-group__label">Incident Criticality</label>
+        <div class="space-y-3">
+          <label class="selection-card selection-card--success">
+            <input type="radio" name="criticality" value="low">
+            <div class="selection-card__content">
+              <span class="selection-card__title">Low Impact</span>
+              <p class="selection-card__description">Minor disruption</p>
+            </div>
+          </label>
+          <label class="selection-card selection-card--warning">
+            <input type="radio" name="criticality" value="minor" checked>
+            <div class="selection-card__content">
+              <span class="selection-card__title">Minor Impact</span>
+              <p class="selection-card__description">Moderate slowdown</p>
+            </div>
+          </label>
+          <label class="selection-card selection-card--major">
+            <input type="radio" name="criticality" value="major">
+            <div class="selection-card__content">
+              <span class="selection-card__title">Major Impact</span>
+              <p class="selection-card__description">Significant delays</p>
+            </div>
+          </label>
+          <label class="selection-card selection-card--critical">
+            <input type="radio" name="criticality" value="critical">
+            <div class="selection-card__content">
+              <span class="selection-card__title">Critical Impact</span>
+              <p class="selection-card__description">Severe disruption or closure</p>
+            </div>
+          </label>
         </div>
-        <div class="panel__title-group">
-            <h2 class="panel__title">Report Disruption</h2>
-            <p class="panel__subtitle">Submit a new road incident</p>
+      </div>
+
+      <!-- Road Closure Section -->
+      <div class="border-t pt-5">
+        <label class="checkbox-card checkbox-card--danger">
+          <div class="checkbox-card__content">
+            <i data-lucide="ban" class="checkbox-card__icon"></i>
+            <div class="checkbox-card__text">
+              <span class="checkbox-card__title">Road is Completely Closed</span>
+              <p class="checkbox-card__description">Mark as impassable</p>
+            </div>
+          </div>
+          <input type="checkbox" id="incident-road-closed" class="toggle-checkbox">
+        </label>
+      </div>
+
+      <!-- Time Range Section -->
+      <div class="stat-grid stat-grid--2">
+        <div class="input-group">
+          <label class="input-group__label">Start Time (Optional)</label>
+          <input type="datetime-local" id="incident-start-time" class="datetime-input">
         </div>
-        <button class="panel__close" onclick="closePanel('report')" title="Close panel">
-            <i data-lucide="x"></i>
-        </button>
-    </div>
-    
-    <!-- Body -->
-    <div class="panel__body">
-        <form id="report-form" onsubmit="submitDisruptionReport(event)">
-            <!-- Location Section -->
-            <div class="panel__section">
-                <h4 class="panel__section-title">
-                    <i data-lucide="map-pin" class="panel__section-icon"></i>
-                    Location
-                </h4>
-                
-                <div class="form-group">
-                    <label class="form-label form-label--required">Road/Street Name</label>
-                    <input type="text" 
-                           class="form-input" 
-                           id="report-road-name" 
-                           placeholder="e.g., Main Street, Highway 101"
-                           required>
-                    <p class="form-hint">Enter the road where the disruption is located</p>
-                </div>
-                
-                <div class="form-group">
-                    <label class="form-label">Click on Map to Set Location</label>
-                    <div class="form-input-group">
-                        <button type="button" class="btn btn--surface btn--sm btn--block" onclick="enableReportLocationPicker()">
-                            <i data-lucide="map-pin" class="btn__icon"></i>
-                            Pick Location on Map
-                        </button>
-                    </div>
-                    <div class="metric-card mt-2" id="report-location-preview" style="display: none;">
-                        <div class="metric-card__icon">
-                            <i data-lucide="map-pin"></i>
-                        </div>
-                        <div class="metric-card__content">
-                            <div class="metric-card__label">Selected Location</div>
-                            <div class="metric-card__value" id="report-location-coords">--</div>
-                        </div>
-                    </div>
-                    <input type="hidden" id="report-latitude">
-                    <input type="hidden" id="report-longitude">
-                </div>
-            </div>
-            
-            <!-- Disruption Details -->
-            <div class="panel__section">
-                <h4 class="panel__section-title">
-                    <i data-lucide="alert-triangle" class="panel__section-icon"></i>
-                    Disruption Details
-                </h4>
-                
-                <div class="form-group">
-                    <label class="form-label form-label--required">Type</label>
-                    <select class="form-select" id="report-type" required>
-                        <option value="">Select disruption type...</option>
-                        <option value="accident">Accident</option>
-                        <option value="construction">Road Construction</option>
-                        <option value="closure">Road Closure</option>
-                        <option value="traffic">Heavy Traffic</option>
-                        <option value="hazard">Road Hazard</option>
-                        <option value="weather">Weather Condition</option>
-                        <option value="event">Event/Gathering</option>
-                        <option value="other">Other</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label class="form-label form-label--required">Severity</label>
-                    <div class="form-row form-row--2">
-                        <label class="form-check">
-                            <input type="radio" name="report-severity" value="low" class="form-check__input">
-                            <div class="form-check__content">
-                                <span class="severity-badge severity-badge--low">Low</span>
-                            </div>
-                        </label>
-                        <label class="form-check">
-                            <input type="radio" name="report-severity" value="moderate" class="form-check__input" checked>
-                            <div class="form-check__content">
-                                <span class="severity-badge severity-badge--moderate">Moderate</span>
-                            </div>
-                        </label>
-                        <label class="form-check">
-                            <input type="radio" name="report-severity" value="high" class="form-check__input">
-                            <div class="form-check__content">
-                                <span class="severity-badge severity-badge--high">High</span>
-                            </div>
-                        </label>
-                        <label class="form-check">
-                            <input type="radio" name="report-severity" value="critical" class="form-check__input">
-                            <div class="form-check__content">
-                                <span class="severity-badge severity-badge--critical">Critical</span>
-                            </div>
-                        </label>
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label class="form-label">Description</label>
-                    <textarea class="form-textarea" 
-                              id="report-description" 
-                              rows="3"
-                              placeholder="Provide additional details about the disruption..."></textarea>
-                </div>
-            </div>
-            
-            <!-- Duration -->
-            <div class="panel__section">
-                <h4 class="panel__section-title">
-                    <i data-lucide="clock" class="panel__section-icon"></i>
-                    Duration (Optional)
-                </h4>
-                
-                <div class="form-row form-row--2">
-                    <div class="form-group">
-                        <label class="form-label">Start Time</label>
-                        <input type="datetime-local" class="form-input" id="report-start-time">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Expected End</label>
-                        <input type="datetime-local" class="form-input" id="report-end-time">
-                    </div>
-                </div>
-            </div>
-        </form>
-    </div>
-    
-    <!-- Footer -->
-    <div class="panel__footer panel__footer--end">
-        <button type="button" class="btn btn--ghost" onclick="resetReportForm()">
-            <i data-lucide="rotate-ccw" class="btn__icon"></i>
-            Reset
-        </button>
-        <button type="submit" form="report-form" class="btn btn--warning">
-            <i data-lucide="send" class="btn__icon"></i>
-            Submit Report
-        </button>
-    </div>
+        <div class="input-group">
+          <label class="input-group__label">End Time (Optional)</label>
+          <input type="datetime-local" id="incident-end-time" class="datetime-input">
+        </div>
+      </div>
+
+      <!-- Description Field -->
+      <div class="input-group">
+        <label class="input-group__label">Additional Details (Optional)</label>
+        <textarea id="disruption-description" class="textarea" rows="3"
+          placeholder="Describe what you observed (e.g., accident details, lane closures, etc.)"></textarea>
+      </div>
+
+      <!-- User-reported incidents management -->
+      <div class="mt-8 pt-6 border-t">
+        <div class="d-flex justify-between items-center mb-4">
+          <div>
+            <p class="text-xs uppercase tracking-wide text-primary font-semibold">Custom Incidents</p>
+            <h3 class="font-bold text-lg">Saved Pins</h3>
+            <p class="text-xs text-muted">Remove or refresh your manually added incidents.</p>
+          </div>
+          <button type="button" id="refresh-user-disruptions" class="btn btn--surface btn--sm">
+            Refresh
+          </button>
+        </div>
+
+        <div id="user-disruptions-empty" class="text-sm text-muted bg-alt rounded-xl p-3 hidden">
+          No custom incidents yet. Report one above to see it here.
+        </div>
+        <div id="user-disruptions-list" class="space-y-3"></div>
+      </div>
+
+      <button type="submit" class="btn btn--primary btn--lg btn--block">
+        Submit Report
+      </button>
+    </form>
+  </div>
 </div>
