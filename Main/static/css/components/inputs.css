@@ -512,7 +512,7 @@
   gap: var(--spacing-2);
   width: 100%;
   padding: var(--spacing-4);
-  background: linear-gradient(135deg, var(--color-primary) 0%, #7c3aed 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary-dark) 100%);
   color: var(--color-text-inverse);
   border: none;
   border-radius: var(--radius-xl);
@@ -541,5 +541,5 @@
 }
 
 .pin-button--active {
-  background: linear-gradient(135deg, var(--color-success) 0%, #059669 100%);
+  background: linear-gradient(135deg, var(--color-success) 0%, var(--color-success-dark) 100%);
 }

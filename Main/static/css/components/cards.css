@@ -389,9 +389,9 @@
 .section-card__icon--warning { background: var(--color-warning-light); color: var(--color-warning); }
 .section-card__icon--danger { background: var(--color-danger-light); color: var(--color-danger); }
 .section-card__icon--info { background: var(--color-info-light); color: var(--color-info); }
-.section-card__icon--purple { background: hsla(259, 94%, 51%, 0.1); color: #8b5cf6; }
-.section-card__icon--amber { background: hsla(38, 92%, 50%, 0.1); color: #f59e0b; }
-.section-card__icon--teal { background: hsla(168, 76%, 42%, 0.1); color: #14b8a6; }
+.section-card__icon--purple { background: var(--color-purple-light); color: var(--color-purple); }
+.section-card__icon--amber { background: var(--color-warning-light); color: var(--color-warning); }
+.section-card__icon--teal { background: var(--color-teal-light); color: var(--color-teal); }
 
 .section-card__title {
   display: flex;
@@ -708,11 +708,11 @@
 
 .flow-card--heavy .flow-card__icon {
   background: hsla(14, 100%, 57%, 0.1);
-  color: #f97316;
+  color: var(--color-warning);
 }
 
 .flow-card--heavy .flow-card__bar-fill {
-  background: #f97316;
+  background: var(--color-warning);
 }
 
 .flow-card--slow {

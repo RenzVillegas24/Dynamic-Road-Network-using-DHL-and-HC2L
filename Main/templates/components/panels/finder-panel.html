@@ -28,19 +28,11 @@
           <i data-lucide="play" class="w-5 h-5"></i>
           Route
         </button>
-        <button id="admin-reset-btn" class="btn btn--secondary">Reset</button>
-        <button id="admin-export-btn" class="btn btn--secondary">Export</button>
-        <button id="admin-google-compare-btn" onclick="compareWithGoogleMaps()" class="btn btn--warning btn--block col-span-2" disabled>
-          <i data-lucide="map" class="w-5 h-5"></i>
-          Compare Route Algorithms
-        </button>
+        <button id="admin-reset-btn" class="btn btn--outline btn--secondary">Reset</button>
+        <button id="admin-export-btn" class="btn btn--outline btn--secondary">Export</button>
         <button onclick="openDisruptionsPanel()" class="btn btn--error btn--block col-span-2">
           <i data-lucide="alert-triangle" class="w-5 h-5"></i>
           Network Disruptions
-        </button>
-        <button id="open-experiment-wizard-btn" onclick="openExperimentWizard()" class="btn btn--info btn--block col-span-2">
-          <i data-lucide="flask-conical" class="w-5 h-5"></i>
-          Experiment Automation
         </button>
       </div>
     </div>
@@ -53,7 +45,7 @@
         </div>
         <h3 class="section-card__title">Algorithm Selection</h3>
       </div>
-      <div class="nav-select nav-select--blue">
+      <div class="nav-select">
         <label class="nav-select__option" data-color="blue">
           <input type="radio" name="algorithm" value="hc2l" checked>
           <span class="nav-select__icon"><i data-lucide="zap" class="w-4 h-4"></i></span>
@@ -62,7 +54,7 @@
             <span class="nav-select__description">Advanced lazy update algorithm</span>
           </div>
         </label>
-        <label class="nav-select__option" data-color="emerald">
+        <label class="nav-select__option" data-color="indigo">
           <input type="radio" name="algorithm" value="dhl">
           <span class="nav-select__icon"><i data-lucide="layers" class="w-4 h-4"></i></span>
           <div class="nav-select__content">
@@ -80,7 +72,7 @@
         </div>
         <h3 class="section-card__title">Dataset Selection</h3>
       </div>
-      <div class="nav-select nav-select--amber">
+      <div class="nav-select">
         <label class="nav-select__option" data-color="slate">
           <input type="radio" name="dataset" value="none" checked>
           <span class="nav-select__icon"><i data-lucide="ban" class="w-4 h-4"></i></span>
@@ -89,7 +81,7 @@
             <span class="nav-select__description">No traffic data (shortest path only)</span>
           </div>
         </label>
-        <label class="nav-select__option" data-color="amber">
+        <label class="nav-select__option" data-color="red">
           <input type="radio" name="dataset" value="both">
           <span class="nav-select__icon"><i data-lucide="traffic-cone" class="w-4 h-4"></i></span>
           <div class="nav-select__content">
@@ -115,7 +107,7 @@
           <span class="stat-box__sublabel">min</span>
         </div>
       </div>
-      <button id="auto-update-interval-set" class="btn btn--primary btn--block mt-4">
+      <button id="auto-update-interval-set" class="btn btn--indigo btn--block mt-4">
         Apply Interval
       </button>
       <p id="auto-update-interval-status" class="text-xs text-muted mt-2">Current interval: 2 minutes</p>
@@ -145,7 +137,7 @@
         <label class="form-group__label">Quick Select</label>
         <div class="grid grid-cols-4 gap-2">
           <button class="quick-threshold-btn btn btn--outline btn--secondary btn--sm" data-value="0.25">0.25</button>
-          <button class="quick-threshold-btn btn btn--primary btn--sm" data-value="0.5">0.5</button>
+          <button class="quick-threshold-btn btn btn--indigo btn--sm" data-value="0.5">0.5</button>
           <button class="quick-threshold-btn btn btn--outline btn--secondary btn--sm" data-value="0.75">0.75</button>
           <button class="quick-threshold-btn btn btn--outline btn--secondary btn--sm" data-value="1.0">1.0</button>
         </div>

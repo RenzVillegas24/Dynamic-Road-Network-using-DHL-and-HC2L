@@ -526,82 +526,82 @@
 /* Step 1 - Purple (Config) */
 .wizard-steps__item--purple .wizard-steps__indicator {
   background: rgba(147, 51, 234, 0.1);
-  color: #9333ea;
-  border-color: #9333ea;
+  color: var(--color-purple);
+  border-color: var(--color-purple);
 }
 
 .wizard-steps__item--purple.wizard-steps__item--active .wizard-steps__indicator {
-  background: linear-gradient(135deg, #9333ea 0%, #7c3aed 100%);
+  background: var(--gradient-purple);
   color: white;
   box-shadow: 0 0 0 4px rgba(147, 51, 234, 0.2);
 }
 
 .wizard-steps__item--purple .wizard-steps__label {
-  color: #9333ea;
+  color: var(--color-purple);
 }
 
 /* Step 2 - Amber (Disruptions) */
 .wizard-steps__item--amber .wizard-steps__indicator {
   background: rgba(245, 158, 11, 0.1);
-  color: #d97706;
-  border-color: #f59e0b;
+  color: var(--color-warning-dark);
+  border-color: var(--color-warning);
 }
 
 .wizard-steps__item--amber.wizard-steps__item--active .wizard-steps__indicator {
-  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  background: var(--gradient-warning);
   color: white;
   box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.2);
 }
 
 .wizard-steps__item--amber .wizard-steps__label {
-  color: #d97706;
+  color: var(--color-warning-dark);
 }
 
 /* Step 3 - Blue (Sequence) */
 .wizard-steps__item--blue .wizard-steps__indicator {
   background: rgba(59, 130, 246, 0.1);
-  color: #2563eb;
-  border-color: #3b82f6;
+  color: var(--color-primary-dark);
+  border-color: var(--color-blue);
 }
 
 .wizard-steps__item--blue.wizard-steps__item--active .wizard-steps__indicator {
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  background: var(--gradient-blue);
   color: white;
   box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
 }
 
 .wizard-steps__item--blue .wizard-steps__label {
-  color: #2563eb;
+  color: var(--color-primary-dark);
 }
 
 /* Step 4 - Emerald (Review) */
 .wizard-steps__item--emerald .wizard-steps__indicator {
   background: rgba(16, 185, 129, 0.1);
-  color: #059669;
-  border-color: #10b981;
+  color: var(--color-success-dark);
+  border-color: var(--color-emerald);
 }
 
 .wizard-steps__item--emerald.wizard-steps__item--active .wizard-steps__indicator {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  background: var(--gradient-emerald);
   color: white;
   box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2);
 }
 
 .wizard-steps__item--emerald .wizard-steps__label {
-  color: #059669;
+  color: var(--color-success-dark);
 }
 
 /* Completed line colors matching steps */
 .wizard-steps__line--purple.wizard-steps__line--completed {
-  background: #9333ea;
+  background: var(--color-purple);
 }
 
 .wizard-steps__line--amber.wizard-steps__line--completed {
-  background: #f59e0b;
+  background: var(--color-warning);
 }
 
 .wizard-steps__line--blue.wizard-steps__line--completed {
-  background: #3b82f6;
+  background: var(--color-blue);
 }
 
 /* =====================

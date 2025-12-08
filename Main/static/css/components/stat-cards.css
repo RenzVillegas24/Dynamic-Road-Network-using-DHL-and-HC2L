@@ -352,7 +352,7 @@
 }
 
 .stat-box--purple .stat-box__value {
-  color: #a855f7;
+  color: var(--color-purple);
 }
 
 .stat-box--amber {
@@ -361,7 +361,7 @@
 }
 
 .stat-box--amber .stat-box__value {
-  color: #f59e0b;
+  color: var(--color-warning);
 }
 
 .stat-box--slate {
@@ -370,5 +370,5 @@
 }
 
 .stat-box--slate .stat-box__value {
-  color: #64748b;
+  color: var(--color-slate);
 }

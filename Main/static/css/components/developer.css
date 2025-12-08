@@ -314,14 +314,14 @@
 
 .filter-chip--query {
   --chip-bg: rgba(168, 85, 247, 0.1);
-  --chip-border: #a855f7;
-  --chip-icon-bg: #a855f7;
+  --chip-border: var(--color-purple);
+  --chip-icon-bg: var(--color-purple);
 }
 
 .filter-chip--update {
   --chip-bg: rgba(6, 182, 212, 0.1);
-  --chip-border: #06b6d4;
-  --chip-icon-bg: #06b6d4;
+  --chip-border: var(--color-cyan);
+  --chip-icon-bg: var(--color-cyan);
 }
 
 /* Legacy filter-checkbox support */
@@ -410,32 +410,32 @@
 
 .log-entry__level--info {
   background: rgba(59, 130, 246, 0.2);
-  color: #60a5fa;
+  color: var(--color-blue);
 }
 
 .log-entry__level--success {
   background: rgba(16, 185, 129, 0.2);
-  color: #34d399;
+  color: var(--color-emerald);
 }
 
 .log-entry__level--warning {
   background: rgba(245, 158, 11, 0.2);
-  color: #fbbf24;
+  color: var(--color-warning);
 }
 
 .log-entry__level--error {
   background: rgba(239, 68, 68, 0.2);
-  color: #f87171;
+  color: var(--color-danger);
 }
 
 .log-entry__level--query {
   background: rgba(168, 85, 247, 0.2);
-  color: #c084fc;
+  color: var(--color-purple);
 }
 
 .log-entry__level--update {
   background: rgba(6, 182, 212, 0.2);
-  color: #22d3ee;
+  color: var(--color-cyan);
 }
 
 .log-entry__message {
@@ -453,12 +453,12 @@
 
 .log-entry__source--console {
   background: rgba(59, 130, 246, 0.2);
-  color: #60a5fa;
+  color: var(--color-blue);
 }
 
 .log-entry__source--backend {
   background: rgba(16, 185, 129, 0.2);
-  color: #34d399;
+  color: var(--color-emerald);
 }
 
 /* =====================
@@ -555,30 +555,30 @@
 
 .log-entry__badge--info {
   background: rgba(59, 130, 246, 0.2);
-  color: #60a5fa;
+  color: var(--color-blue);
 }
 
 .log-entry__badge--success {
   background: rgba(16, 185, 129, 0.2);
-  color: #34d399;
+  color: var(--color-emerald);
 }
 
 .log-entry__badge--warning {
   background: rgba(245, 158, 11, 0.2);
-  color: #fbbf24;
+  color: var(--color-warning);
 }
 
 .log-entry__badge--error {
   background: rgba(239, 68, 68, 0.2);
-  color: #f87171;
+  color: var(--color-danger);
 }
 
 .log-entry__badge--query {
   background: rgba(168, 85, 247, 0.2);
-  color: #c084fc;
+  color: var(--color-purple);
 }
 
 .log-entry__badge--update {
   background: rgba(6, 182, 212, 0.2);
-  color: #22d3ee;
+  color: var(--color-cyan);
 }

@@ -224,7 +224,7 @@
 
 .tabs--pills .tabs__tab[aria-selected="true"] {
   background: var(--color-primary-600);
-  color: #fff;
+  color: var(--color-text-inverse);
   box-shadow: 0 6px 12px rgba(33, 37, 41, 0.06);
   transform: translateY(-1px);
 }
