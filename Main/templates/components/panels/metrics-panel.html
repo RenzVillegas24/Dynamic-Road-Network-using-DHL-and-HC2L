@@ -19,158 +19,153 @@
       <!-- Algorithm -->
       <div class="stat-box stat-box--primary">
         <div class="stat-box__label">Algorithm</div>
-        <div id="metrics-algorithm" class="stat-box__value text-lg">--</div>
+        <div id="metrics-algorithm" class="stat-box__value">--</div>
       </div>
 
       <!-- Query Time -->
       <div class="stat-box stat-box--purple">
         <div class="stat-box__label">Query Time</div>
-        <div id="metrics-query-time" class="stat-box__value text-lg">-- ms</div>
+        <div id="metrics-query-time" class="stat-box__value">-- ms</div>
       </div>
 
       <!-- Baseline ETA -->
       <div class="stat-box stat-box--success">
         <div class="stat-box__label">Baseline ETA</div>
-        <div id="metrics-baseline-eta" class="stat-box__value text-lg">-- sec</div>
+        <div id="metrics-baseline-eta" class="stat-box__value">-- sec</div>
       </div>
 
       <!-- Actual ETA -->
       <div class="stat-box stat-box--warning">
         <div class="stat-box__label">Actual ETA</div>
-        <div id="metrics-actual-eta" class="stat-box__value text-lg">-- sec</div>
+        <div id="metrics-actual-eta" class="stat-box__value">-- sec</div>
       </div>
 
       <!-- Time Impact -->
       <div class="stat-box stat-box--error">
         <div class="stat-box__label">Time Impact</div>
-        <div id="metrics-time-impact" class="stat-box__value text-lg">-- sec</div>
+        <div id="metrics-time-impact" class="stat-box__value">-- sec</div>
       </div>
 
       <!-- Disrupted Edges -->
-      <div class="stat-box stat-box--info">
+      <div class="stat-box stat-box--slate">
         <div class="stat-box__label">Disrupted Edges</div>
-        <div id="metrics-disrupted-edges" class="stat-box__value text-lg">-- edges</div>
+        <div id="metrics-disrupted-edges" class="stat-box__value">--</div>
+        <div class="stat-box__sublabel">edges</div>
       </div>
     </div>
 
     <!-- Detailed Metrics Section -->
-    <div class="section-card mb-5">
+    <div class="section-card section-card--slate mb-5">
       <div class="section-card__header">
-        <div class="section-card__icon">
+        <div class="section-card__icon section-card__icon--primary">
           <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
         </div>
         <h3 class="section-card__title">Detailed Performance</h3>
       </div>
-      <div class="section-card__body--compact">
-        <div class="space-y-2">
-          <div class="metric-row">
-            <span class="metric-row__label">Total Distance (units):</span>
-            <span id="metrics-distance" class="metric-row__value">--</span>
-          </div>
-          <div class="metric-row">
-            <span class="metric-row__label">Path Length (nodes):</span>
-            <span id="metrics-path-length" class="metric-row__value">--</span>
-          </div>
-          <div class="metric-row">
-            <span class="metric-row__label">Edge Count:</span>
-            <span id="metrics-edge-count" class="metric-row__value">--</span>
-          </div>
-          <div class="metric-row">
-            <span class="metric-row__label">Uses Disruptions:</span>
-            <span id="metrics-uses-disruptions" class="metric-row__value">--</span>
-          </div>
-          <div class="metric-row">
-            <span class="metric-row__label">Labeling Time (ms):</span>
-            <span id="metrics-labeling-time" class="metric-row__value">--</span>
-          </div>
-          <div class="metric-row">
-            <span class="metric-row__label">Labeling Size (MB):</span>
-            <span id="metrics-labeling-size" class="metric-row__value">--</span>
-          </div>
-          <div class="metric-row">
-            <span class="metric-row__label">Calculated Distance:</span>
-            <span id="metrics-calculated-distance" class="metric-row__value">--</span>
-          </div>
-          <div class="metric-row">
-            <span class="metric-row__label">Interpolation Used:</span>
-            <span id="metrics-interpolation" class="metric-row__value">--</span>
-          </div>
+      <div class="space-y-2">
+        <div class="metric-row">
+          <span class="metric-row__label">Total Distance (units):</span>
+          <span id="metrics-distance" class="metric-row__value">--</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row__label">Path Length (nodes):</span>
+          <span id="metrics-path-length" class="metric-row__value">--</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row__label">Edge Count:</span>
+          <span id="metrics-edge-count" class="metric-row__value">--</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row__label">Uses Disruptions:</span>
+          <span id="metrics-uses-disruptions" class="metric-row__value">--</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row__label">Labeling Time (ms):</span>
+          <span id="metrics-labeling-time" class="metric-row__value">--</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row__label">Labeling Size (MB):</span>
+          <span id="metrics-labeling-size" class="metric-row__value">--</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row__label">Calculated Distance:</span>
+          <span id="metrics-calculated-distance" class="metric-row__value">--</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row__label">Interpolation Used:</span>
+          <span id="metrics-interpolation" class="metric-row__value">--</span>
         </div>
       </div>
     </div>
 
     <!-- HC2L Labeling Info Section -->
-    <div id="hc2l-labeling-info-section" class="section-card mb-5">
+    <div id="hc2l-labeling-info-section" class="section-card section-card--info mb-5">
       <div class="section-card__header">
-        <div class="section-card__icon section-card__icon--cyan">
+        <div class="section-card__icon section-card__icon--info">
           <i data-lucide="database" class="w-5 h-5"></i>
         </div>
         <h3 class="section-card__title">Labeling Information</h3>
       </div>
-      <div class="section-card__body--compact">
-        <div class="space-y-2">
-          <div class="metric-row metric-row--cyan">
-            <span class="metric-row__label">Total Labels:</span>
-            <span id="metrics-total-labels" class="metric-row__value">--</span>
-          </div>
-          <div class="metric-row metric-row--cyan">
-            <span class="metric-row__label">Infinite Labels:</span>
-            <span id="metrics-infinite-labels" class="metric-row__value">--</span>
-          </div>
-          <div class="metric-row metric-row--cyan">
-            <span class="metric-row__label">Index Size (bytes):</span>
-            <span id="metrics-index-size-bytes" class="metric-row__value">--</span>
-          </div>
-          <div class="metric-row metric-row--cyan">
-            <span class="metric-row__label">Hierarchy Height:</span>
-            <span id="metrics-hierarchy-height" class="metric-row__value">--</span>
-          </div>
-          <div class="metric-row metric-row--cyan">
-            <span class="metric-row__label">Max Label Count/Node:</span>
-            <span id="metrics-max-label-count" class="metric-row__value">--</span>
-          </div>
-          <div class="metric-row metric-row--cyan">
-            <span class="metric-row__label">Max Cut Size:</span>
-            <span id="metrics-max-cut-size" class="metric-row__value">--</span>
-          </div>
-          <div class="metric-row metric-row--cyan">
-            <span class="metric-row__label">Average Cut Size:</span>
-            <span id="metrics-avg-cut-size" class="metric-row__value">--</span>
-          </div>
-          <div class="metric-row metric-row--cyan">
-            <span class="metric-row__label">Non-Empty Cuts:</span>
-            <span id="metrics-non-empty-cuts" class="metric-row__value">--</span>
-          </div>
-          <div class="metric-row metric-row--cyan">
-            <span class="metric-row__label">Index Load Time:</span>
-            <span id="metrics-index-load-time" class="metric-row__value">--</span>
-          </div>
+      <div class="space-y-2">
+        <div class="metric-row">
+          <span class="metric-row__label">Total Labels:</span>
+          <span id="metrics-total-labels" class="metric-row__value text-info">--</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row__label">Infinite Labels:</span>
+          <span id="metrics-infinite-labels" class="metric-row__value text-info">--</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row__label">Index Size (bytes):</span>
+          <span id="metrics-index-size-bytes" class="metric-row__value text-info">--</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row__label">Hierarchy Height:</span>
+          <span id="metrics-hierarchy-height" class="metric-row__value text-info">--</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row__label">Max Label Count/Node:</span>
+          <span id="metrics-max-label-count" class="metric-row__value text-info">--</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row__label">Max Cut Size:</span>
+          <span id="metrics-max-cut-size" class="metric-row__value text-info">--</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row__label">Average Cut Size:</span>
+          <span id="metrics-avg-cut-size" class="metric-row__value text-info">--</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row__label">Non-Empty Cuts:</span>
+          <span id="metrics-non-empty-cuts" class="metric-row__value text-info">--</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row__label">Index Load Time:</span>
+          <span id="metrics-index-load-time" class="metric-row__value text-info">--</span>
         </div>
       </div>
     </div>
 
     <!-- DHL Labeling Info Section -->
-    <div id="dhl-labeling-info-section" class="section-card hidden">
+    <div id="dhl-labeling-info-section" class="section-card section-card--purple hidden">
       <div class="section-card__header">
         <div class="section-card__icon section-card__icon--purple">
           <i data-lucide="database" class="w-5 h-5"></i>
         </div>
         <h3 class="section-card__title">DHL Labeling Information</h3>
       </div>
-      <div class="section-card__body--compact">
-        <div class="space-y-2">
-          <div class="metric-row metric-row--purple">
-            <span class="metric-row__label">Total Labels:</span>
-            <span id="dhl-metrics-total-labels" class="metric-row__value">--</span>
-          </div>
-          <div class="metric-row metric-row--purple">
-            <span class="metric-row__label">Index Size (bytes):</span>
-            <span id="dhl-metrics-index-size" class="metric-row__value">--</span>
-          </div>
-          <div class="metric-row metric-row--purple">
-            <span class="metric-row__label">Construction Time:</span>
-            <span id="dhl-metrics-construction-time" class="metric-row__value">--</span>
-          </div>
+      <div class="space-y-2">
+        <div class="metric-row">
+          <span class="metric-row__label">Total Labels:</span>
+          <span id="dhl-metrics-total-labels" class="metric-row__value" style="color: #8b5cf6;">--</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row__label">Index Size (bytes):</span>
+          <span id="dhl-metrics-index-size" class="metric-row__value" style="color: #8b5cf6;">--</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row__label">Construction Time:</span>
+          <span id="dhl-metrics-construction-time" class="metric-row__value" style="color: #8b5cf6;">--</span>
         </div>
       </div>
     </div>

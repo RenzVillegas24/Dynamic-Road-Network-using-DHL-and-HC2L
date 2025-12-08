@@ -90,6 +90,11 @@ function updateLogDisplay() {
     const visibleLogs = filteredLogs.slice(0, 100);
     logContainer.innerHTML = visibleLogs.map(log => createLogEntryHTML(log)).join('');
     
+    // Re-create lucide icons for the new log entries
+    if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+    }
+    
     // Auto-scroll to newest (top)
     if (LoggingSystem.autoScroll) {
         logContainer.scrollTop = 0;
@@ -97,67 +102,86 @@ function updateLogDisplay() {
 }
 
 /**
- * Create HTML for a single log entry
+ * Create HTML for a single log entry (collapsible dark theme)
  */
 function createLogEntryHTML(log) {
     const hasMetadata = Object.keys(log.metadata).length > 0;
-    const metadataId = `metadata-${log.id}`;
+    const entryId = `log-${log.id}`;
     
     // Determine source indicator
     const isBackendLog = log.message.includes('[Backend]');
     const isConsoleLog = log.message.includes('[Console]');
-    let sourceIndicator = '';
+    let sourceClass = '';
+    let sourceLabel = '';
     
     if (isBackendLog) {
-        sourceIndicator = '<span class="inline-block w-2 h-2 rounded-full bg-green-600 mr-1" title="Python Backend"></span>';
+        sourceClass = 'log-entry__source--backend';
+        sourceLabel = 'PY';
     } else if (isConsoleLog) {
-        sourceIndicator = '<span class="inline-block w-2 h-2 rounded-full bg-blue-600 mr-1" title="Web Console"></span>';
+        sourceClass = 'log-entry__source--console';
+        sourceLabel = 'JS';
     }
     
-    return `
-        <div class="log-entry border-l-4 border-${log.level.color} bg-white rounded-lg p-3 mb-2 shadow-sm hover:shadow-md transition-all" 
-             style="border-left-color: ${log.level.color};">
-            <div class="flex items-start gap-2">
-                <span class="text-lg flex-shrink-0">${log.level.icon}</span>
-                <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-2 mb-1">
-                        ${sourceIndicator}
-                        <span class="text-xs font-mono text-gray-500">${log.formattedTime}</span>
-                        <span class="text-xs font-bold px-2 py-0.5 rounded ${log.level.bgColor}" 
-                              style="color: ${log.level.color};">
-                            ${log.level.name}
-                        </span>
-                        ${log.metadata.module ? `<span class="text-xs text-gray-500">${log.metadata.module}:${log.metadata.line || ''}</span>` : ''}
+    // Get level class
+    const levelClass = `log-entry__badge--${log.level.name.toLowerCase()}`;
+    
+    // Truncate message for preview (max 80 chars)
+    const fullMessage = log.message;
+    const previewMessage = fullMessage.length > 80 ? fullMessage.substring(0, 80) + '...' : fullMessage;
+    const needsExpand = fullMessage.length > 80 || hasMetadata;
+    
+    // Build metadata section
+    let metadataSection = '';
+    if (hasMetadata) {
+        metadataSection = `
+            <div class="mt-2 pt-2 border-t border-gray-700">
+                <div class="text-xs text-gray-500 mb-1">Metadata:</div>
+                <pre class="text-xs text-gray-400">${JSON.stringify(log.metadata, null, 2)}</pre>
+            </div>
+        `;
+    }
+    
+    if (needsExpand) {
+        return `
+            <div class="log-entry log-entry--collapsible" id="${entryId}" onclick="toggleLogEntry('${entryId}')">
+                <div class="log-entry__header">
+                    <div class="log-entry__expand">
+                        <i data-lucide="chevron-right" class="w-3 h-3"></i>
                     </div>
-                    <div class="text-sm text-gray-800 font-medium break-words">
-                        ${escapeHTML(log.message)}
-                    </div>
-                    ${hasMetadata ? `
-                        <button onclick="toggleLogMetadata('${metadataId}')" 
-                                class="text-xs text-blue-600 hover:text-blue-800 mt-1 flex items-center gap-1">
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                            View Details
-                        </button>
-                        <div id="${metadataId}" class="hidden mt-2 p-2 bg-gray-50 rounded text-xs font-mono overflow-x-auto">
-                            <pre class="text-gray-700">${JSON.stringify(log.metadata, null, 2)}</pre>
-                        </div>
-                    ` : ''}
+                    <span class="log-entry__time">${log.formattedTime}</span>
+                    <span class="log-entry__badge ${levelClass}">${log.level.name}</span>
+                    ${sourceLabel ? `<span class="log-entry__source ${sourceClass}">${sourceLabel}</span>` : ''}
+                    <span class="log-entry__preview">${escapeHTML(previewMessage)}</span>
+                </div>
+                <div class="log-entry__full">
+                    ${escapeHTML(fullMessage)}
+                    ${metadataSection}
                 </div>
             </div>
-        </div>
-    `;
+        `;
+    } else {
+        return `
+            <div class="log-entry" id="${entryId}">
+                <span class="log-entry__time">${log.formattedTime}</span>
+                <span class="log-entry__level log-entry__level--${log.level.name.toLowerCase()}">${log.level.name}</span>
+                ${sourceLabel ? `<span class="log-entry__source ${sourceClass}">${sourceLabel}</span>` : ''}
+                <span class="log-entry__message">${escapeHTML(fullMessage)}</span>
+            </div>
+        `;
+    }
 }
 
 /**
- * Toggle metadata visibility
+ * Toggle log entry expansion
  */
-function toggleLogMetadata(id) {
+function toggleLogEntry(id) {
     const element = document.getElementById(id);
     if (element) {
-        element.classList.toggle('hidden');
+        element.classList.toggle('log-entry--expanded');
+        // Re-create lucide icons after toggle
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
     }
 }
 
@@ -389,7 +413,7 @@ window.LoggingSystem = LoggingSystem;
 window.addLog = addLog;
 window.clearLogs = clearLogs;
 window.exportLogs = exportLogs;
-window.toggleLogMetadata = toggleLogMetadata;
+window.toggleLogEntry = toggleLogEntry;
 window.toggleLogFilter = toggleLogFilter;
 window.updateLogDisplay = updateLogDisplay;
 window.interceptConsoleLogs = interceptConsoleLogs;

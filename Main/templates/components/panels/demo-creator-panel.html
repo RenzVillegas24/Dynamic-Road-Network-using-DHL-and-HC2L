@@ -2,13 +2,15 @@
       <!-- ============================================================ -->
       <!-- DEMO CREATOR V2 PANEL - Reimagined Custom Demo Creation -->
       <!-- ============================================================ -->
-      <div id="demo-creator-panel" class="panel panel--xl panel--fixed">
+      <div id="demo-creator-panel" class="panel panel--lg panel--fixed">
 
         <!-- Header -->
         <div class="panel__header panel__header--purple">
+          <div class="panel__icon">
+            <i data-lucide="palette" class="w-6 h-6"></i>
+          </div>
           <div class="panel__title-group">
             <h2 id="demo-creator-title" class="panel__title flex items-center gap-2">
-              <i data-lucide="palette" class="w-6 h-6"></i>
               <span>Demo Creator</span>
               <span class="badge badge--success">New</span>
             </h2>
@@ -21,22 +23,22 @@
 
         <!-- Step Indicators -->
         <div class="wizard-steps">
-          <div class="wizard-steps__item">
+          <div id="demo-v2-step-item-1" class="wizard-steps__item wizard-steps__item--purple wizard-steps__item--active">
             <div id="demo-v2-indicator-1" class="wizard-steps__indicator wizard-steps__indicator--active">1</div>
             <span class="wizard-steps__label">Config</span>
           </div>
-          <div class="wizard-steps__line"></div>
-          <div class="wizard-steps__item">
+          <div id="demo-v2-line-1" class="wizard-steps__line wizard-steps__line--purple"></div>
+          <div id="demo-v2-step-item-2" class="wizard-steps__item wizard-steps__item--amber">
             <div id="demo-v2-indicator-2" class="wizard-steps__indicator">2</div>
             <span class="wizard-steps__label">Disruptions</span>
           </div>
-          <div class="wizard-steps__line"></div>
-          <div class="wizard-steps__item">
+          <div id="demo-v2-line-2" class="wizard-steps__line wizard-steps__line--amber"></div>
+          <div id="demo-v2-step-item-3" class="wizard-steps__item wizard-steps__item--blue">
             <div id="demo-v2-indicator-3" class="wizard-steps__indicator">3</div>
             <span class="wizard-steps__label">Sequence</span>
           </div>
-          <div class="wizard-steps__line"></div>
-          <div class="wizard-steps__item">
+          <div id="demo-v2-line-3" class="wizard-steps__line wizard-steps__line--blue"></div>
+          <div id="demo-v2-step-item-4" class="wizard-steps__item wizard-steps__item--emerald">
             <div id="demo-v2-indicator-4" class="wizard-steps__indicator">4</div>
             <span class="wizard-steps__label">Review</span>
           </div>
@@ -47,47 +49,59 @@
           <div id="demo-creator-content">
             <!-- Step 1: Config (was Routes - now includes Demo Name and Trials) -->
             <div id="demo-v2-step-1" class="space-y-4">
-              <h3 class="section-title"><i data-lucide="settings" class="w-5 h-5 inline-block"></i> Demo Configuration</h3>
+              <div class="section-card__header">
+                <div class="section-card__icon section-card__icon--purple">
+                  <i data-lucide="settings" class="w-5 h-5"></i>
+                </div>
+                <h3 class="section-card__title">Demo Configuration</h3>
+              </div>
 
               <!-- Demo Name -->
-              <div class="form-card">
-                <label class="form-card__label">Demo Name</label>
+              <div class="form-group">
+                <label class="form-group__label">Demo Name</label>
                 <input type="text" id="demo-v2-name" placeholder="My Custom Demo" class="form-input">
               </div>
 
               <!-- Number of Trials -->
-              <div class="form-card form-card--info">
-                <label class="form-card__label text-blue-800"><i data-lucide="repeat" class="w-4 h-4 inline-block"></i> Number of Trials</label>
-                <div class="flex items-center gap-3">
-                  <input type="number" id="demo-trials-count" value="1" min="1" max="100" class="form-input flex-1">
-                  <span class="text-muted">times to repeat</span>
+              <div class="section-card section-card--info">
+                <div class="form-group">
+                  <label class="form-group__label"><i data-lucide="repeat" class="w-4 h-4 inline"></i> Number of Trials</label>
+                  <div class="flex items-center gap-3">
+                    <input type="number" id="demo-trials-count" value="1" min="1" max="100" class="form-input flex-1">
+                    <span class="text-muted">times to repeat</span>
+                  </div>
+                  <span class="form-group__help">Each route will be tested this many times</span>
                 </div>
-                <p class="form-card__help">Each route will be tested this many times</p>
               </div>
 
               <!-- Routes Section -->
               <div class="border-t border-gray-200 pt-4 mt-4">
-                <h4 class="section-title text-base"><i data-lucide="map-pin" class="w-5 h-5 inline-block"></i> Routes</h4>
+                <div class="section-card__header">
+                  <div class="section-card__icon section-card__icon--primary">
+                    <i data-lucide="map-pin" class="w-5 h-5"></i>
+                  </div>
+                  <h4 class="section-card__title">Routes</h4>
+                </div>
               </div>
 
               <!-- Add Route Section -->
-              <div class="form-card">
-                <h4 class="form-card__title">Add Route</h4>
+              <div class="section-card">
+                <h4 class="text-sm font-semibold mb-3">Add Route</h4>
 
                 <!-- Start Location -->
                 <div class="mb-3 relative">
-                  <label class="form-card__label text-gray-600">Start Location</label>
+                  <label class="form-group__label text-gray-600">Start Location</label>
                   <div class="flex gap-2">
-                    <input type="text" id="demo-start-search" class="form-input form-input--success flex-1" placeholder="Search for start location...">
+                    <input type="text" id="demo-start-search" class="form-input flex-1" placeholder="Search for start location...">
                   </div>
                   <div id="demo-start-dropdown" class="dropdown-menu hidden"></div>
                 </div>
 
                 <!-- End Location -->
                 <div class="mb-3 relative">
-                  <label class="form-card__label text-gray-600">Destination</label>
+                  <label class="form-group__label text-gray-600">Destination</label>
                   <div class="flex gap-2">
-                    <input type="text" id="demo-end-search" class="form-input form-input--error flex-1" placeholder="Search for destination...">
+                    <input type="text" id="demo-end-search" class="form-input flex-1" placeholder="Search for destination...">
                   </div>
                   <div id="demo-end-dropdown" class="dropdown-menu hidden"></div>
                 </div>
@@ -98,26 +112,28 @@
               </div>
 
               <!-- Random Routes Section -->
-              <div class="form-card form-card--warning">
-                <h4 class="form-card__title text-amber-800"><i data-lucide="shuffle" class="w-5 h-5 inline-block"></i> Generate Random Routes</h4>
+              <div class="section-card section-card--warning">
+                <h4 class="text-sm font-semibold mb-3 flex items-center gap-2">
+                  <i data-lucide="shuffle" class="w-5 h-5"></i> Generate Random Routes
+                </h4>
                 <div class="space-y-3">
                   <div class="grid grid-cols-3 gap-3">
-                    <div>
-                      <label class="form-card__label text-amber-600">Count</label>
-                      <input type="number" id="demo-random-count" value="3" min="1" max="10" class="form-input form-input--warning">
+                    <div class="form-group">
+                      <label class="form-group__label">Count</label>
+                      <input type="number" id="demo-random-count" value="3" min="1" max="10" class="form-input">
                     </div>
-                    <div>
-                      <label class="form-card__label text-amber-600">Min Distance (km)</label>
-                      <input type="number" id="demo-random-min-dist" value="1" min="0.5" max="20" step="0.5" class="form-input form-input--warning">
+                    <div class="form-group">
+                      <label class="form-group__label">Min Distance (km)</label>
+                      <input type="number" id="demo-random-min-dist" value="1" min="0.5" max="20" step="0.5" class="form-input">
                     </div>
-                    <div>
-                      <label class="form-card__label text-amber-600">Max Distance (km)</label>
-                      <input type="number" id="demo-random-max-dist" value="10" min="1" max="30" step="0.5" class="form-input form-input--warning">
+                    <div class="form-group">
+                      <label class="form-group__label">Max Distance (km)</label>
+                      <input type="number" id="demo-random-max-dist" value="10" min="1" max="30" step="0.5" class="form-input">
                     </div>
                   </div>
-                  <label class="filter-checkbox text-amber-700">
-                    <input type="checkbox" id="demo-random-validate-roads" checked class="filter-checkbox__input">
-                    <span>Validate points near roads (100m)</span>
+                  <label class="form-check">
+                    <input type="checkbox" id="demo-random-validate-roads" checked class="form-check__input">
+                    <span class="form-check__label">Validate points near roads (100m)</span>
                   </label>
                   <button onclick="DemoCreator.generateRandomRoutes()" id="demo-generate-routes-btn" class="btn btn--warning btn--block">
                     Generate Routes
@@ -126,10 +142,10 @@
               </div>
 
               <!-- Routes List -->
-              <div class="form-card">
+              <div class="section-card">
                 <div class="flex justify-between items-center mb-3">
-                  <h4 class="form-card__title mb-0">Routes</h4>
-                  <button onclick="DemoCreator.clearAllRoutes()" class="utility-btn utility-btn--link utility-btn--danger">Clear All</button>
+                  <h4 class="text-sm font-semibold">Routes</h4>
+                  <button onclick="DemoCreator.clearAllRoutes()" class="btn btn--ghost btn--sm text-red-600">Clear All</button>
                 </div>
                 <div id="demo-routes-list" class="space-y-3">
                   <!-- Routes will be rendered here -->
@@ -139,115 +155,125 @@
 
             <!-- Step 2: Disruptions -->
             <div id="demo-v2-step-2" class="hidden space-y-4">
-              <h3 class="section-title"><i data-lucide="traffic-cone" class="w-5 h-5 inline-block"></i> Disruption Configuration</h3>
+              <div class="section-card__header">
+                <div class="section-card__icon section-card__icon--warning">
+                  <i data-lucide="traffic-cone" class="w-5 h-5"></i>
+                </div>
+                <h3 class="section-card__title">Disruption Configuration</h3>
+              </div>
 
-              <div class="option-card option-card--slate">
-                <label class="form-card__label font-bold">Disruption Mode</label>
-                <div class="space-y-2">
-                  <div class="grid grid-cols-2 gap-2">
-                    <label class="gradient-select gradient-select--slate disruption-mode-option">
-                      <input type="radio" name="demo-disruption-mode" value="none" onchange="DemoCreator.setDisruptionMode(this.value)">
-                      <div class="gradient-select__content">
-                        <span class="gradient-select__title"><i data-lucide="ban" class="w-4 h-4 inline-block"></i> None</span>
-                        <p class="gradient-select__desc">No disruptions</p>
-                      </div>
-                    </label>
-                    <label class="gradient-select gradient-select--orange disruption-mode-option">
-                      <input type="radio" name="demo-disruption-mode" value="random-flow" onchange="DemoCreator.setDisruptionMode(this.value)">
-                      <div class="gradient-select__content">
-                        <span class="gradient-select__title"><i data-lucide="traffic-cone" class="w-4 h-4 inline-block"></i> Traffic</span>
-                        <p class="gradient-select__desc">Traffic flow only</p>
-                      </div>
-                    </label>
-                    <label class="gradient-select gradient-select--red disruption-mode-option">
-                      <input type="radio" name="demo-disruption-mode" value="random-incidents" onchange="DemoCreator.setDisruptionMode(this.value)">
-                      <div class="gradient-select__content">
-                        <span class="gradient-select__title"><i data-lucide="alert-triangle" class="w-4 h-4 inline-block"></i> Incidents</span>
-                        <p class="gradient-select__desc">Incidents only</p>
-                      </div>
-                    </label>
-                    <label class="gradient-select gradient-select--purple disruption-mode-option">
-                      <input type="radio" name="demo-disruption-mode" value="random-both" checked onchange="DemoCreator.setDisruptionMode(this.value)">
-                      <div class="gradient-select__content">
-                        <span class="gradient-select__title"><i data-lucide="zap" class="w-4 h-4 inline-block"></i> Both</span>
-                        <p class="gradient-select__desc">Traffic + Incidents</p>
-                      </div>
-                    </label>
-                  </div>
-                  <label class="gradient-select gradient-select--blue disruption-mode-option">
+              <div class="section-card">
+                <label class="form-group__label font-bold mb-3">Disruption Mode</label>
+                <div class="nav-select nav-select--grid">
+                  <label class="nav-select__option disruption-mode-option">
+                    <input type="radio" name="demo-disruption-mode" value="none" onchange="DemoCreator.setDisruptionMode(this.value)">
+                    <div class="nav-select__icon"><i data-lucide="ban" class="w-5 h-5"></i></div>
+                    <div class="nav-select__content">
+                      <span class="nav-select__title">None</span>
+                    </div>
+                  </label>
+                  <label class="nav-select__option disruption-mode-option">
+                    <input type="radio" name="demo-disruption-mode" value="random-flow" onchange="DemoCreator.setDisruptionMode(this.value)">
+                    <div class="nav-select__icon"><i data-lucide="traffic-cone" class="w-5 h-5"></i></div>
+                    <div class="nav-select__content">
+                      <span class="nav-select__title">Traffic</span>
+                    </div>
+                  </label>
+                  <label class="nav-select__option disruption-mode-option">
+                    <input type="radio" name="demo-disruption-mode" value="random-incidents" onchange="DemoCreator.setDisruptionMode(this.value)">
+                    <div class="nav-select__icon"><i data-lucide="alert-triangle" class="w-5 h-5"></i></div>
+                    <div class="nav-select__content">
+                      <span class="nav-select__title">Incidents</span>
+                    </div>
+                  </label>
+                  <label class="nav-select__option disruption-mode-option">
+                    <input type="radio" name="demo-disruption-mode" value="random-both" checked onchange="DemoCreator.setDisruptionMode(this.value)">
+                    <div class="nav-select__icon"><i data-lucide="zap" class="w-5 h-5"></i></div>
+                    <div class="nav-select__content">
+                      <span class="nav-select__title">Both</span>
+                    </div>
+                  </label>
+                </div>
+                <div class="nav-select nav-select--blue mt-2">
+                  <label class="nav-select__option disruption-mode-option">
                     <input type="radio" name="demo-disruption-mode" value="custom" onchange="DemoCreator.setDisruptionMode(this.value)">
-                    <div class="gradient-select__content">
-                      <span class="gradient-select__title"><i data-lucide="target" class="w-4 h-4 inline-block"></i> Custom Disruptions</span>
-                      <p class="gradient-select__desc">Define specific disruption locations</p>
+                    <div class="nav-select__icon"><i data-lucide="target" class="w-5 h-5"></i></div>
+                    <div class="nav-select__content">
+                      <span class="nav-select__title">Custom Disruptions</span>
+                      <span class="nav-select__description">Define disruption locations</span>
                     </div>
                   </label>
                 </div>
               </div>
 
               <!-- Random Settings -->
-              <div id="disruption-random-settings" class="form-card form-card--warning space-y-4">
-                <h4 class="form-card__title text-amber-800 flex items-center gap-2">
+              <div id="disruption-random-settings" class="section-card section-card--warning space-y-4">
+                <h4 class="text-sm font-semibold flex items-center gap-2">
                   <i data-lucide="shuffle" class="w-5 h-5"></i> Random Disruption Settings
                 </h4>
 
                 <!-- Generation Scope -->
                 <div class="border-b border-amber-200 pb-4">
-                  <label class="form-card__label text-amber-800">Generation Scope</label>
-                  <div class="space-y-2">
-                    <label class="gradient-select gradient-select--indigo disruption-scope-option">
+                  <label class="form-group__label">Generation Scope</label>
+                  <div class="nav-select nav-select--amber">
+                    <label class="nav-select__option disruption-scope-option">
                       <input type="radio" name="disruption-generation-scope" value="all" onchange="DemoCreator.setDisruptionScope(this.value)">
-                      <div class="gradient-select__content">
-                        <span class="gradient-select__title"><i data-lucide="globe" class="w-4 h-4 inline-block"></i> Same for All</span>
-                        <p class="gradient-select__desc">All routes in all trials share same disruptions</p>
+                      <div class="nav-select__icon"><i data-lucide="globe" class="w-4 h-4"></i></div>
+                      <div class="nav-select__content">
+                        <span class="nav-select__title">Same for All</span>
+                        <span class="nav-select__description">All routes share same disruptions</span>
                       </div>
                     </label>
-                    <label class="gradient-select gradient-select--blue disruption-scope-option">
+                    <label class="nav-select__option disruption-scope-option">
                       <input type="radio" name="disruption-generation-scope" value="per-trial" onchange="DemoCreator.setDisruptionScope(this.value)">
-                      <div class="gradient-select__content">
-                        <span class="gradient-select__title"><i data-lucide="repeat" class="w-4 h-4 inline-block"></i> Per Trial</span>
-                        <p class="gradient-select__desc">Each trial gets unique disruptions</p>
+                      <div class="nav-select__icon"><i data-lucide="repeat" class="w-4 h-4"></i></div>
+                      <div class="nav-select__content">
+                        <span class="nav-select__title">Per Trial</span>
+                        <span class="nav-select__description">Each trial gets unique disruptions</span>
                       </div>
                     </label>
-                    <label class="gradient-select gradient-select--teal disruption-scope-option">
+                    <label class="nav-select__option disruption-scope-option">
                       <input type="radio" name="disruption-generation-scope" value="per-route" onchange="DemoCreator.setDisruptionScope(this.value)">
-                      <div class="gradient-select__content">
-                        <span class="gradient-select__title"><i data-lucide="route" class="w-4 h-4 inline-block"></i> Per Route</span>
-                        <p class="gradient-select__desc">Each route gets unique disruptions</p>
+                      <div class="nav-select__icon"><i data-lucide="route" class="w-4 h-4"></i></div>
+                      <div class="nav-select__content">
+                        <span class="nav-select__title">Per Route</span>
+                        <span class="nav-select__description">Each route gets unique disruptions</span>
                       </div>
                     </label>
-                    <label class="gradient-select gradient-select--amber disruption-scope-option">
+                    <label class="nav-select__option disruption-scope-option">
                       <input type="radio" name="disruption-generation-scope" value="per-trial-route" checked onchange="DemoCreator.setDisruptionScope(this.value)">
-                      <div class="gradient-select__content">
-                        <span class="gradient-select__title"><i data-lucide="shuffle" class="w-4 h-4 inline-block"></i> Per Trial & Route</span>
-                        <p class="gradient-select__desc">Each route in each trial gets unique disruptions</p>
+                      <div class="nav-select__icon"><i data-lucide="shuffle" class="w-4 h-4"></i></div>
+                      <div class="nav-select__content">
+                        <span class="nav-select__title">Per Trial & Route</span>
+                        <span class="nav-select__description">Unique disruptions for each</span>
                       </div>
                     </label>
                   </div>
                 </div>
 
-                <div id="disruption-flow-count-row" class="toggle-row">
-                  <span class="toggle-row__label text-amber-700">Traffic Flow Count</span>
-                  <input type="number" id="random-flow-count" value="1500" min="50" max="3000" onchange="DemoCreator.onDisruptionSettingChange()" class="form-input form-input--sm w-24 text-center">
+                <div class="metric-row">
+                  <span class="metric-row__label">Traffic Flow Count</span>
+                  <input type="number" id="random-flow-count" value="1500" min="50" max="3000" onchange="DemoCreator.onDisruptionSettingChange()" class="form-input w-24 text-center">
                 </div>
-                <div id="disruption-incident-count-row" class="toggle-row">
-                  <span class="toggle-row__label text-amber-700">Incident Count</span>
-                  <input type="number" id="random-incident-count" value="5" min="5" max="200" onchange="DemoCreator.onDisruptionSettingChange()" class="form-input form-input--sm w-24 text-center">
+                <div id="disruption-incident-count-row" class="metric-row">
+                  <span class="metric-row__label">Incident Count</span>
+                  <input type="number" id="random-incident-count" value="5" min="5" max="200" onchange="DemoCreator.onDisruptionSettingChange()" class="form-input w-24 text-center">
                 </div>
                 <div class="border-t border-amber-200 pt-3 mt-3">
-                  <h5 class="form-card__label text-amber-800">Severity Range</h5>
+                  <h5 class="form-group__label">Severity Range</h5>
                   <div class="grid grid-cols-2 gap-3">
-                    <div>
-                      <label class="form-card__label text-amber-600">Min Severity</label>
+                    <div class="form-group">
+                      <label class="form-group__label text-sm">Min Severity</label>
                       <div class="flex items-center gap-2">
                         <input type="range" id="random-severity-min" min="0" max="0.9" step="0.1" value="0.1" oninput="document.getElementById('random-severity-min-display').textContent = this.value" onchange="DemoCreator.onDisruptionSettingChange()" class="form-range flex-1">
-                        <span id="random-severity-min-display" class="badge badge--solid-warning w-8">0.1</span>
+                        <span id="random-severity-min-display" class="badge badge--warning w-8">0.1</span>
                       </div>
                     </div>
-                    <div>
-                      <label class="form-card__label text-amber-600">Max Severity</label>
+                    <div class="form-group">
+                      <label class="form-group__label text-sm">Max Severity</label>
                       <div class="flex items-center gap-2">
                         <input type="range" id="random-severity-max" min="0.1" max="1" step="0.1" value="0.7" oninput="document.getElementById('random-severity-max-display').textContent = this.value" onchange="DemoCreator.onDisruptionSettingChange()" class="form-range flex-1">
-                        <span id="random-severity-max-display" class="badge badge--solid-warning w-8">0.7</span>
+                        <span id="random-severity-max-display" class="badge badge--warning w-8">0.7</span>
                       </div>
                     </div>
                   </div>
@@ -255,8 +281,8 @@
 
                 <!-- Disruption Generation Status/Loading Indicator -->
                 <div id="disruption-generation-status" class="border-t border-amber-200 pt-3 mt-3">
-                  <div class="toggle-row mb-2">
-                    <span class="toggle-row__label text-amber-700">Disruption Sets</span>
+                  <div class="metric-row mb-2">
+                    <span class="metric-row__label">Disruption Sets</span>
                     <span id="disruption-status-text" class="text-muted">Not generated</span>
                   </div>
 
@@ -264,27 +290,24 @@
                   <button onclick="DemoCreator.generateRandomDisruptions()" id="generate-disruptions-btn" class="btn btn--warning btn--block flex items-center justify-center gap-2">
                     <i data-lucide="shuffle" class="w-4 h-4"></i> Generate Random Disruptions
                   </button>
-                  <div class="text-center text-xs text-gray-500 mt-1" id="disruption-sets-status">No sets generated
-                  </div>
+                  <div class="text-center text-xs text-muted mt-1" id="disruption-sets-status">No sets generated</div>
 
-                  <div id="disruption-loading-indicator" class="hidden mt-2">
-                    <div class="loading-indicator loading-indicator--amber">
-                      <span class="loading-indicator__spinner"></span>
-                      <span id="disruption-loading-text" class="loading-indicator__text">Generating...</span>
-                    </div>
+                  <div id="disruption-loading-indicator" class="hidden mt-2 flex items-center justify-center gap-2 py-2">
+                    <div class="animate-spin h-4 w-4 border-2 border-amber-500 border-t-transparent rounded-full"></div>
+                    <span id="disruption-loading-text" class="text-sm text-amber-700">Generating...</span>
                   </div>
                 </div>
               </div>
 
               <!-- Disruption Preview Panel (NEW) -->
-              <div id="disruption-preview-panel" class="hidden form-card">
+              <div id="disruption-preview-panel" class="hidden section-card">
                 <div class="flex items-center justify-between mb-3">
-                  <h4 class="form-card__title mb-0"><i data-lucide="map-pin" class="w-4 h-4 inline"></i> Disruption Preview</h4>
+                  <h4 class="text-sm font-semibold"><i data-lucide="map-pin" class="w-4 h-4 inline"></i> Disruption Preview</h4>
                   <div class="flex gap-2">
-                    <select id="preview-set-selector" class="form-input form-input--sm hidden">
+                    <select id="preview-set-selector" class="form-select form-select--sm hidden">
                       <!-- Populated dynamically for multi-set previews -->
                     </select>
-                    <button onclick="DemoCreator.clearDisruptionPreview()" class="utility-btn utility-btn--link utility-btn--danger">Clear</button>
+                    <button onclick="DemoCreator.clearDisruptionPreview()" class="btn btn--ghost btn--sm text-red-600">Clear</button>
                   </div>
                 </div>
                 <div id="disruption-preview-content" class="space-y-2">
@@ -294,25 +317,25 @@
 
               <!-- Custom Disruptions -->
               <div id="disruption-custom-settings" class="hidden space-y-3">
-                <div class="form-card">
-                  <h4 class="form-card__title">Add Custom Disruption</h4>
+                <div class="section-card">
+                  <h4 class="text-sm font-semibold mb-3">Add Custom Disruption</h4>
 
                   <!-- Type Selection - Radio Buttons -->
                   <div class="mb-4">
-                    <label class="form-card__label">Disruption Type</label>
-                    <div class="grid grid-cols-2 gap-2">
-                      <label class="selection-card selection-card--red">
+                    <label class="form-group__label">Disruption Type</label>
+                    <div class="nav-select nav-select--grid">
+                      <label class="nav-select__option">
                         <input type="radio" name="custom-disruption-type" value="incident" checked onchange="DemoCreator.updateCustomDisruptionTypeUI()">
-                        <div class="selection-card__content">
-                          <span class="selection-card__icon"><i data-lucide="siren" class="w-5 h-5"></i></span>
-                          <p class="selection-card__label">Incident</p>
+                        <div class="nav-select__icon"><i data-lucide="siren" class="w-5 h-5"></i></div>
+                        <div class="nav-select__content">
+                          <span class="nav-select__title">Incident</span>
                         </div>
                       </label>
-                      <label class="selection-card selection-card--orange">
+                      <label class="nav-select__option">
                         <input type="radio" name="custom-disruption-type" value="traffic" onchange="DemoCreator.updateCustomDisruptionTypeUI()">
-                        <div class="selection-card__content">
-                          <span class="selection-card__icon"><i data-lucide="traffic-cone" class="w-5 h-5"></i></span>
-                          <p class="selection-card__label">Traffic</p>
+                        <div class="nav-select__icon"><i data-lucide="traffic-cone" class="w-5 h-5"></i></div>
+                        <div class="nav-select__content">
+                          <span class="nav-select__title">Traffic</span>
                         </div>
                       </label>
                     </div>
@@ -320,27 +343,27 @@
 
                   <!-- Incident-specific: Criticality Selection -->
                   <div id="custom-incident-settings" class="mb-4">
-                    <label class="form-card__label">Incident Criticality</label>
-                    <div class="grid grid-cols-3 gap-2">
-                      <label class="selection-card selection-card--yellow">
+                    <label class="form-group__label">Incident Criticality</label>
+                    <div class="nav-select nav-select--grid nav-select--grid-3">
+                      <label class="nav-select__option nav-select--amber">
                         <input type="radio" name="custom-incident-criticality" value="minor">
-                        <div class="selection-card__content">
-                          <span class="selection-card__icon"><i data-lucide="alert-triangle" class="w-5 h-5"></i></span>
-                          <p class="selection-card__label">Minor</p>
+                        <div class="nav-select__icon"><i data-lucide="alert-triangle" class="w-4 h-4"></i></div>
+                        <div class="nav-select__content">
+                          <span class="nav-select__title">Minor</span>
                         </div>
                       </label>
-                      <label class="selection-card selection-card--orange">
+                      <label class="nav-select__option nav-select--orange">
                         <input type="radio" name="custom-incident-criticality" value="major" checked>
-                        <div class="selection-card__content">
-                          <span class="selection-card__icon"><i data-lucide="diamond" class="w-5 h-5"></i></span>
-                          <p class="selection-card__label">Major</p>
+                        <div class="nav-select__icon"><i data-lucide="diamond" class="w-4 h-4"></i></div>
+                        <div class="nav-select__content">
+                          <span class="nav-select__title">Major</span>
                         </div>
                       </label>
-                      <label class="selection-card selection-card--red">
+                      <label class="nav-select__option nav-select--red">
                         <input type="radio" name="custom-incident-criticality" value="critical">
-                        <div class="selection-card__content">
-                          <span class="selection-card__icon"><i data-lucide="ban" class="w-5 h-5"></i></span>
-                          <p class="selection-card__label">Critical</p>
+                        <div class="nav-select__icon"><i data-lucide="ban" class="w-4 h-4"></i></div>
+                        <div class="nav-select__content">
+                          <span class="nav-select__title">Critical</span>
                         </div>
                       </label>
                     </div>
@@ -348,12 +371,12 @@
 
                   <!-- Traffic-specific: Jam Factor -->
                   <div id="custom-traffic-settings" class="hidden mb-4">
-                    <label class="form-card__label">Jam Factor (0-10)</label>
+                    <label class="form-group__label">Jam Factor (0-10)</label>
                     <div class="flex items-center gap-3">
                       <input type="range" id="custom-jam-factor" min="0" max="10" step="0.5" value="5" oninput="document.getElementById('custom-jam-factor-display').value = this.value" class="form-range flex-1">
-                      <input type="number" id="custom-jam-factor-display" min="0" max="10" step="0.5" value="5" oninput="document.getElementById('custom-jam-factor').value = this.value" class="form-input form-input--sm w-16 text-center">
+                      <input type="number" id="custom-jam-factor-display" min="0" max="10" step="0.5" value="5" oninput="document.getElementById('custom-jam-factor').value = this.value" class="form-input w-16 text-center">
                     </div>
-                    <div class="flex justify-between text-muted mt-1">
+                    <div class="flex justify-between text-muted text-xs mt-1">
                       <span>Free flow</span>
                       <span>Moderate</span>
                       <span>Standstill</span>
@@ -365,10 +388,10 @@
                   </button>
                 </div>
 
-                <div class="form-card">
+                <div class="section-card">
                   <div class="flex justify-between items-center mb-2">
-                    <h4 class="form-card__title mb-0">Custom Disruptions</h4>
-                    <button onclick="DemoCreator.clearAllDisruptions()" class="utility-btn utility-btn--link utility-btn--danger">Clear</button>
+                    <h4 class="text-sm font-semibold">Custom Disruptions</h4>
+                    <button onclick="DemoCreator.clearAllDisruptions()" class="btn btn--ghost btn--sm text-red-600">Clear</button>
                   </div>
                   <div id="demo-disruptions-list" class="space-y-2 max-h-32 overflow-y-auto">
                     <!-- Disruptions list -->
@@ -379,88 +402,98 @@
 
             <!-- Step 3: Sequence -->
             <div id="demo-v2-step-3" class="hidden space-y-4">
-              <h3 class="section-title"><i data-lucide="settings" class="w-5 h-5 inline"></i> Sequence Configuration</h3>
+              <div class="section-card__header">
+                <div class="section-card__icon section-card__icon--info">
+                  <i data-lucide="settings" class="w-5 h-5"></i>
+                </div>
+                <h3 class="section-card__title">Sequence Configuration</h3>
+              </div>
 
-              <div class="option-card option-card--slate">
-                <label class="form-card__label font-bold">Algorithm Selection</label>
-                <div class="space-y-2">
-                  <label class="gradient-select gradient-select--purple algorithm-option">
+              <div class="section-card">
+                <label class="form-group__label font-bold mb-3">Algorithm Selection</label>
+                <div class="nav-select nav-select--purple">
+                  <label class="nav-select__option algorithm-option">
                     <input type="radio" name="demo-algorithm" value="both" checked onchange="DemoCreator.sequence.algorithm = this.value; DemoCreator.updateAlgorithmUI()">
-                    <div class="gradient-select__content">
-                      <span class="gradient-select__title"><i data-lucide="scale" class="w-4 h-4 inline"></i> Both Algorithms</span>
-                      <p class="gradient-select__desc">Compare HC2L and DHL side by side</p>
+                    <div class="nav-select__icon"><i data-lucide="scale" class="w-4 h-4"></i></div>
+                    <div class="nav-select__content">
+                      <span class="nav-select__title">Both Algorithms</span>
+                      <span class="nav-select__description">Compare HC2L and DHL side by side</span>
                     </div>
                   </label>
-                  <div class="grid grid-cols-2 gap-2">
-                    <label class="gradient-select gradient-select--blue algorithm-option">
-                      <input type="radio" name="demo-algorithm" value="hc2l" onchange="DemoCreator.sequence.algorithm = this.value; DemoCreator.updateAlgorithmUI()">
-                      <div class="gradient-select__content">
-                        <span class="gradient-select__title"><i data-lucide="circle" class="w-4 h-4 inline text-blue-500"></i> HC2L Only</span>
-                        <p class="gradient-select__desc">Hierarchical Cut</p>
-                      </div>
-                    </label>
-                    <label class="gradient-select gradient-select--emerald algorithm-option">
-                      <input type="radio" name="demo-algorithm" value="dhl" onchange="DemoCreator.sequence.algorithm = this.value; DemoCreator.updateAlgorithmUI()">
-                      <div class="gradient-select__content">
-                        <span class="gradient-select__title"><i data-lucide="circle" class="w-4 h-4 inline text-emerald-500"></i> DHL Only</span>
-                        <p class="gradient-select__desc">Dual Hierarchy</p>
-                      </div>
-                    </label>
-                  </div>
+                </div>
+                <div class="nav-select nav-select--grid mt-2">
+                  <label class="nav-select__option nav-select--blue algorithm-option">
+                    <input type="radio" name="demo-algorithm" value="hc2l" onchange="DemoCreator.sequence.algorithm = this.value; DemoCreator.updateAlgorithmUI()">
+                    <div class="nav-select__icon"><i data-lucide="circle" class="w-4 h-4"></i></div>
+                    <div class="nav-select__content">
+                      <span class="nav-select__title">HC2L</span>
+                    </div>
+                  </label>
+                  <label class="nav-select__option nav-select--emerald algorithm-option">
+                    <input type="radio" name="demo-algorithm" value="dhl" onchange="DemoCreator.sequence.algorithm = this.value; DemoCreator.updateAlgorithmUI()">
+                    <div class="nav-select__icon"><i data-lucide="circle" class="w-4 h-4"></i></div>
+                    <div class="nav-select__content">
+                      <span class="nav-select__title">DHL</span>
+                    </div>
+                  </label>
                 </div>
               </div>
 
-              <div class="form-card form-card--primary">
-                <label class="form-card__label font-bold text-purple-800">TAU (τ) Scope</label>
+              <div class="section-card section-card--purple">
+                <label class="form-group__label font-bold mb-3">TAU (τ) Scope</label>
 
-                <!-- TAU Scope Selection with Gradient Style -->
-                <div class="space-y-2 mb-4">
-                  <label class="gradient-select gradient-select--indigo tau-scope-option">
+                <!-- TAU Scope Selection -->
+                <div class="nav-select nav-select--purple mb-4">
+                  <label class="nav-select__option tau-scope-option">
                     <input type="radio" name="tau-generation-scope" value="all" onchange="DemoCreator.updateTauScopeUI()">
-                    <div class="gradient-select__content">
-                      <span class="gradient-select__title"><i data-lucide="globe" class="w-4 h-4 inline"></i> Same for All</span>
-                      <p class="gradient-select__desc">All routes in all trials use the same TAU</p>
+                    <div class="nav-select__icon"><i data-lucide="globe" class="w-4 h-4"></i></div>
+                    <div class="nav-select__content">
+                      <span class="nav-select__title">Same for All</span>
+                      <span class="nav-select__description">All routes use the same TAU</span>
                     </div>
                   </label>
-                  <label class="gradient-select gradient-select--blue tau-scope-option">
+                  <label class="nav-select__option tau-scope-option">
                     <input type="radio" name="tau-generation-scope" value="per-trial" onchange="DemoCreator.updateTauScopeUI()">
-                    <div class="gradient-select__content">
-                      <span class="gradient-select__title"><i data-lucide="repeat" class="w-4 h-4 inline"></i> Per Trial</span>
-                      <p class="gradient-select__desc">Each trial gets a unique TAU value</p>
+                    <div class="nav-select__icon"><i data-lucide="repeat" class="w-4 h-4"></i></div>
+                    <div class="nav-select__content">
+                      <span class="nav-select__title">Per Trial</span>
+                      <span class="nav-select__description">Each trial gets unique TAU</span>
                     </div>
                   </label>
-                  <label class="gradient-select gradient-select--teal tau-scope-option">
+                  <label class="nav-select__option tau-scope-option">
                     <input type="radio" name="tau-generation-scope" value="per-route" onchange="DemoCreator.updateTauScopeUI()">
-                    <div class="gradient-select__content">
-                      <span class="gradient-select__title"><i data-lucide="git-branch" class="w-4 h-4 inline"></i> Per Route</span>
-                      <p class="gradient-select__desc">Each route gets a unique TAU value</p>
+                    <div class="nav-select__icon"><i data-lucide="git-branch" class="w-4 h-4"></i></div>
+                    <div class="nav-select__content">
+                      <span class="nav-select__title">Per Route</span>
+                      <span class="nav-select__description">Each route gets unique TAU</span>
                     </div>
                   </label>
-                  <label class="gradient-select gradient-select--amber tau-scope-option">
+                  <label class="nav-select__option tau-scope-option">
                     <input type="radio" name="tau-generation-scope" value="per-trial-route" checked onchange="DemoCreator.updateTauScopeUI()">
-                    <div class="gradient-select__content">
-                      <span class="gradient-select__title"><i data-lucide="shuffle" class="w-4 h-4 inline"></i> Per Trial & Route</span>
-                      <p class="gradient-select__desc">Each route in each trial gets unique TAU</p>
+                    <div class="nav-select__icon"><i data-lucide="shuffle" class="w-4 h-4"></i></div>
+                    <div class="nav-select__content">
+                      <span class="nav-select__title">Per Trial & Route</span>
+                      <span class="nav-select__description">Unique TAU for each combination</span>
                     </div>
                   </label>
                 </div>
 
-                <!-- TAU Value Input Mode (Fixed or Random) with Gradient Style -->
+                <!-- TAU Value Input Mode (Fixed or Random) -->
                 <div class="border-t border-purple-200 pt-3 mt-3">
-                  <label class="form-card__label text-purple-800">Value Input Mode</label>
-                  <div class="space-y-2 mb-3">
-                    <label class="gradient-select gradient-select--indigo tau-mode-option">
+                  <label class="form-group__label mb-3">Value Input Mode</label>
+                  <div class="nav-select nav-select--grid mb-3">
+                    <label class="nav-select__option nav-select--indigo tau-mode-option">
                       <input type="radio" name="demo-tau-mode" value="fixed" onchange="DemoCreator.updateTauModeUI()">
-                      <div class="gradient-select__content">
-                        <span class="gradient-select__title"><i data-lucide="crosshair" class="w-4 h-4 inline"></i> Fixed Values</span>
-                        <p class="gradient-select__desc">Specify exact TAU values manually</p>
+                      <div class="nav-select__icon"><i data-lucide="crosshair" class="w-4 h-4"></i></div>
+                      <div class="nav-select__content">
+                        <span class="nav-select__title">Fixed</span>
                       </div>
                     </label>
-                    <label class="gradient-select gradient-select--amber tau-mode-option">
+                    <label class="nav-select__option nav-select--amber tau-mode-option">
                       <input type="radio" name="demo-tau-mode" value="random" checked onchange="DemoCreator.updateTauModeUI()">
-                      <div class="gradient-select__content">
-                        <span class="gradient-select__title"><i data-lucide="dice-5" class="w-4 h-4 inline"></i> Random Range</span>
-                        <p class="gradient-select__desc">Generate TAU values within a range</p>
+                      <div class="nav-select__icon"><i data-lucide="dice-5" class="w-4 h-4"></i></div>
+                      <div class="nav-select__content">
+                        <span class="nav-select__title">Random</span>
                       </div>
                     </label>
                   </div>
@@ -470,33 +503,33 @@
                 <div id="tau-values-container" class="border-t border-purple-200 pt-3 mt-3">
                   <!-- Fixed TAU Values (shown when mode is fixed) -->
                   <div id="tau-fixed-setting">
-                    <label class="form-card__label text-purple-600" id="tau-fixed-label">τ Values</label>
-                    <p class="text-muted mb-2" id="tau-fixed-help">Enter τ value (0 to 1)</p>
+                    <label class="form-group__label" id="tau-fixed-label">τ Values</label>
+                    <p class="text-muted text-sm mb-2" id="tau-fixed-help">Enter τ value (0 to 1)</p>
                     <div id="tau-fixed-inputs-container" class="space-y-2">
                       <!-- Dynamic inputs will be added here by JavaScript -->
-                      <input type="text" id="demo-tau-fixed-values" value="0.5" placeholder="0.5" class="form-input form-input--primary">
+                      <input type="text" id="demo-tau-fixed-values" value="0.5" placeholder="0.5" class="form-input">
                     </div>
                   </div>
 
                   <!-- Random TAU Range (shown when mode is random) -->
                   <div id="tau-random-setting" class="hidden">
-                    <label class="form-card__label text-amber-600">Random τ Range</label>
+                    <label class="form-group__label">Random τ Range</label>
                     <div class="grid grid-cols-2 gap-3 mb-3">
-                      <div>
-                        <label class="form-card__label text-amber-500">Min</label>
-                        <input type="number" id="demo-tau-random-min" value="0.1" min="0" max="1" step="0.1" class="form-input form-input--warning">
+                      <div class="form-group">
+                        <label class="form-group__label text-sm">Min</label>
+                        <input type="number" id="demo-tau-random-min" value="0.1" min="0" max="1" step="0.1" class="form-input">
                       </div>
-                      <div>
-                        <label class="form-card__label text-amber-500">Max</label>
-                        <input type="number" id="demo-tau-random-max" value="0.9" min="0" max="1" step="0.1" class="form-input form-input--warning">
+                      <div class="form-group">
+                        <label class="form-group__label text-sm">Max</label>
+                        <input type="number" id="demo-tau-random-max" value="0.9" min="0" max="1" step="0.1" class="form-input">
                       </div>
                     </div>
                     <button onclick="DemoCreator.generateRandomTauValues()" class="btn btn--warning btn--block flex items-center justify-center gap-2">
                       <i data-lucide="dice-5" class="w-4 h-4"></i> Generate Random Values
                     </button>
                     <div id="tau-random-generated" class="mt-2 hidden">
-                      <label class="form-card__label text-amber-600">Generated Values</label>
-                      <div id="tau-random-values-display" class="preview-box preview-box--amber">
+                      <label class="form-group__label">Generated Values</label>
+                      <div id="tau-random-values-display" class="card card--flat p-3 bg-amber-50">
                         <!-- Generated values will appear here -->
                       </div>
                     </div>
@@ -504,16 +537,21 @@
                 </div>
               </div>
 
-              <div class="form-card">
-                <label class="form-card__label">Step Delay (ms)</label>
+              <div class="form-group">
+                <label class="form-group__label">Step Delay (ms)</label>
                 <input type="number" id="demo-step-delay" value="1000" min="500" max="10000" step="500" class="form-input">
-                <p class="form-card__help">Time between demo steps</p>
+                <span class="form-group__help">Time between demo steps</span>
               </div>
             </div>
 
             <!-- Step 4: Review -->
             <div id="demo-v2-step-4" class="hidden space-y-4">
-              <h3 class="section-title"><i data-lucide="clipboard-list" class="w-5 h-5 inline"></i> Review Configuration</h3>
+              <div class="section-card__header">
+                <div class="section-card__icon section-card__icon--success">
+                  <i data-lucide="clipboard-list" class="w-5 h-5"></i>
+                </div>
+                <h3 class="section-card__title">Review Configuration</h3>
+              </div>
 
               <div id="demo-v2-review-summary" class="space-y-3">
                 <!-- Summary will be rendered here with tables by JavaScript -->
@@ -523,19 +561,24 @@
             <!-- Step Running: Demo Execution with Detailed Progress -->
             <div id="demo-v2-step-running" class="hidden space-y-4">
               <div class="flex items-center justify-between">
-                <h3 class="section-title"><i data-lucide="play" class="w-5 h-5 inline"></i> Demo Running</h3>
-                <div class="status-indicator status-indicator--live">
-                  <span class="status-indicator__dot"></span>
-                  <span class="status-indicator__text">Live</span>
+                <div class="section-card__header">
+                  <div class="section-card__icon section-card__icon--success">
+                    <i data-lucide="play" class="w-5 h-5"></i>
+                  </div>
+                  <h3 class="section-card__title">Demo Running</h3>
                 </div>
+                <span class="badge badge--success flex items-center gap-1">
+                  <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                  Live
+                </span>
               </div>
 
               <!-- Detailed Progress Display Container -->
               <div id="demo-v2-progress-display" class="space-y-4">
                 <!-- Detailed progress will be rendered here by JavaScript -->
-                <div class="loading-state">
-                  <div class="loading-state__spinner"></div>
-                  <p class="loading-state__text">Initializing demo...</p>
+                <div class="flex flex-col items-center justify-center py-8 gap-3">
+                  <div class="animate-spin h-8 w-8 border-3 border-primary-500 border-t-transparent rounded-full"></div>
+                  <p class="text-muted">Initializing demo...</p>
                 </div>
               </div>
 
@@ -560,23 +603,24 @@
 
         <!-- Sticky Navigation Footer -->
         <div class="panel__footer">
-          <div class="flex gap-2 mb-2" id="demo-v2-save-buttons">
-            <button id="demo-v2-save-btn" onclick="DemoCreator.saveForLater()" class="hidden btn btn--secondary btn--lg flex-1">
-              <i data-lucide="save" class="w-4 h-4 inline"></i> Save Demo
-            </button>
-            <button id="demo-v2-save-run-btn" onclick="DemoCreator.saveAndRun()" class="hidden btn btn--success btn--lg flex-1">
-              <i data-lucide="rocket" class="w-4 h-4 inline"></i> Save & Run
-            </button>
-          </div>
           <div class="flex gap-2" id="demo-v2-nav-buttons">
             <button id="demo-v2-prev-btn" onclick="DemoCreator.prevStep()" class="hidden btn btn--ghost btn--lg flex-1">
-              ← Previous
+              <i data-lucide="arrow-left" class="w-4 h-4"></i> Previous
             </button>
             <button id="demo-v2-next-btn" onclick="DemoCreator.nextStep()" class="btn btn--primary btn--lg flex-1">
-              Next →
+              Next <i data-lucide="arrow-right" class="w-4 h-4"></i>
             </button>
-            <button id="demo-v2-run-btn" onclick="DemoCreator.runOnly()" class="hidden btn btn--success btn--lg flex-1">
-              <i data-lucide="play" class="w-4 h-4 inline"></i> Run Demo
+          </div>
+          <!-- Save buttons - only shown on review step (step 4) -->
+          <div class="hidden gap-2 mt-2" id="demo-v2-save-buttons">
+            <button id="demo-v2-save-btn" onclick="DemoCreator.saveForLater()" class="btn btn--secondary btn--lg flex-1">
+              <i data-lucide="save" class="w-4 h-4"></i> Save Demo
+            </button>
+            <button id="demo-v2-save-run-btn" onclick="DemoCreator.saveAndRun()" class="btn btn--success btn--lg flex-1">
+              <i data-lucide="rocket" class="w-4 h-4"></i> Save & Run
+            </button>
+            <button id="demo-v2-run-btn" onclick="DemoCreator.runOnly()" class="btn btn--primary btn--lg flex-1">
+              <i data-lucide="play" class="w-4 h-4"></i> Run Demo
             </button>
           </div>
         </div>

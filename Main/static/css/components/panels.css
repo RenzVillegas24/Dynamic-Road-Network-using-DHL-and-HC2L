@@ -104,97 +104,83 @@
   gap: var(--spacing-4);
   padding: var(--spacing-5);
   border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-inverse) !important;
   flex-shrink: 0;
 }
 
 /* Header color variants (using gradients) */
 .panel__header--gradient {
   background: var(--gradient-primary);
-  color: var(--color-text-inverse);
   border-bottom: none;
 }
 
 .panel__header--primary {
   background: var(--gradient-primary);
-  color: var(--color-text-inverse);
   border-bottom: none;
 }
 
 .panel__header--secondary {
   background: var(--gradient-secondary);
-  color: var(--color-text-inverse);
   border-bottom: none;
 }
 
 .panel__header--success {
   background: var(--gradient-success);
-  color: var(--color-text-inverse);
   border-bottom: none;
 }
 
 .panel__header--warning {
   background: var(--gradient-warning);
-  color: var(--color-text);
   border-bottom: none;
 }
 
 .panel__header--error {
   background: var(--gradient-error);
-  color: var(--color-text-inverse);
   border-bottom: none;
 }
 
 .panel__header--info {
   background: var(--gradient-info);
-  color: var(--color-text-inverse);
   border-bottom: none;
 }
 
 .panel__header--dark {
   background: var(--gradient-dark);
-  color: var(--color-text-inverse);
   border-bottom: none;
 }
 
 .panel__header--purple {
   background: var(--gradient-purple);
-  color: var(--color-text-inverse);
   border-bottom: none;
 }
 
 .panel__header--amber {
   background: var(--gradient-amber);
-  color: var(--color-text-inverse);
   border-bottom: none;
 }
 
 .panel__header--teal {
   background: var(--gradient-teal);
-  color: var(--color-text-inverse);
   border-bottom: none;
 }
 
 .panel__header--blue {
   background: var(--gradient-blue);
-  color: var(--color-text-inverse);
   border-bottom: none;
 }
 
 .panel__header--emerald {
   background: var(--gradient-emerald);
-  color: var(--color-text-inverse);
   border-bottom: none;
 }
 
 .panel__header--rose {
   background: var(--gradient-rose);
-  color: var(--color-text-inverse);
   border-bottom: none;
 }
 
 .panel__header--slate {
   background: var(--gradient-slate);
-  color: var(--color-text-inverse);
   border-bottom: none;
 }
 
@@ -456,6 +442,169 @@
 }
 
 /* =====================
+   WIZARD STEP INDICATOR
+   ===================== */
+
+.wizard-steps {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-4) var(--spacing-5);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.wizard-steps__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-1);
+  z-index: 1;
+}
+
+.wizard-steps__indicator {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+  font-weight: var(--font-bold);
+  background: var(--color-gray-100);
+  color: var(--color-text-muted);
+  border: 2px solid var(--color-gray-200);
+  transition: all var(--transition-fast);
+}
+
+.wizard-steps__indicator--active {
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.2);
+}
+
+.wizard-steps__indicator--completed {
+  background: var(--color-success);
+  color: var(--color-text-inverse);
+  border-color: var(--color-success);
+}
+
+.wizard-steps__label {
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  color: var(--color-text-muted);
+  transition: color var(--transition-fast);
+}
+
+.wizard-steps__item--active .wizard-steps__label {
+  color: var(--color-primary);
+  font-weight: var(--font-semibold);
+}
+
+.wizard-steps__item--completed .wizard-steps__label {
+  color: var(--color-success);
+}
+
+.wizard-steps__line {
+  flex: 1;
+  height: 2px;
+  background: var(--color-gray-200);
+  margin: 0 var(--spacing-2);
+  margin-bottom: var(--spacing-5);
+  transition: background var(--transition-fast);
+}
+
+.wizard-steps__line--completed {
+  background: var(--color-success);
+}
+
+/* =====================
+   WIZARD STEP COLOR VARIANTS
+   ===================== */
+
+/* Step 1 - Purple (Config) */
+.wizard-steps__item--purple .wizard-steps__indicator {
+  background: rgba(147, 51, 234, 0.1);
+  color: #9333ea;
+  border-color: #9333ea;
+}
+
+.wizard-steps__item--purple.wizard-steps__item--active .wizard-steps__indicator {
+  background: linear-gradient(135deg, #9333ea 0%, #7c3aed 100%);
+  color: white;
+  box-shadow: 0 0 0 4px rgba(147, 51, 234, 0.2);
+}
+
+.wizard-steps__item--purple .wizard-steps__label {
+  color: #9333ea;
+}
+
+/* Step 2 - Amber (Disruptions) */
+.wizard-steps__item--amber .wizard-steps__indicator {
+  background: rgba(245, 158, 11, 0.1);
+  color: #d97706;
+  border-color: #f59e0b;
+}
+
+.wizard-steps__item--amber.wizard-steps__item--active .wizard-steps__indicator {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: white;
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.2);
+}
+
+.wizard-steps__item--amber .wizard-steps__label {
+  color: #d97706;
+}
+
+/* Step 3 - Blue (Sequence) */
+.wizard-steps__item--blue .wizard-steps__indicator {
+  background: rgba(59, 130, 246, 0.1);
+  color: #2563eb;
+  border-color: #3b82f6;
+}
+
+.wizard-steps__item--blue.wizard-steps__item--active .wizard-steps__indicator {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
+}
+
+.wizard-steps__item--blue .wizard-steps__label {
+  color: #2563eb;
+}
+
+/* Step 4 - Emerald (Review) */
+.wizard-steps__item--emerald .wizard-steps__indicator {
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+  border-color: #10b981;
+}
+
+.wizard-steps__item--emerald.wizard-steps__item--active .wizard-steps__indicator {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2);
+}
+
+.wizard-steps__item--emerald .wizard-steps__label {
+  color: #059669;
+}
+
+/* Completed line colors matching steps */
+.wizard-steps__line--purple.wizard-steps__line--completed {
+  background: #9333ea;
+}
+
+.wizard-steps__line--amber.wizard-steps__line--completed {
+  background: #f59e0b;
+}
+
+.wizard-steps__line--blue.wizard-steps__line--completed {
+  background: #3b82f6;
+}
+
+/* =====================
    RESPONSIVE PANELS
    ===================== */
 
@@ -491,3 +640,4 @@
     max-width: 100%;
   }
 }
+

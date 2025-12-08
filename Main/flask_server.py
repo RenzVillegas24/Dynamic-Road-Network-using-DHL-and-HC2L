@@ -5321,6 +5321,40 @@ def reset_settings():
         })
 
 
+@app.route('/set_traffic_mode', methods=['POST'])
+def set_traffic_mode():
+    """Set the traffic/dataset mode for disruption data"""
+    try:
+        payload = request.get_json(silent=True) or {}
+        mode = payload.get('mode', 'none')
+        
+        # Validate mode
+        valid_modes = ['none', 'incidents', 'flow', 'both']
+        if mode not in valid_modes:
+            return jsonify({
+                'success': False,
+                'error': f"Invalid mode: {mode}. Must be one of: {', '.join(valid_modes)}"
+            }), 400
+        
+        # Save to persistent settings
+        settings = get_settings_manager()
+        settings.set('traffic_mode', mode)
+        
+        console_logger.info(f"Traffic mode set to: {mode}")
+        
+        return jsonify({
+            'success': True,
+            'mode': mode,
+            'message': f'Traffic mode set to {mode}'
+        })
+    except Exception as e:
+        console_logger.error(f"Error setting traffic mode: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 @app.route('/set_auto_update_interval', methods=['POST'])
 def set_auto_update_interval():
     """Set the auto-disruption update interval (1-30 minutes) - SAVED PERSISTENTLY"""

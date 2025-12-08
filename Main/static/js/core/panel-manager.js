@@ -18,13 +18,13 @@ const PanelManager = (function() {
       id: 'current-path-panel',
       title: 'Current Route',
       icon: 'route',
-      size: 'sm'
+      size: 'md'
     },
     'report': {
       id: 'report-panel',
       title: 'Report Disruption',
       icon: 'alert-triangle',
-      size: 'md'
+      size: 'lg'
     },
     'disruptions': {
       id: 'disruptions-panel',
@@ -42,19 +42,19 @@ const PanelManager = (function() {
       id: 'algorithm-comparison-panel',
       title: 'Algorithm Comparison',
       icon: 'git-compare',
-      size: 'xxl'
+      size: 'lg'
     },
     'developer': {
       id: 'developer-view-panel',
       title: 'Developer Tools',
-      icon: 'code',
-      size: 'lg'
+      icon: 'terminal',
+      size: 'xl'
     },
     'demo-runner': {
       id: 'demo-runner-panel',
       title: 'Demo Runner',
       icon: 'play-circle',
-      size: 'md'
+      size: 'lg'
     },
     'demo-creator': {
       id: 'demo-creator-panel',

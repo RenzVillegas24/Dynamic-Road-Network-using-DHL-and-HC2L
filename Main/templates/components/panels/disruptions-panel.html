@@ -39,107 +39,105 @@
     </div>
 
     <!-- Traffic Flow Status Breakdown -->
-    <div class="section-card mb-5">
+    <div class="section-card section-card--primary mb-5">
       <div class="section-card__header">
-        <div class="section-card__icon" style="background: linear-gradient(135deg, #2563eb 0%, #9333ea 100%);">
+        <div class="section-card__icon section-card__icon--purple">
           <i data-lucide="zap" class="w-5 h-5"></i>
         </div>
         <h3 class="section-card__title">Traffic Flow Status</h3>
       </div>
-      <div class="section-card__body">
-        <div class="stat-grid stat-grid--2 gap-4">
-          <!-- Blocked -->
-          <div class="flow-card flow-card--blocked">
-            <div class="flow-card__content">
-              <div class="flow-card__icon">
-                <i data-lucide="ban" class="w-6 h-6"></i>
+      <div class="stat-grid stat-grid--2 gap-4">
+        <!-- Blocked -->
+        <div class="flow-card flow-card--blocked">
+          <div class="flow-card__content">
+            <div class="flow-card__icon">
+              <i data-lucide="ban" class="w-6 h-6"></i>
+            </div>
+            <div class="flow-card__info">
+              <div class="flow-card__header">
+                <div>
+                  <div class="flow-card__label">Blocked</div>
+                  <div id="flow-blocked-count" class="flow-card__count">0</div>
+                </div>
+                <div id="flow-blocked-percent" class="flow-card__percent">0%</div>
               </div>
-              <div class="flow-card__info">
-                <div class="flow-card__header">
-                  <div>
-                    <div class="flow-card__label">Blocked</div>
-                    <div id="flow-blocked-count" class="flow-card__count">0</div>
-                  </div>
-                  <div id="flow-blocked-percent" class="flow-card__percent">0%</div>
+              <div class="flow-card__bar-container">
+                <div class="flow-card__bar">
+                  <div id="flow-blocked-bar" class="flow-card__bar-fill" style="width:0%"></div>
                 </div>
-                <div class="flow-card__bar-container">
-                  <div class="flow-card__bar">
-                    <div id="flow-blocked-bar" class="flow-card__bar-fill" style="width:0%"></div>
-                  </div>
-                  <div class="flow-card__description">Traffic is completely blocked</div>
-                </div>
+                <div class="flow-card__description">Traffic is completely blocked</div>
               </div>
             </div>
           </div>
+        </div>
 
-          <!-- Heavy -->
-          <div class="flow-card flow-card--heavy">
-            <div class="flow-card__content">
-              <div class="flow-card__icon">
-                <i data-lucide="alert-circle" class="w-6 h-6"></i>
+        <!-- Heavy -->
+        <div class="flow-card flow-card--heavy">
+          <div class="flow-card__content">
+            <div class="flow-card__icon">
+              <i data-lucide="alert-circle" class="w-6 h-6"></i>
+            </div>
+            <div class="flow-card__info">
+              <div class="flow-card__header">
+                <div>
+                  <div class="flow-card__label">Heavy</div>
+                  <div id="flow-heavy-count" class="flow-card__count">0</div>
+                </div>
+                <div id="flow-heavy-percent" class="flow-card__percent">0%</div>
               </div>
-              <div class="flow-card__info">
-                <div class="flow-card__header">
-                  <div>
-                    <div class="flow-card__label">Heavy</div>
-                    <div id="flow-heavy-count" class="flow-card__count">0</div>
-                  </div>
-                  <div id="flow-heavy-percent" class="flow-card__percent">0%</div>
+              <div class="flow-card__bar-container">
+                <div class="flow-card__bar">
+                  <div id="flow-heavy-bar" class="flow-card__bar-fill" style="width:0%"></div>
                 </div>
-                <div class="flow-card__bar-container">
-                  <div class="flow-card__bar">
-                    <div id="flow-heavy-bar" class="flow-card__bar-fill" style="width:0%"></div>
-                  </div>
-                  <div class="flow-card__description">Heavy congestion, major delays</div>
-                </div>
+                <div class="flow-card__description">Heavy congestion, major delays</div>
               </div>
             </div>
           </div>
+        </div>
 
-          <!-- Moderate -->
-          <div class="flow-card flow-card--moderate">
-            <div class="flow-card__content">
-              <div class="flow-card__icon">
-                <i data-lucide="info" class="w-6 h-6"></i>
+        <!-- Moderate -->
+        <div class="flow-card flow-card--slow">
+          <div class="flow-card__content">
+            <div class="flow-card__icon">
+              <i data-lucide="info" class="w-6 h-6"></i>
+            </div>
+            <div class="flow-card__info">
+              <div class="flow-card__header">
+                <div>
+                  <div class="flow-card__label">Moderate</div>
+                  <div id="flow-moderate-count" class="flow-card__count">0</div>
+                </div>
+                <div id="flow-moderate-percent" class="flow-card__percent">0%</div>
               </div>
-              <div class="flow-card__info">
-                <div class="flow-card__header">
-                  <div>
-                    <div class="flow-card__label">Moderate</div>
-                    <div id="flow-moderate-count" class="flow-card__count">0</div>
-                  </div>
-                  <div id="flow-moderate-percent" class="flow-card__percent">0%</div>
+              <div class="flow-card__bar-container">
+                <div class="flow-card__bar">
+                  <div id="flow-moderate-bar" class="flow-card__bar-fill" style="width:0%"></div>
                 </div>
-                <div class="flow-card__bar-container">
-                  <div class="flow-card__bar">
-                    <div id="flow-moderate-bar" class="flow-card__bar-fill" style="width:0%"></div>
-                  </div>
-                  <div class="flow-card__description">Moderate traffic, some delays</div>
-                </div>
+                <div class="flow-card__description">Moderate traffic, some delays</div>
               </div>
             </div>
           </div>
+        </div>
 
-          <!-- Light -->
-          <div class="flow-card flow-card--light">
-            <div class="flow-card__content">
-              <div class="flow-card__icon">
-                <i data-lucide="check-circle" class="w-6 h-6"></i>
+        <!-- Light -->
+        <div class="flow-card flow-card--normal">
+          <div class="flow-card__content">
+            <div class="flow-card__icon">
+              <i data-lucide="check-circle" class="w-6 h-6"></i>
+            </div>
+            <div class="flow-card__info">
+              <div class="flow-card__header">
+                <div>
+                  <div class="flow-card__label">Light</div>
+                  <div id="flow-light-count" class="flow-card__count">0</div>
+                </div>
+                <div id="flow-light-percent" class="flow-card__percent">0%</div>
               </div>
-              <div class="flow-card__info">
-                <div class="flow-card__header">
-                  <div>
-                    <div class="flow-card__label">Light</div>
-                    <div id="flow-light-count" class="flow-card__count">0</div>
-                  </div>
-                  <div id="flow-light-percent" class="flow-card__percent">0%</div>
+              <div class="flow-card__bar-container">
+                <div class="flow-card__bar">
+                  <div id="flow-light-bar" class="flow-card__bar-fill" style="width:0%"></div>
                 </div>
-                <div class="flow-card__bar-container">
-                  <div class="flow-card__bar">
-                    <div id="flow-light-bar" class="flow-card__bar-fill" style="width:0%"></div>
-                  </div>
-                  <div class="flow-card__description">Light traffic, minimal delays</div>
-                </div>
+                <div class="flow-card__description">Light traffic, minimal delays</div>
               </div>
             </div>
           </div>
@@ -148,73 +146,67 @@
     </div>
 
     <!-- Network Statistics -->
-    <div class="section-card mb-5">
+    <div class="section-card section-card--purple mb-5">
       <div class="section-card__header">
-        <div class="section-card__icon" style="background: linear-gradient(135deg, #9333ea 0%, #6366f1 100%);">
+        <div class="section-card__icon section-card__icon--purple">
           <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
         </div>
         <h3 class="section-card__title">Network Statistics</h3>
       </div>
-      <div class="section-card__body--compact">
-        <div class="stat-grid stat-grid--2 gap-3">
-          <div class="stat-box stat-box--slate">
-            <div id="network-total-disruptions" class="stat-box__value">--</div>
-            <div class="stat-box__sublabel">Total Disruptions</div>
-          </div>
-          <div class="stat-box stat-box--slate">
-            <div id="network-coverage" class="stat-box__value">--</div>
-            <div class="stat-box__sublabel">Coverage Area</div>
-          </div>
+      <div class="stat-grid stat-grid--2 gap-3">
+        <div class="stat-box stat-box--slate">
+          <div id="network-total-disruptions" class="stat-box__value">--</div>
+          <div class="stat-box__sublabel">Total Disruptions</div>
+        </div>
+        <div class="stat-box stat-box--slate">
+          <div id="network-coverage" class="stat-box__value">--</div>
+          <div class="stat-box__sublabel">Coverage Area</div>
         </div>
       </div>
     </div>
 
     <!-- Algorithm Performance Details -->
-    <div class="section-card mb-5">
+    <div class="section-card section-card--info mb-5">
       <div class="section-card__header">
-        <div class="section-card__icon" style="background: linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%);">
+        <div class="section-card__icon section-card__icon--info">
           <i data-lucide="cpu" class="w-5 h-5"></i>
         </div>
         <h3 class="section-card__title">Algorithm Performance</h3>
       </div>
-      <div class="section-card__body--compact">
-        <div class="space-y-2">
-          <div class="metric-row">
-            <span class="metric-row__label">Algorithm:</span>
-            <span id="analysis-algorithm" class="metric-row__value">--</span>
-          </div>
-          <div class="metric-row metric-row--cyan">
-            <span class="metric-row__label">Query Time:</span>
-            <span id="analysis-query-time" class="metric-row__value font-mono">--</span>
-          </div>
-          <div class="metric-row" style="background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);">
-            <span class="metric-row__label" style="color: #b91c1c;">Disrupted Edges:</span>
-            <span id="analysis-disrupted-edges" class="metric-row__value" style="color: #991b1b;">--</span>
-          </div>
+      <div class="space-y-2">
+        <div class="metric-row">
+          <span class="metric-row__label">Algorithm:</span>
+          <span id="analysis-algorithm" class="metric-row__value">--</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row__label">Query Time:</span>
+          <span id="analysis-query-time" class="metric-row__value font-mono text-info">--</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row__label">Disrupted Edges:</span>
+          <span id="analysis-disrupted-edges" class="metric-row__value text-error">--</span>
         </div>
       </div>
     </div>
 
     <!-- Top Disruptions List -->
-    <div class="section-card">
+    <div class="section-card section-card--warning">
       <div class="section-card__header">
-        <div class="section-card__icon" style="background: linear-gradient(135deg, #d97706 0%, #eab308 100%);">
+        <div class="section-card__icon section-card__icon--amber">
           <i data-lucide="alert-circle" class="w-5 h-5"></i>
         </div>
-        <div class="d-flex justify-between items-center flex-1">
+        <div class="flex-1 flex items-center justify-between">
           <h3 class="section-card__title">Disruptions on Route</h3>
-          <span id="top-disruptions-count" class="text-sm text-muted font-medium">--</span>
+          <span id="top-disruptions-count" class="badge badge--warning">--</span>
         </div>
       </div>
-      <div class="section-card__body">
-        <div id="top-disruptions-list" class="space-y-3">
-          <div class="panel__empty">
-            <div class="panel__empty-icon">
-              <i data-lucide="info" class="w-10 h-10"></i>
-            </div>
-            <p class="panel__empty-title">No disruption data available</p>
-            <p class="panel__empty-text">Calculate a route to see disruptions</p>
+      <div id="top-disruptions-list" class="space-y-3">
+        <div class="panel__empty">
+          <div class="panel__empty-icon">
+            <i data-lucide="info" class="w-10 h-10"></i>
           </div>
+          <p class="panel__empty-title">No disruption data available</p>
+          <p class="panel__empty-text">Calculate a route to see disruptions</p>
         </div>
       </div>
     </div>

@@ -2,10 +2,10 @@
 <div id="developer-view-panel" class="panel panel--xl flex flex-col">
   <div class="panel__header panel__header--success">
     <div class="panel__icon">
-      <i data-lucide="code" class="w-6 h-6"></i>
+      <i data-lucide="terminal" class="w-6 h-6"></i>
     </div>
     <div class="panel__title-group">
-      <h2 class="panel__title">Developer View</h2>
+      <h2 class="panel__title">Developer Console</h2>
       <p class="panel__subtitle">System logs and debugging</p>
     </div>
     <button onclick="closeDeveloperView()" class="panel__close">
@@ -15,30 +15,39 @@
 
   <!-- Log Controls -->
   <div class="log-controls">
+    <!-- Actions Row -->
     <div class="log-controls__actions">
-      <button onclick="clearLogs()" class="btn btn--danger btn--sm">
-        <i data-lucide="trash-2" class="w-4 h-4"></i>
-        Clear
-      </button>
-      <button onclick="exportLogs()" class="btn btn--info btn--sm">
-        <i data-lucide="download" class="w-4 h-4"></i>
-        Export
-      </button>
-      <label class="toggle-label">
-        <span class="toggle-label__text">Auto-scroll</span>
-        <input type="checkbox" id="log-autoscroll" checked class="toggle-checkbox"
-               onchange="LoggingSystem.autoScroll = this.checked">
-      </label>
-      <label class="toggle-label">
-        <span class="toggle-label__text toggle-label__text--info">Console</span>
-        <input type="checkbox" id="console-log-toggle" class="toggle-checkbox"
-               onchange="toggleConsoleLogging(this.checked)">
-      </label>
-      <label class="toggle-label">
-        <span class="toggle-label__text toggle-label__text--success">Backend</span>
-        <input type="checkbox" id="backend-log-toggle" class="toggle-checkbox"
-               onchange="toggleBackendLogging(this.checked)">
-      </label>
+      <div class="log-controls__buttons">
+        <button onclick="clearLogs()" class="btn btn--danger btn--sm">
+          <i data-lucide="trash-2" class="w-4 h-4"></i>
+          Clear
+        </button>
+        <button onclick="exportLogs()" class="btn btn--secondary btn--sm">
+          <i data-lucide="download" class="w-4 h-4"></i>
+          Export
+        </button>
+      </div>
+      
+      <div class="log-controls__toggles">
+        <label class="toggle-switch">
+          <span class="toggle-switch__label">Auto-scroll</span>
+          <input type="checkbox" id="log-autoscroll" checked
+                 onchange="LoggingSystem.autoScroll = this.checked">
+          <span class="toggle-switch__track"></span>
+        </label>
+        <label class="toggle-switch toggle-switch--info">
+          <span class="toggle-switch__label toggle-switch__label--info">Console</span>
+          <input type="checkbox" id="console-log-toggle"
+                 onchange="toggleConsoleLogging(this.checked)">
+          <span class="toggle-switch__track"></span>
+        </label>
+        <label class="toggle-switch toggle-switch--success">
+          <span class="toggle-switch__label toggle-switch__label--success">Backend</span>
+          <input type="checkbox" id="backend-log-toggle"
+                 onchange="toggleBackendLogging(this.checked)">
+          <span class="toggle-switch__track"></span>
+        </label>
+      </div>
     </div>
 
     <!-- Source Indicators -->
@@ -54,35 +63,45 @@
     </div>
 
     <!-- Filters -->
-    <div class="log-filters">
-      <label class="filter-checkbox">
-        <input type="checkbox" id="filter-debug" checked onchange="toggleLogFilter('debug')">
-        <span class="filter-checkbox__label"><i data-lucide="wrench" class="w-3 h-3 inline"></i> Debug</span>
-      </label>
-      <label class="filter-checkbox">
-        <input type="checkbox" id="filter-info" checked onchange="toggleLogFilter('info')">
-        <span class="filter-checkbox__label"><i data-lucide="info" class="w-3 h-3 inline"></i> Info</span>
-      </label>
-      <label class="filter-checkbox">
-        <input type="checkbox" id="filter-success" checked onchange="toggleLogFilter('success')">
-        <span class="filter-checkbox__label"><i data-lucide="check-circle" class="w-3 h-3 inline"></i> Success</span>
-      </label>
-      <label class="filter-checkbox">
-        <input type="checkbox" id="filter-warning" checked onchange="toggleLogFilter('warning')">
-        <span class="filter-checkbox__label"><i data-lucide="alert-triangle" class="w-3 h-3 inline"></i> Warning</span>
-      </label>
-      <label class="filter-checkbox">
-        <input type="checkbox" id="filter-error" checked onchange="toggleLogFilter('error')">
-        <span class="filter-checkbox__label"><i data-lucide="x-circle" class="w-3 h-3 inline"></i> Error</span>
-      </label>
-      <label class="filter-checkbox">
-        <input type="checkbox" id="filter-query" checked onchange="toggleLogFilter('query')">
-        <span class="filter-checkbox__label"><i data-lucide="search" class="w-3 h-3 inline"></i> Query</span>
-      </label>
-      <label class="filter-checkbox">
-        <input type="checkbox" id="filter-update" checked onchange="toggleLogFilter('update')">
-        <span class="filter-checkbox__label"><i data-lucide="refresh-cw" class="w-3 h-3 inline"></i> Update</span>
-      </label>
+    <div class="log-controls__group">
+      <span class="log-controls__group-label">Log Filters</span>
+      <div class="log-filters">
+        <label class="filter-chip filter-chip--debug">
+          <input type="checkbox" id="filter-debug" checked onchange="toggleLogFilter('debug')">
+          <span class="filter-chip__icon"><i data-lucide="wrench" class="w-3 h-3"></i></span>
+          <span class="filter-chip__label">Debug</span>
+        </label>
+        <label class="filter-chip filter-chip--info">
+          <input type="checkbox" id="filter-info" checked onchange="toggleLogFilter('info')">
+          <span class="filter-chip__icon"><i data-lucide="info" class="w-3 h-3"></i></span>
+          <span class="filter-chip__label">Info</span>
+        </label>
+        <label class="filter-chip filter-chip--success">
+          <input type="checkbox" id="filter-success" checked onchange="toggleLogFilter('success')">
+          <span class="filter-chip__icon"><i data-lucide="check-circle" class="w-3 h-3"></i></span>
+          <span class="filter-chip__label">Success</span>
+        </label>
+        <label class="filter-chip filter-chip--warning">
+          <input type="checkbox" id="filter-warning" checked onchange="toggleLogFilter('warning')">
+          <span class="filter-chip__icon"><i data-lucide="alert-triangle" class="w-3 h-3"></i></span>
+          <span class="filter-chip__label">Warning</span>
+        </label>
+        <label class="filter-chip filter-chip--error">
+          <input type="checkbox" id="filter-error" checked onchange="toggleLogFilter('error')">
+          <span class="filter-chip__icon"><i data-lucide="x-circle" class="w-3 h-3"></i></span>
+          <span class="filter-chip__label">Error</span>
+        </label>
+        <label class="filter-chip filter-chip--query">
+          <input type="checkbox" id="filter-query" checked onchange="toggleLogFilter('query')">
+          <span class="filter-chip__icon"><i data-lucide="search" class="w-3 h-3"></i></span>
+          <span class="filter-chip__label">Query</span>
+        </label>
+        <label class="filter-chip filter-chip--update">
+          <input type="checkbox" id="filter-update" checked onchange="toggleLogFilter('update')">
+          <span class="filter-chip__icon"><i data-lucide="refresh-cw" class="w-3 h-3"></i></span>
+          <span class="filter-chip__label">Update</span>
+        </label>
+      </div>
     </div>
   </div>
 

@@ -18,37 +18,39 @@
     <div id="demo-runner-tab-main" class="space-y-4">
       <!-- Quick Actions -->
       <div class="grid grid-cols-2 gap-3">
-        <button onclick="DemoRunner.openRandomSettings()" class="action-card action-card--warning">
-          <span class="action-card__icon"><i data-lucide="shuffle" class="w-6 h-6"></i></span>
-          <span class="action-card__text">Random Demo</span>
+        <button onclick="DemoRunner.openRandomSettings()" class="btn btn--warning btn--lg flex-col gap-2 py-4">
+          <i data-lucide="shuffle" class="w-6 h-6"></i>
+          <span class="text-sm font-semibold">Random Demo</span>
         </button>
-        <button onclick="openDemoCreator()" class="action-card action-card--primary">
-          <span class="action-card__icon"><i data-lucide="sparkles" class="w-6 h-6"></i></span>
-          <span class="action-card__text">Custom Demo</span>
+        <button data-panel="demo-creator" class="btn btn--primary btn--lg flex-col gap-2 py-4">
+          <i data-lucide="sparkles" class="w-6 h-6"></i>
+          <span class="text-sm font-semibold">Custom Demo</span>
         </button>
       </div>
 
       <!-- Tab Navigation for Configurations/Results -->
       <div class="section-card">
-        <div class="tab-nav">
-          <button id="tab-btn-configs" onclick="DemoRunner.switchDataTab('configs')" class="tab-nav__btn tab-nav__btn--active">
-            <i data-lucide="save" class="w-4 h-4 mr-1"></i> Configurations
-          </button>
-          <button id="tab-btn-saved-results" onclick="DemoRunner.switchDataTab('saved-results')" class="tab-nav__btn">
-            <i data-lucide="bar-chart-3" class="w-4 h-4 mr-1"></i> Saved Results
-          </button>
+        <div class="tabs tabs--pills">
+          <div class="tabs__list">
+            <button id="tab-btn-configs" onclick="DemoRunner.switchDataTab('configs')" class="tabs__tab" aria-selected="true">
+              <i data-lucide="save" class="w-4 h-4"></i> Configurations
+            </button>
+            <button id="tab-btn-saved-results" onclick="DemoRunner.switchDataTab('saved-results')" class="tabs__tab">
+              <i data-lucide="bar-chart-3" class="w-4 h-4"></i> Saved Results
+            </button>
+          </div>
         </div>
 
         <!-- Tab Content: Configurations -->
-        <div id="data-tab-configs" class="section-card__body">
+        <div id="data-tab-configs" class="mt-4">
           <div id="saved-configs-list" class="space-y-3"></div>
         </div>
 
         <!-- Tab Content: Saved Results -->
-        <div id="data-tab-saved-results" class="section-card__body hidden">
-          <div class="flex items-center justify-end mb-2">
-            <button onclick="DemoRunner.refreshSavedResults()" class="utility-btn utility-btn--link flex items-center gap-1">
-              <i data-lucide="refresh-cw" class="w-3 h-3"></i>
+        <div id="data-tab-saved-results" class="mt-4 hidden">
+          <div class="flex items-center justify-end mb-3">
+            <button onclick="DemoRunner.refreshSavedResults()" class="btn btn--ghost btn--sm">
+              <i data-lucide="refresh-cw" class="w-4 h-4"></i>
               Refresh
             </button>
           </div>
@@ -61,30 +63,37 @@
 
     <!-- Random Settings Tab -->
     <div id="demo-runner-tab-random-settings" class="hidden space-y-4">
-      <button onclick="DemoRunner.showTab('main')" class="btn btn--ghost text-sm">
+      <button onclick="DemoRunner.showTab('main')" class="btn btn--ghost btn--sm">
         <i data-lucide="arrow-left" class="w-4 h-4"></i>
         Back
       </button>
 
-      <h3 class="section-title"><i data-lucide="shuffle" class="w-5 h-5 inline-block"></i> Random Demo Settings</h3>
+      <div class="section-card__header">
+        <div class="section-card__icon section-card__icon--amber">
+          <i data-lucide="shuffle" class="w-5 h-5"></i>
+        </div>
+        <h3 class="section-card__title">Random Demo Settings</h3>
+      </div>
 
       <!-- Number of Trials -->
-      <div class="form-card form-card--info">
-        <label class="form-card__label"><i data-lucide="repeat" class="w-4 h-4 inline-block"></i> Number of Trials</label>
-        <input type="number" id="random-trials-count" value="1" min="1" max="100" class="form-input">
-        <p class="form-card__help">Times to repeat the entire demo</p>
+      <div class="section-card section-card--info">
+        <div class="form-group">
+          <label class="form-group__label"><i data-lucide="repeat" class="w-4 h-4 inline"></i> Number of Trials</label>
+          <input type="number" id="random-trials-count" value="1" min="1" max="100" class="form-input">
+          <span class="form-group__help">Times to repeat the entire demo</span>
+        </div>
       </div>
 
       <!-- Route Count -->
-      <div class="form-card">
-        <label class="form-card__label">Number of Routes</label>
+      <div class="form-group">
+        <label class="form-group__label">Number of Routes</label>
         <input type="number" id="random-route-count" value="1" min="1" max="10" class="form-input">
       </div>
 
       <!-- Algorithm -->
-      <div class="form-card">
-        <label class="form-card__label">Algorithm</label>
-        <select id="random-algorithm" class="form-input form-input--select">
+      <div class="form-group">
+        <label class="form-group__label">Algorithm</label>
+        <select id="random-algorithm" class="form-select">
           <option value="both">Both (HC2L & DHL)</option>
           <option value="hc2l">HC2L Only</option>
           <option value="dhl">DHL Only</option>
@@ -92,9 +101,9 @@
       </div>
 
       <!-- TAU Mode -->
-      <div class="form-card">
-        <label class="form-card__label">TAU (τ) Mode</label>
-        <select id="random-tau-mode" class="form-input form-input--select mb-3">
+      <div class="form-group">
+        <label class="form-group__label">TAU (τ) Mode</label>
+        <select id="random-tau-mode" class="form-select mb-3">
           <option value="fixed">Fixed Value</option>
           <option value="random">Random</option>
           <option value="sequence">Test Sequence</option>
@@ -113,9 +122,9 @@
       </div>
 
       <!-- Disruptions -->
-      <div class="form-card">
-        <label class="form-card__label">Disruptions</label>
-        <select id="random-disruption-mode" class="form-input form-input--select">
+      <div class="form-group">
+        <label class="form-group__label">Disruptions</label>
+        <select id="random-disruption-mode" class="form-select">
           <option value="both">Flow + Incidents</option>
           <option value="flow">Flow Only</option>
           <option value="incidents">Incidents Only</option>
@@ -124,8 +133,8 @@
       </div>
 
       <!-- Step Delay -->
-      <div class="form-card">
-        <label class="form-card__label">Step Delay (ms)</label>
+      <div class="form-group">
+        <label class="form-group__label">Step Delay (ms)</label>
         <input type="number" id="random-step-delay" value="2000" min="500" max="10000" step="500" class="form-input">
       </div>
 
@@ -138,30 +147,35 @@
     <!-- Running Tab -->
     <div id="demo-runner-tab-running" class="hidden flex flex-col h-full">
       <div class="flex-1 overflow-y-auto space-y-3 pb-4">
-        <h3 class="section-title"><i data-lucide="play" class="w-5 h-5 inline-block"></i> Demo Running</h3>
+        <div class="section-card__header">
+          <div class="section-card__icon section-card__icon--success">
+            <i data-lucide="play" class="w-5 h-5"></i>
+          </div>
+          <h3 class="section-card__title">Demo Running</h3>
+        </div>
 
         <!-- Disruption Preview Panel -->
-        <div class="form-card form-card--warning">
-          <div class="flex items-center justify-between mb-2">
-            <h4 class="info-label text-amber-800"><i data-lucide="traffic-cone" class="w-4 h-4 inline-block"></i> Disruption Display</h4>
+        <div class="section-card section-card--warning">
+          <div class="flex items-center justify-between mb-3">
+            <h4 class="text-sm font-semibold"><i data-lucide="traffic-cone" class="w-4 h-4 inline"></i> Disruption Display</h4>
             <div class="flex gap-2">
-              <label class="filter-checkbox">
-                <input type="checkbox" id="demo-show-incidents" checked onchange="DemoRunner.toggleIncidents(this.checked)">
-                <span>Incidents</span>
+              <label class="form-check">
+                <input type="checkbox" id="demo-show-incidents" checked onchange="DemoRunner.toggleIncidents(this.checked)" class="form-check__input">
+                <span class="form-check__label">Incidents</span>
               </label>
-              <label class="filter-checkbox">
-                <input type="checkbox" id="demo-show-flow" checked onchange="DemoRunner.toggleFlowOverlay(this.checked)">
-                <span>Flow</span>
+              <label class="form-check">
+                <input type="checkbox" id="demo-show-flow" checked onchange="DemoRunner.toggleFlowOverlay(this.checked)" class="form-check__input">
+                <span class="form-check__label">Flow</span>
               </label>
             </div>
           </div>
 
           <div id="demo-runner-disruption-sets" class="mb-2 hidden">
-            <div class="info-label text-amber-700 mb-1"><i data-lucide="package" class="w-4 h-4 inline-block"></i> Disruption Sets</div>
+            <div class="text-xs font-semibold text-muted mb-1"><i data-lucide="package" class="w-4 h-4 inline"></i> Disruption Sets</div>
             <div id="demo-runner-set-buttons" class="flex flex-wrap gap-1"></div>
           </div>
 
-          <div id="demo-runner-disruption-preview" class="max-h-48 overflow-y-auto">
+          <div id="demo-runner-disruption-preview" class="max-h-48 overflow-y-auto card card--flat p-3">
             <div class="text-muted text-center py-2">No disruptions loaded</div>
           </div>
         </div>
@@ -172,7 +186,7 @@
 
       <!-- Fixed Controls at Bottom -->
       <div class="panel__footer">
-        <div class="flex gap-2">
+        <div class="flex gap-2 w-full">
           <button id="demo-play-pause-btn" onclick="DemoRunner.togglePauseResume()" class="btn btn--warning flex-1">
             <i data-lucide="pause" class="w-4 h-4"></i> Pause
           </button>
@@ -186,7 +200,7 @@
     <!-- Results Tab -->
     <div id="demo-runner-tab-results" class="hidden flex flex-col h-full">
       <div class="flex-1 overflow-y-auto space-y-4 pb-4">
-        <button onclick="DemoRunner.showTab('main')" class="btn btn--ghost text-sm">
+        <button onclick="DemoRunner.showTab('main')" class="btn btn--ghost btn--sm">
           <i data-lucide="arrow-left" class="w-4 h-4"></i>
           Back to Main
         </button>
@@ -209,47 +223,63 @@
 
         <!-- Performance Charts Section -->
         <div id="demo-results-charts" class="space-y-4">
-          <div class="form-card">
-            <h4 class="form-card__title flex items-center gap-2">
-              <i data-lucide="trending-up" class="w-5 h-5"></i> Algorithm Comparison
-            </h4>
+          <div class="section-card">
+            <div class="section-card__header">
+              <div class="section-card__icon section-card__icon--success">
+                <i data-lucide="trending-up" class="w-5 h-5"></i>
+              </div>
+              <h4 class="section-card__title">Algorithm Comparison</h4>
+            </div>
             <div class="h-48"><canvas id="chart-algorithm-comparison"></canvas></div>
           </div>
 
-          <div class="form-card">
-            <h4 class="form-card__title flex items-center gap-2">
-              <i data-lucide="rocket" class="w-5 h-5"></i> Process Time Comparison
-            </h4>
+          <div class="section-card">
+            <div class="section-card__header">
+              <div class="section-card__icon section-card__icon--primary">
+                <i data-lucide="rocket" class="w-5 h-5"></i>
+              </div>
+              <h4 class="section-card__title">Process Time Comparison</h4>
+            </div>
             <div class="h-40"><canvas id="chart-process-time"></canvas></div>
           </div>
 
-          <div class="form-card">
-            <h4 class="form-card__title flex items-center gap-2">
-              <i data-lucide="timer" class="w-5 h-5"></i> Query Time Trend
-            </h4>
+          <div class="section-card">
+            <div class="section-card__header">
+              <div class="section-card__icon section-card__icon--info">
+                <i data-lucide="timer" class="w-5 h-5"></i>
+              </div>
+              <h4 class="section-card__title">Query Time Trend</h4>
+            </div>
             <div class="h-40"><canvas id="chart-query-time-trend"></canvas></div>
           </div>
 
-          <div class="form-card">
-            <h4 class="form-card__title flex items-center gap-2">
-              <i data-lucide="target" class="w-5 h-5"></i> Performance Radar
-            </h4>
+          <div class="section-card">
+            <div class="section-card__header">
+              <div class="section-card__icon section-card__icon--warning">
+                <i data-lucide="target" class="w-5 h-5"></i>
+              </div>
+              <h4 class="section-card__title">Performance Radar</h4>
+            </div>
             <div class="h-56"><canvas id="chart-performance-radar"></canvas></div>
           </div>
         </div>
 
         <!-- All Results List -->
-        <div class="form-card">
-          <h4 class="form-card__title flex items-center gap-2">
-            <i data-lucide="clipboard-list" class="w-5 h-5"></i> All Results <span id="demo-results-count" class="text-muted">(0 total)</span>
-          </h4>
+        <div class="section-card">
+          <div class="section-card__header">
+            <div class="section-card__icon section-card__icon--purple">
+              <i data-lucide="clipboard-list" class="w-5 h-5"></i>
+            </div>
+            <h4 class="section-card__title">All Results</h4>
+            <span id="demo-results-count" class="badge badge--primary">(0 total)</span>
+          </div>
           <div id="demo-results-list" class="space-y-2"></div>
         </div>
       </div>
 
       <!-- Fixed Action Buttons at Bottom -->
       <div class="panel__footer">
-        <div class="flex gap-3">
+        <div class="flex gap-3 w-full">
           <button id="btn-save-to-server" onclick="DemoRunner.exportResultsLocally()" class="btn btn--primary flex-1">
             <i data-lucide="save" class="w-4 h-4"></i> Save to Server
           </button>

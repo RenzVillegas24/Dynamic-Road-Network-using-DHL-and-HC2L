@@ -568,51 +568,48 @@ const DemoRunner = {
 
         if (this.savedConfigs.length === 0) {
             container.innerHTML = `
-                <div class="text-center py-8 text-gray-400">
-                    <svg class="w-12 h-12 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" 
-                              d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
-                    </svg>
-                    <p class="text-sm">No saved configurations</p>
-                    <p class="text-xs mt-1">Create a custom demo to save it here</p>
+                <div class="empty-state text-center py-8">
+                    <div class="empty-state__icon text-muted mb-2">
+                        <i data-lucide="folder-open" class="w-12 h-12 mx-auto opacity-50"></i>
+                    </div>
+                    <p class="text-sm text-muted">No saved configurations</p>
+                    <p class="text-xs text-muted mt-1">Create a custom demo to save it here</p>
                 </div>
             `;
+            lucide.createIcons();
             return;
         }
 
         container.innerHTML = this.savedConfigs.map(config => `
-            <div class="bg-white rounded-xl p-4 border border-gray-200 hover:border-purple-300 hover:shadow-md transition-all">
+            <div class="card card--bordered p-4 hover:border-purple-300 hover:shadow-md transition-all">
                 <div class="flex items-start justify-between mb-2">
                     <div class="flex-1 min-w-0">
                         <h4 class="font-bold text-gray-800 truncate">${config.name || 'Unnamed Demo'}</h4>
-                        <p class="text-xs text-gray-500">${new Date(config.savedAt).toLocaleDateString()}</p>
+                        <p class="text-xs text-muted">${new Date(config.savedAt).toLocaleDateString()}</p>
                     </div>
                     <div class="flex gap-1">
                         <button onclick="DemoRunner.editConfig('${config.id}')" 
-                                class="p-1.5 hover:bg-blue-100 rounded-lg transition-colors" title="Edit">
-                            <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                            </svg>
+                                class="btn btn--ghost btn--sm p-1.5" title="Edit">
+                            <i data-lucide="pencil" class="w-4 h-4 text-blue-500"></i>
                         </button>
                         <button onclick="DemoRunner.deleteConfig('${config.id}')" 
-                                class="p-1.5 hover:bg-red-100 rounded-lg transition-colors" title="Delete">
-                            <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                            </svg>
+                                class="btn btn--ghost btn--sm p-1.5" title="Delete">
+                            <i data-lucide="x" class="w-4 h-4 text-red-500"></i>
                         </button>
                     </div>
                 </div>
-                <div class="flex flex-wrap items-center gap-2 text-xs text-gray-600 mb-3">
-                    <span class="px-2 py-0.5 bg-blue-100 text-blue-700 rounded">${config.routes?.length || 0} routes</span>
-                    <span class="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded">${config.trials || 1} trials</span>
-                    <span class="px-2 py-0.5 bg-orange-100 text-orange-700 rounded">${config.algorithm?.toUpperCase() || 'HC2L'}</span>
+                <div class="flex flex-wrap items-center gap-2 text-xs mb-3">
+                    <span class="badge badge--info">${config.routes?.length || 0} routes</span>
+                    <span class="badge badge--purple">${config.trials || 1} trials</span>
+                    <span class="badge badge--warning">${config.algorithm?.toUpperCase() || 'HC2L'}</span>
                 </div>
                 <button onclick="DemoRunner.runSavedConfig('${config.id}')" 
-                        class="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-all text-sm">
-                    ▶️ Run Demo
+                        class="btn btn--primary btn--block">
+                    <i data-lucide="play" class="w-4 h-4"></i> Run Demo
                 </button>
             </div>
         `).join('');
+        lucide.createIcons();
     },
 
     runSavedConfig(configId) {
@@ -662,15 +659,15 @@ const DemoRunner = {
 
         if (this.savedResults.length === 0) {
             container.innerHTML = `
-                <div class="text-center py-6 text-gray-400">
-                    <svg class="w-10 h-10 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" 
-                              d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                    </svg>
-                    <p class="text-sm">No saved results yet</p>
-                    <p class="text-xs mt-1">Run a demo and save results to see them here</p>
+                <div class="empty-state text-center py-6">
+                    <div class="empty-state__icon text-muted mb-2">
+                        <i data-lucide="bar-chart-2" class="w-10 h-10 mx-auto opacity-50"></i>
+                    </div>
+                    <p class="text-sm text-muted">No saved results yet</p>
+                    <p class="text-xs text-muted mt-1">Run a demo and save results to see them here</p>
                 </div>
             `;
+            lucide.createIcons();
             return;
         }
 
@@ -694,8 +691,9 @@ const DemoRunner = {
             html += `
                 <div class="mb-4">
                     <div class="flex items-center gap-2 mb-2 pb-1 border-b border-gray-200">
-                        <span class="text-sm font-semibold text-gray-700">📁 ${group.name}</span>
-                        <span class="text-xs text-gray-400">(${group.results.length} run${group.results.length !== 1 ? 's' : ''})</span>
+                        <i data-lucide="folder" class="w-4 h-4 text-muted"></i>
+                        <span class="text-sm font-semibold">${group.name}</span>
+                        <span class="badge badge--secondary badge--sm">${group.results.length} run${group.results.length !== 1 ? 's' : ''}</span>
                     </div>
                     <div class="space-y-2 pl-2">
                         ${group.results.map((result, idx) => {
@@ -715,21 +713,21 @@ const DemoRunner = {
                             // Algorithm breakdown
                             const algos = summary.algorithmBreakdown || {};
                             const algoStr = [];
-                            if (algos.hc2l > 0) algoStr.push(`🔵${algos.hc2l}`);
-                            if (algos.dhl > 0) algoStr.push(`🟢${algos.dhl}`);
+                            if (algos.hc2l > 0) algoStr.push(`<span class="text-blue-600">${algos.hc2l}</span>`);
+                            if (algos.dhl > 0) algoStr.push(`<span class="text-green-600">${algos.dhl}</span>`);
                             
                             return `
-                                <div class="bg-gray-50 rounded-lg p-3 border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/30 transition-all cursor-pointer"
+                                <div class="card card--flat p-3 hover:border-indigo-300 hover:bg-indigo-50/30 transition-all cursor-pointer"
                                      onclick="DemoRunner.viewSavedResult('${result.filePath.replace(/'/g, "\\'")}')">
                                     <div class="flex items-center justify-between mb-1">
-                                        <span class="text-xs text-gray-500">${dateStr} ${timeStr}</span>
-                                        <span class="text-xs font-medium text-indigo-600">${result.totalRoutes || 0} routes</span>
+                                        <span class="text-xs text-muted">${dateStr} ${timeStr}</span>
+                                        <span class="badge badge--info badge--sm">${result.totalRoutes || 0} routes</span>
                                     </div>
                                     <div class="flex flex-wrap gap-2 text-xs">
-                                        ${summary.trialsCompleted ? `<span class="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">🔄 ${summary.trialsCompleted} trial${summary.trialsCompleted !== 1 ? 's' : ''}</span>` : ''}
-                                        <span class="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded">⏱️ ${durationStr}</span>
-                                        <span class="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded">⚡ ${processTimeStr}</span>
-                                        ${algoStr.length > 0 ? `<span class="px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded">${algoStr.join(' ')}</span>` : ''}
+                                        ${summary.trialsCompleted ? `<span class="badge badge--primary badge--sm"><i data-lucide="repeat" class="w-3 h-3 inline"></i> ${summary.trialsCompleted}</span>` : ''}
+                                        <span class="badge badge--purple badge--sm"><i data-lucide="clock" class="w-3 h-3 inline"></i> ${durationStr}</span>
+                                        <span class="badge badge--warning badge--sm"><i data-lucide="zap" class="w-3 h-3 inline"></i> ${processTimeStr}</span>
+                                        ${algoStr.length > 0 ? `<span class="badge badge--secondary badge--sm">${algoStr.join(' / ')}</span>` : ''}
                                     </div>
                                 </div>
                             `;
@@ -740,6 +738,7 @@ const DemoRunner = {
         });
 
         container.innerHTML = html;
+        lucide.createIcons();
     },
 
     async viewSavedResult(filePath) {
@@ -1714,7 +1713,7 @@ const DemoRunner = {
                 ${p.lastResult ? `
                 <div class="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-xl p-3 border border-amber-200">
                     <div class="flex justify-between items-center mb-2">
-                        <h4 class="text-xs font-bold text-amber-700">🔄 Update Phase</h4>
+                        <h4 class="text-xs font-bold text-amber-700"><i data-lucide="refresh-cw" class="w-3 h-3 inline"></i> Update Phase</h4>
                         <span class="text-[10px] text-amber-600">${(p.lastResult.algorithm || '').toUpperCase() === 'HC2L' ? 'Lazy Update' : 'Immediate Update'}</span>
                     </div>
                     <div class="grid grid-cols-2 gap-1">
@@ -1732,7 +1731,7 @@ const DemoRunner = {
                 ${p.lastResult ? `
                 <div class="bg-gradient-to-br from-purple-50 to-violet-50 rounded-xl p-3 border border-purple-200">
                     <div class="flex justify-between items-center mb-2">
-                        <h4 class="text-xs font-bold text-purple-700">⚡ Query Phase</h4>
+                        <h4 class="text-xs font-bold text-purple-700"><i data-lucide="zap" class="w-3 h-3 inline"></i> Query Phase</h4>
                         <span class="text-[10px] text-purple-600">Per Batch (1,000 OD)</span>
                     </div>
                     <div class="grid grid-cols-2 gap-1">
@@ -2571,15 +2570,17 @@ const DemoRunner = {
         if (!btn) return;
 
         if (this.isPaused) {
-            // Show "Resume" state - green button with play icon
-            btn.innerHTML = '▶️ Resume';
-            btn.classList.remove('bg-yellow-500', 'hover:bg-yellow-600');
-            btn.classList.add('bg-green-500', 'hover:bg-green-600');
+            // Show "Resume" state - success button with play icon
+            btn.innerHTML = '<i data-lucide="play" class="w-4 h-4"></i> Resume';
+            btn.classList.remove('btn--warning');
+            btn.classList.add('btn--success');
+            lucide.createIcons();
         } else {
-            // Show "Pause" state - yellow button with pause icon
-            btn.innerHTML = '⏸️ Pause';
-            btn.classList.remove('bg-green-500', 'hover:bg-green-600');
-            btn.classList.add('bg-yellow-500', 'hover:bg-yellow-600');
+            // Show "Pause" state - warning button with pause icon
+            btn.innerHTML = '<i data-lucide="pause" class="w-4 h-4"></i> Pause';
+            btn.classList.remove('btn--success');
+            btn.classList.add('btn--warning');
+            lucide.createIcons();
         }
     },
 

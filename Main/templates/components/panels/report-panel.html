@@ -1,5 +1,5 @@
 <!-- Report Incident Panel -->
-<div id="report-panel" class="panel panel--sm">
+<div id="report-panel" class="panel panel--lg">
   <div class="panel__header panel__header--purple">
     <div class="panel__icon">
       <i data-lucide="alert-triangle" class="w-6 h-6"></i>
@@ -16,19 +16,19 @@
   <div class="panel__body">
     <form class="space-y-5" id="report-form">
       <!-- Incident Location -->
-      <div class="input-group">
-        <label class="input-group__label">Incident Location</label>
+      <div class="form-group">
+        <label class="form-group__label">Incident Location</label>
         <button type="button" id="pin-disruption-btn" class="pin-button">
           <i data-lucide="map-pin" class="pin-button__icon"></i>
           <span id="pin-disruption-text">Click to pin location on map</span>
         </button>
-        <div id="disruption-coords" class="text-xs text-center font-semibold hidden mt-3 p-2 bg-alt rounded-xl"></div>
+        <div id="disruption-coords" class="badge badge--primary badge--lg hidden mt-3 w-full justify-center"></div>
       </div>
 
       <!-- Incident Type -->
-      <div class="input-group">
-        <label class="input-group__label">Incident Type</label>
-        <select id="disruption-type" class="select">
+      <div class="form-group">
+        <label class="form-group__label">Incident Type</label>
+        <select id="disruption-type" class="form-select">
           <option value="">Select incident type...</option>
           <option value="accident">Accident</option>
           <option value="construction">Construction Work</option>
@@ -44,93 +44,98 @@
       </div>
 
       <!-- Incident Criticality -->
-      <div class="input-group">
-        <label class="input-group__label">Incident Criticality</label>
-        <div class="space-y-3">
-          <label class="selection-card selection-card--success">
+      <div class="form-group">
+        <label class="form-group__label">Incident Criticality</label>
+        <div class="nav-select">
+          <label class="nav-select__option nav-select--emerald">
             <input type="radio" name="criticality" value="low">
-            <div class="selection-card__content">
-              <span class="selection-card__title">Low Impact</span>
-              <p class="selection-card__description">Minor disruption</p>
+            <span class="nav-select__icon"><i data-lucide="minus-circle" class="w-4 h-4"></i></span>
+            <div class="nav-select__content">
+              <span class="nav-select__title">Low Impact</span>
+              <span class="nav-select__description">Minor disruption</span>
             </div>
           </label>
-          <label class="selection-card selection-card--warning">
+          <label class="nav-select__option nav-select--amber">
             <input type="radio" name="criticality" value="minor" checked>
-            <div class="selection-card__content">
-              <span class="selection-card__title">Minor Impact</span>
-              <p class="selection-card__description">Moderate slowdown</p>
+            <span class="nav-select__icon"><i data-lucide="alert-circle" class="w-4 h-4"></i></span>
+            <div class="nav-select__content">
+              <span class="nav-select__title">Minor Impact</span>
+              <span class="nav-select__description">Moderate slowdown</span>
             </div>
           </label>
-          <label class="selection-card selection-card--major">
+          <label class="nav-select__option nav-select--orange">
             <input type="radio" name="criticality" value="major">
-            <div class="selection-card__content">
-              <span class="selection-card__title">Major Impact</span>
-              <p class="selection-card__description">Significant delays</p>
+            <span class="nav-select__icon"><i data-lucide="alert-triangle" class="w-4 h-4"></i></span>
+            <div class="nav-select__content">
+              <span class="nav-select__title">Major Impact</span>
+              <span class="nav-select__description">Significant delays</span>
             </div>
           </label>
-          <label class="selection-card selection-card--critical">
+          <label class="nav-select__option nav-select--red">
             <input type="radio" name="criticality" value="critical">
-            <div class="selection-card__content">
-              <span class="selection-card__title">Critical Impact</span>
-              <p class="selection-card__description">Severe disruption or closure</p>
+            <span class="nav-select__icon"><i data-lucide="x-circle" class="w-4 h-4"></i></span>
+            <div class="nav-select__content">
+              <span class="nav-select__title">Critical Impact</span>
+              <span class="nav-select__description">Severe disruption or closure</span>
             </div>
           </label>
         </div>
       </div>
 
       <!-- Road Closure Section -->
-      <div class="border-t pt-5">
-        <label class="checkbox-card checkbox-card--danger">
-          <div class="checkbox-card__content">
-            <i data-lucide="ban" class="checkbox-card__icon"></i>
-            <div class="checkbox-card__text">
-              <span class="checkbox-card__title">Road is Completely Closed</span>
-              <p class="checkbox-card__description">Mark as impassable</p>
-            </div>
+      <div class="section-card section-card--error">
+        <div class="form-switch">
+          <input type="checkbox" id="incident-road-closed" class="form-switch__input">
+          <span class="form-switch__slider"></span>
+          <div class="form-switch__label">
+            <span class="font-semibold">Road is Completely Closed</span>
+            <p class="text-xs text-muted">Mark as impassable</p>
           </div>
-          <input type="checkbox" id="incident-road-closed" class="toggle-checkbox">
-        </label>
+        </div>
       </div>
 
       <!-- Time Range Section -->
       <div class="stat-grid stat-grid--2">
-        <div class="input-group">
-          <label class="input-group__label">Start Time (Optional)</label>
-          <input type="datetime-local" id="incident-start-time" class="datetime-input">
+        <div class="form-group">
+          <label class="form-group__label">Start Time (Optional)</label>
+          <input type="datetime-local" id="incident-start-time" class="form-input">
         </div>
-        <div class="input-group">
-          <label class="input-group__label">End Time (Optional)</label>
-          <input type="datetime-local" id="incident-end-time" class="datetime-input">
+        <div class="form-group">
+          <label class="form-group__label">End Time (Optional)</label>
+          <input type="datetime-local" id="incident-end-time" class="form-input">
         </div>
       </div>
 
       <!-- Description Field -->
-      <div class="input-group">
-        <label class="input-group__label">Additional Details (Optional)</label>
-        <textarea id="disruption-description" class="textarea" rows="3"
+      <div class="form-group">
+        <label class="form-group__label">Additional Details (Optional)</label>
+        <textarea id="disruption-description" class="form-textarea" rows="3"
           placeholder="Describe what you observed (e.g., accident details, lane closures, etc.)"></textarea>
       </div>
 
       <!-- User-reported incidents management -->
-      <div class="mt-8 pt-6 border-t">
-        <div class="d-flex justify-between items-center mb-4">
-          <div>
-            <p class="text-xs uppercase tracking-wide text-primary font-semibold">Custom Incidents</p>
-            <h3 class="font-bold text-lg">Saved Pins</h3>
-            <p class="text-xs text-muted">Remove or refresh your manually added incidents.</p>
+      <div class="section-card section-card--slate">
+        <div class="section-card__header">
+          <div class="section-card__icon section-card__icon--primary">
+            <i data-lucide="bookmark" class="w-5 h-5"></i>
           </div>
-          <button type="button" id="refresh-user-disruptions" class="btn btn--surface btn--sm">
-            Refresh
+          <div class="flex-1">
+            <h3 class="section-card__title">Saved Pins</h3>
+            <p class="text-xs text-muted">Your manually added incidents</p>
+          </div>
+          <button type="button" id="refresh-user-disruptions" class="btn btn--ghost btn--sm">
+            <i data-lucide="refresh-cw" class="w-4 h-4"></i>
           </button>
         </div>
 
-        <div id="user-disruptions-empty" class="text-sm text-muted bg-alt rounded-xl p-3 hidden">
-          No custom incidents yet. Report one above to see it here.
+        <div id="user-disruptions-empty" class="panel__empty panel__empty--compact hidden">
+          <p class="panel__empty-text">No custom incidents yet</p>
         </div>
         <div id="user-disruptions-list" class="space-y-3"></div>
       </div>
 
       <button type="submit" class="btn btn--primary btn--lg btn--block">
+        <i data-lucide="send" class="w-5 h-5"></i>
         Submit Report
       </button>
     </form>
