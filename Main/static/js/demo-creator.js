@@ -222,7 +222,7 @@ const DemoCreator = {
 
     async init() {
         await this.loadQCBoundary();
-        console.log('🎨 Initializing Demo Creator...');
+        console.log('Initializing Demo Creator...');
         this.applyDefaultsToUI();
         this.bindEvents();
         this.renderRoutesList();
@@ -515,7 +515,6 @@ const DemoCreator = {
             if (this.mode === 'edit') {
                 titleEl.innerHTML = `
                     <span class="flex items-center gap-2">
-                        <span class="text-xl">✏️</span>
                         <span>Edit Demo</span>
                         <span class="px-2 py-0.5 bg-blue-500 text-white text-xs rounded-full">Editing</span>
                     </span>
@@ -523,7 +522,6 @@ const DemoCreator = {
             } else {
                 titleEl.innerHTML = `
                     <span class="flex items-center gap-2">
-                        <span class="text-xl">🎨</span>
                         <span>Demo Creator</span>
                         <span class="px-2 py-0.5 bg-green-500 text-white text-xs rounded-full">New</span>
                     </span>
@@ -957,8 +955,11 @@ const DemoCreator = {
         // Reset currentEditRoute
         this.currentEditRoute = { start: null, end: null };
         
-        // Reset edit mode
-        this.editingConfigId = null;
+    // Reset edit mode and panel mode (default to create)
+    this.editingConfigId = null;
+    this.mode = 'create';
+    // Update panel title to reflect mode
+    try { this.updatePanelTitle(); } catch (e) { /* ignore if UI not initialized */ }
         
         // Reset running state
         this.isRunning = false;
@@ -1053,17 +1054,41 @@ const DemoCreator = {
         // Update step indicators (only for numbered steps)
         if (typeof step === 'number') {
             [1, 2, 3, 4].forEach(s => {
+                const item = document.getElementById(`demo-v2-step-item-${s}`);
                 const indicator = document.getElementById(`demo-v2-indicator-${s}`);
+                const line = document.getElementById(`demo-v2-line-${s}`);
+                
+                if (item) {
+                    if (s === step) {
+                        item.classList.add('wizard-steps__item--active');
+                    } else {
+                        item.classList.remove('wizard-steps__item--active');
+                    }
+                    
+                    if (s < step) {
+                        item.classList.add('wizard-steps__item--completed');
+                    } else {
+                        item.classList.remove('wizard-steps__item--completed');
+                    }
+                }
+                
                 if (indicator) {
                     if (s === step) {
-                        indicator.classList.remove('bg-gray-300', 'text-gray-600');
-                        indicator.classList.add('bg-purple-600', 'text-white');
+                        indicator.classList.add('wizard-steps__indicator--active');
+                        indicator.classList.remove('wizard-steps__indicator--completed');
                     } else if (s < step) {
-                        indicator.classList.remove('bg-gray-300', 'text-gray-600', 'bg-purple-600');
-                        indicator.classList.add('bg-green-500', 'text-white');
+                        indicator.classList.add('wizard-steps__indicator--completed');
+                        indicator.classList.remove('wizard-steps__indicator--active');
                     } else {
-                        indicator.classList.remove('bg-purple-600', 'text-white', 'bg-green-500');
-                        indicator.classList.add('bg-gray-300', 'text-gray-600');
+                        indicator.classList.remove('wizard-steps__indicator--active', 'wizard-steps__indicator--completed');
+                    }
+                }
+                
+                if (line) {
+                    if (s < step) {
+                        line.classList.add('wizard-steps__line--completed');
+                    } else {
+                        line.classList.remove('wizard-steps__line--completed');
                     }
                 }
             });
@@ -1072,13 +1097,24 @@ const DemoCreator = {
             this.updateMapLayerVisibility(step);
         }
         
-        // Update nav buttons
+        // Update nav buttons based on current step
         const isRunning = step === 'running';
+        
+        // Toggle navigation buttons (shown on steps 1-3)
+        const navButtonsContainer = document.getElementById('demo-v2-nav-buttons');
+        if (navButtonsContainer) {
+            navButtonsContainer.classList.toggle('hidden', step === 4 || isRunning);
+        }
+        
+        // Toggle save buttons (shown only on step 4)
+        const saveButtonsContainer = document.getElementById('demo-v2-save-buttons');
+        if (saveButtonsContainer) {
+            saveButtonsContainer.classList.toggle('hidden', step !== 4);
+        }
+        
+        // Update individual button visibility within navigation buttons
         document.getElementById('demo-v2-prev-btn')?.classList.toggle('hidden', step === 1 || isRunning);
         document.getElementById('demo-v2-next-btn')?.classList.toggle('hidden', step === 4 || isRunning);
-        document.getElementById('demo-v2-run-btn')?.classList.toggle('hidden', step !== 4);
-        document.getElementById('demo-v2-save-btn')?.classList.toggle('hidden', step !== 4);
-        document.getElementById('demo-v2-save-run-btn')?.classList.toggle('hidden', step !== 4);
         
         // Show/hide step indicators during running
         document.querySelector('.sticky.top-\\[68px\\]')?.classList.toggle('opacity-50', isRunning);
@@ -3312,6 +3348,8 @@ const DemoCreator = {
 
         this.isRunning = true;
         this.isPaused = false;
+    // Update config list to reflect running state (disables run buttons)
+    if (typeof DemoRunner !== 'undefined' && DemoRunner.renderConfigList) DemoRunner.renderConfigList();
         
         const trials = config.trials || config.settings?.trials || 1;
         const routes = config.routes || [];
@@ -3378,6 +3416,8 @@ const DemoCreator = {
             showUpdateToast('Demo failed: ' + error.message, 'error');
         } finally {
             this.isRunning = false;
+            // Update config list to reflect stopped state (re-enable buttons)
+            if (typeof DemoRunner !== 'undefined' && DemoRunner.renderConfigList) DemoRunner.renderConfigList();
         }
     },
 
@@ -3998,7 +4038,13 @@ const DemoCreator = {
         
         // Return to step 1 after a short delay
         setTimeout(() => {
+            // Revert to create mode when stopping the demo
+            this.mode = 'create';
+            this.editingConfigId = null;
+            try { this.updatePanelTitle(); } catch (e) { /* ignore if UI not present */ }
             this.goToStep(1);
+            // Update config list to reflect stopped demo
+            if (typeof DemoRunner !== 'undefined' && DemoRunner.renderConfigList) DemoRunner.renderConfigList();
         }, 1000);
     },
 

@@ -1,5 +1,5 @@
 <!-- Admin Panel -->
-<div id="admin-panel" class="panel panel--md">
+<div id="finder-panel" class="panel panel--md">
 
   <div class="panel__header panel__header--dark">
     <div class="panel__icon">
@@ -54,7 +54,7 @@
         <h3 class="section-card__title">Algorithm Selection</h3>
       </div>
       <div class="nav-select nav-select--blue">
-        <label class="nav-select__option">
+        <label class="nav-select__option" data-color="blue">
           <input type="radio" name="algorithm" value="hc2l" checked>
           <span class="nav-select__icon"><i data-lucide="zap" class="w-4 h-4"></i></span>
           <div class="nav-select__content">
@@ -62,7 +62,7 @@
             <span class="nav-select__description">Advanced lazy update algorithm</span>
           </div>
         </label>
-        <label class="nav-select__option">
+        <label class="nav-select__option" data-color="emerald">
           <input type="radio" name="algorithm" value="dhl">
           <span class="nav-select__icon"><i data-lucide="layers" class="w-4 h-4"></i></span>
           <div class="nav-select__content">
@@ -81,7 +81,7 @@
         <h3 class="section-card__title">Dataset Selection</h3>
       </div>
       <div class="nav-select nav-select--amber">
-        <label class="nav-select__option">
+        <label class="nav-select__option" data-color="slate">
           <input type="radio" name="dataset" value="none" checked>
           <span class="nav-select__icon"><i data-lucide="ban" class="w-4 h-4"></i></span>
           <div class="nav-select__content">
@@ -89,7 +89,7 @@
             <span class="nav-select__description">No traffic data (shortest path only)</span>
           </div>
         </label>
-        <label class="nav-select__option">
+        <label class="nav-select__option" data-color="amber">
           <input type="radio" name="dataset" value="both">
           <span class="nav-select__icon"><i data-lucide="traffic-cone" class="w-4 h-4"></i></span>
           <div class="nav-select__content">

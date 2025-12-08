@@ -114,7 +114,7 @@
       <div class="split-view__secondary" id="right-panel-container">
         {% include 'components/panels/route-panel.html' %}
         {% include 'components/panels/report-panel.html' %}
-        {% include 'components/panels/admin-panel.html' %}
+        {% include 'components/panels/finder-panel.html' %}
         {% include 'components/panels/disruptions-panel.html' %}
         {% include 'components/panels/metrics-panel.html' %}
         {% include 'components/panels/demo-runner-panel.html' %}
@@ -1612,7 +1612,7 @@
 
       // Wire up Admin Panel Toggle
       const adminToggle = document.getElementById('admin-toggle');
-      const adminPanel = document.getElementById('admin-panel');
+      const adminPanel = document.getElementById('finder-panel');
       const adminClose = document.getElementById('admin-close');
 
       if (adminToggle && adminPanel) {
@@ -1861,31 +1861,6 @@
           const mode = e.target.value;
           localStorage.setItem('selectedDataset', mode);
 
-          // Update backend traffic mode
-          fetch('/set_traffic_mode', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ mode: mode })
-          })
-            .then(response => response.json())
-            .then(data => {
-              if (data.success) {
-                const modeLabel = {
-                  'none': 'No Disruptions',
-                  'incidents': 'Incidents Only',
-                  'flow': 'Flow Only',
-                  'both': 'Incidents + Flow'
-                }[mode] || mode;
-
-                showUpdateToast(`Dataset: ${modeLabel}`, 'success');
-              } else {
-                showUpdateToast('Failed to set dataset mode', 'error');
-              }
-            })
-            .catch(error => {
-              console.error('Error setting dataset mode:', error);
-              showUpdateToast('Error updating dataset mode', 'error');
-            });
         });
       });
 
@@ -2288,7 +2263,7 @@
 
           // Close any currently open panel first (slide out)
           const allPanels = [
-            'admin-panel', 'current-path-panel', 'report-panel',
+            'finder-panel', 'current-path-panel', 'report-panel',
             'disruptions-panel', 'route-metrics-panel', 'algorithm-comparison-panel',
             'developer-view-panel', 'demo-runner-panel', 'demo-creator-panel'
           ];
@@ -2301,7 +2276,7 @@
           const panelActions = {
             'route-finder': () => {
               // Open admin panel (now Route Finder)
-              const panel = document.getElementById('admin-panel');
+              const panel = document.getElementById('finder-panel');
               if (panel) panel.classList.remove('translate-x-full');
             },
             'current-route': () => {

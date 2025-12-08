@@ -142,7 +142,7 @@
 /* Warning button */
 .btn--warning {
   background: var(--gradient-warning);
-  color: var(--color-text);
+  color: var(--color-text-inverse);
   box-shadow: var(--shadow-warning);
 }
 

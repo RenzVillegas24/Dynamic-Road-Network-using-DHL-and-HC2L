@@ -25,60 +25,115 @@
         <div id="disruption-coords" class="badge badge--primary badge--lg hidden mt-3 w-full justify-center"></div>
       </div>
 
-      <!-- Incident Type -->
-      <div class="form-group">
-        <label class="form-group__label">Incident Type</label>
-        <select id="disruption-type" class="form-select">
-          <option value="">Select incident type...</option>
-          <option value="accident">Accident</option>
-          <option value="construction">Construction Work</option>
-          <option value="congestion">Heavy Congestion</option>
-          <option value="disabled-vehicle">Disabled Vehicle</option>
-          <option value="mass-transit">Mass Transit Event</option>
-          <option value="planned-event">Planned Event</option>
-          <option value="road-hazard">Road Hazard</option>
-          <option value="road-closure">Road Closure</option>
-          <option value="weather">Severe Weather</option>
-          <option value="lane-restriction">Lane Restriction</option>
-        </select>
+      <!-- Incident Type & Criticality Section -->
+      <div class="section-card section-card--warning">
+        <div class="section-card__header">
+          <div class="section-card__icon section-card__icon--warning">
+            <i data-lucide="alert-circle" class="w-5 h-5"></i>
+          </div>
+          <div class="flex-1">
+            <h3 class="section-card__title">Incident Details</h3>
+            <p class="text-xs text-muted">Type and severity classification</p>
+          </div>
+        </div>
+
+        <!-- Incident Type -->
+        <div class="form-group mb-4">
+          <label class="form-group__label">Incident Type</label>
+          <select id="disruption-type" class="form-select">
+            <option value="">Select incident type...</option>
+            <option value="accident">Accident</option>
+            <option value="construction">Construction Work</option>
+            <option value="congestion">Heavy Congestion</option>
+            <option value="disabled-vehicle">Disabled Vehicle</option>
+            <option value="mass-transit">Mass Transit Event</option>
+            <option value="planned-event">Planned Event</option>
+            <option value="road-hazard">Road Hazard</option>
+            <option value="road-closure">Road Closure</option>
+            <option value="weather">Severe Weather</option>
+            <option value="lane-restriction">Lane Restriction</option>
+          </select>
+        </div>
+
+        <!-- Incident Criticality -->
+        <div class="form-group">
+          <label class="form-group__label">Incident Criticality</label>
+          <div class="nav-select">
+            <label class="nav-select__option" data-color="emerald">
+              <input type="radio" name="criticality" value="low">
+              <span class="nav-select__icon"><i data-lucide="minus-circle" class="w-4 h-4"></i></span>
+              <div class="nav-select__content">
+                <span class="nav-select__title">Low Impact</span>
+                <span class="nav-select__description">Minor disruption</span>
+              </div>
+            </label>
+            <label class="nav-select__option" data-color="amber">
+              <input type="radio" name="criticality" value="minor" checked>
+              <span class="nav-select__icon"><i data-lucide="alert-circle" class="w-4 h-4"></i></span>
+              <div class="nav-select__content">
+                <span class="nav-select__title">Minor Impact</span>
+                <span class="nav-select__description">Moderate slowdown</span>
+              </div>
+            </label>
+            <label class="nav-select__option" data-color="orange">
+              <input type="radio" name="criticality" value="major">
+              <span class="nav-select__icon"><i data-lucide="alert-triangle" class="w-4 h-4"></i></span>
+              <div class="nav-select__content">
+                <span class="nav-select__title">Major Impact</span>
+                <span class="nav-select__description">Significant delays</span>
+              </div>
+            </label>
+            <label class="nav-select__option" data-color="red">
+              <input type="radio" name="criticality" value="critical">
+              <span class="nav-select__icon"><i data-lucide="x-circle" class="w-4 h-4"></i></span>
+              <div class="nav-select__content">
+                <span class="nav-select__title">Critical Impact</span>
+                <span class="nav-select__description">Severe disruption or closure</span>
+              </div>
+            </label>
+          </div>
+        </div>
       </div>
 
-      <!-- Incident Criticality -->
-      <div class="form-group">
-        <label class="form-group__label">Incident Criticality</label>
-        <div class="nav-select">
-          <label class="nav-select__option nav-select--emerald">
-            <input type="radio" name="criticality" value="low">
-            <span class="nav-select__icon"><i data-lucide="minus-circle" class="w-4 h-4"></i></span>
-            <div class="nav-select__content">
-              <span class="nav-select__title">Low Impact</span>
-              <span class="nav-select__description">Minor disruption</span>
-            </div>
-          </label>
-          <label class="nav-select__option nav-select--amber">
-            <input type="radio" name="criticality" value="minor" checked>
-            <span class="nav-select__icon"><i data-lucide="alert-circle" class="w-4 h-4"></i></span>
-            <div class="nav-select__content">
-              <span class="nav-select__title">Minor Impact</span>
-              <span class="nav-select__description">Moderate slowdown</span>
-            </div>
-          </label>
-          <label class="nav-select__option nav-select--orange">
-            <input type="radio" name="criticality" value="major">
-            <span class="nav-select__icon"><i data-lucide="alert-triangle" class="w-4 h-4"></i></span>
-            <div class="nav-select__content">
-              <span class="nav-select__title">Major Impact</span>
-              <span class="nav-select__description">Significant delays</span>
-            </div>
-          </label>
-          <label class="nav-select__option nav-select--red">
-            <input type="radio" name="criticality" value="critical">
-            <span class="nav-select__icon"><i data-lucide="x-circle" class="w-4 h-4"></i></span>
-            <div class="nav-select__content">
-              <span class="nav-select__title">Critical Impact</span>
-              <span class="nav-select__description">Severe disruption or closure</span>
-            </div>
-          </label>
+      <!-- Time Range Section -->
+      <div class="section-card section-card--info">
+        <div class="section-card__header">
+          <div class="section-card__icon section-card__icon--info">
+            <i data-lucide="clock" class="w-5 h-5"></i>
+          </div>
+          <div class="flex-1">
+            <h3 class="section-card__title">Incident Duration</h3>
+            <p class="text-xs text-muted">When did it occur (optional)</p>
+          </div>
+        </div>
+
+        <div class="stat-grid stat-grid--2">
+          <div class="form-group">
+            <label class="form-group__label">Start Time</label>
+            <input type="datetime-local" id="incident-start-time" class="form-input">
+          </div>
+          <div class="form-group">
+            <label class="form-group__label">End Time</label>
+            <input type="datetime-local" id="incident-end-time" class="form-input">
+          </div>
+        </div>
+      </div>
+
+      <!-- Description Section -->
+      <div class="section-card section-card--slate">
+        <div class="section-card__header">
+          <div class="section-card__icon section-card__icon--secondary">
+            <i data-lucide="message-square" class="w-5 h-5"></i>
+          </div>
+          <div class="flex-1">
+            <h3 class="section-card__title">Additional Details</h3>
+            <p class="text-xs text-muted">Help others understand the situation</p>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <textarea id="disruption-description" class="form-textarea" rows="3"
+            placeholder="Describe what you observed (e.g., accident details, lane closures, etc.)"></textarea>
         </div>
       </div>
 
@@ -92,25 +147,6 @@
             <p class="text-xs text-muted">Mark as impassable</p>
           </div>
         </div>
-      </div>
-
-      <!-- Time Range Section -->
-      <div class="stat-grid stat-grid--2">
-        <div class="form-group">
-          <label class="form-group__label">Start Time (Optional)</label>
-          <input type="datetime-local" id="incident-start-time" class="form-input">
-        </div>
-        <div class="form-group">
-          <label class="form-group__label">End Time (Optional)</label>
-          <input type="datetime-local" id="incident-end-time" class="form-input">
-        </div>
-      </div>
-
-      <!-- Description Field -->
-      <div class="form-group">
-        <label class="form-group__label">Additional Details (Optional)</label>
-        <textarea id="disruption-description" class="form-textarea" rows="3"
-          placeholder="Describe what you observed (e.g., accident details, lane closures, etc.)"></textarea>
       </div>
 
       <!-- User-reported incidents management -->

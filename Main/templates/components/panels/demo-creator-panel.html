@@ -114,7 +114,7 @@
               <!-- Random Routes Section -->
               <div class="section-card section-card--warning">
                 <h4 class="text-sm font-semibold mb-3 flex items-center gap-2">
-                  <i data-lucide="shuffle" class="w-5 h-5"></i> Generate Random Routes
+                  <i data-lucide="shuffle" class="w-4 h-4"></i> Generate Random Routes
                 </h4>
                 <div class="space-y-3">
                   <div class="grid grid-cols-3 gap-3">
@@ -165,28 +165,28 @@
               <div class="section-card">
                 <label class="form-group__label font-bold mb-3">Disruption Mode</label>
                 <div class="nav-select nav-select--grid">
-                  <label class="nav-select__option disruption-mode-option">
+                  <label class="nav-select__option" data-color="slate">
                     <input type="radio" name="demo-disruption-mode" value="none" onchange="DemoCreator.setDisruptionMode(this.value)">
                     <div class="nav-select__icon"><i data-lucide="ban" class="w-5 h-5"></i></div>
                     <div class="nav-select__content">
                       <span class="nav-select__title">None</span>
                     </div>
                   </label>
-                  <label class="nav-select__option disruption-mode-option">
+                  <label class="nav-select__option" data-color="amber">
                     <input type="radio" name="demo-disruption-mode" value="random-flow" onchange="DemoCreator.setDisruptionMode(this.value)">
                     <div class="nav-select__icon"><i data-lucide="traffic-cone" class="w-5 h-5"></i></div>
                     <div class="nav-select__content">
                       <span class="nav-select__title">Traffic</span>
                     </div>
                   </label>
-                  <label class="nav-select__option disruption-mode-option">
+                  <label class="nav-select__option" data-color="orange">
                     <input type="radio" name="demo-disruption-mode" value="random-incidents" onchange="DemoCreator.setDisruptionMode(this.value)">
                     <div class="nav-select__icon"><i data-lucide="alert-triangle" class="w-5 h-5"></i></div>
                     <div class="nav-select__content">
                       <span class="nav-select__title">Incidents</span>
                     </div>
                   </label>
-                  <label class="nav-select__option disruption-mode-option">
+                  <label class="nav-select__option" data-color="red">
                     <input type="radio" name="demo-disruption-mode" value="random-both" checked onchange="DemoCreator.setDisruptionMode(this.value)">
                     <div class="nav-select__icon"><i data-lucide="zap" class="w-5 h-5"></i></div>
                     <div class="nav-select__content">
@@ -195,7 +195,7 @@
                   </label>
                 </div>
                 <div class="nav-select nav-select--blue mt-2">
-                  <label class="nav-select__option disruption-mode-option">
+                  <label class="nav-select__option" data-color="blue">
                     <input type="radio" name="demo-disruption-mode" value="custom" onchange="DemoCreator.setDisruptionMode(this.value)">
                     <div class="nav-select__icon"><i data-lucide="target" class="w-5 h-5"></i></div>
                     <div class="nav-select__content">
@@ -216,7 +216,7 @@
                 <div class="border-b border-amber-200 pb-4">
                   <label class="form-group__label">Generation Scope</label>
                   <div class="nav-select nav-select--amber">
-                    <label class="nav-select__option disruption-scope-option">
+                    <label class="nav-select__option disruption-scope-option" data-color="blue">
                       <input type="radio" name="disruption-generation-scope" value="all" onchange="DemoCreator.setDisruptionScope(this.value)">
                       <div class="nav-select__icon"><i data-lucide="globe" class="w-4 h-4"></i></div>
                       <div class="nav-select__content">
@@ -224,7 +224,7 @@
                         <span class="nav-select__description">All routes share same disruptions</span>
                       </div>
                     </label>
-                    <label class="nav-select__option disruption-scope-option">
+                    <label class="nav-select__option disruption-scope-option" data-color="amber">
                       <input type="radio" name="disruption-generation-scope" value="per-trial" onchange="DemoCreator.setDisruptionScope(this.value)">
                       <div class="nav-select__icon"><i data-lucide="repeat" class="w-4 h-4"></i></div>
                       <div class="nav-select__content">
@@ -232,7 +232,7 @@
                         <span class="nav-select__description">Each trial gets unique disruptions</span>
                       </div>
                     </label>
-                    <label class="nav-select__option disruption-scope-option">
+                    <label class="nav-select__option disruption-scope-option" data-color="orange">
                       <input type="radio" name="disruption-generation-scope" value="per-route" onchange="DemoCreator.setDisruptionScope(this.value)">
                       <div class="nav-select__icon"><i data-lucide="route" class="w-4 h-4"></i></div>
                       <div class="nav-select__content">
@@ -240,7 +240,7 @@
                         <span class="nav-select__description">Each route gets unique disruptions</span>
                       </div>
                     </label>
-                    <label class="nav-select__option disruption-scope-option">
+                    <label class="nav-select__option disruption-scope-option" data-color="red">
                       <input type="radio" name="disruption-generation-scope" value="per-trial-route" checked onchange="DemoCreator.setDisruptionScope(this.value)">
                       <div class="nav-select__icon"><i data-lucide="shuffle" class="w-4 h-4"></i></div>
                       <div class="nav-select__content">
@@ -324,14 +324,14 @@
                   <div class="mb-4">
                     <label class="form-group__label">Disruption Type</label>
                     <div class="nav-select nav-select--grid">
-                      <label class="nav-select__option">
+                      <label class="nav-select__option" data-color="orange">
                         <input type="radio" name="custom-disruption-type" value="incident" checked onchange="DemoCreator.updateCustomDisruptionTypeUI()">
                         <div class="nav-select__icon"><i data-lucide="siren" class="w-5 h-5"></i></div>
                         <div class="nav-select__content">
                           <span class="nav-select__title">Incident</span>
                         </div>
                       </label>
-                      <label class="nav-select__option">
+                      <label class="nav-select__option" data-color="amber">
                         <input type="radio" name="custom-disruption-type" value="traffic" onchange="DemoCreator.updateCustomDisruptionTypeUI()">
                         <div class="nav-select__icon"><i data-lucide="traffic-cone" class="w-5 h-5"></i></div>
                         <div class="nav-select__content">
@@ -345,21 +345,21 @@
                   <div id="custom-incident-settings" class="mb-4">
                     <label class="form-group__label">Incident Criticality</label>
                     <div class="nav-select nav-select--grid nav-select--grid-3">
-                      <label class="nav-select__option nav-select--amber">
+                      <label class="nav-select__option" data-color="amber">
                         <input type="radio" name="custom-incident-criticality" value="minor">
                         <div class="nav-select__icon"><i data-lucide="alert-triangle" class="w-4 h-4"></i></div>
                         <div class="nav-select__content">
                           <span class="nav-select__title">Minor</span>
                         </div>
                       </label>
-                      <label class="nav-select__option nav-select--orange">
+                      <label class="nav-select__option" data-color="orange">
                         <input type="radio" name="custom-incident-criticality" value="major" checked>
                         <div class="nav-select__icon"><i data-lucide="diamond" class="w-4 h-4"></i></div>
                         <div class="nav-select__content">
                           <span class="nav-select__title">Major</span>
                         </div>
                       </label>
-                      <label class="nav-select__option nav-select--red">
+                      <label class="nav-select__option" data-color="red">
                         <input type="radio" name="custom-incident-criticality" value="critical">
                         <div class="nav-select__icon"><i data-lucide="ban" class="w-4 h-4"></i></div>
                         <div class="nav-select__content">
@@ -371,15 +371,75 @@
 
                   <!-- Traffic-specific: Jam Factor -->
                   <div id="custom-traffic-settings" class="hidden mb-4">
-                    <label class="form-group__label">Jam Factor (0-10)</label>
-                    <div class="flex items-center gap-3">
-                      <input type="range" id="custom-jam-factor" min="0" max="10" step="0.5" value="5" oninput="document.getElementById('custom-jam-factor-display').value = this.value" class="form-range flex-1">
-                      <input type="number" id="custom-jam-factor-display" min="0" max="10" step="0.5" value="5" oninput="document.getElementById('custom-jam-factor').value = this.value" class="form-input w-16 text-center">
-                    </div>
-                    <div class="flex justify-between text-muted text-xs mt-1">
-                      <span>Free flow</span>
-                      <span>Moderate</span>
-                      <span>Standstill</span>
+                    <div class="section-card section-card--orange p-4">
+                      <div class="section-card__header mb-4">
+                        <div class="section-card__icon section-card__icon--warning">
+                          <i data-lucide="traffic-cone" class="w-5 h-5"></i>
+                        </div>
+                        <div class="flex-1">
+                          <h4 class="section-card__title">Traffic Congestion Factor</h4>
+                          <p class="text-xs text-muted">0 = Free Flow, 10 = Complete Standstill</p>
+                        </div>
+                      </div>
+
+                      <div class="space-y-3">
+                        <!-- Slider Input -->
+                        <div class="form-group">
+                          <label class="form-group__label text-sm font-semibold mb-2">Jam Factor</label>
+                          <input type="range" id="custom-jam-factor" min="0" max="10" step="0.5" value="5" 
+                            oninput="document.getElementById('custom-jam-factor-display').value = this.value" 
+                            onchange="DemoCreator.customDisruption.jamFactor = parseFloat(this.value)"
+                            class="form-range w-full">
+                        </div>
+
+                        <!-- Number Input with Visual Indicator -->
+                        <div class="flex items-center gap-3">
+                          <div class="flex-1">
+                            <input type="number" id="custom-jam-factor-display" min="0" max="10" step="0.5" value="5" 
+                              oninput="document.getElementById('custom-jam-factor').value = this.value" 
+                              onchange="DemoCreator.customDisruption.jamFactor = parseFloat(this.value)"
+                              class="form-input w-full text-center text-lg font-semibold">
+                          </div>
+                          <span class="text-2xl font-bold whitespace-nowrap" id="jam-factor-indicator">🟢</span>
+                        </div>
+
+                        <!-- Visual Scale -->
+                        <div class="flex justify-between text-xs text-muted px-1 mt-2">
+                          <span class="flex items-center gap-1">
+                            <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Free Flow (0-2)
+                          </span>
+                          <span class="flex items-center gap-1">
+                            <span class="w-2 h-2 rounded-full bg-amber-500"></span> Moderate (3-7)
+                          </span>
+                          <span class="flex items-center gap-1">
+                            <span class="w-2 h-2 rounded-full bg-red-500"></span> Standstill (8-10)
+                          </span>
+                        </div>
+
+                        <!-- Real-time update script -->
+                        <script>
+                          (function() {
+                            function updateJamFactorIndicator() {
+                              const value = parseFloat(document.getElementById('custom-jam-factor').value);
+                              const indicator = document.getElementById('jam-factor-indicator');
+                              if (value <= 2) {
+                                indicator.textContent = '🟢';
+                              } else if (value <= 7) {
+                                indicator.textContent = '🟡';
+                              } else {
+                                indicator.textContent = '🔴';
+                              }
+                            }
+                            
+                            // Update on slider input
+                            document.getElementById('custom-jam-factor').addEventListener('input', updateJamFactorIndicator);
+                            document.getElementById('custom-jam-factor-display').addEventListener('input', updateJamFactorIndicator);
+                            
+                            // Initial update
+                            updateJamFactorIndicator();
+                          })();
+                        </script>
+                      </div>
                     </div>
                   </div>
 
@@ -412,7 +472,7 @@
               <div class="section-card">
                 <label class="form-group__label font-bold mb-3">Algorithm Selection</label>
                 <div class="nav-select nav-select--purple">
-                  <label class="nav-select__option algorithm-option">
+                  <label class="nav-select__option algorithm-option" data-color="purple">
                     <input type="radio" name="demo-algorithm" value="both" checked onchange="DemoCreator.sequence.algorithm = this.value; DemoCreator.updateAlgorithmUI()">
                     <div class="nav-select__icon"><i data-lucide="scale" class="w-4 h-4"></i></div>
                     <div class="nav-select__content">
@@ -422,14 +482,14 @@
                   </label>
                 </div>
                 <div class="nav-select nav-select--grid mt-2">
-                  <label class="nav-select__option nav-select--blue algorithm-option">
+                  <label class="nav-select__option algorithm-option" data-color="blue">
                     <input type="radio" name="demo-algorithm" value="hc2l" onchange="DemoCreator.sequence.algorithm = this.value; DemoCreator.updateAlgorithmUI()">
                     <div class="nav-select__icon"><i data-lucide="circle" class="w-4 h-4"></i></div>
                     <div class="nav-select__content">
                       <span class="nav-select__title">HC2L</span>
                     </div>
                   </label>
-                  <label class="nav-select__option nav-select--emerald algorithm-option">
+                  <label class="nav-select__option algorithm-option" data-color="emerald">
                     <input type="radio" name="demo-algorithm" value="dhl" onchange="DemoCreator.sequence.algorithm = this.value; DemoCreator.updateAlgorithmUI()">
                     <div class="nav-select__icon"><i data-lucide="circle" class="w-4 h-4"></i></div>
                     <div class="nav-select__content">
@@ -444,7 +504,7 @@
 
                 <!-- TAU Scope Selection -->
                 <div class="nav-select nav-select--purple mb-4">
-                  <label class="nav-select__option tau-scope-option">
+                  <label class="nav-select__option tau-scope-option" data-color="purple">
                     <input type="radio" name="tau-generation-scope" value="all" onchange="DemoCreator.updateTauScopeUI()">
                     <div class="nav-select__icon"><i data-lucide="globe" class="w-4 h-4"></i></div>
                     <div class="nav-select__content">
@@ -452,7 +512,7 @@
                       <span class="nav-select__description">All routes use the same TAU</span>
                     </div>
                   </label>
-                  <label class="nav-select__option tau-scope-option">
+                  <label class="nav-select__option tau-scope-option" data-color="indigo">
                     <input type="radio" name="tau-generation-scope" value="per-trial" onchange="DemoCreator.updateTauScopeUI()">
                     <div class="nav-select__icon"><i data-lucide="repeat" class="w-4 h-4"></i></div>
                     <div class="nav-select__content">
@@ -460,7 +520,7 @@
                       <span class="nav-select__description">Each trial gets unique TAU</span>
                     </div>
                   </label>
-                  <label class="nav-select__option tau-scope-option">
+                  <label class="nav-select__option tau-scope-option" data-color="teal">
                     <input type="radio" name="tau-generation-scope" value="per-route" onchange="DemoCreator.updateTauScopeUI()">
                     <div class="nav-select__icon"><i data-lucide="git-branch" class="w-4 h-4"></i></div>
                     <div class="nav-select__content">
@@ -468,7 +528,7 @@
                       <span class="nav-select__description">Each route gets unique TAU</span>
                     </div>
                   </label>
-                  <label class="nav-select__option tau-scope-option">
+                  <label class="nav-select__option tau-scope-option" data-color="slate">
                     <input type="radio" name="tau-generation-scope" value="per-trial-route" checked onchange="DemoCreator.updateTauScopeUI()">
                     <div class="nav-select__icon"><i data-lucide="shuffle" class="w-4 h-4"></i></div>
                     <div class="nav-select__content">
@@ -525,7 +585,7 @@
                       </div>
                     </div>
                     <button onclick="DemoCreator.generateRandomTauValues()" class="btn btn--warning btn--block flex items-center justify-center gap-2">
-                      <i data-lucide="dice-5" class="w-4 h-4"></i> Generate Random Values
+                      <i data-lucide="shuffle" class="w-4 h-4"></i>  Generate Random Values
                     </button>
                     <div id="tau-random-generated" class="mt-2 hidden">
                       <label class="form-group__label">Generated Values</label>
@@ -603,24 +663,29 @@
 
         <!-- Sticky Navigation Footer -->
         <div class="panel__footer">
-          <div class="flex gap-2" id="demo-v2-nav-buttons">
-            <button id="demo-v2-prev-btn" onclick="DemoCreator.prevStep()" class="hidden btn btn--ghost btn--lg flex-1">
+          <!-- Navigation buttons (shown on steps 1-3) -->
+          <div id="demo-v2-nav-buttons" class="flex gap-2 w-full">
+            <button id="demo-v2-prev-btn" onclick="DemoCreator.prevStep()" class="hidden btn btn--danger btn--lg flex-1">
               <i data-lucide="arrow-left" class="w-4 h-4"></i> Previous
             </button>
             <button id="demo-v2-next-btn" onclick="DemoCreator.nextStep()" class="btn btn--primary btn--lg flex-1">
               Next <i data-lucide="arrow-right" class="w-4 h-4"></i>
             </button>
           </div>
-          <!-- Save buttons - only shown on review step (step 4) -->
-          <div class="hidden gap-2 mt-2" id="demo-v2-save-buttons">
-            <button id="demo-v2-save-btn" onclick="DemoCreator.saveForLater()" class="btn btn--secondary btn--lg flex-1">
-              <i data-lucide="save" class="w-4 h-4"></i> Save Demo
+          
+          <!-- Save and Run buttons (shown only on step 4) -->
+          <div id="demo-v2-save-buttons" class="hidden grid grid-cols-2 gap-2 w-full flex">
+            <button id="demo-v2-save-btn" onclick="DemoCreator.saveForLater()" class="btn btn--warning btn--lg w-full flex items-center justify-center gap-2">
+              <i data-lucide="save" class="w-4 h-4"></i> Save
             </button>
-            <button id="demo-v2-save-run-btn" onclick="DemoCreator.saveAndRun()" class="btn btn--success btn--lg flex-1">
+            <button id="demo-v2-save-run-btn" onclick="DemoCreator.saveAndRun()" class="btn btn--success btn--lg w-full flex items-center justify-center gap-2">
               <i data-lucide="rocket" class="w-4 h-4"></i> Save & Run
             </button>
-            <button id="demo-v2-run-btn" onclick="DemoCreator.runOnly()" class="btn btn--primary btn--lg flex-1">
-              <i data-lucide="play" class="w-4 h-4"></i> Run Demo
+            <button id="demo-v2-prev-btn-step4" onclick="DemoCreator.prevStep()" class="btn btn--danger btn--lg w-full flex items-center justify-center gap-2">
+              <i data-lucide="arrow-left" class="w-4 h-4"></i> Previous
+            </button>
+            <button id="demo-v2-run-btn" onclick="DemoCreator.runOnly()" class="btn btn--primary btn--lg w-full flex items-center justify-center gap-2">
+              <i data-lucide="play" class="w-4 h-4"></i> Run
             </button>
           </div>
         </div>

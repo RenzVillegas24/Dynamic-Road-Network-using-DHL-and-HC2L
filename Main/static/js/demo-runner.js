@@ -428,10 +428,12 @@ const DemoRunner = {
             if (configsBtn) {
                 configsBtn.classList.add('bg-indigo-50', 'text-indigo-700', 'border-b-2', 'border-indigo-500');
                 configsBtn.classList.remove('text-gray-500');
+                configsBtn.setAttribute('aria-selected', 'true');
             }
             if (resultsBtn) {
                 resultsBtn.classList.remove('bg-indigo-50', 'text-indigo-700', 'border-b-2', 'border-indigo-500');
                 resultsBtn.classList.add('text-gray-500');
+                resultsBtn.setAttribute('aria-selected', 'false');
             }
             if (configsContent) configsContent.classList.remove('hidden');
             if (resultsContent) resultsContent.classList.add('hidden');
@@ -440,10 +442,12 @@ const DemoRunner = {
             if (resultsBtn) {
                 resultsBtn.classList.add('bg-indigo-50', 'text-indigo-700', 'border-b-2', 'border-indigo-500');
                 resultsBtn.classList.remove('text-gray-500');
+                resultsBtn.setAttribute('aria-selected', 'true');
             }
             if (configsBtn) {
                 configsBtn.classList.remove('bg-indigo-50', 'text-indigo-700', 'border-b-2', 'border-indigo-500');
                 configsBtn.classList.add('text-gray-500');
+                configsBtn.setAttribute('aria-selected', 'false');
             }
             if (resultsContent) resultsContent.classList.remove('hidden');
             if (configsContent) configsContent.classList.add('hidden');
@@ -580,7 +584,8 @@ const DemoRunner = {
             return;
         }
 
-        container.innerHTML = this.savedConfigs.map(config => `
+    const isRunning = (typeof DemoCreator !== 'undefined' && DemoCreator.isRunning);
+    container.innerHTML = this.savedConfigs.map(config => `
             <div class="card card--bordered p-4 hover:border-purple-300 hover:shadow-md transition-all">
                 <div class="flex items-start justify-between mb-2">
                     <div class="flex-1 min-w-0">
@@ -589,11 +594,12 @@ const DemoRunner = {
                     </div>
                     <div class="flex gap-1">
                         <button onclick="DemoRunner.editConfig('${config.id}')" 
-                                class="btn btn--ghost btn--sm p-1.5" title="Edit">
+                                data-panel="demo-creator"
+                                class="btn btn--ghost btn--sm p-1.5 ${isRunning ? 'opacity-50 cursor-not-allowed' : ''}" ${isRunning ? 'disabled' : ''} title="Edit">
                             <i data-lucide="pencil" class="w-4 h-4 text-blue-500"></i>
                         </button>
-                        <button onclick="DemoRunner.deleteConfig('${config.id}')" 
-                                class="btn btn--ghost btn--sm p-1.5" title="Delete">
+            <button onclick="DemoRunner.deleteConfig('${config.id}')" 
+                class="btn btn--ghost btn--sm p-1.5 ${isRunning ? 'opacity-50 cursor-not-allowed' : ''}" ${isRunning ? 'disabled' : ''} title="Delete">
                             <i data-lucide="x" class="w-4 h-4 text-red-500"></i>
                         </button>
                     </div>
@@ -603,13 +609,16 @@ const DemoRunner = {
                     <span class="badge badge--purple">${config.trials || 1} trials</span>
                     <span class="badge badge--warning">${config.algorithm?.toUpperCase() || 'HC2L'}</span>
                 </div>
-                <button onclick="DemoRunner.runSavedConfig('${config.id}')" 
-                        class="btn btn--primary btn--block">
+        <button onclick="DemoRunner.runSavedConfig('${config.id}')" 
+            class="btn btn--primary btn--block ${isRunning ? 'opacity-50 cursor-not-allowed' : ''}" ${isRunning ? 'disabled' : ''}>
                     <i data-lucide="play" class="w-4 h-4"></i> Run Demo
                 </button>
             </div>
         `).join('');
         lucide.createIcons();
+        // Update tab badge count
+        const badge = document.getElementById('tab-badge-configs');
+        if (badge) badge.textContent = `${this.savedConfigs.length}`;
     },
 
     runSavedConfig(configId) {
@@ -739,6 +748,9 @@ const DemoRunner = {
 
         container.innerHTML = html;
         lucide.createIcons();
+        // Update tab badge count for results
+        const badge = document.getElementById('tab-badge-results');
+        if (badge) badge.textContent = `${this.savedResults.length}`;
     },
 
     async viewSavedResult(filePath) {

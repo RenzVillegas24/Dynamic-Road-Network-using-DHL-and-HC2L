@@ -32,11 +32,13 @@
       <div class="section-card">
         <div class="tabs tabs--pills">
           <div class="tabs__list">
-            <button id="tab-btn-configs" onclick="DemoRunner.switchDataTab('configs')" class="tabs__tab" aria-selected="true">
+            <button id="tab-btn-configs" onclick="DemoRunner.switchDataTab('configs')" class="tabs__tab" aria-selected="true" data-demo-tab="configs" data-color="blue">
               <i data-lucide="save" class="w-4 h-4"></i> Configurations
+              <span id="tab-badge-configs" class="tabs__tab-badge">0</span>
             </button>
-            <button id="tab-btn-saved-results" onclick="DemoRunner.switchDataTab('saved-results')" class="tabs__tab">
+            <button id="tab-btn-saved-results" onclick="DemoRunner.switchDataTab('saved-results')" class="tabs__tab" data-demo-tab="saved-results" data-color="emerald">
               <i data-lucide="bar-chart-3" class="w-4 h-4"></i> Saved Results
+              <span id="tab-badge-results" class="tabs__tab-badge">0</span>
             </button>
           </div>
         </div>
@@ -204,16 +206,6 @@
           <i data-lucide="arrow-left" class="w-4 h-4"></i>
           Back to Main
         </button>
-
-        <div class="alert-card alert-card--primary">
-          <div class="alert-card__icon">
-            <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
-          </div>
-          <div class="alert-card__content">
-            <h3 class="alert-card__title">Demo Results Summary</h3>
-            <p id="demo-results-demo-name" class="alert-card__description">Results from your demo run</p>
-          </div>
-        </div>
 
         <!-- Statistics Cards -->
         <div id="demo-results-stats" class="grid grid-cols-2 gap-3"></div>

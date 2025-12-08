@@ -18,11 +18,14 @@
 
 .tabs__list {
   display: flex;
-  gap: var(--spacing-1);
-  border-bottom: 1px solid var(--color-border);
+  gap: var(--spacing-2);
+  border-bottom: none;
   overflow-x: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  padding: var(--spacing-1);
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
 }
 
 .tabs__list::-webkit-scrollbar {
@@ -41,16 +44,81 @@
   padding: var(--spacing-3) var(--spacing-4);
   font-size: var(--text-sm);
   font-weight: var(--font-medium);
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
   background: transparent;
   border: none;
+  border-radius: var(--radius-md);
   cursor: pointer;
   white-space: nowrap;
-  transition: color var(--transition-fast);
+  transition: all var(--transition-fast);
+  flex: 1;
+  justify-content: center;
+  user-select: none;
+}
+
+/* Individual color support for tabs */
+.tabs__tab[data-color] {
+  background: rgba(var(--color-tab-rgb, 59, 130, 246), 0.08);
+  color: rgba(var(--color-tab-rgb, 59, 130, 246), 0.8);
+}
+
+.tabs__tab[data-color="emerald"] {
+  --color-tab-rgb: 16, 185, 129;
+}
+
+.tabs__tab[data-color="amber"] {
+  --color-tab-rgb: 245, 158, 11;
+}
+
+.tabs__tab[data-color="orange"] {
+  --color-tab-rgb: 249, 115, 22;
+}
+
+.tabs__tab[data-color="red"] {
+  --color-tab-rgb: 239, 68, 68;
+}
+
+.tabs__tab[data-color="blue"] {
+  --color-tab-rgb: 59, 130, 246;
+}
+
+.tabs__tab[data-color="purple"] {
+  --color-tab-rgb: 147, 51, 234;
+}
+
+.tabs__tab[data-color="teal"] {
+  --color-tab-rgb: 20, 184, 166;
+}
+
+.tabs__tab[data-color="indigo"] {
+  --color-tab-rgb: 99, 102, 241;
+}
+
+.tabs__tab[data-color="slate"] {
+  --color-tab-rgb: 100, 116, 139;
+}
+
+.tabs__tab[data-color="gray"] {
+  --color-tab-rgb: 107, 114, 128;
 }
 
 .tabs__tab:hover {
-  color: var(--color-text);
+  background: rgba(var(--color-tab-rgb, 59, 130, 246), 0.12);
+  color: rgb(var(--color-tab-rgb, 59, 130, 246));
+}
+
+/* Pill variant: subtle hover & focus for non-selected items */
+.tabs--pills .tabs__tab:not([aria-selected="true"]) {
+  background: rgba(var(--color-tab-rgb, 59, 130, 246), 0.08);
+  color: rgba(var(--color-tab-rgb, 59, 130, 246), 0.8);
+}
+.tabs--pills .tabs__tab:not([aria-selected="true"]):hover {
+  background: rgba(var(--color-tab-rgb, 59, 130, 246), 0.12);
+  color: rgb(var(--color-tab-rgb, 59, 130, 246));
+}
+
+.tabs__tab:active {
+  transform: translateY(1px);
 }
 
 .tabs__tab:focus {
@@ -64,17 +132,21 @@
 }
 
 .tabs__tab[aria-selected="true"] {
-  color: var(--color-primary);
+  background: rgb(var(--color-tab-rgb, 59, 130, 246));
+  color: white;
+  box-shadow: 0 4px 12px rgba(var(--color-tab-rgb, 59, 130, 246), 0.3);
 }
 
 .tabs__tab[aria-selected="true"]::after {
   content: '';
   position: absolute;
-  bottom: -1px;
-  left: 0;
   right: 0;
-  height: 2px;
-  background: var(--color-primary);
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 70%;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: var(--radius-full);
 }
 
 .tabs__tab:disabled {
@@ -85,6 +157,10 @@
 .tabs__tab-icon {
   width: 18px;
   height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 6px;
 }
 
 .tabs__tab-badge {
@@ -93,11 +169,18 @@
   font-weight: var(--font-medium);
   background: var(--color-bg);
   border-radius: var(--radius-full);
+  box-shadow: inset 0 -1px 0 rgba(16, 24, 40, 0.02);
 }
 
 .tabs__tab[aria-selected="true"] .tabs__tab-badge {
-  background: hsla(222, 100%, 61%, 0.15);
-  color: var(--color-primary);
+  background: rgba(255,255,255,0.2);
+  color: white;
+}
+
+/* Ensure badges remain visible on pill-style selected tabs */
+.tabs--pills .tabs__tab[aria-selected="true"] .tabs__tab-badge {
+  background: rgba(255,255,255,0.2);
+  color: white;
 }
 
 /* =====================
@@ -133,14 +216,17 @@
 }
 
 .tabs--pills .tabs__tab {
-  padding: var(--spacing-2) var(--spacing-4);
-  border-radius: var(--radius-md);
+  padding: calc(var(--spacing-1) + 2px) var(--spacing-4);
+  border-radius: var(--radius-full);
+  min-height: 36px;
+  transition: background-color var(--transition-fast), color var(--transition-fast), transform 120ms ease;
 }
 
 .tabs--pills .tabs__tab[aria-selected="true"] {
-  background: var(--color-surface);
-  color: var(--color-text);
-  box-shadow: var(--shadow-sm);
+  background: var(--color-primary-600);
+  color: #fff;
+  box-shadow: 0 6px 12px rgba(33, 37, 41, 0.06);
+  transform: translateY(-1px);
 }
 
 .tabs--pills .tabs__tab[aria-selected="true"]::after {
@@ -255,10 +341,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(90deg, var(--color-surface) 60%, transparent);
+  background: linear-gradient(90deg, rgba(255,255,255,0.95) 20%, rgba(255,255,255,0.7) 60%, rgba(255,255,255,0));
   border: none;
   cursor: pointer;
   z-index: 1;
+  transition: opacity var(--transition-fast), transform 160ms ease;
+  border-radius: 4px;
 }
 
 .tabs--scrollable .tabs__scroll-btn--left {
@@ -271,6 +359,19 @@
 }
 
 .tabs--scrollable .tabs__scroll-btn:disabled {
-  opacity: 0.3;
+  opacity: 0.25;
   cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .tabs__tab {
+    padding: var(--spacing-2) var(--spacing-3);
+    font-size: var(--text-sm);
+  }
+  .tabs--pills .tabs__list {
+    padding: var(--spacing-1);
+  }
+  .tabs--scrollable .tabs__scroll-btn {
+    display: none;
+  }
 }

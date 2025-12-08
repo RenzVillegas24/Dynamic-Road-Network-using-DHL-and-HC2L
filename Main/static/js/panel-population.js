@@ -1141,7 +1141,7 @@ window.highlightAlternativeRoute = function(routeIndex, altRoute) {
     });
   }
   
-  console.log(`🎨 CARD STYLING: Updating card visuals`);
+  console.log(`CARD STYLING: Updating card visuals`);
   updateAlternativeRouteCardStyling();
 
   // Zoom to the bounds of all polylines in this route
@@ -1269,7 +1269,7 @@ window.resetAlternativeRoutesDisplay = function() {
   }
   
   // Update card styling to remove all highlights
-  console.log('🎨 CARD STYLING: Removing all highlights');
+  console.log('CARD STYLING: Removing all highlights');
   updateAlternativeRouteCardStyling();
   
   showUpdateToast('✅ Best route visible', 'success');
@@ -1280,7 +1280,7 @@ window.resetAlternativeRoutesDisplay = function() {
  * Called after selection state changes to reflect current selection
  */
 function updateAlternativeRouteCardStyling() {
-  console.log(`🎨 Card styling: Updating cards (currentSelectedIndex=${window.currentSelectedAlternativeRouteIndex})`);
+  console.log(`Card styling: Updating cards (currentSelectedIndex=${window.currentSelectedAlternativeRouteIndex})`);
   
   // Get the primary route color for consistency
   let primaryRouteColor = '#3b82f6'; // Default blue
@@ -1295,7 +1295,7 @@ function updateAlternativeRouteCardStyling() {
   const alternativeRoutesList = document.getElementById('metrics-alternative-routes-list');
   if (alternativeRoutesList) {
     const cards = alternativeRoutesList.querySelectorAll('[id^="alt-route-card-"]');
-    console.log(`🎨 Found ${cards.length} route cards to style`);
+    console.log(`Found ${cards.length} route cards to style`);
     
     cards.forEach((card, index) => {
       const isSelected = window.currentSelectedAlternativeRouteIndex === index;

@@ -174,6 +174,7 @@
  }
 
  label:has(input[type="radio"]:checked) {
+   z-index: 99;
    transform: scale(1.02) !important;
    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25) !important;
  }
@@ -383,7 +384,7 @@
  #api-console-output::-webkit-scrollbar-thumb:hover {
    background: #4e4e54;
  }
- 
+
  #api-console-output::-webkit-scrollbar-corner {
    background: #1e1e1e;
  }

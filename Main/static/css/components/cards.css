@@ -623,9 +623,14 @@
 
 .flow-card__header {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start; /* keep label and value-group together */
   align-items: flex-start;
+  gap: var(--spacing-4);
   margin-bottom: var(--spacing-2);
+}
+
+.flow-card__header > div {
+  flex: 1; /* allow the left block to take up available space so percent can align to the right within it */
 }
 
 .flow-card__label {
@@ -634,6 +639,8 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--color-text-muted);
+  display: block;
+  margin-bottom: var(--spacing-1);
 }
 
 .flow-card__count {
@@ -643,10 +650,19 @@
   line-height: 1;
 }
 
+/* Inline value and percentage group for flow cards */
+.flow-card__value-group {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-2);
+  width: 100%;
+  justify-content: space-between;
+}
+
 .flow-card__percent {
-  font-size: var(--text-lg);
-  font-weight: var(--font-bold);
-  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--color-text-muted);
 }
 
 .flow-card__bar-container {

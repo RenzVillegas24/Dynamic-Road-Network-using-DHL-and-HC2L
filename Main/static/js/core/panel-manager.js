@@ -9,7 +9,7 @@ const PanelManager = (function() {
   // Panel configuration - maps sidebar data-panel values to actual DOM IDs
   const panels = {
     'route-finder': {
-      id: 'admin-panel',
+      id: 'finder-panel',
       title: 'Route Finder',
       icon: 'navigation',
       size: 'md'
