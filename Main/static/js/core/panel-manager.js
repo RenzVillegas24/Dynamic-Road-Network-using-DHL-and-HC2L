@@ -190,6 +190,17 @@ const PanelManager = (function() {
       return;
     }
 
+    // Check if demo is running and prevent opening route-finder panel
+    if (panelKey === 'route-finder') {
+      const isDemoRunning = (typeof DemoRunner !== 'undefined' && DemoRunner.isRunning) ||
+                           (typeof DemoCreator !== 'undefined' && DemoCreator.isRunning);
+      if (isDemoRunning) {
+        // Show modal dialog instead of toast
+        showDemoStopModal(panelKey, source);
+        return;
+      }
+    }
+
     const panelElement = document.getElementById(panelConfig.id);
     if (!panelElement) {
       console.warn(`[PanelManager] Panel element not found: ${panelConfig.id}`);
@@ -433,6 +444,70 @@ const PanelManager = (function() {
     if (modal) {
       modal.classList.add('active');
     }
+  }
+
+  /**
+   * Show demo stop modal dialog
+   * Allows user to stop demo and navigate or cancel
+   * @param {string} targetPanelKey - Panel key to navigate to
+   * @param {string} source - Navigation source ('sidebar' or 'panel')
+   */
+  function showDemoStopModal(targetPanelKey, source = 'sidebar') {
+    const modal = document.getElementById('demo-stop-modal');
+    if (!modal) {
+      console.warn('[PanelManager] demo-stop-modal not found');
+      return;
+    }
+
+    // Set up modal buttons
+    const stopBtn = document.getElementById('demo-stop-modal-stop');
+    const cancelBtn = document.getElementById('demo-stop-modal-cancel');
+    const closeBtn = modal.querySelector('[data-modal-close]');
+
+    // Remove old event listeners by cloning
+    const stopBtnNew = stopBtn.cloneNode(true);
+    const cancelBtnNew = cancelBtn.cloneNode(true);
+    const closeBtnNew = closeBtn.cloneNode(true);
+
+    stopBtn.replaceWith(stopBtnNew);
+    cancelBtn.replaceWith(cancelBtnNew);
+    closeBtn.replaceWith(closeBtnNew);
+
+    // Get new references
+    const newStopBtn = document.getElementById('demo-stop-modal-stop');
+    const newCancelBtn = document.getElementById('demo-stop-modal-cancel');
+    const newCloseBtn = modal.querySelector('[data-modal-close]');
+
+    // Handle stop demo button
+    newStopBtn.addEventListener('click', () => {
+      // Stop the demo
+      if (typeof DemoCreator !== 'undefined' && DemoCreator.isRunning) {
+        DemoCreator.stopDemo();
+      } else if (typeof DemoRunner !== 'undefined' && DemoRunner.isRunning) {
+        DemoRunner.stopDemo();
+      }
+
+      // Close modal
+      modal.classList.remove('active');
+
+      // Navigate to target panel after a brief delay
+      setTimeout(() => {
+        showPanel(targetPanelKey, source);
+      }, 300);
+    });
+
+    // Handle cancel button
+    newCancelBtn.addEventListener('click', () => {
+      modal.classList.remove('active');
+    });
+
+    // Handle close button (same as cancel)
+    newCloseBtn.addEventListener('click', () => {
+      modal.classList.remove('active');
+    });
+
+    // Show modal
+    modal.classList.add('active');
   }
 
   // Public API

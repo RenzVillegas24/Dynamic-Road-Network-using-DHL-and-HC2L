@@ -143,6 +143,7 @@
   height: 100%;
   position: relative;
   transition: flex var(--transition-normal);
+  overflow: hidden;
 }
 
 .split-view__secondary {

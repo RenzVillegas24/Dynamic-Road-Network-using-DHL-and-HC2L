@@ -137,6 +137,18 @@
   box-shadow: 0 4px 12px rgba(var(--color-tab-rgb, 59, 130, 246), 0.3);
 }
 
+.tabs__tab[aria-selected="true"]::before {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60%;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: var(--radius-full);
+}
+
 .tabs__tab[aria-selected="true"]::after {
   content: '';
   position: absolute;
@@ -205,21 +217,23 @@
    TAB VARIANTS
    ===================== */
 
-/* Pills */
-.tabs--pills .tabs__list {
-  border-bottom: none;
+/* Pills in tab-card context */
+.tab-card__nav .tabs--pills .tabs__list {
+  border: none;
   gap: var(--spacing-2);
-  padding: var(--spacing-1);
-  background: var(--color-bg);
-  border-radius: var(--radius-lg);
-  width: fit-content;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+  width: auto;
+  justify-content: flex-start;
 }
 
-.tabs--pills .tabs__tab {
+.tab-card__nav .tabs--pills .tabs__tab {
   padding: calc(var(--spacing-1) + 2px) var(--spacing-4);
   border-radius: var(--radius-full);
   min-height: 36px;
   transition: background-color var(--transition-fast), color var(--transition-fast), transform 120ms ease;
+  flex: none;
 }
 
 .tabs--pills .tabs__tab[aria-selected="true"] {

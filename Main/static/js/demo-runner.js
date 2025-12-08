@@ -215,6 +215,43 @@ const DemoRunner = {
         });
     },
 
+    /**
+     * Toggle route finder UI elements based on demo running state
+     */
+    toggleRouteFinderUI(disable = false) {
+        // Go button
+        const goButton = document.getElementById('go-button');
+        if (goButton) {
+            goButton.style.display = disable ? 'none' : '';
+        }
+
+        // Algorithm dropdown
+        const algoDropdown = document.getElementById('algo-dropdown');
+        if (algoDropdown) {
+            algoDropdown.style.display = disable ? 'none' : '';
+        }
+
+        // Traffic dropdown
+        const trafficDropdown = document.getElementById('traffic-dropdown');
+        if (trafficDropdown) {
+            trafficDropdown.style.display = disable ? 'none' : '';
+        }
+
+        // Start location input
+        const startInput = document.getElementById('start-location-input');
+        if (startInput) {
+            startInput.disabled = disable;
+            startInput.style.opacity = disable ? '0.5' : '1';
+        }
+
+        // Destination location input
+        const destInput = document.getElementById('dest-location-input');
+        if (destInput) {
+            destInput.disabled = disable;
+            destInput.style.opacity = disable ? '0.5' : '1';
+        }
+    },
+
     // ==========================================================================
     // PANEL CONTROLS
     // ==========================================================================
@@ -895,6 +932,9 @@ const DemoRunner = {
         this.currentDemo = config;
         this.currentDemoId = null;  // Track demoId for cleanup
         
+        // Disable route finder UI when demo starts
+        this.toggleRouteFinderUI(true);
+        
         // Reset saved state for new demo run
         this.currentResultsSavedPath = null;
         
@@ -1058,6 +1098,9 @@ const DemoRunner = {
             this.currentDemo = null;
             this.currentDemoId = null;  // Reset demoId
             this.demoDisruptionDir = null;
+            
+            // Re-enable route finder UI when demo stops
+            this.toggleRouteFinderUI(false);
         }
     },
     
@@ -1647,136 +1690,163 @@ const DemoRunner = {
         // Helper function to render metric if exists
         const renderMetric = (label, value, colorClass = 'text-gray-800') => {
             if (!value) return '';
-            return `<div class="flex justify-between py-1 px-2 bg-white rounded border border-gray-100">
-                <span class="text-gray-500 text-xs">${label}:</span>
+            return `<div class="flex justify-between py-1 px-2 bg-gray-50 rounded border border-gray-100">
+                <span class="text-gray-600 text-xs font-medium">${label}:</span>
                 <span class="font-semibold text-xs ${colorClass}">${value}</span>
             </div>`;
         };
 
         container.innerHTML = `
             <div class="space-y-3">
-                <!-- Demo Name -->
-                <div class="text-center">
-                    <h3 class="font-bold text-lg text-gray-800">${p.configName || 'Demo'}</h3>
-                </div>
+                <!-- Demo Name & Status Card -->
+                <div class="section-card section-card--primary">
+                    <div class="section-card__header">
+                        <div class="section-card__icon section-card__icon--primary">
+                            <i data-lucide="activity" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h3 class="section-card__title">${p.configName || 'Demo'}</h3>
+                            <p class="text-xs text-gray-600 mt-1">${p.status || 'Initializing...'}</p>
+                        </div>
+                    </div>
+                    <div class="section-card__body">
+                        <!-- Overall Progress -->
+                        <div class="flex justify-between mb-3">
+                            <span class="text-xs font-semibold text-gray-700">Overall Progress</span>
+                            <span class="text-xs font-bold text-primary">${overallProgress.toFixed(1)}%</span>
+                        </div>
+                        <div class="h-3 bg-gray-200 rounded-full overflow-hidden mb-4">
+                            <div class="h-full bg-gradient-to-r from-blue-400 to-blue-600 transition-all duration-500 ease-out rounded-full"
+                                 style="width: ${Math.max(overallProgress, 2)}%"></div>
+                        </div>
 
-                <!-- Overall Progress - More Precise -->
-                <div class="bg-white rounded-xl p-3 border border-gray-200 shadow-sm">
-                    <div class="flex justify-between mb-1">
-                        <span class="text-xs font-semibold text-gray-600">Overall Progress</span>
-                        <span class="text-xs font-bold text-amber-600">${overallProgress.toFixed(1)}%</span>
-                    </div>
-                    <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
-                        <div class="h-full bg-gradient-to-r from-amber-500 to-orange-500 transition-all duration-500 ease-out" 
-                             style="width: ${overallProgress}%"></div>
-                    </div>
-                    <div class="text-xs text-gray-500 mt-1 text-center">${p.status || 'Initializing...'}</div>
-                </div>
-
-                <!-- Detailed Progress Grid - Compact -->
-                <div class="grid ${(p.algorithm || '').toUpperCase() === 'DHL' ? 'grid-cols-3' : 'grid-cols-4'} gap-2">
-                    <div class="bg-blue-50 rounded-lg p-2 border border-blue-200 text-center">
-                        <div class="text-[10px] text-blue-600 uppercase">Trial</div>
-                        <div class="text-sm font-bold text-blue-800">${p.trial}/${p.totalTrials}</div>
-                    </div>
-                    <div class="bg-emerald-50 rounded-lg p-2 border border-emerald-200 text-center">
-                        <div class="text-[10px] text-emerald-600 uppercase">Route</div>
-                        <div class="text-sm font-bold text-emerald-800">${p.route}/${p.totalRoutes}</div>
-                    </div>
-                    <div class="bg-violet-50 rounded-lg p-2 border border-violet-200 text-center">
-                        <div class="text-[10px] text-violet-600 uppercase">Algo</div>
-                        <div class="text-sm font-bold text-violet-800">${p.algorithm || '-'}</div>
-                    </div>
-                    ${(p.algorithm || '').toUpperCase() !== 'DHL' ? `
-                    <div class="bg-rose-50 rounded-lg p-2 border border-rose-200 text-center">
-                        <div class="text-[10px] text-rose-600 uppercase">τ</div>
-                        <div class="text-sm font-bold text-rose-800">${p.currentTau ? p.currentTau.toFixed(2) : '-'}</div>
-                    </div>
-                    ` : ''}
-                </div>
-
-                <!-- Last Result - Full Algorithm Metrics -->
-                ${p.lastResult ? `
-                <div class="bg-gradient-to-br from-gray-50 to-slate-50 rounded-xl p-3 border border-gray-200">
-                    <div class="flex justify-between items-center mb-2">
-                        <h4 class="text-xs font-bold text-gray-700">📊 Last Result</h4>
-                        <span class="text-[10px] text-gray-500">${p.lastResult.route}</span>
-                    </div>
-                    
-                    <!-- Key Metrics Grid -->
-                    <div class="grid grid-cols-2 gap-1 mb-2">
-                        ${renderMetric('Algorithm', p.lastResult.algorithm, 'text-blue-700')}
-                        ${(p.lastResult.algorithm || '').toUpperCase() !== 'DHL' ? renderMetric('τ Value', p.lastResult.tau.toFixed(2), 'text-rose-700') : ''}
-                        ${renderMetric('Query Time', p.lastResult.metrics.queryTime, 'text-purple-700')}
-                        ${renderMetric('Distance', p.lastResult.metrics.displayDistance || p.lastResult.metrics.calculatedDistance || p.lastResult.metrics.distance, 'text-green-700')}
-                        ${renderMetric('Baseline ETA', p.lastResult.metrics.baselineEta, 'text-emerald-700')}
-                        ${renderMetric('Actual ETA', p.lastResult.metrics.displayEta || p.lastResult.metrics.actualEta, 'text-orange-700')}
-                        ${renderMetric('Time Impact', p.lastResult.metrics.timeImpact, 'text-red-700')}
-                        ${renderMetric('Disrupted Edges', p.lastResult.metrics.disruptedEdges, 'text-indigo-700')}
-                        ${renderMetric('Path Length', p.lastResult.metrics.pathLength, 'text-cyan-700')}
-                        ${renderMetric('Edge Count', p.lastResult.metrics.edgeCount, 'text-teal-700')}
-                        ${renderMetric('Labeling Time', p.lastResult.metrics.labelingTime, 'text-amber-700')}
-                        ${renderMetric('Labeling Size', p.lastResult.metrics.labelingSize, 'text-lime-700')}
-                    </div>
-                </div>
-                ` : ''}
-
-                <!-- Update Phase Metrics Card -->
-                ${p.lastResult ? `
-                <div class="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-xl p-3 border border-amber-200">
-                    <div class="flex justify-between items-center mb-2">
-                        <h4 class="text-xs font-bold text-amber-700"><i data-lucide="refresh-cw" class="w-3 h-3 inline"></i> Update Phase</h4>
-                        <span class="text-[10px] text-amber-600">${(p.lastResult.algorithm || '').toUpperCase() === 'HC2L' ? 'Lazy Update' : 'Immediate Update'}</span>
-                    </div>
-                    <div class="grid grid-cols-2 gap-1">
-                        ${renderMetric('Lazy Update Time', p.lastResult.metrics.lazyUpdateTime || 'N/A', 'text-amber-700')}
-                        ${renderMetric('Threshold Rebuild', p.lastResult.metrics.thresholdRebuildTime || 'N/A', 'text-orange-700')}
-                        ${renderMetric('Peak Label Size', p.lastResult.metrics.peakLabelSize || p.lastResult.metrics.labelingSize || 'N/A', 'text-yellow-700')}
-                        ${renderMetric('Label Size Δ', p.lastResult.metrics.labelSizeChange || 'N/A', 'text-amber-600')}
-                        ${renderMetric('Dirty Nodes', p.lastResult.metrics.dirtyNodes || 'N/A', 'text-orange-600')}
-                        ${renderMetric('Impact Score', p.lastResult.metrics.impactScore || 'N/A', 'text-red-600')}
-                    </div>
-                </div>
-                ` : ''}
-
-                <!-- Query Phase Metrics Card -->
-                ${p.lastResult ? `
-                <div class="bg-gradient-to-br from-purple-50 to-violet-50 rounded-xl p-3 border border-purple-200">
-                    <div class="flex justify-between items-center mb-2">
-                        <h4 class="text-xs font-bold text-purple-700"><i data-lucide="zap" class="w-3 h-3 inline"></i> Query Phase</h4>
-                        <span class="text-[10px] text-purple-600">Per Batch (1,000 OD)</span>
-                    </div>
-                    <div class="grid grid-cols-2 gap-1">
-                        ${renderMetric('Avg Query Time', p.lastResult.metrics.queryTime || 'N/A', 'text-purple-700')}
-                        ${renderMetric('Std Dev', p.lastResult.metrics.queryTimeStdDev || 'N/A', 'text-violet-700')}
-                        ${renderMetric('Min Query Time', p.lastResult.metrics.minQueryTime || 'N/A', 'text-indigo-600')}
-                        ${renderMetric('Max Query Time', p.lastResult.metrics.maxQueryTime || 'N/A', 'text-purple-600')}
-                        ${renderMetric('P95 Latency', p.lastResult.metrics.p95Latency || 'N/A', 'text-fuchsia-600')}
-                        ${renderMetric('Queries Count', p.lastResult.metrics.queriesProcessed || '1', 'text-pink-600')}
-                    </div>
-                </div>
-                ` : ''}
-
-                <!-- Results History - All Results -->
-                ${p.results && p.results.length > 0 ? `
-                <div class="bg-white rounded-xl p-3 border border-gray-200">
-                    <h4 class="text-xs font-bold text-gray-700 mb-2">📜 Results History (${p.results.length} total)</h4>
-                    <div class="space-y-1 max-h-48 overflow-y-auto">
-                        ${p.results.slice().reverse().map((r, i) => `
-                            <div class="text-xs p-2 ${i === 0 ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-100'} rounded border">
-                                <div class="flex justify-between items-center">
-                                    <span class="font-semibold text-gray-800">${r.algorithm}${(r.algorithm || '').toUpperCase() !== 'DHL' ? ` τ=${r.tau.toFixed(2)}` : ''}</span>
-                                    <span class="text-gray-500">T${r.trial}</span>
-                                </div>
-                                <div class="text-gray-600 truncate text-[10px]">${r.route}</div>
-                                <div class="flex gap-2 mt-1 text-[10px]">
-                                    ${r.metrics.displayDistance || r.metrics.calculatedDistance || r.metrics.distance ? `<span class="text-green-600">📏 ${r.metrics.displayDistance || r.metrics.calculatedDistance || r.metrics.distance}</span>` : ''}
-                                    ${r.metrics.displayEta || r.metrics.actualEta ? `<span class="text-orange-600">⏱ ${r.metrics.displayEta || r.metrics.actualEta}</span>` : ''}
-                                    ${r.metrics.queryTime ? `<span class="text-purple-600">⚡ ${r.metrics.queryTime}</span>` : ''}
-                                    ${r.metrics.pathLength ? `<span class="text-cyan-600">📍 ${r.metrics.pathLength}</span>` : ''}
-                                </div>
+                        <!-- Trial/Route/Algorithm Progress -->
+                        <div class="flex gap-2">
+                            <div class="flex flex-col items-center p-2 rounded-lg bg-blue-50 border border-blue-200 flex-1">
+                                <i data-lucide="repeat" class="w-4 h-4 text-blue-600 mb-1"></i>
+                                <div class="text-sm text-blue-600 font-semibold uppercase">Trial</div>
+                                <div class="text-lg font-bold text-blue-800">${p.trial}/${p.totalTrials}</div>
                             </div>
-                        `).join('')}
+                            <div class="flex flex-col items-center p-2 rounded-lg bg-emerald-50 border border-emerald-200 flex-1">
+                                <i data-lucide="navigation" class="w-4 h-4 text-emerald-600 mb-1"></i>
+                                <div class="text-sm text-emerald-600 font-semibold uppercase">Route</div>
+                                <div class="text-lg font-bold text-emerald-800">${p.route}/${p.totalRoutes}</div>
+                            </div>
+                            <div class="flex flex-col items-center p-2 rounded-lg bg-violet-50 border border-violet-200 flex-1">
+                                <i data-lucide="cpu" class="w-4 h-4 text-violet-600 mb-1"></i>
+                                <div class="text-sm text-violet-600 font-semibold uppercase">Algorithm</div>
+                                <div class="text-lg font-bold text-violet-800">${p.algorithm || '-'}</div>
+                            </div>
+                            ${(p.algorithm || '').toUpperCase() !== 'DHL' ? `
+                            <div class="flex flex-col items-center p-2 rounded-lg bg-rose-50 border border-rose-200 flex-1">
+                                <i data-lucide="sliders" class="w-4 h-4 text-rose-600 mb-1"></i>
+                                <div class="text-sm text-rose-600 font-semibold uppercase">Threshold</div>
+                                <div class="text-lg font-bold text-rose-800">${p.currentTau ? p.currentTau.toFixed(2) : '-'}</div>
+                            </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Last Result Card -->
+                ${p.lastResult ? `
+                <div class="section-card section-card--slate">
+                    <div class="section-card__header">
+                        <div class="section-card__icon section-card__icon--success">
+                            <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h4 class="section-card__title">Last Result</h4>
+                            <p class="text-xs text-gray-600 mt-1">${p.lastResult.route}</p>
+                        </div>
+                    </div>
+                    <div class="section-card__body">
+                        <div class="grid grid-cols-2 gap-2">
+                            ${renderMetric('Algorithm', p.lastResult.algorithm, 'text-blue-700')}
+                            ${(p.lastResult.algorithm || '').toUpperCase() !== 'DHL' ? renderMetric('τ Value', p.lastResult.tau.toFixed(2), 'text-rose-700') : ''}
+                            ${renderMetric('Query Time', p.lastResult.metrics.queryTime, 'text-purple-700')}
+                            ${renderMetric('Distance', p.lastResult.metrics.displayDistance || p.lastResult.metrics.calculatedDistance || p.lastResult.metrics.distance, 'text-green-700')}
+                            ${renderMetric('Baseline ETA', p.lastResult.metrics.baselineEta, 'text-emerald-700')}
+                            ${renderMetric('Actual ETA', p.lastResult.metrics.displayEta || p.lastResult.metrics.actualEta, 'text-orange-700')}
+                            ${renderMetric('Time Impact', p.lastResult.metrics.timeImpact, 'text-red-700')}
+                            ${renderMetric('Disrupted Edges', p.lastResult.metrics.disruptedEdges, 'text-indigo-700')}
+                        </div>
+                    </div>
+                </div>
+                ` : ''}
+
+                <!-- Update Phase Card -->
+                ${p.lastResult ? `
+                <div class="section-card section-card--warning">
+                    <div class="section-card__header">
+                        <div class="section-card__icon section-card__icon--warning">
+                            <i data-lucide="refresh-cw" class="w-5 h-5"></i>
+                        </div>
+                        <h4 class="section-card__title">Update Phase</h4>
+                    </div>
+                    <div class="section-card__body">
+                        <div class="grid grid-cols-2 gap-2">
+                            ${renderMetric('Lazy Update Time', p.lastResult.metrics.lazyUpdateTime || 'N/A', 'text-amber-700')}
+                            ${renderMetric('Threshold Rebuild', p.lastResult.metrics.thresholdRebuildTime || 'N/A', 'text-orange-700')}
+                            ${renderMetric('Peak Label Size', p.lastResult.metrics.peakLabelSize || p.lastResult.metrics.labelingSize || 'N/A', 'text-yellow-700')}
+                            ${renderMetric('Label Size Δ', p.lastResult.metrics.labelSizeChange || 'N/A', 'text-amber-600')}
+                            ${renderMetric('Dirty Nodes', p.lastResult.metrics.dirtyNodes || 'N/A', 'text-orange-600')}
+                            ${renderMetric('Impact Score', p.lastResult.metrics.impactScore || 'N/A', 'text-red-600')}
+                        </div>
+                    </div>
+                </div>
+                ` : ''}
+
+                <!-- Query Phase Card -->
+                ${p.lastResult ? `
+                <div class="section-card section-card--info">
+                    <div class="section-card__header">
+                        <div class="section-card__icon section-card__icon--info">
+                            <i data-lucide="zap" class="w-5 h-5"></i>
+                        </div>
+                        <h4 class="section-card__title">Query Phase</h4>
+                    </div>
+                    <div class="section-card__body">
+                        <div class="grid grid-cols-2 gap-2">
+                            ${renderMetric('Avg Query Time', p.lastResult.metrics.queryTime || 'N/A', 'text-blue-700')}
+                            ${renderMetric('Std Dev', p.lastResult.metrics.queryTimeStdDev || 'N/A', 'text-violet-700')}
+                            ${renderMetric('Min Query Time', p.lastResult.metrics.minQueryTime || 'N/A', 'text-indigo-600')}
+                            ${renderMetric('Max Query Time', p.lastResult.metrics.maxQueryTime || 'N/A', 'text-purple-600')}
+                            ${renderMetric('P95 Latency', p.lastResult.metrics.p95Latency || 'N/A', 'text-fuchsia-600')}
+                            ${renderMetric('Queries Count', p.lastResult.metrics.queriesProcessed || '1', 'text-pink-600')}
+                        </div>
+                    </div>
+                </div>
+                ` : ''}
+
+                <!-- Results History Card -->
+                ${p.results && p.results.length > 0 ? `
+                <div class="section-card section-card--primary">
+                    <div class="section-card__header">
+                        <div class="section-card__icon section-card__icon--primary">
+                            <i data-lucide="history" class="w-5 h-5"></i>
+                        </div>
+                        <h4 class="section-card__title">Results History</h4>
+                        <span class="badge badge--primary">${p.results.length} total</span>
+                    </div>
+                    <div class="section-card__body">
+                        <div class="space-y-2">
+                            ${p.results.slice().reverse().map((r, i) => `
+                                <div class="text-xs p-2 ${i === 0 ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-100'} rounded border">
+                                    <div class="flex justify-between items-center">
+                                        <span class="font-semibold text-gray-800">${r.algorithm}${(r.algorithm || '').toUpperCase() !== 'DHL' ? ` τ=${r.tau.toFixed(2)}` : ''}</span>
+                                        <span class="text-gray-500 text-[10px]">T${r.trial}</span>
+                                    </div>
+                                    <div class="text-gray-600 truncate text-[10px]">${r.route}</div>
+                                    <div class="flex gap-2 mt-1 text-[10px] flex-wrap">
+                                        ${r.metrics.displayDistance || r.metrics.calculatedDistance || r.metrics.distance ? `<span class="flex items-center gap-1 text-green-600"><i data-lucide="map-pin" class="w-3 h-3"></i> ${r.metrics.displayDistance || r.metrics.calculatedDistance || r.metrics.distance}</span>` : ''}
+                                        ${r.metrics.displayEta || r.metrics.actualEta ? `<span class="flex items-center gap-1 text-orange-600"><i data-lucide="clock" class="w-3 h-3"></i> ${r.metrics.displayEta || r.metrics.actualEta}</span>` : ''}
+                                        ${r.metrics.queryTime ? `<span class="flex items-center gap-1 text-purple-600"><i data-lucide="zap" class="w-3 h-3"></i> ${r.metrics.queryTime}</span>` : ''}
+                                        ${r.metrics.pathLength ? `<span class="flex items-center gap-1 text-cyan-600"><i data-lucide="route" class="w-3 h-3"></i> ${r.metrics.pathLength}</span>` : ''}
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
                     </div>
                 </div>
                 ` : ''}
@@ -2146,11 +2216,15 @@ const DemoRunner = {
         
         buttonsContainer.innerHTML = setKeys.map(key => `
             <button onclick="DemoRunner.selectDisruptionSet('${key}')"
-                    class="px-2 py-1 text-xs rounded-lg transition-colors ${this.currentPreviewSet === key ? 
-                        'bg-amber-600 text-white' : 'bg-amber-100 text-amber-700 hover:bg-amber-200'}">
+                    class="disruption-set-btn ${this.currentPreviewSet === key ? 'active' : ''}">
                 ${this.getSetLabel(key)}
             </button>
         `).join('');
+
+        // Auto-scroll to active set if one is selected
+        if (this.currentPreviewSet) {
+            setTimeout(() => this.scrollToActiveDisruptionSet(this.currentPreviewSet), 100);
+        }
         
         // Render current set details
         previewContainer.innerHTML = this.renderCurrentDisruptionList();
@@ -2187,20 +2261,20 @@ const DemoRunner = {
      */
     selectDisruptionSet(setKey) {
         if (!this.disruptionSets || !this.disruptionSets[setKey]) return;
-        
+
         this.currentPreviewSet = setKey;
-        
+
         // Update generatedDisruptions to match the selected set
         const setData = this.disruptionSets[setKey];
         const disruptions = setData.disruptions || {};
-        
+
         this.generatedDisruptions = {
             incidents: (disruptions.incidents || []).map(d => ({
                 ...d,
                 source_lng: d.source_lon || d.source_lng,
                 target_lng: d.target_lon || d.target_lng,
                 incident_type: d.type || d.incident_type || 'Incident',
-                severity: d.criticality === 'critical' ? 'Heavy' : 
+                severity: d.criticality === 'critical' ? 'Heavy' :
                           d.criticality === 'major' ? 'Medium' : 'Light'
             })),
             flowSegments: (disruptions.flow || []).map(d => ({
@@ -2208,23 +2282,44 @@ const DemoRunner = {
                 source_lng: d.source_lon || d.source_lng,
                 target_lng: d.target_lon || d.target_lng,
                 incident_type: 'Congestion',
-                severity: d.jam_factor > 7 ? 'Heavy' : 
+                severity: d.jam_factor > 7 ? 'Heavy' :
                           d.jam_factor > 4 ? 'Medium' : 'Light',
                 current_speed: d.speed_kph,
                 free_flow_speed: d.free_flow_kph
             }))
         };
-        
+
         // Refresh map display
         const showIncidents = document.getElementById('demo-show-incidents')?.checked ?? true;
         const showFlow = document.getElementById('demo-show-flow')?.checked ?? true;
         this.showGeneratedDisruptions(showIncidents, showFlow);
-        
+
+        // Auto-scroll to selected button
+        this.scrollToActiveDisruptionSet(setKey);
+
         // Refresh preview panel
         this.showDisruptionSetsPreview();
     },
 
     /**
+     * Auto-scroll to the active disruption set button
+     */
+    scrollToActiveDisruptionSet(setKey) {
+        const container = document.getElementById('demo-runner-set-buttons');
+        const activeBtn = container?.querySelector(`[onclick*="selectDisruptionSet('${setKey}')"]`);
+
+        if (container && activeBtn) {
+            // Calculate scroll position to center the active button
+            const containerRect = container.getBoundingClientRect();
+            const activeBtnRect = activeBtn.getBoundingClientRect();
+            const scrollLeft = activeBtnRect.left - containerRect.left - (containerRect.width / 2) + (activeBtnRect.width / 2);
+
+            container.scrollTo({
+                left: container.scrollLeft + scrollLeft,
+                behavior: 'smooth'
+            });
+        }
+    },    /**
      * Render the current disruption list for the preview panel
      */
     renderCurrentDisruptionList() {
@@ -2239,42 +2334,54 @@ const DemoRunner = {
         
         // Flow disruptions
         if (flow.length > 0) {
-            html += `<div class="text-xs font-semibold text-orange-600 mb-1">🚦 Traffic Flow (${flow.length})</div>`;
-            html += `<div class="space-y-1 mb-2">`;
+            html += `<div class="flex items-center gap-2 text-xs font-semibold text-orange-600 mb-2">
+                <i data-lucide="traffic-cone" class="w-4 h-4"></i>
+                <span>Traffic Flow (${flow.length})</span>
+            </div>`;
+            html += `<div class="space-y-1 mb-3">`;
             flow.slice(0, 10).forEach((f, i) => {
                 const jamFactor = parseFloat(f.jam_factor) || 0;
                 const severityColor = TrafficUtils.getSeverityTextClass(jamFactor);
                 html += `
-                    <div class="flex items-center justify-between bg-orange-50 rounded px-2 py-1 text-xs cursor-pointer hover:bg-orange-100"
+                    <div class="flex items-center justify-between bg-orange-50 rounded-lg px-3 py-2 text-xs cursor-pointer hover:bg-orange-100 border border-orange-200 transition-colors"
                          onclick="DemoRunner.focusDisruption('flow', ${i})">
-                        <span class="truncate flex-1 text-gray-700">${f.road_name || 'Unknown Road'}</span>
-                        <span class="${severityColor} font-semibold ml-2">JF: ${jamFactor.toFixed(1)}</span>
+                        <div class="flex items-center gap-2 flex-1 min-w-0">
+                            <i data-lucide="car" class="w-3 h-3 text-orange-600 flex-shrink-0"></i>
+                            <span class="truncate text-gray-700">${f.road_name || 'Unknown Road'}</span>
+                        </div>
+                        <span class="${severityColor} font-semibold ml-2 flex-shrink-0">JF: ${jamFactor.toFixed(1)}</span>
                     </div>
                 `;
             });
             if (flow.length > 10) {
-                html += `<div class="text-xs text-gray-400 text-center">+${flow.length - 10} more...</div>`;
+                html += `<div class="text-xs text-gray-400 text-center py-1">+${flow.length - 10} more...</div>`;
             }
             html += `</div>`;
         }
-        
+
         // Incidents
         if (incidents.length > 0) {
-            html += `<div class="text-xs font-semibold text-red-600 mb-1">🚨 Incidents (${incidents.length})</div>`;
-            html += `<div class="space-y-1">`;
+            html += `<div class="flex items-center gap-2 text-xs font-semibold text-red-600 mb-2">
+                <i data-lucide="alert-triangle" class="w-4 h-4"></i>
+                <span>Incidents (${incidents.length})</span>
+            </div>`;
+            html += `<div class="space-y-1 mb-3">`;
             incidents.slice(0, 10).forEach((inc, i) => {
                 const criticality = (inc.criticality || inc.incident_criticality || 'minor').toLowerCase();
                 const critColor = criticality === 'critical' ? 'text-red-700' : criticality === 'major' ? 'text-red-500' : 'text-amber-600';
                 html += `
-                    <div class="flex items-center justify-between bg-red-50 rounded px-2 py-1 text-xs cursor-pointer hover:bg-red-100"
+                    <div class="flex items-center justify-between bg-red-50 rounded-lg px-3 py-2 text-xs cursor-pointer hover:bg-red-100 border border-red-200 transition-colors"
                          onclick="DemoRunner.focusDisruption('incident', ${i})">
-                        <span class="truncate flex-1 text-gray-700">${inc.road_name || 'Unknown Road'}</span>
-                        <span class="${critColor} font-semibold ml-2">${inc.incident_type || inc.type || 'Incident'}</span>
+                        <div class="flex items-center gap-2 flex-1 min-w-0">
+                            <i data-lucide="zap" class="w-3 h-3 text-red-600 flex-shrink-0"></i>
+                            <span class="truncate text-gray-700">${inc.road_name || 'Unknown Road'}</span>
+                        </div>
+                        <span class="${critColor} font-semibold ml-2 flex-shrink-0">${inc.incident_type || inc.type || 'Incident'}</span>
                     </div>
                 `;
             });
             if (incidents.length > 10) {
-                html += `<div class="text-xs text-gray-400 text-center">+${incidents.length - 10} more...</div>`;
+                html += `<div class="text-xs text-gray-400 text-center py-1">+${incidents.length - 10} more...</div>`;
             }
             html += `</div>`;
         }
@@ -2604,6 +2711,9 @@ const DemoRunner = {
         // Clear all routes, disruptions, and markers using the same reset logic as Admin Panel
         this.performFullReset();
         
+        // Re-enable route finder UI when demo stops
+        this.toggleRouteFinderUI(false);
+        
         showUpdateToast('Demo stopped', 'warning');
         this.showTab('main');
     },
@@ -2679,7 +2789,7 @@ const DemoRunner = {
         statsHTML += `
             <div class="col-span-2 bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-4 text-white">
                 <h4 class="font-bold mb-3 flex items-center gap-2 text-sm">
-                    <span>⚡</span> Execution Summary
+                    <i data-lucide="zap" class="w-5 h-5 text-blue-600"></i> Execution Summary
                 </h4>
                 <div class="grid grid-cols-4 gap-2 text-center">
                     <div class="bg-white/10 rounded-lg p-2">
@@ -2712,7 +2822,7 @@ const DemoRunner = {
             statsHTML += `
                 <div class="bg-purple-50 rounded-xl p-3 border border-purple-200">
                     <h4 class="font-bold text-purple-700 mb-2 flex items-center gap-1 text-xs">
-                        <span>⏱️</span> Query Latency
+                        <i data-lucide="clock" class="w-4 h-4"></i> Query Latency
                     </h4>
                     <div class="space-y-1 text-xs">
                         <div class="flex justify-between">
@@ -2733,7 +2843,7 @@ const DemoRunner = {
             statsHTML += `
                 <div class="bg-cyan-50 rounded-xl p-3 border border-cyan-200">
                     <h4 class="font-bold text-cyan-700 mb-2 flex items-center gap-1 text-xs">
-                        <span>🚀</span> Process Time
+                        <i data-lucide="rocket" class="w-4 h-4"></i> Process Time
                     </h4>
                     <div class="space-y-1 text-xs">
                         <div class="flex justify-between">
@@ -2758,7 +2868,7 @@ const DemoRunner = {
             statsHTML += `
                 <div class="bg-amber-50 rounded-xl p-3 border border-amber-200">
                     <h4 class="font-bold text-amber-700 mb-2 flex items-center gap-1 text-xs">
-                        <span>🔗</span> Graph Metrics
+                        <i data-lucide="network" class="w-4 h-4"></i> Graph Metrics
                     </h4>
                     <div class="space-y-1 text-xs">
                         ${stats.pathLength.avg !== null ? `
@@ -2783,7 +2893,7 @@ const DemoRunner = {
             statsHTML += `
                 <div class="bg-red-50 rounded-xl p-3 border border-red-200">
                     <h4 class="font-bold text-red-700 mb-2 flex items-center gap-1 text-xs">
-                        <span>�</span> Disruption Impact
+                        <i data-lucide="alert-triangle" class="w-4 h-4"></i> Disruption Impact
                     </h4>
                     <div class="space-y-1 text-xs">
                         <div class="flex justify-between">
@@ -2804,7 +2914,7 @@ const DemoRunner = {
             statsHTML += `
                 <div class="bg-indigo-50 rounded-xl p-3 border border-indigo-200">
                     <h4 class="font-bold text-indigo-700 mb-2 flex items-center gap-1 text-xs">
-                        <span>🔄</span> Update Phase
+                        <i data-lucide="refresh-cw" class="w-4 h-4"></i> Update Phase
                     </h4>
                     <div class="space-y-1 text-xs">
                         ${stats.lazyRepairTime?.avg !== null ? `
@@ -2840,23 +2950,27 @@ const DemoRunner = {
             const showWinner = (metric, hc2lVal, dhlVal) => {
                 if (hc2lVal === null || dhlVal === null) return '';
                 const winner = best[metric];
-                if (winner === 'HC2L') return '<span class="ml-1 text-blue-600">🏆</span>';
-                if (winner === 'DHL') return '<span class="ml-1 text-green-600">🏆</span>';
+                if (winner === 'HC2L') return '<i data-lucide="cpu" class="w-4 h-4 ml-1 text-blue-600"></i>';
+                if (winner === 'DHL') return '<i data-lucide="zap" class="w-4 h-4 ml-1 text-green-600"></i>';
                 return '';
             };
             
             statsHTML += `
                 <div class="col-span-2 bg-white rounded-xl p-3 border border-gray-200 shadow-sm">
                     <h4 class="font-bold text-gray-700 mb-2 flex items-center gap-1 text-xs">
-                        <span>📊</span> Algorithm Comparison
+                        <i data-lucide="bar-chart-3" class="w-4 h-4"></i> Algorithm Comparison
                     </h4>
                     <div class="overflow-x-auto">
                         <table class="w-full text-xs">
                             <thead>
                                 <tr class="border-b border-gray-200">
                                     <th class="text-left py-1 px-2 text-gray-500 font-medium">Metric</th>
-                                    <th class="text-center py-1 px-2 text-blue-600 font-medium">🔵 HC2L</th>
-                                    <th class="text-center py-1 px-2 text-green-600 font-medium">🟢 DHL</th>
+                                    <th class="text-center py-1 px-2 text-blue-600 font-medium">
+                                        <i data-lucide="cpu" class="w-4 h-4 inline mr-1"></i> HC2L
+                                    </th>
+                                    <th class="text-center py-1 px-2 text-green-600 font-medium">
+                                        <i data-lucide="zap" class="w-4 h-4 inline mr-1"></i> DHL
+                                    </th>
                                     <th class="text-center py-1 px-2 text-gray-500 font-medium">Winner</th>
                                 </tr>
                             </thead>
@@ -2885,7 +2999,7 @@ const DemoRunner = {
                     ${best.winner ? `
                     <div class="mt-2 pt-2 border-t border-gray-100 text-center">
                         <span class="text-xs text-gray-500">Overall Winner: </span>
-                        <span class="font-bold text-sm ${best.winner === 'HC2L' ? 'text-blue-600' : best.winner === 'DHL' ? 'text-green-600' : 'text-gray-600'}">${best.winner === 'Tie' ? '🤝 Tie' : '🏆 ' + best.winner}</span>
+                        <span class="font-bold text-sm ${best.winner === 'HC2L' ? 'text-blue-600' : best.winner === 'DHL' ? 'text-green-600' : 'text-gray-600'}">${best.winner === 'Tie' ? '<i data-lucide="minus" class="w-4 h-4 inline mr-1"></i>Tie' : best.winner === 'HC2L' ? '<i data-lucide="cpu" class="w-4 h-4 inline mr-1"></i>' + best.winner : '<i data-lucide="zap" class="w-4 h-4 inline mr-1"></i>' + best.winner}</span>
                     </div>
                     ` : ''}
                 </div>
@@ -2897,7 +3011,7 @@ const DemoRunner = {
             statsHTML += `
                 <div class="col-span-2 bg-green-50 rounded-xl p-3 border border-green-200">
                     <h4 class="font-bold text-green-700 mb-2 flex items-center gap-1 text-xs">
-                        <span>�</span> Labeling Performance
+                        <i data-lucide="database" class="w-4 h-4"></i> Labeling Performance
                     </h4>
                     <div class="grid grid-cols-2 gap-3 text-xs">
                         <div class="flex justify-between">
@@ -2940,7 +3054,7 @@ const DemoRunner = {
         const resultsListHTML = results.map((r, i) => {
             const metrics = r.metrics || {};
             const algoColor = (r.algorithm || '').toUpperCase() === 'HC2L' ? 'blue' : 'green';
-            const algoIcon = (r.algorithm || '').toUpperCase() === 'HC2L' ? '🔵' : '🟢';
+            const algoIcon = (r.algorithm || '').toUpperCase() === 'HC2L' ? '<i data-lucide="cpu" class="w-4 h-4 text-blue-600"></i>' : '<i data-lucide="zap" class="w-4 h-4 text-green-600"></i>';
             
             // Helper to get best display value for a metric
             const getDisplayValue = (...keys) => {
@@ -3039,7 +3153,9 @@ const DemoRunner = {
                         
                         <!-- Update Phase Metrics -->
                         <div class="mt-3 bg-amber-50 rounded-lg p-2 border border-amber-200">
-                            <div class="text-xs font-bold text-amber-700 mb-1">🔄 Update Phase</div>
+                            <div class="text-xs font-bold text-amber-700 mb-1 flex items-center gap-1">
+                                <i data-lucide="refresh-cw" class="w-3 h-3"></i> Update Phase
+                            </div>
                             <div class="grid grid-cols-3 gap-1 text-xs">
                                 <div class="bg-white/50 rounded p-1">
                                     <div class="text-amber-600 text-[10px]">Strategy</div>
@@ -3070,7 +3186,9 @@ const DemoRunner = {
                         
                         <!-- Query Phase Metrics -->
                         <div class="mt-2 bg-purple-50 rounded-lg p-2 border border-purple-200">
-                            <div class="text-xs font-bold text-purple-700 mb-1">⚡ Query Phase</div>
+                            <div class="text-xs font-bold text-purple-700 mb-1 flex items-center gap-1">
+                                <i data-lucide="zap" class="w-3 h-3"></i> Query Phase
+                            </div>
                             <div class="grid grid-cols-3 gap-1 text-xs">
                                 <div class="bg-white/50 rounded p-1">
                                     <div class="text-purple-600 text-[10px]">Query Time</div>
@@ -3515,7 +3633,7 @@ const DemoRunner = {
         
         const overallWinner = hc2lWins > dhlWins ? 'HC2L' : dhlWins > hc2lWins ? 'DHL' : 'Tie';
         const winnerColor = overallWinner === 'HC2L' ? 'blue' : overallWinner === 'DHL' ? 'green' : 'gray';
-        const winnerIcon = overallWinner === 'HC2L' ? '🔵' : overallWinner === 'DHL' ? '🟢' : '🔘';
+        const winnerIcon = overallWinner === 'HC2L' ? '<i data-lucide="cpu" class="w-4 h-4 text-blue-600"></i>' : overallWinner === 'DHL' ? '<i data-lucide="zap" class="w-4 h-4 text-green-600"></i>' : '<i data-lucide="minus" class="w-4 h-4 text-gray-600"></i>';
 
         container.innerHTML = `
             <div class="bg-gradient-to-r from-${winnerColor}-50 to-${winnerColor}-100 rounded-xl p-4 border border-${winnerColor}-200">

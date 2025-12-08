@@ -792,10 +792,12 @@
 }
 
 .nav-select--grid .nav-select__option {
+  display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
   padding: var(--spacing-3);
+  min-height: 80px;
 }
 
 .nav-select--grid .nav-select__option[data-color] {
@@ -812,8 +814,8 @@
 .nav-select--grid .nav-select__option::after {
   top: auto;
   bottom: 0;
-  right: 50%;
-  transform: translateX(50%) scaleX(0);
+  left: 50%;
+  transform: translateX(-50%) scaleX(0);
   width: 70%;
   height: 4px;
   background: rgba(255, 255, 255, 0.5);
@@ -821,7 +823,7 @@
 }
 
 .nav-select--grid .nav-select__option:has(input:checked)::after {
-  transform: translateX(50%) scaleX(1);
+  transform: translateX(-50%) scaleX(1);
 }
 
 .nav-select--grid .nav-select__icon {

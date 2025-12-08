@@ -126,145 +126,32 @@
     </div>
 
 
-    <!-- Similarity Computation Modal -->
-    <div id="similarity-modal"
-      class="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-6">
-      <div class="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div
-          class="p-6 bg-gradient-to-r from-emerald-600 via-green-600 to-teal-700 text-white flex justify-between items-center sticky top-0 rounded-t-3xl">
-          <div>
-            <h2 class="font-bold text-2xl mb-1">Route Similarity Computation</h2>
-            <p class="text-green-100 text-sm">Understanding similarity metrics</p>
+
+    <!-- Demo Stop Modal -->
+    <div id="demo-stop-modal" class="modal" data-backdrop-close="false" data-escape-close="false">
+      <div class="modal-backdrop"></div>
+      <div class="modal__dialog">
+        <div class="modal__header modal__header--warning">
+          <div class="modal__icon modal__icon--warning">
+            <i data-lucide="alert-circle" class="w-6 h-6"></i>
           </div>
-          <button id="similarity-modal-close" class="hover:bg-white/20 rounded-xl p-2 transition-all">
-            <i data-lucide="x" class="w-6 h-6"></i>
+          <div class="modal__title-group">
+            <h3 class="modal__title">Demo is Running</h3>
+            <p class="modal__subtitle">A demo is currently in progress</p>
+          </div>
+        </div>
+        <div class="modal__body">
+          <p class="text-sm text-slate-700 leading-relaxed">
+            You are attempting to navigate while the demo is running. Would you like to stop the demo and navigate, or cancel this action?
+          </p>
+        </div>
+        <div class="modal__footer modal__footer--right">
+          <button id="demo-stop-modal-cancel" class="btn btn--ghost" data-modal-close>
+            Cancel
           </button>
-        </div>
-        <div class="p-8">
-          <h3 class="text-2xl font-bold text-slate-900 mb-6">Similarity Metrics Explained</h3>
-
-          <div class="space-y-5">
-            <!-- Fréchet Distance -->
-            <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 border-2 border-blue-300 shadow-md">
-              <h4 class="font-bold text-blue-900 mb-3 flex items-center text-lg">
-                <div class="bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl p-2 mr-3">
-                  <i data-lucide="trending-up" class="w-5 h-5 text-white"></i>
-                </div>
-                Fréchet Distance
-              </h4>
-              <p class="text-sm text-slate-700 mb-4 leading-relaxed">
-                Measures how similar two curves are by finding the minimum leash length needed for a person walking a
-                dog along two paths.
-              </p>
-              <div class="bg-white rounded-xl p-4 border-2 border-blue-200 shadow-sm">
-                <div class="flex justify-between text-sm">
-                  <span class="text-slate-600 font-semibold">Current Value:</span>
-                  <span class="font-bold text-blue-700 text-lg">12.3</span>
-                </div>
-                <p class="text-xs text-slate-500 mt-2 font-medium">Lower is better (closer routes)</p>
-              </div>
-            </div>
-
-            <!-- Segment Overlap -->
-            <div
-              class="bg-gradient-to-br from-emerald-50 to-green-50 rounded-2xl p-6 border-2 border-emerald-300 shadow-md">
-              <h4 class="font-bold text-emerald-900 mb-3 flex items-center text-lg">
-                <div class="bg-gradient-to-br from-emerald-600 to-green-600 rounded-xl p-2 mr-3">
-                  <i data-lucide="check-circle" class="w-5 h-5 text-white"></i>
-                </div>
-                Segment Overlap
-              </h4>
-              <p class="text-sm text-slate-700 mb-4 leading-relaxed">
-                Percentage of road segments that are common between the computed route and Google Maps baseline route.
-              </p>
-              <div class="bg-white rounded-xl p-4 border-2 border-emerald-200 shadow-sm">
-                <div class="flex justify-between text-sm">
-                  <span class="text-slate-600 font-semibold">Current Value:</span>
-                  <span class="font-bold text-emerald-700 text-lg">87%</span>
-                </div>
-                <p class="text-xs text-slate-500 mt-2 font-medium">Higher is better (more similar routes)</p>
-              </div>
-            </div>
-
-            <!-- Combined Interpretation -->
-            <div
-              class="bg-gradient-to-br from-purple-50 to-violet-50 rounded-2xl p-6 border-2 border-purple-300 shadow-md">
-              <h4 class="font-bold text-purple-900 mb-3 text-lg">Combined Interpretation</h4>
-              <p class="text-sm text-slate-700 leading-relaxed">
-                With <strong class="text-emerald-600">87% segment overlap</strong> and a Fréchet distance of <strong
-                  class="text-blue-600">12.3</strong>,
-                the Dynamic HC2L algorithm produces routes that are highly similar to Google Maps baseline,
-                while achieving significant improvements in labeling efficiency.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Algorithm Comparison Modal -->
-    <div id="comparison-modal"
-      class="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-6">
-      <div class="bg-white rounded-3xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto">
-        <div
-          class="p-6 bg-gradient-to-r from-blue-600 via-blue-700 to-purple-700 text-white flex justify-between items-center sticky top-0 rounded-t-3xl">
-          <div>
-            <h2 class="font-bold text-2xl mb-1">Algorithm Performance Comparison</h2>
-            <p class="text-blue-100 text-sm">DHL vs Dynamic HC2L Analysis</p>
-          </div>
-          <button id="comparison-modal-close" class="hover:bg-white/20 rounded-xl p-2 transition-all">
-            <i data-lucide="x" class="w-6 h-6"></i>
+          <button id="demo-stop-modal-stop" class="btn btn--warning">
+            Stop Demo & Navigate
           </button>
-        </div>
-        <div class="p-8">
-          <h3 class="text-2xl font-bold text-slate-900 mb-6">Performance Summary</h3>
-
-          <div class="grid grid-cols-2 gap-5 mb-8">
-            <!-- DHL Column -->
-            <div
-              class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-6 border-2 border-slate-300 shadow-lg">
-              <h4 class="font-bold text-xl text-slate-800 mb-4 flex items-center">
-                <span class="w-4 h-4 bg-slate-500 rounded-full mr-3 shadow-md"></span>
-                DHL (Baseline)
-              </h4>
-              <div class="space-y-3">
-                <div class="flex justify-between text-sm bg-white p-3 rounded-xl border border-slate-200">
-                  <span class="text-slate-600 font-medium">Labeling Time:</span>
-                  <span id="dhl-labeling-time" class="font-bold text-slate-800">--</span>
-                </div>
-                <div class="flex justify-between text-sm bg-white p-3 rounded-xl border border-slate-200">
-                  <span class="text-slate-600 font-medium">Labeling Size:</span>
-                  <span id="dhl-labeling-size" class="font-bold text-slate-800">--</span>
-                </div>
-                <div class="flex justify-between text-sm bg-white p-3 rounded-xl border border-slate-200">
-                  <span class="text-slate-600 font-medium">Query Time:</span>
-                  <span id="dhl-query-time" class="font-bold text-slate-800">--</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- D-HC2L Column -->
-            <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 border-2 border-blue-400 shadow-lg">
-              <h4 class="font-bold text-xl text-blue-900 mb-4 flex items-center">
-                <span class="w-4 h-4 bg-blue-600 rounded-full mr-3 shadow-md"></span>
-                Dynamic HC2L
-              </h4>
-              <div class="space-y-3">
-                <div class="flex justify-between text-sm bg-white p-3 rounded-xl border border-blue-200">
-                  <span class="text-slate-600 font-medium">Labeling Time:</span>
-                  <span id="dhc2l-labeling-time" class="font-bold text-emerald-600">--</span>
-                </div>
-                <div class="flex justify-between text-sm bg-white p-3 rounded-xl border border-blue-200">
-                  <span class="text-slate-600 font-medium">Labeling Size:</span>
-                  <span id="dhc2l-labeling-size" class="font-bold text-emerald-600">--</span>
-                </div>
-                <div class="flex justify-between text-sm bg-white p-3 rounded-xl border border-blue-200">
-                  <span class="text-slate-600 font-medium">Query Time:</span>
-                  <span id="dhc2l-query-time" class="font-bold text-red-600">--</span>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>

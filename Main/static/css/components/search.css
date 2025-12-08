@@ -10,9 +10,10 @@
 .search-combobox {
   position: relative;
   width: 100%;
+  overflow: visible;
 }
 
-/* Input wrapper (alias: __input-wrapper and __wrapper) */
+/* Input wrapper (alias: __input and __wrapper) */
 .search-combobox__input-wrapper,
 .search-combobox__wrapper {
   display: flex;
@@ -42,6 +43,8 @@
   background: transparent;
   border: none;
   outline: none;
+  border: none !important;
+  box-shadow: none !important;
   font-size: var(--text-sm);
   font-weight: var(--font-medium);
   color: var(--color-text);
@@ -165,7 +168,7 @@
   position: absolute;
   top: calc(100% + var(--spacing-2));
   left: 0;
-  right: 0;
+  width: 100%;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
@@ -175,8 +178,9 @@
   z-index: var(--z-dropdown);
   opacity: 0;
   visibility: hidden;
-  transform: translateY(-8px);
+  transform: translateY(-6px);
   transition: all var(--transition-fast);
+  pointer-events: none;
 }
 
 .search-dropdown.active,
@@ -186,6 +190,7 @@
   opacity: 1;
   visibility: visible;
   transform: translateY(0);
+  pointer-events: auto;
 }
 
 /* Fixed position variant (for dropdowns that need to escape overflow) */

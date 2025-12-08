@@ -28,9 +28,15 @@
           <i data-lucide="play" class="w-5 h-5"></i>
           Route
         </button>
-        <button id="admin-reset-btn" class="btn btn--outline btn--secondary">Reset</button>
-        <button id="admin-export-btn" class="btn btn--outline btn--secondary">Export</button>
-        <button onclick="openDisruptionsPanel()" class="btn btn--error btn--block col-span-2">
+        <button id="admin-reset-btn" class="btn btn--indigo">
+          <i data-lucide="refresh-cw" class="w-5 h-5"></i>
+          Reset
+        </button>
+        <button id="admin-export-btn" class="btn btn--indigo">
+          <i data-lucide="download" class="w-5 h-5"></i>
+          Export
+        </button>
+        <button onclick="openDisruptionsPanel()" class="btn btn--error btn--block col-span-2" data-panel="disruptions">
           <i data-lucide="alert-triangle" class="w-5 h-5"></i>
           Network Disruptions
         </button>

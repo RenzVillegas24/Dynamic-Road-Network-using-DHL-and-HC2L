@@ -403,6 +403,10 @@
   margin: 0;
 }
 
+.section-card__title + .badge {
+  margin-left: auto;
+}
+
 .section-card__body {
   /* Content container - no specific styles needed */
   display: block;
@@ -904,3 +908,177 @@
   font-size: var(--text-sm);
   color: var(--color-text);
 }
+
+/* =====================
+   TAB CARD
+   ===================== */
+
+/* Tab card container - combines tabs with card layout */
+.tab-card {
+  background: var(--color-surface);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+}
+
+/* Tab card header - contains the tabs */
+.tab-card__header {
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+  padding: var(--spacing-4) var(--spacing-5) 0 var(--spacing-5);
+}
+
+/* Tab card navigation - the tabs themselves */
+.tab-card__nav {
+  display: flex;
+  gap: var(--spacing-2);
+  margin-bottom: var(--spacing-4);
+}
+
+/* Tab card body - contains the tab content */
+.tab-card__body {
+  padding: var(--spacing-5);
+}
+
+/* Tab card body compact variant */
+.tab-card__body--compact {
+  padding: var(--spacing-4);
+}
+
+/* Tab card body flush variant */
+.tab-card__body--flush {
+  padding: 0;
+}
+
+/* Tab card color variants */
+.tab-card--slate {
+  background: var(--color-gray-50);
+  border-color: var(--color-gray-200);
+}
+
+.tab-card--primary {
+  background: var(--color-primary-50);
+  border-color: var(--color-primary-light);
+}
+
+.tab-card--success {
+  background: hsla(142, 71%, 45%, 0.05);
+  border-color: var(--color-success-light);
+}
+
+.tab-card--warning {
+  background: hsla(45, 93%, 47%, 0.05);
+  border-color: var(--color-warning-light);
+}
+
+.tab-card--error,
+.tab-card--danger {
+  background: hsla(0, 84%, 60%, 0.05);
+  border-color: var(--color-danger-light);
+}
+
+.tab-card--info {
+  background: hsla(199, 89%, 48%, 0.05);
+  border-color: var(--color-info-light);
+}
+
+.tab-card--purple {
+  background: hsla(259, 94%, 51%, 0.05);
+  border-color: hsla(259, 94%, 51%, 0.2);
+}
+
+.tab-card--amber {
+  background: hsla(38, 92%, 50%, 0.05);
+  border-color: hsla(38, 92%, 50%, 0.2);
+}
+
+.tab-card--teal {
+  background: hsla(168, 76%, 42%, 0.05);
+  border-color: hsla(168, 76%, 42%, 0.2);
+}
+
+/* =====================
+   DISRUPTION SET BUTTONS
+   ===================== */
+
+.disruption-set-btn {
+  position: relative;
+  padding: var(--spacing-2) var(--spacing-3);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.disruption-set-btn:hover {
+  border-color: var(--color-text-secondary);
+  background: var(--color-gray-50);
+}
+
+/* Active/Highlighted state with gradient */
+.disruption-set-btn.active {
+  background: var(--gradient-primary);
+  color: var(--color-text-inverse);
+  border-color: transparent;
+  box-shadow: var(--shadow-md);
+}
+
+/* Alternative gradient colors for variety */
+.disruption-set-btn.active--success {
+  background: var(--gradient-success);
+  color: var(--color-text-inverse);
+  border-color: transparent;
+}
+
+.disruption-set-btn.active--warning {
+  background: var(--gradient-warning);
+  color: var(--color-text-inverse);
+  border-color: transparent;
+}
+
+.disruption-set-btn.active--danger {
+  background: var(--gradient-danger);
+  color: var(--color-text-inverse);
+  border-color: transparent;
+}
+
+.disruption-set-btn.active--info {
+  background: var(--gradient-info);
+  color: var(--color-text-inverse);
+  border-color: transparent;
+}
+
+/* Hide scrollbar while keeping functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* =====================
+   DISRUPTION SETS CONTAINER
+   ===================== */
+
+.disruption-sets-container {
+  scroll-behavior: smooth;
+}
+
+.disruption-sets-container .disruption-set-btn.active {
+  animation: scrollIntoView 0.5s ease-out;
+}
+
+@keyframes scrollIntoView {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+

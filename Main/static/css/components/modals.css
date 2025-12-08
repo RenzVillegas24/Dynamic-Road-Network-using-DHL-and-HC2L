@@ -125,7 +125,7 @@
 
 .modal__header--gradient {
   background: var(--gradient-primary);
-  color: var(--color-text-inverse);
+  color: var(--color-text);
   border-bottom: none;
 }
 
@@ -143,7 +143,7 @@
 
 .modal__header--warning {
   background: var(--gradient-warning);
-  color: var(--color-text);
+  color: var(--color-text-inverse);
   border-bottom: none;
 }
 

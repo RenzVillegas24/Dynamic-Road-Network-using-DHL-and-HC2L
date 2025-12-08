@@ -918,6 +918,49 @@ const DemoCreator = {
         this.resetAll();
     },
 
+    /**
+     * Stop the currently running demo
+     * Cleans up state and re-enables route finder UI
+     */
+    stopDemo() {
+        if (!this.isRunning) {
+            return;
+        }
+
+        // Mark as stopped
+        this.isRunning = false;
+        this.isPaused = false;
+
+        // Clear all visual markers
+        this.clearPreviewMarkers();
+        this.clearAllRouteMarkers();
+        this.clearAllDisruptionMarkers();
+        this.clearDisruptionPreview(true);
+
+        // Re-enable route finder UI
+        if (typeof DemoRunner !== 'undefined' && DemoRunner.toggleRouteFinderUI) {
+            DemoRunner.toggleRouteFinderUI(false);
+        }
+
+        // Update config list to reflect stopped state
+        if (typeof DemoRunner !== 'undefined' && DemoRunner.renderConfigList) {
+            DemoRunner.renderConfigList();
+        }
+
+        // Show toast notification
+        showUpdateToast('Demo stopped', 'warning');
+
+        // Close the demo panel and go back to route finder
+        const panel = document.getElementById('demo-creator-panel');
+        if (panel) {
+            panel.classList.add('translate-x-full');
+        }
+        
+        if (typeof PanelManager !== 'undefined') {
+            PanelManager.closeRightPanel();
+        }
+    },
+
     resetAll() {
         // Clear all markers from map
         this.clearPreviewMarkers();
@@ -3351,6 +3394,11 @@ const DemoCreator = {
     // Update config list to reflect running state (disables run buttons)
     if (typeof DemoRunner !== 'undefined' && DemoRunner.renderConfigList) DemoRunner.renderConfigList();
         
+        // Disable route finder UI when demo starts
+        if (typeof DemoRunner !== 'undefined' && DemoRunner.toggleRouteFinderUI) {
+            DemoRunner.toggleRouteFinderUI(true);
+        }
+        
         const trials = config.trials || config.settings?.trials || 1;
         const routes = config.routes || [];
         
@@ -3418,6 +3466,11 @@ const DemoCreator = {
             this.isRunning = false;
             // Update config list to reflect stopped state (re-enable buttons)
             if (typeof DemoRunner !== 'undefined' && DemoRunner.renderConfigList) DemoRunner.renderConfigList();
+            
+            // Re-enable route finder UI when demo stops
+            if (typeof DemoRunner !== 'undefined' && DemoRunner.toggleRouteFinderUI) {
+                DemoRunner.toggleRouteFinderUI(false);
+            }
         }
     },
 
@@ -4035,6 +4088,11 @@ const DemoCreator = {
         this.currentProgress.status = '⏹️ Stopped';
         this.updateProgressDisplay();
         showUpdateToast('Demo stopped', 'warning');
+        
+        // Re-enable route finder UI when demo stops
+        if (typeof DemoRunner !== 'undefined' && DemoRunner.toggleRouteFinderUI) {
+            DemoRunner.toggleRouteFinderUI(false);
+        }
         
         // Return to step 1 after a short delay
         setTimeout(() => {

@@ -8,7 +8,7 @@
       <h2 class="panel__title">Demo Runner</h2>
       <p class="panel__subtitle">Run, load, or create demos</p>
     </div>
-    <button onclick="closeDemoRunner()" class="panel__close">
+    <button class="panel__close">
       <i data-lucide="x" class="w-6 h-6"></i>
     </button>
   </div>
@@ -29,35 +29,39 @@
       </div>
 
       <!-- Tab Navigation for Configurations/Results -->
-      <div class="section-card">
-        <div class="tabs tabs--pills">
-          <div class="tabs__list">
-            <button id="tab-btn-configs" onclick="DemoRunner.switchDataTab('configs')" class="tabs__tab" aria-selected="true" data-demo-tab="configs" data-color="blue">
-              <i data-lucide="save" class="w-4 h-4"></i> Configurations
-              <span id="tab-badge-configs" class="tabs__tab-badge">0</span>
-            </button>
-            <button id="tab-btn-saved-results" onclick="DemoRunner.switchDataTab('saved-results')" class="tabs__tab" data-demo-tab="saved-results" data-color="emerald">
-              <i data-lucide="bar-chart-3" class="w-4 h-4"></i> Saved Results
-              <span id="tab-badge-results" class="tabs__tab-badge">0</span>
-            </button>
+      <div class="tab-card">
+        <div class="tab-card__header">
+          <div class="tab-card__nav tabs tabs--pills">
+            <div class="tabs__list">
+              <button id="tab-btn-configs" onclick="DemoRunner.switchDataTab('configs')" class="tabs__tab" aria-selected="true" data-demo-tab="configs" data-color="blue">
+                <i data-lucide="save" class="w-4 h-4"></i> Configurations
+                <span id="tab-badge-configs" class="tabs__tab-badge">0</span>
+              </button>
+              <button id="tab-btn-saved-results" onclick="DemoRunner.switchDataTab('saved-results')" class="tabs__tab" data-demo-tab="saved-results" data-color="blue">
+                <i data-lucide="bar-chart-3" class="w-4 h-4"></i> Saved Results
+                <span id="tab-badge-results" class="tabs__tab-badge">0</span>
+              </button>
+            </div>
           </div>
         </div>
 
-        <!-- Tab Content: Configurations -->
-        <div id="data-tab-configs" class="mt-4">
-          <div id="saved-configs-list" class="space-y-3"></div>
-        </div>
-
-        <!-- Tab Content: Saved Results -->
-        <div id="data-tab-saved-results" class="mt-4 hidden">
-          <div class="flex items-center justify-end mb-3">
-            <button onclick="DemoRunner.refreshSavedResults()" class="btn btn--ghost btn--sm">
-              <i data-lucide="refresh-cw" class="w-4 h-4"></i>
-              Refresh
-            </button>
+        <div class="tab-card__body">
+          <!-- Tab Content: Configurations -->
+          <div id="data-tab-configs">
+            <div id="saved-configs-list" class="space-y-3"></div>
           </div>
-          <div id="saved-results-list" class="space-y-3">
-            <p class="text-muted text-center py-4">Loading saved results...</p>
+
+          <!-- Tab Content: Saved Results -->
+          <div id="data-tab-saved-results" class="hidden">
+            <div class="flex items-center justify-end mb-3">
+              <button onclick="DemoRunner.refreshSavedResults()" class="btn btn--ghost btn--sm">
+                <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                Refresh
+              </button>
+            </div>
+            <div id="saved-results-list" class="space-y-3">
+              <p class="text-muted text-center py-4">Loading saved results...</p>
+            </div>
           </div>
         </div>
       </div>
@@ -158,27 +162,41 @@
 
         <!-- Disruption Preview Panel -->
         <div class="section-card section-card--warning">
-          <div class="flex items-center justify-between mb-3">
-            <h4 class="text-sm font-semibold"><i data-lucide="traffic-cone" class="w-4 h-4 inline"></i> Disruption Display</h4>
-            <div class="flex gap-2">
-              <label class="form-check">
-                <input type="checkbox" id="demo-show-incidents" checked onchange="DemoRunner.toggleIncidents(this.checked)" class="form-check__input">
-                <span class="form-check__label">Incidents</span>
+          <div class="section-card__header">
+            <div class="section-card__icon section-card__icon--warning">
+              <i data-lucide="zap" class="w-5 h-5"></i>
+            </div>
+            <h3 class="section-card__title">Disruption Display</h3>
+          </div>
+
+          <div class="section-card__body">
+            <!-- Display Toggles -->
+            <div class="flex items-center justify-between gap-4 mb-4 pb-4 border-b border-gray-200">
+              <label class="form-switch">
+                <input type="checkbox" id="demo-show-incidents" checked onchange="DemoRunner.toggleIncidents(this.checked)" class="form-switch__input">
+                <span class="form-switch__slider"></span>
+                <span class="form-switch__label">Show Incidents</span>
               </label>
-              <label class="form-check">
-                <input type="checkbox" id="demo-show-flow" checked onchange="DemoRunner.toggleFlowOverlay(this.checked)" class="form-check__input">
-                <span class="form-check__label">Flow</span>
+              <label class="form-switch">
+                <input type="checkbox" id="demo-show-flow" checked onchange="DemoRunner.toggleFlowOverlay(this.checked)" class="form-switch__input">
+                <span class="form-switch__slider"></span>
+                <span class="form-switch__label">Show Flow</span>
               </label>
             </div>
-          </div>
 
-          <div id="demo-runner-disruption-sets" class="mb-2 hidden">
-            <div class="text-xs font-semibold text-muted mb-1"><i data-lucide="package" class="w-4 h-4 inline"></i> Disruption Sets</div>
-            <div id="demo-runner-set-buttons" class="flex flex-wrap gap-1"></div>
-          </div>
+            <!-- Disruption Sets Carousel -->
+            <div id="demo-runner-disruption-sets" class="hidden">
+              <div class="flex items-center gap-2 mb-2">
+                <i data-lucide="package" class="w-4 h-4 text-gray-600"></i>
+                <span class="text-xs font-semibold text-gray-700">Disruption Sets</span>
+              </div>
+              <div id="demo-runner-set-buttons" class="disruption-sets-container flex gap-2 overflow-x-auto pb-2 -mx-5 px-5 scrollbar-hide"></div>
+            </div>
 
-          <div id="demo-runner-disruption-preview" class="max-h-48 overflow-y-auto card card--flat p-3">
-            <div class="text-muted text-center py-2">No disruptions loaded</div>
+            <!-- Preview Panel -->
+            <div id="demo-runner-disruption-preview" class="max-h-48 overflow-y-auto card card--flat p-3 bg-gray-50 border border-gray-200">
+              <div class="text-muted text-center py-2 text-sm">No disruptions loaded</div>
+            </div>
           </div>
         </div>
 

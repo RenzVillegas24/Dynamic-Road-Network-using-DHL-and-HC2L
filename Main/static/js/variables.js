@@ -7,8 +7,6 @@ const alertBanner = document.getElementById("alert-banner");
 const thresholdValue = document.getElementById("threshold-value");
 const updateModeBadge = document.getElementById("update-mode-badge");
 const comparisonButtons = document.getElementById("comparison-buttons");
-const comparisonModal = document.getElementById("comparison-modal");
-// const similarityModal = document.getElementById("similarity-modal");
 const mapContainer = document.getElementById("map-container");
 const newDatasetButtonText = document.getElementById("new-dataset-text");
 

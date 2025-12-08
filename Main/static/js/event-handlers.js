@@ -751,20 +751,11 @@ function initializeEventHandlers() {
         };
     }
   
-    const comparisonModalClose = document.getElementById('comparison-modal-close');
-    if (comparisonModalClose) {
-        comparisonModalClose.onclick = () => {
-            comparisonModal.classList.add('hidden');
-        };
-    }
   
 // document.getElementById('show-similarity-computation').onclick = () => {
 //     similarityModal.classList.remove('hidden');
 // };
-  
-// document.getElementById('similarity-modal-close').onclick = () => {
-//     similarityModal.classList.add('hidden');
-// };
+
 
     const adminResetBtn = document.getElementById('admin-reset-btn');
     if (adminResetBtn) {

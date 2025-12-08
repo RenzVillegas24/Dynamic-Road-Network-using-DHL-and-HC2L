@@ -3,34 +3,29 @@
 let searchTimeout;
 let currentFocusIndex = -1;
 
-// Position dropdown below input field using fixed positioning
-function positionDropdown(inputElement, dropdownElement) {
-  if (!inputElement || !dropdownElement) return;
-  
-  const rect = inputElement.getBoundingClientRect();
-  const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-  const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
-  
-  // Position dropdown below the input with 8px gap (mt-2) and 8px margin (mr-8 equivalent)
-  dropdownElement.style.top = (rect.bottom + scrollTop + 8) + 'px';
-  dropdownElement.style.left = (rect.left + scrollLeft) + 'px';
-  dropdownElement.style.width = (rect.width - 16) + 'px'; // 8px margin on each side
-  dropdownElement.style.marginRight = '8px';
+function showComboboxDropdown(dropdown) {
+  if (!dropdown) return;
+  dropdown.classList.add('open');
+}
+
+function hideComboboxDropdown(dropdown) {
+  if (!dropdown) return;
+  dropdown.classList.remove('open');
 }
 
 function initializeLocationCombobox() {
   console.log('🔍 Initializing location combobox...');
   
-  // Start location input
   const startInput = document.getElementById('start-location-input');
-  if (startInput) {
+  const startDropdown = document.getElementById('start-location-dropdown');
+  if (startInput && startDropdown) {
     startInput.addEventListener('input', (e) => {
       clearTimeout(searchTimeout);
       const query = e.target.value.trim();
       currentFocusIndex = -1; // Reset focus
       
       if (query.length < 2) {
-        document.getElementById('start-location-dropdown').classList.add('hidden');
+        hideComboboxDropdown(startDropdown);
         return;
       }
       
@@ -49,23 +44,23 @@ function initializeLocationCombobox() {
     document.addEventListener('click', (e) => {
       if (!e.target.closest('#start-location-input') && 
           !e.target.closest('#start-location-dropdown')) {
-        document.getElementById('start-location-dropdown').classList.add('hidden');
+        hideComboboxDropdown(startDropdown);
       }
     });
     
     console.log('✅ Start location input initialized');
   }
   
-  // Destination location input
   const destInput = document.getElementById('dest-location-input');
-  if (destInput) {
+  const destDropdown = document.getElementById('dest-location-dropdown');
+  if (destInput && destDropdown) {
     destInput.addEventListener('input', (e) => {
       clearTimeout(searchTimeout);
       const query = e.target.value.trim();
       currentFocusIndex = -1; // Reset focus
       
       if (query.length < 2) {
-        document.getElementById('dest-location-dropdown').classList.add('hidden');
+        hideComboboxDropdown(destDropdown);
         return;
       }
       
@@ -84,14 +79,13 @@ function initializeLocationCombobox() {
     document.addEventListener('click', (e) => {
       if (!e.target.closest('#dest-location-input') && 
           !e.target.closest('#dest-location-dropdown')) {
-        document.getElementById('dest-location-dropdown').classList.add('hidden');
+        hideComboboxDropdown(destDropdown);
       }
     });
     
     console.log('✅ Destination location input initialized');
   }
   
-  // Pin button handlers (existing behavior)
   const startPinBtn = document.getElementById('start-location-pin-btn');
   if (startPinBtn) {
     startPinBtn.addEventListener('click', (e) => {
@@ -102,8 +96,7 @@ function initializeLocationCombobox() {
         map.getContainer().style.cursor = 'crosshair';
       }
       showUpdateToast('Click on map to pin start location', 'info');
-      // Close dropdown
-      document.getElementById('start-location-dropdown').classList.add('hidden');
+      hideComboboxDropdown(startDropdown);
     });
     console.log('✅ Start pin button handler registered');
   }
@@ -118,48 +111,19 @@ function initializeLocationCombobox() {
         map.getContainer().style.cursor = 'crosshair';
       }
       showUpdateToast('Click on map to pin destination', 'info');
-      // Close dropdown
-      document.getElementById('dest-location-dropdown').classList.add('hidden');
+      hideComboboxDropdown(destDropdown);
     });
     console.log('✅ Dest pin button handler registered');
   }
   
   console.log('✅ Location combobox fully initialized');
-  
-  // Reposition dropdowns on window resize or scroll
-  window.addEventListener('resize', () => {
-    const startDropdown = document.getElementById('start-location-dropdown');
-    const destDropdown = document.getElementById('dest-location-dropdown');
-    const startInput = document.getElementById('start-location-input');
-    const destInput = document.getElementById('dest-location-input');
-    
-    if (startDropdown && !startDropdown.classList.contains('hidden')) {
-      positionDropdown(startInput, startDropdown);
-    }
-    if (destDropdown && !destDropdown.classList.contains('hidden')) {
-      positionDropdown(destInput, destDropdown);
-    }
-  });
-  
-  window.addEventListener('scroll', () => {
-    const startDropdown = document.getElementById('start-location-dropdown');
-    const destDropdown = document.getElementById('dest-location-dropdown');
-    const startInput = document.getElementById('start-location-input');
-    const destInput = document.getElementById('dest-location-input');
-    
-    if (startDropdown && !startDropdown.classList.contains('hidden')) {
-      positionDropdown(startInput, startDropdown);
-    }
-    if (destDropdown && !destDropdown.classList.contains('hidden')) {
-      positionDropdown(destInput, destDropdown);
-    }
-  });
 }
 
 // Handle keyboard navigation (arrow keys, Enter, Escape)
 function handleKeyboardNavigation(e, type) {
   const dropdownId = type === 'start' ? 'start-location-dropdown' : 'dest-location-dropdown';
   const dropdown = document.getElementById(dropdownId);
+  if (!dropdown) return;
   const items = dropdown.querySelectorAll('.dropdown-item');
   
   if (items.length === 0) return;
@@ -185,7 +149,7 @@ function handleKeyboardNavigation(e, type) {
   }
   // Escape - close dropdown
   else if (e.key === 'Escape') {
-    dropdown.classList.add('hidden');
+    hideComboboxDropdown(dropdown);
     currentFocusIndex = -1;
   }
 }
@@ -205,16 +169,15 @@ function updateFocus(items) {
 // Perform location search and show dropdown results
 async function performLocationSearch(query, type) {
   const dropdownId = type === 'start' ? 'start-location-dropdown' : 'dest-location-dropdown';
-  const inputId = type === 'start' ? 'start-location-input' : 'dest-location-input';
   const dropdown = document.getElementById(dropdownId);
-  const input = document.getElementById(inputId);
+  
+  if (!dropdown) {
+    console.warn('Dropdown not found for', type);
+    return;
+  }
   
   console.log(`🔍 Searching for "${query}" (${type})`);
   
-  // Position dropdown below the input field
-  positionDropdown(input, dropdown);
-  
-  // Show loading state with framework classes
   const iconVariant = type === 'start' ? 'search-result__icon--start' : 'search-result__icon--dest';
   dropdown.innerHTML = `
     <div class="search-loading">
@@ -222,7 +185,7 @@ async function performLocationSearch(query, type) {
       <p class="search-loading__text">Searching...</p>
     </div>
   `;
-  dropdown.classList.remove('hidden');
+  showComboboxDropdown(dropdown);
   
   try {
     console.log('📡 Sending search request');
@@ -263,7 +226,6 @@ async function performLocationSearch(query, type) {
       return;
     }
     
-    // Display results using framework search-result classes
     const resultHTML = data.results.map((result, index) => `
       <div class="search-result dropdown-item"
            data-lat="${result.lat}" 
@@ -288,7 +250,6 @@ async function performLocationSearch(query, type) {
     if (typeof lucide !== 'undefined') lucide.createIcons();
     console.log(`✅ Displayed ${data.results.length} results`);
     
-    // Add click handlers to results - use setTimeout to ensure DOM is updated
     setTimeout(() => {
       const items = dropdown.querySelectorAll('.dropdown-item');
       items.forEach(item => {
@@ -301,33 +262,27 @@ async function performLocationSearch(query, type) {
           
           console.log(`📍 Location selected: ${name} (${lat}, ${lng})`);
           
-          // Get the correct input element based on data-type
           const selectedType = item.dataset.type;
           const selectedInputId = selectedType === 'start' ? 'start-location-input' : 'dest-location-input';
           const targetInput = document.getElementById(selectedInputId);
           
           if (targetInput) {
-            const displayName = name.split(',')[0]; // Show just the main name
+            const displayName = name.split(',')[0];
             targetInput.value = displayName;
             console.log(`✅ Set ${selectedInputId} value to: ${displayName}`);
-            
-            // Dispatch input event to trigger any listeners
             targetInput.dispatchEvent(new Event('input', { bubbles: true }));
           } else {
             console.error(`❌ Input ${selectedInputId} not found`);
           }
           
-          // Hide dropdown
-          dropdown.classList.add('hidden');
+          hideComboboxDropdown(dropdown);
           
-          // Set location
           if (locType === 'start') {
             handleStartLocationPin(lat, lng, name);
           } else {
             handleDestLocationPin(lat, lng, name);
           }
           
-          // Pan map to location
           if (map) {
             map.setView([lat, lng], 17);
           }
