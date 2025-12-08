@@ -3,7 +3,7 @@
  * Handles sidebar navigation, collapse/expand, and mobile responsiveness
  */
 
-const Sidebar = (function() {
+const Sidebar = (function () {
   'use strict';
 
   // State
@@ -23,11 +23,11 @@ const Sidebar = (function() {
   function init() {
     sidebarElement = document.getElementById('sidebar');
     // Look for toggle button by ID first, then by class
-    toggleButton = document.getElementById('sidebar-toggle') || 
-                   document.querySelector('.header-sidebar-toggle') ||
-                   document.querySelector('.header__toggle');
+    toggleButton = document.getElementById('sidebar-toggle') ||
+      document.querySelector('.header-sidebar-toggle') ||
+      document.querySelector('.header__toggle');
     mainWrapper = document.getElementById('main-wrapper');
-    
+
     if (!sidebarElement) {
       console.warn('[Sidebar] Sidebar element not found');
       return;
@@ -50,6 +50,11 @@ const Sidebar = (function() {
     window.addEventListener('resize', debounce(handleResize, 150));
 
     console.log('[Sidebar] Initialized');
+  }
+
+  function isDemoRunning() {
+    return (typeof DemoRunner !== 'undefined' && DemoRunner.isRunning) ||
+           (typeof DemoCreator !== 'undefined' && DemoCreator.isRunning);
   }
 
   /**
@@ -98,21 +103,21 @@ const Sidebar = (function() {
    * Handle nav item click
    */
   function handleNavClick(e) {
-    const navItem = e.target.closest('.nav-item');
-    if (!navItem) return;
+    // const navItem = e.target.closest('.nav-item');
+    // if (!navItem) return;
 
-    // Remove active from siblings
-    sidebarElement.querySelectorAll('.nav-item').forEach(item => {
-      item.classList.remove('active');
-    });
+    // // Remove active from siblings
+    // sidebarElement.querySelectorAll('.nav-item').forEach(item => {
+    //   item.classList.remove('active');
+    // });
 
-    // Add active to clicked
-    navItem.classList.add('active');
+    // // Add active to clicked
+    // navItem.classList.add('active');
 
-    // Close mobile sidebar after selection
-    if (isMobile()) {
-      closeMobile();
-    }
+    // // Close mobile sidebar after selection
+    // if (isMobile()) {
+    //   closeMobile();
+    // }
   }
 
   /**
@@ -129,13 +134,13 @@ const Sidebar = (function() {
         const nextIndex = currentIndex < navItems.length - 1 ? currentIndex + 1 : 0;
         navItems[nextIndex]?.focus();
         break;
-      
+
       case 'ArrowUp':
         e.preventDefault();
         const prevIndex = currentIndex > 0 ? currentIndex - 1 : navItems.length - 1;
         navItems[prevIndex]?.focus();
         break;
-      
+
       case 'Enter':
       case ' ':
         if (focusedItem.classList.contains('nav-item')) {
@@ -150,11 +155,11 @@ const Sidebar = (function() {
    */
   function toggleNavGroup(group) {
     group.classList.toggle('collapsed');
-    
+
     const icon = group.querySelector('.nav-group-header i');
     if (icon) {
-      icon.style.transform = group.classList.contains('collapsed') 
-        ? 'rotate(-90deg)' 
+      icon.style.transform = group.classList.contains('collapsed')
+        ? 'rotate(-90deg)'
         : 'rotate(0deg)';
     }
   }
@@ -180,13 +185,13 @@ const Sidebar = (function() {
     isCollapsed = true;
     sidebarElement.classList.add('sidebar--collapsed');
     document.body.setAttribute('data-sidebar-collapsed', 'true');
-    
+
     // Update toggle button icon
     updateToggleIcon();
 
     // Save state
     localStorage.setItem('sidebar-collapsed', 'true');
-    
+
     console.log('[Sidebar] Collapsed');
   }
 
@@ -200,13 +205,13 @@ const Sidebar = (function() {
     isCollapsed = false;
     sidebarElement.classList.remove('sidebar--collapsed');
     document.body.removeAttribute('data-sidebar-collapsed');
-    
+
     // Update toggle button icon
     updateToggleIcon();
 
     // Save state
     localStorage.setItem('sidebar-collapsed', 'false');
-    
+
     console.log('[Sidebar] Expanded');
   }
 
@@ -307,6 +312,16 @@ const Sidebar = (function() {
    */
   function setActive(panelKey) {
     sidebarElement?.querySelectorAll('.nav-item').forEach(item => {
+      if (isDemoRunning() && 
+        ( 
+          panelKey === 'route-finder'||
+          panelKey === 'current-route' ||
+          panelKey === 'comparison' || 
+          panelKey === 'demo-creator'
+        )) {
+        return;
+      }
+
       item.classList.toggle('active', item.dataset.panel === panelKey);
     });
   }

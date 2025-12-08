@@ -128,7 +128,7 @@
 
 
     <!-- Demo Stop Modal -->
-    <div id="demo-stop-modal" class="modal" data-backdrop-close="false" data-escape-close="false">
+    <div id="demo-stop-modal" class="modal" data-backdrop-close="false" data-escape-close="true">
       <div class="modal-backdrop"></div>
       <div class="modal__dialog">
         <div class="modal__header modal__header--warning">
@@ -2142,76 +2142,76 @@
         lucide.createIcons();
       }
 
-      // Bridge between new sidebar and existing panels
-      document.querySelectorAll('.nav-item[data-panel]').forEach(item => {
-        item.addEventListener('click', function (e) {
-          e.preventDefault();
-          const panelKey = this.dataset.panel;
+      // // Bridge between new sidebar and existing panels
+      // document.querySelectorAll('.nav-item[data-panel]').forEach(item => {
+      //   item.addEventListener('click', function (e) {
+      //     e.preventDefault();
+      //     const panelKey = this.dataset.panel;
 
-          // Close any currently open panel first (slide out)
-          const allPanels = [
-            'finder-panel', 'current-path-panel', 'report-panel',
-            'disruptions-panel', 'route-metrics-panel', 'algorithm-comparison-panel',
-            'developer-view-panel', 'demo-runner-panel', 'demo-creator-panel'
-          ];
-          allPanels.forEach(id => {
-            const p = document.getElementById(id);
-            if (p) p.classList.add('translate-x-full');
-          });
+      //     // Close any currently open panel first (slide out)
+      //     const allPanels = [
+      //       'finder-panel', 'current-path-panel', 'report-panel',
+      //       'disruptions-panel', 'route-metrics-panel', 'algorithm-comparison-panel',
+      //       'developer-view-panel', 'demo-runner-panel', 'demo-creator-panel'
+      //     ];
+      //     allPanels.forEach(id => {
+      //       const p = document.getElementById(id);
+      //       if (p) p.classList.add('translate-x-full');
+      //     });
 
-          // Map panel keys to existing panel functions
-          const panelActions = {
-            'route-finder': () => {
-              // Open admin panel (now Route Finder)
-              const panel = document.getElementById('finder-panel');
-              if (panel) panel.classList.remove('translate-x-full');
-            },
-            'current-route': () => {
-              // Open current-path-panel
-              const panel = document.getElementById('current-path-panel');
-              if (panel) panel.classList.remove('translate-x-full');
-            },
-            'report': () => {
-              // Open report-panel
-              const panel = document.getElementById('report-panel');
-              if (panel) panel.classList.remove('translate-x-full');
-            },
-            'disruptions': () => {
-              const panel = document.getElementById('disruptions-panel');
-              if (panel) panel.classList.remove('translate-x-full');
-            },
-            'metrics': () => {
-              const panel = document.getElementById('route-metrics-panel');
-              if (panel) panel.classList.remove('translate-x-full');
-            },
-            'comparison': () => {
-              const panel = document.getElementById('algorithm-comparison-panel');
-              if (panel) panel.classList.remove('translate-x-full');
-            },
-            'developer': () => {
-              const panel = document.getElementById('developer-view-panel');
-              if (panel) panel.classList.remove('translate-x-full');
-            },
-            'demo-runner': () => {
-              const panel = document.getElementById('demo-runner-panel');
-              if (panel) panel.classList.remove('translate-x-full');
-            },
-            'demo-creator': () => {
-              const panel = document.getElementById('demo-creator-panel');
-              if (panel) panel.classList.remove('translate-x-full');
-            }
-          };
+      //     // Map panel keys to existing panel functions
+      //     const panelActions = {
+      //       'route-finder': () => {
+      //         // Open admin panel (now Route Finder)
+      //         const panel = document.getElementById('finder-panel');
+      //         if (panel) panel.classList.remove('translate-x-full');
+      //       },
+      //       'current-route': () => {
+      //         // Open current-path-panel
+      //         const panel = document.getElementById('current-path-panel');
+      //         if (panel) panel.classList.remove('translate-x-full');
+      //       },
+      //       'report': () => {
+      //         // Open report-panel
+      //         const panel = document.getElementById('report-panel');
+      //         if (panel) panel.classList.remove('translate-x-full');
+      //       },
+      //       'disruptions': () => {
+      //         const panel = document.getElementById('disruptions-panel');
+      //         if (panel) panel.classList.remove('translate-x-full');
+      //       },
+      //       'metrics': () => {
+      //         const panel = document.getElementById('route-metrics-panel');
+      //         if (panel) panel.classList.remove('translate-x-full');
+      //       },
+      //       'comparison': () => {
+      //         const panel = document.getElementById('algorithm-comparison-panel');
+      //         if (panel) panel.classList.remove('translate-x-full');
+      //       },
+      //       'developer': () => {
+      //         const panel = document.getElementById('developer-view-panel');
+      //         if (panel) panel.classList.remove('translate-x-full');
+      //       },
+      //       'demo-runner': () => {
+      //         const panel = document.getElementById('demo-runner-panel');
+      //         if (panel) panel.classList.remove('translate-x-full');
+      //       },
+      //       'demo-creator': () => {
+      //         const panel = document.getElementById('demo-creator-panel');
+      //         if (panel) panel.classList.remove('translate-x-full');
+      //       }
+      //     };
 
-          // Execute panel action
-          if (panelActions[panelKey]) {
-            panelActions[panelKey]();
-          }
+      //     // Execute panel action
+      //     if (panelActions[panelKey]) {
+      //       panelActions[panelKey]();
+      //     }
 
-          // Update active state
-          document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
-          this.classList.add('active');
-        });
-      });
+      //     // Update active state
+      //     document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+      //     this.classList.add('active');
+      //   });
+      // });
 
     });
   </script>

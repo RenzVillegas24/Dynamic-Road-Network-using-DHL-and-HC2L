@@ -87,6 +87,11 @@ const PanelManager = (function() {
     console.log('[PanelManager] Initialized');
   }
 
+  function isDemoRunning() {
+    return (typeof DemoRunner !== 'undefined' && DemoRunner.isRunning) ||
+           (typeof DemoCreator !== 'undefined' && DemoCreator.isRunning);
+  }
+
   /**
    * Set up close and back button handlers
    */
@@ -191,10 +196,13 @@ const PanelManager = (function() {
     }
 
     // Check if demo is running and prevent opening route-finder panel
-    if (panelKey === 'route-finder') {
-      const isDemoRunning = (typeof DemoRunner !== 'undefined' && DemoRunner.isRunning) ||
-                           (typeof DemoCreator !== 'undefined' && DemoCreator.isRunning);
-      if (isDemoRunning) {
+    if ( 
+      panelKey === 'route-finder'||
+      panelKey === 'current-route' ||
+      panelKey === 'comparison' || 
+      panelKey === 'demo-creator'
+    ) {
+      if (isDemoRunning()) {
         // Show modal dialog instead of toast
         showDemoStopModal(panelKey, source);
         return;
@@ -246,7 +254,7 @@ const PanelManager = (function() {
     }
 
     // Update sidebar active state
-    updateSidebarActive(panelKey);
+    // updateSidebarActive(panelKey);
 
     // Track history only if navigating from within a panel
     if (source === 'panel' && activePanel && activePanel !== panelKey) {
@@ -334,18 +342,18 @@ const PanelManager = (function() {
   /**
    * Update sidebar active state
    */
-  function updateSidebarActive(panelKey) {
-    // Remove active from all nav items
-    document.querySelectorAll('.nav-item').forEach(item => {
-      item.classList.remove('active');
-    });
+  // function updateSidebarActive(panelKey) {
+  //   // Remove active from all nav items
+  //   document.querySelectorAll('.nav-item').forEach(item => {
+  //     item.classList.remove('active');
+  //   });
 
-    // Add active to current
-    const navItem = document.querySelector(`[data-panel="${panelKey}"]`);
-    if (navItem) {
-      navItem.classList.add('active');
-    }
-  }
+  //   // Add active to current
+  //   const navItem = document.querySelector(`[data-panel="${panelKey}"]`);
+  //   if (navItem) {
+  //     navItem.classList.add('active');
+  //   }
+  // }
 
   /**
    * Go back to previous panel
