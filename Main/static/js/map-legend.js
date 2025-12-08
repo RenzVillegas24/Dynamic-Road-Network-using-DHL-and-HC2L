@@ -194,7 +194,7 @@ function initLegendWhenReady() {
     
     if (typeof map !== 'undefined' && map) {
         console.log('✅ Map found, creating legend');
-        createMapLegend();
+        // createMapLegend();
     } else {
         console.log('⏳ Map not ready yet, will retry...');
         // Retry after a short delay
@@ -205,7 +205,7 @@ function initLegendWhenReady() {
 // Try immediate initialization
 if (typeof map !== 'undefined' && map) {
     console.log('✅ Map already available, creating legend immediately');
-    createMapLegend();
+    // createMapLegend();
 } else {
     // Wait for DOMContentLoaded
     if (document.readyState === 'loading') {
