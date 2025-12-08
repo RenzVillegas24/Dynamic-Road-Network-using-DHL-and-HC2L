@@ -332,23 +332,49 @@
    RESPONSIVE
    ===================== */
 
-@media (max-width: 1280px) {
-  .header__search {
-    max-width: 40rem;
-    margin: 0 var(--spacing-4);
-  }
-}
 
-@media (max-width: 1024px) {
+
+
+@media (max-width: 1280px) {
   .header {
     padding: var(--spacing-3) var(--spacing-4);
   }
 
-  .header__search {
+  body:has(.split-view__secondary.open) .header__search {
     display: none;
+    opacity: 0;
+    filter: blur(4px);
+    pointer-events: none;
+
+    transition:
+      opacity var(--transition-fast),
+      filter var(--transition-fast),
+      display var(--transition-fast) allow-discrete;
+  }
+
+  /* Showing State (Transition In) */
+  body:not(:has(.split-view__secondary.open)) .header__search {
+    display: flex;
+    opacity: 1;
+    filter: blur(0);
+    pointer-events: auto;
+    ;
+
+    transition:
+      opacity var(--transition-fast),
+      filter var(--transition-fast),
+      display 0s allow-discrete;
   }
 
   .header__title {
     font-size: var(--text-xl);
+  }
+}
+
+
+@media (max-width: 1024px) {
+  body:has(.split-view__secondary.open) .header__search,
+  body:not(:has(.split-view__secondary.open)) .header__search {
+    display: none;
   }
 }

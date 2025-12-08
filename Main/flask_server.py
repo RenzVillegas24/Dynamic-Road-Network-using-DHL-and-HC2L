@@ -615,60 +615,128 @@ def create_demo_disruption_files(demo_id: str, flow_data: list = None, incident_
         flow_rows = selected['flow_rows']
         incident_rows = selected['incident_rows']
     else:
-        # Original mode: snap custom locations to edges
+        # Custom locations mode - check if data already has edge coordinates or needs snapping
         if flow_data:
             for i, flow in enumerate(flow_data):
-                snap = snap_location_to_edge(flow['lat'], flow['lng'])
-                if snap['success']:
-                    jam_factor = flow.get('severity', 0.5) * 10
-                    flow_speed = max(5, 60 - (jam_factor * 5))
+                # Check if data already has full edge coordinates (from config disruption sets)
+                # Handle both source_lon and source_lng formats
+                has_source_lon = 'source_lon' in flow or 'source_lng' in flow
+                has_target_lon = 'target_lon' in flow or 'target_lng' in flow
+                
+                if 'source_lat' in flow and has_source_lon and 'target_lat' in flow and has_target_lon:
+                    # Use existing edge data directly - no snapping needed
+                    source_lon = flow.get('source_lon') or flow.get('source_lng')
+                    target_lon = flow.get('target_lon') or flow.get('target_lng')
                     
                     flow_rows.append({
-                        'id_hash': f'demo_{demo_id}_{i}',
-                        'source_lat': snap['source_lat'],
-                        'source_lon': snap['source_lon'],
-                        'target_lat': snap['target_lat'],
-                        'target_lon': snap['target_lon'],
-                        'source': snap['source'],
-                        'target': snap['target'],
-                        'flow_speed_kph': flow_speed,
-                        'flow_free_flow_kph': 60,
-                        'flow_jam_factor': jam_factor,
-                        'flow_confidence': 0.9,
-                        'flow_traversability': 'open',
-                        'highway_type': snap['highway_type'],
-                        'road_name': snap['road_name']
+                        'id_hash': flow.get('id_hash') or flow.get('edge_id') or f'demo_{demo_id}_{i}',
+                        'source_lat': flow['source_lat'],
+                        'source_lon': source_lon,
+                        'target_lat': flow['target_lat'],
+                        'target_lon': target_lon,
+                        'source': flow.get('source', ''),
+                        'target': flow.get('target', ''),
+                        'flow_speed_kph': flow.get('speed_kph') or flow.get('flow_speed_kph') or flow.get('current_speed', 30),
+                        'flow_free_flow_kph': flow.get('free_flow_kph') or flow.get('flow_free_flow_kph') or flow.get('free_flow_speed', 60),
+                        'flow_jam_factor': flow.get('jam_factor') or flow.get('flow_jam_factor', 5),
+                        'flow_confidence': flow.get('flow_confidence', 0.9),
+                        'flow_traversability': flow.get('flow_traversability', 'open'),
+                        'highway_type': flow.get('highway_type', 'primary'),
+                        'road_name': flow.get('road_name', 'Unknown Road'),
+                        'length': flow.get('length', 0),
+                        'geometry': flow.get('geometry', '')
                     })
+                elif 'lat' in flow and 'lng' in flow:
+                    # Legacy mode: snap single lat/lng to nearest edge
+                    snap = snap_location_to_edge(flow['lat'], flow['lng'])
+                    if snap['success']:
+                        jam_factor = flow.get('severity', 0.5) * 10
+                        flow_speed = max(5, 60 - (jam_factor * 5))
+                        
+                        flow_rows.append({
+                            'id_hash': f'demo_{demo_id}_{i}',
+                            'source_lat': snap['source_lat'],
+                            'source_lon': snap['source_lon'],
+                            'target_lat': snap['target_lat'],
+                            'target_lon': snap['target_lon'],
+                            'source': snap['source'],
+                            'target': snap['target'],
+                            'flow_speed_kph': flow_speed,
+                            'flow_free_flow_kph': 60,
+                            'flow_jam_factor': jam_factor,
+                            'flow_confidence': 0.9,
+                            'flow_traversability': 'open',
+                            'highway_type': snap['highway_type'],
+                            'road_name': snap['road_name']
+                        })
+                else:
+                    console_logger.warning(f"Flow item {i} missing required coordinates (needs source_lat/source_lon/target_lat/target_lon or lat/lng)")
         
         if incident_data:
             for i, incident in enumerate(incident_data):
-                snap = snap_location_to_edge(incident['lat'], incident['lng'])
-                if snap['success']:
-                    severity = incident.get('severity', 0.5)
-                    if severity > 0.7:
-                        criticality = 'critical'
-                    elif severity > 0.4:
-                        criticality = 'major'
-                    else:
-                        criticality = 'minor'
+                # Check if data already has full edge coordinates (from config disruption sets)
+                # Handle both source_lon and source_lng formats
+                has_source_lon = 'source_lon' in incident or 'source_lng' in incident
+                has_target_lon = 'target_lon' in incident or 'target_lng' in incident
+                
+                if 'source_lat' in incident and has_source_lon and 'target_lat' in incident and has_target_lon:
+                    # Use existing edge data directly - no snapping needed
+                    source_lon = incident.get('source_lon') or incident.get('source_lng')
+                    target_lon = incident.get('target_lon') or incident.get('target_lng')
+                    
+                    # Determine criticality
+                    criticality = incident.get('criticality') or incident.get('incident_criticality', 'minor')
+                    road_closed = incident.get('road_closed') or incident.get('incident_road_closed', False)
                     
                     incident_rows.append({
-                        'source': snap['source'],
-                        'target': snap['target'],
-                        'source_lat': snap['source_lat'],
-                        'source_lon': snap['source_lon'],
-                        'target_lat': snap['target_lat'],
-                        'target_lon': snap['target_lon'],
-                        'incident_id': f'demo_{demo_id}_{i}',
-                        'incident_type': incident.get('type', 'construction'),
+                        'source': incident.get('source', ''),
+                        'target': incident.get('target', ''),
+                        'source_lat': incident['source_lat'],
+                        'source_lon': source_lon,
+                        'target_lat': incident['target_lat'],
+                        'target_lon': target_lon,
+                        'incident_id': incident.get('incident_id') or incident.get('edge_id') or f'demo_{demo_id}_{i}',
+                        'incident_type': incident.get('type') or incident.get('incident_type', 'construction'),
                         'incident_criticality': criticality,
-                        'incident_description': incident.get('description', f'Demo incident on {snap["road_name"]}'),
-                        'incident_road_closed': severity > 0.8,
-                        'incident_start_time': datetime.now().isoformat() + 'Z',
-                        'incident_end_time': '',
-                        'highway_type': snap['highway_type'],
-                        'road_name': snap['road_name']
+                        'incident_description': incident.get('description') or incident.get('incident_description', ''),
+                        'incident_road_closed': road_closed,
+                        'incident_start_time': incident.get('incident_start_time') or datetime.now().isoformat() + 'Z',
+                        'incident_end_time': incident.get('incident_end_time', ''),
+                        'highway_type': incident.get('highway_type', 'primary'),
+                        'road_name': incident.get('road_name', 'Unknown Road'),
+                        'length': incident.get('length', 0)
                     })
+                elif 'lat' in incident and 'lng' in incident:
+                    # Legacy mode: snap single lat/lng to nearest edge
+                    snap = snap_location_to_edge(incident['lat'], incident['lng'])
+                    if snap['success']:
+                        severity = incident.get('severity', 0.5)
+                        if severity > 0.7:
+                            criticality = 'critical'
+                        elif severity > 0.4:
+                            criticality = 'major'
+                        else:
+                            criticality = 'minor'
+                        
+                        incident_rows.append({
+                            'source': snap['source'],
+                            'target': snap['target'],
+                            'source_lat': snap['source_lat'],
+                            'source_lon': snap['source_lon'],
+                            'target_lat': snap['target_lat'],
+                            'target_lon': snap['target_lon'],
+                            'incident_id': f'demo_{demo_id}_{i}',
+                            'incident_type': incident.get('type', 'construction'),
+                            'incident_criticality': criticality,
+                            'incident_description': incident.get('description', f'Demo incident on {snap["road_name"]}'),
+                            'incident_road_closed': severity > 0.8,
+                            'incident_start_time': datetime.now().isoformat() + 'Z',
+                            'incident_end_time': '',
+                            'highway_type': snap['highway_type'],
+                            'road_name': snap['road_name']
+                        })
+                else:
+                    console_logger.warning(f"Incident item {i} missing required coordinates (needs source_lat/source_lon/target_lat/target_lon or lat/lng)")
     
     # Write flow CSV
     flow_file = flow_dir / f'flow_{timestamp}.csv'

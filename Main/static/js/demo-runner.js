@@ -16,6 +16,9 @@ const DemoRunner = {
     // Track if current results are saved to server
     currentResultsSavedPath: null,  // Path to saved file, null if not saved
     
+    // Track whether results are from a run (execution summary) or loaded from saved list
+    resultsSource: 'new',  // 'new' (from execution) or 'saved' (from saved results list)
+    
     randomDemoSettings: {
         trials: 1,
         routeCount: 1,
@@ -366,9 +369,17 @@ const DemoRunner = {
             if (el) el.classList.add('hidden');
         });
         
+        ['random-settings', 'running', 'results'].forEach(tab => {
+            const el = document.getElementById(`demo-runner-footer-${tab}`);
+            if (el) el.classList.add('hidden');
+        });
+
         // Show selected tab
         const selectedTab = document.getElementById(`demo-runner-tab-${tabName}`);
         if (selectedTab) selectedTab.classList.remove('hidden');
+        
+        const selectedFooter = document.getElementById(`demo-runner-footer-${tabName}`);
+        if (selectedFooter) selectedFooter.classList.remove('hidden');
         
         // Update tab indicators
         document.querySelectorAll('[data-demo-tab]').forEach(btn => {
@@ -809,6 +820,9 @@ const DemoRunner = {
                 };
                 // Mark as already saved (since we loaded from server)
                 this.currentResultsSavedPath = filePath;
+                // Set source to 'saved' to indicate this is from the saved results list
+                this.resultsSource = 'saved';
+                console.log('📂 Viewing saved result, resultsSource set to "saved"');
                 this.showResultsSummary();
                 this.updateResultsActionButtons();
                 showUpdateToast('Loaded saved result', 'success');
@@ -920,6 +934,62 @@ const DemoRunner = {
     // ==========================================================================
     // DEMO EXECUTION
     // ==========================================================================
+
+    /**
+     * Run an external config (from Demo Creator)
+     * Opens the Demo Runner panel, closes Demo Creator, and starts the demo
+     * @param {Object} config - The demo configuration to run
+     * @param {boolean} isTemporary - If true, config is not persisted (Run Only mode)
+     * @returns {Promise<boolean>} - True if demo started successfully
+     */
+    async runExternalConfig(config, isTemporary = false) {
+        if (this.isRunning) {
+            showUpdateToast('A demo is already running', 'warning');
+            return false;
+        }
+
+        console.log('📥 Receiving external config from Demo Creator:', config.name);
+        console.log('   Temporary:', isTemporary);
+        console.log('   Disruptions:', config.disruptions);
+
+        // Mark config as temporary if needed (won't appear in saved configs list)
+        if (isTemporary) {
+            config.isTemporary = true;
+        }
+
+        // Store the config
+        this.currentDemo = config;
+
+        // Open Demo Runner panel
+        const runnerPanel = document.getElementById('demo-runner-panel');
+        if (runnerPanel) {
+            runnerPanel.classList.remove('translate-x-full');
+        }
+
+        // Close Demo Creator panel
+        const creatorPanel = document.getElementById('demo-creator-panel');
+        if (creatorPanel) {
+            creatorPanel.classList.add('translate-x-full');
+        }
+
+        // Disable admin toggles
+        this.disableAdminToggles();
+
+        // Wait for panel transition
+        await new Promise(resolve => setTimeout(resolve, 150));
+
+        // Show running tab and start the demo
+        this.showTab('running');
+        
+        try {
+            await this.runDemo(config);
+            return true;
+        } catch (error) {
+            console.error('Error running external config:', error);
+            showUpdateToast('Error running demo: ' + error.message, 'error');
+            return false;
+        }
+    },
 
     async runDemo(config) {
         if (this.isRunning) {
@@ -1081,6 +1151,11 @@ const DemoRunner = {
                 if (this.currentDemoId) {
                     await this.cleanupDemoDisruptions(this.currentDemoId);
                 }
+                
+                // Mark this as a new execution result (not loaded from saved results)
+                this.resultsSource = 'new';
+                this.currentResultsSavedPath = null; // Reset saved path on new run
+                console.log('✅ Demo completed, resultsSource set to "new", currentResultsSavedPath=', this.currentResultsSavedPath);
                 
                 // Show results summary after a short delay
                 setTimeout(() => {
@@ -3235,6 +3310,9 @@ const DemoRunner = {
 
         // Switch to results tab in the panel
         this.showTab('results');
+        
+        // Update button visibility based on current source
+        this.updateResultsActionButtons();
     },
 
     // Chart instance storage for cleanup
@@ -3750,20 +3828,111 @@ const DemoRunner = {
     },
 
     /**
+     * Import results from a JSON file selected by user
+     */
+    importResultsFromFile() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        input.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            try {
+                const text = await file.text();
+                const data = JSON.parse(text);
+                
+                if (!data.results || !Array.isArray(data.results)) {
+                    throw new Error('Invalid file format: missing results array');
+                }
+
+                // Load the imported results
+                this.currentProgress.results = data.results;
+                this.currentDemo = {
+                    name: data.demoName || file.name.replace('.json', ''),
+                    id: data.demoId || data.configId || `imported_${Date.now()}`
+                };
+                this.currentResultsSavedPath = null; // Not saved to server yet
+                this.resultsSource = 'new'; // Treat as new results
+                console.log('📥 Results imported, resultsSource set to "new"');
+                
+                this.showResultsSummary();
+                this.updateResultsActionButtons();
+                showUpdateToast('Results imported successfully!', 'success');
+            } catch (error) {
+                console.error('Error importing results:', error);
+                showUpdateToast('Failed to import results: ' + error.message, 'error');
+            }
+        };
+        input.click();
+    },
+
+    /**
      * Update the action buttons (Save/Delete) based on current save state
      */
     updateResultsActionButtons() {
         const saveBtn = document.getElementById('btn-save-to-server');
         const deleteBtn = document.getElementById('btn-delete-from-server');
+        const downloadBtn = document.getElementById('btn-download-json');
         
-        if (this.currentResultsSavedPath) {
-            // Already saved - show Delete button
-            if (saveBtn) saveBtn.classList.add('hidden');
-            if (deleteBtn) deleteBtn.classList.remove('hidden');
-        } else {
-            // Not saved - show Save button
-            if (saveBtn) saveBtn.classList.remove('hidden');
-            if (deleteBtn) deleteBtn.classList.add('hidden');
+        console.log('🔘 updateResultsActionButtons:', {
+            resultsSource: this.resultsSource,
+            isSaved: !!this.currentResultsSavedPath,
+            saveBtnExists: !!saveBtn,
+            deleteBtnExists: !!deleteBtn,
+            downloadBtnExists: !!downloadBtn
+        });
+        
+        // If viewing saved results from the saved results list
+        if (this.resultsSource === 'saved') {
+            console.log('  → Viewing SAVED results: Hide Save, Show Delete+Download');
+            // Show: Delete and Download buttons only
+            if (saveBtn) {
+                saveBtn.classList.add('hidden');
+                saveBtn.style.display = 'none';
+            }
+            if (deleteBtn) {
+                deleteBtn.classList.remove('hidden');
+                deleteBtn.style.display = '';
+            }
+            if (downloadBtn) {
+                downloadBtn.classList.remove('hidden');
+                downloadBtn.style.display = '';
+            }
+        }
+        // If viewing execution summary from a recent run
+        else if (this.resultsSource === 'new') {
+            if (this.currentResultsSavedPath) {
+                console.log('  → New execution, ALREADY SAVED: Hide Save, Show Delete+Download');
+                // Already saved - show Delete and Download buttons
+                if (saveBtn) {
+                    saveBtn.classList.add('hidden');
+                    saveBtn.style.display = 'none';
+                }
+                if (deleteBtn) {
+                    deleteBtn.classList.remove('hidden');
+                    deleteBtn.style.display = '';
+                }
+                if (downloadBtn) {
+                    downloadBtn.classList.remove('hidden');
+                    downloadBtn.style.display = '';
+                }
+            } else {
+                console.log('  → New execution, NOT SAVED: Show Save+Download, Hide Delete');
+                // Not saved yet - show Save and Download buttons
+                if (saveBtn) {
+                    saveBtn.classList.remove('hidden');
+                    saveBtn.style.display = '';
+                }
+                if (deleteBtn) {
+                    deleteBtn.classList.add('hidden');
+                    deleteBtn.style.display = 'none';
+                }
+                if (downloadBtn) {
+                    downloadBtn.classList.remove('hidden');
+                    downloadBtn.style.display = '';
+                }
+            }
         }
     },
 

@@ -1067,6 +1067,54 @@ const DemoCreator = {
         console.log('🔄 Demo Creator V2 reset');
     },
 
+    /**
+     * Reset Demo Creator state for handoff to Demo Runner
+     * Does NOT clear markers or show confirmation (that's done before calling this)
+     * Just resets state and goes to step 1
+     */
+    resetForHandoff() {
+        // Reset mode
+        this.mode = 'create';
+        this.editingConfigId = null;
+        
+        // Go back to step 1
+        this.goToStep(1);
+        
+        // Reset state but keep the panel structure
+        this.routes = [];
+        this.currentRouteIndex = -1;
+        this.disruptions = {
+            mode: 'random-both',
+            generationScope: 'per-trial-route',
+            randomFlowCount: 1500,
+            randomIncidentCount: 5,
+            severityMin: 0.1,
+            severityMax: 0.7,
+            customItems: [],
+            disruptionSets: {}
+        };
+        this.sequence = {
+            algorithm: 'both',
+            tauMode: 'random',
+            tauFixed: 0.5,
+            tauSequence: [],
+            tauRandomMin: 0.1,
+            tauRandomMax: 0.9,
+            tauGenerationScope: 'per-trial-route',
+            stepDelay: 2000,
+            showMetrics: true,
+            trials: 1
+        };
+        
+        // Clear UI elements
+        this.renderRoutesList();
+        
+        // Update panel title
+        try { this.updatePanelTitle(); } catch (e) { /* ignore */ }
+        
+        console.log('🔄 Demo Creator reset for handoff to Demo Runner');
+    },
+
     clearAllRouteMarkers() {
         this.routeMarkers.forEach(marker => {
             if (map && marker) {
@@ -3252,19 +3300,7 @@ const DemoCreator = {
     async saveForLater() {
         const saveBtn = document.getElementById('demo-v2-save-btn');
         const originalContent = saveBtn?.innerHTML;
-        
-        // Show loading state
-        if (saveBtn) {
-            saveBtn.disabled = true;
-            saveBtn.innerHTML = `
-                <svg class="animate-spin h-5 w-5 mr-2 inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Saving...
-            `;
-        }
-        
+
         try {
             // Build config using helper function
             const config = this.buildDemoConfig();
@@ -3298,35 +3334,31 @@ const DemoCreator = {
     },
 
     /**
-     * Run the demo without saving
+     * Run the demo without saving (temporary config)
      */
     async runOnly() {
         const runBtn = document.getElementById('demo-v2-run-btn');
         const originalContent = runBtn?.innerHTML;
         
-        // Show loading state
-        if (runBtn) {
-            runBtn.disabled = true;
-            runBtn.innerHTML = `
-                <svg class="animate-spin h-5 w-5 mr-2 inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Starting...
-            `;
-        }
-        
         try {
-            // Build config using helper function
-            const config = this.buildDemoConfig(`Demo Run - ${new Date().toLocaleString()}`);
+            // Build config with temporary name
+            const config = this.buildDemoConfig(`Temp Demo - ${new Date().toLocaleString()}`);
             
-            // Run demo with detailed progress in this panel
-            await this.runDemoWithProgress(config);
+            // Clear visual markers before handoff
+            this.clearPreviewMarkers();
+            this.clearAllRouteMarkers();
+            this.clearAllDisruptionMarkers();
+            
+            // Reset Demo Creator state
+            this.resetForHandoff();
+            
+            // Delegate execution to Demo Runner (temporary config)
+            await DemoRunner.runExternalConfig(config, true);
+            
         } catch (error) {
             console.error('Error running demo:', error);
             showUpdateToast('Error running demo: ' + error.message, 'error');
-        } finally {
-            // Restore button state
+            // Restore button state on error
             if (runBtn) {
                 runBtn.disabled = false;
                 runBtn.innerHTML = originalContent;
@@ -3346,7 +3378,7 @@ const DemoCreator = {
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                Preparing...
+                Saving...
             `;
         }
         
@@ -3354,7 +3386,7 @@ const DemoCreator = {
             // Build config using helper function
             const config = this.buildDemoConfig();
             
-            // Save the configuration
+            // Save the configuration first
             if (this.editingConfigId) {
                 config.id = this.editingConfigId;
                 await DemoRunner.updateConfig(config);
@@ -3364,13 +3396,21 @@ const DemoCreator = {
                 showUpdateToast('Demo configuration saved!', 'success');
             }
             
-            // Run demo with detailed progress in this panel
-            await this.runDemoWithProgress(config);
+            // Clear visual markers before handoff
+            this.clearPreviewMarkers();
+            this.clearAllRouteMarkers();
+            this.clearAllDisruptionMarkers();
+            
+            // Reset Demo Creator state
+            this.resetForHandoff();
+            
+            // Delegate execution to Demo Runner (saved config, not temporary)
+            await DemoRunner.runExternalConfig(config, false);
+            
         } catch (error) {
-            console.error('Error running demo:', error);
-            showUpdateToast('Error running demo: ' + error.message, 'error');
-        } finally {
-            // Restore button state
+            console.error('Error saving/running demo:', error);
+            showUpdateToast('Error: ' + error.message, 'error');
+            // Restore button state on error
             if (runBtn) {
                 runBtn.disabled = false;
                 runBtn.innerHTML = originalContent;

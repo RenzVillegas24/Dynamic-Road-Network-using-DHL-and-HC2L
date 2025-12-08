@@ -1,5 +1,5 @@
 <!-- Admin Panel -->
-<div id="finder-panel" class="panel panel--md">
+<div id="finder-panel" class="panel">
 
   <div class="panel__header panel__header--dark">
     <div class="panel__icon">
@@ -24,6 +24,35 @@
         <h3 class="section-card__title">System Controls</h3>
       </div>
       <div class="grid grid-cols-2 gap-3">
+
+        <!-- Start Location -->
+        <!-- <div class="search-combobox col-span-2" id="start-location-search">
+          <div class="search-combobox__wrapper">
+            <input type="text" id="start-location-input" class="search-combobox__input"
+              placeholder="Search start location..." autocomplete="off">
+            <button class="search-combobox__pin-btn search-combobox__pin-btn--success" id="start-location-pin-btn"
+              title="Pin on map">
+              <i data-lucide="map-pin"></i>
+            </button>
+          </div>
+          <div class="search-combobox__dropdown" id="start-location-dropdown"></div>
+        </div> -->
+
+
+        <!-- Destination Location -->
+        <!-- <div class="search-combobox col-span-2" id="dest-location-search">
+          <div class="search-combobox__wrapper">
+            <input type="text" id="dest-location-input" class="search-combobox__input"
+              placeholder="Search destination..." autocomplete="off">
+            <button class="search-combobox__pin-btn search-combobox__pin-btn--danger" id="dest-location-pin-btn"
+              title="Pin on map">
+              <i data-lucide="map-pin"></i>
+            </button>
+          </div>
+          <div class="search-combobox__dropdown" id="dest-location-dropdown"></div>
+        </div> -->
+
+
         <button id="admin-start-btn" class="btn btn--success btn--block col-span-2">
           <i data-lucide="play" class="w-5 h-5"></i>
           Route
@@ -105,7 +134,8 @@
         </div>
         <h3 class="section-card__title">Update Interval</h3>
       </div>
-      <p class="text-sm text-muted mb-3">Control how often the auto-disruption service polls HERE traffic (1-30 minutes).</p>
+      <p class="text-sm text-muted mb-3">Control how often the auto-disruption service polls HERE traffic (1-30
+        minutes).</p>
       <div class="flex items-center gap-4">
         <input id="auto-update-interval-slider" type="range" min="1" max="30" value="2" class="form-range flex-1">
         <div class="stat-box stat-box--purple">
@@ -132,12 +162,14 @@
           <i data-lucide="zap" class="w-5 h-5"></i>
         </div>
         <div class="alert-card__content">
-          <div class="alert-card__description">LazyHC2L Feature: Threshold controls when to update labels. DHL does not use lazy updates.</div>
+          <div class="alert-card__description">LazyHC2L Feature: Threshold controls when to update labels. DHL does not
+            use lazy updates.</div>
         </div>
       </div>
       <div class="form-group mb-4">
         <label class="form-group__label">Enter Threshold Value</label>
-        <input type="number" id="threshold-input" min="0" max="1" step="0.01" value="0.5" class="form-input form-input--lg" placeholder="0.00 - 1.00">
+        <input type="number" id="threshold-input" min="0" max="1" step="0.01" value="0.5"
+          class="form-input form-input--lg" placeholder="0.00 - 1.00">
       </div>
       <div class="form-group mb-4">
         <label class="form-group__label">Quick Select</label>
@@ -180,7 +212,7 @@
           <span class="form-switch__slider"></span>
           <div>
             <span class="form-switch__label">Show Active Incidents</span>
-            <p class="text-xs text-muted">Accidents, closures, hazards (excludes flow)</p>
+            <p class="text-xs text-muted">Accidents, closures, hazards<br>(excludes flow)</p>
           </div>
         </label>
         <label class="form-switch">
@@ -196,7 +228,7 @@
           <span class="form-switch__slider"></span>
           <div>
             <span class="form-switch__label">Show Alternative Routes</span>
-            <p class="text-xs text-muted">Display alternative routes on map (transparent overlay)</p>
+            <p class="text-xs text-muted">Display alternative routes on map<br>(transparent overlay)</p>
           </div>
         </label>
       </div>

@@ -16,7 +16,7 @@
   flex-direction: column;
   position: relative;
   z-index: var(--z-sidebar);
-  transition: width var(--transition-normal);
+  transition: width var(--transition-fast);
   overflow: hidden;
 }
 
@@ -213,13 +213,17 @@
    ===================== */
 
 @media (max-width: 1024px) {
-  .sidebar {
+  /* .sidebar {
     position: fixed;
     left: 0;
     top: 0;
     height: 100vh;
     transform: translateX(-100%);
     box-shadow: var(--shadow-2xl);
+  } */
+
+  .sidebar--collapsed {
+    width: 0;
   }
 
   .sidebar.open {

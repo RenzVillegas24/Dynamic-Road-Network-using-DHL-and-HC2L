@@ -31,6 +31,10 @@
 .panel.hidden {
   display: none;
 }
+.hidden.panel__footer {
+  display: none;
+}
+
 
 /* =====================
    SPLIT VIEW SECONDARY CONTAINER
@@ -613,7 +617,6 @@
   .panel.visible,
   .split-view__secondary.open {
     width: 100%;
-    max-width: var(--panel-width-lg);
   }
 }
 
