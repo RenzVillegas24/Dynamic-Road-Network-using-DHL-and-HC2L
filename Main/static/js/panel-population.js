@@ -1225,7 +1225,7 @@ window.highlightAlternativeRoute = function(routeIndex, altRoute) {
     }).openPopup();
   }
   
-  showUpdateToast(`✅ Highlighted alternative route ${routeIndex + 1}`, 'success');
+  showUpdateToast(`Highlighted alternative route ${routeIndex + 1}`, 'success');
 };
 
 /**
@@ -1272,7 +1272,7 @@ window.resetAlternativeRoutesDisplay = function() {
   console.log('CARD STYLING: Removing all highlights');
   updateAlternativeRouteCardStyling();
   
-  showUpdateToast('✅ Best route visible', 'success');
+  showUpdateToast('Best route visible', 'success');
 };
 
 /**

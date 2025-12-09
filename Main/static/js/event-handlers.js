@@ -235,12 +235,6 @@ function initializeEventHandlers() {
             destLng: routeData.input.dest_snap_lng
           });
 
-          // 🧹 Clear previous Google Maps comparison when new route is calculated
-          if (typeof clearGoogleMapsComparison === 'function') {
-            clearGoogleMapsComparison();
-            console.log('✅ Google Maps comparison cleared for new route');
-          }
-
           // Enable "Compare with Google Maps" button after route is calculated
           const googleCompareBtn = document.getElementById('admin-google-compare-btn');
           if (googleCompareBtn) {
@@ -295,42 +289,6 @@ function initializeEventHandlers() {
     adminStartBtn.onclick = async () => {
       // Trigger the go button functionality
       document.getElementById("go-button")?.click();
-    };
-  }
-
-  const currentPathClose = document.getElementById("current-path-close");
-  if (currentPathClose) {
-    currentPathClose.onclick = () => {
-      closeCurrentPathPanel();
-      
-      // Reset snap points visualization
-      if (window.startSnapMarker) {
-        map.removeLayer(window.startSnapMarker);
-        window.startSnapMarker = null;
-      }
-      if (window.destSnapMarker) {
-        map.removeLayer(window.destSnapMarker);
-        window.destSnapMarker = null;
-      }
-      if (window.startSnapLine) {
-        map.removeLayer(window.startSnapLine);
-        window.startSnapLine = null;
-      }
-      if (window.destSnapLine) {
-        map.removeLayer(window.destSnapLine);
-        window.destSnapLine = null;
-      }
-
-      // Clear stored snap data
-      window.startOsmEdge = null;
-      window.destOsmEdge = null;
-
-      // Clear Google Maps comparison
-      if (typeof clearGoogleMapsComparison === 'function') {
-        clearGoogleMapsComparison();
-      }
-
-      console.log('✅ Route and snap points cleared, map resized');
     };
   }
 
@@ -663,7 +621,7 @@ function initializeEventHandlers() {
 
         if (data.success) {
           // Success: incident saved
-          showUpdateToast(`✅ Incident saved: ${data.road_name} (${data.incident_type})`, 'success');
+          showUpdateToast(`Incident saved: ${data.road_name} (${data.incident_type})`, 'success');
 
           // Reset form
           document.getElementById('report-form').reset();

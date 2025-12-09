@@ -399,45 +399,5 @@ window.displayGoogleMapsRoute = displayGoogleMapsRoute;
 window.clearGoogleMapsRoute = clearGoogleMapsRoute;
 window.autoCompareWithGoogleMaps = autoCompareWithGoogleMaps;
 
-/**
- * Clear Google Maps comparison (remove visualization and hide metrics)
- */
-function clearGoogleMapsComparison() {
-    console.log('🧹 Clearing Google Maps comparison...');
-    
-    try {
-        // Remove Google Maps route layer from map
-        clearGoogleMapsRoute();
-        
-        // Show the compare button again
-        const compareButtonContainer = document.getElementById('current-path-google-compare-btn-container');
-        if (compareButtonContainer) {
-            compareButtonContainer.style.display = 'block';
-        }
-        
-        // Hide metrics container
-        const metricsContainer = document.getElementById('google-maps-metrics-container');
-        if (metricsContainer) {
-            metricsContainer.style.display = 'none';
-        }
-        
-        // Reset metric values
-        const frechetValue = document.getElementById('frechet-distance-value');
-        if (frechetValue) frechetValue.textContent = '-- m';
-        
-        const overlapValue = document.getElementById('segment-overlap-value');
-        if (overlapValue) overlapValue.textContent = '--%';
-        
-        const statusValue = document.getElementById('frechet-status-value');
-        if (statusValue) statusValue.textContent = '--';
-        
-        showUpdateToast('Google Maps comparison cleared', 'info');
-        console.log('✅ Google Maps comparison cleared');
-    } catch (error) {
-        console.error('❌ Error clearing comparison:', error);
-    }
-}
-
-window.clearGoogleMapsComparison = clearGoogleMapsComparison;
 
 console.log('✅ Google Maps comparison module loaded');

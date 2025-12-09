@@ -121,7 +121,7 @@ function checkDisruptionUpdates() {
           currentDisruptionHash = data.hash;
           
           // Show notification
-          showUpdateToast('🔄 Disruptions updated - Recalculating route...', 'info');
+          showUpdateToast('Disruptions updated - Recalculating route...', 'info');
           
           // Trigger route recalculation
           triggerRouteRecalculation();

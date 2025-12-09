@@ -8,7 +8,7 @@
       <h2 id="current-path-title" class="panel__title">Current Path</h2>
       <p class="panel__subtitle">Optimized route details</p>
     </div>
-    <button id="current-path-close" class="panel__close">
+    <button class="panel__close">
       <i data-lucide="x" class="w-5 h-5"></i>
     </button>
   </div>
@@ -31,7 +31,7 @@
     </div>
 
     <!-- Algorithm Metrics Section (Clickable) -->
-    <div onclick="openRouteMetricsPanel()" class="alert-card alert-card--primary mb-4">
+    <div class="alert-card alert-card--primary mb-4" data-panel="metrics">
       <div class="alert-card__icon">
         <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
       </div>
@@ -45,19 +45,17 @@
     </div>
 
     <!-- Enhanced Disruption Alert -->
-    <div id="disruption-alert-container" class="hidden mb-4">
-      <div onclick="openDisruptionsPanel()" class="alert-card alert-card--error">
-        <div class="alert-card__icon">
-          <i data-lucide="alert-triangle" class="w-5 h-5"></i>
-        </div>
-        <div class="alert-card__content">
-          <div class="alert-card__title" id="disruption-alert-title">Disruptions Detected</div>
-          <div class="alert-card__description" id="disruption-alert-summary">Loading...</div>
-          <div class="alert-card__meta" id="disruption-alert-impact">Time Impact: --</div>
-        </div>
-        <div class="alert-card__arrow">
-          <i data-lucide="chevron-right" class="w-4 h-4"></i>
-        </div>
+    <div id="disruption-alert-container" class="hidden mb-4 alert-card alert-card--error" data-panel="disruptions">
+      <div class="alert-card__icon">
+        <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+      </div>
+      <div class="alert-card__content">
+        <div class="alert-card__title" id="disruption-alert-title">Disruptions Detected</div>
+        <div class="alert-card__description" id="disruption-alert-summary">Loading...</div>
+        <div class="alert-card__meta" id="disruption-alert-impact">Time Impact: --</div>
+      </div>
+      <div class="alert-card__arrow">
+        <i data-lucide="chevron-right" class="w-4 h-4"></i>
       </div>
     </div>
 
@@ -79,7 +77,7 @@
   <div class="panel__footer flex-column gap-3">
     <!-- Primary Compare Button -->
     <div id="current-path-google-compare-btn-container" class="w-full">
-      <button id="current-path-google-compare-btn" onclick="openComparisonPanel()"
+      <button id="current-path-google-compare-btn" data-action="comparison"
         class="btn btn--primary btn--block gap-3">
         <div class="btn--icon bg-white/10 p-2 rounded-xl">
           <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
@@ -88,29 +86,6 @@
           <div class="text-sm">Compare Route Algorithms</div>
           <div class="text-xs opacity-80 font-medium">DHL, HC2L, and Google Maps</div>
         </div>
-      </button>
-    </div>
-
-    <!-- Collapsible Google Metrics -->
-    <div id="google-maps-metrics-container" class="card card--flat p-3 hidden w-full">
-      <h3 class="text-xs font-bold text-muted uppercase tracking-wide mb-2"><i data-lucide="bar-chart-3" class="w-4 h-4 inline"></i> Route Accuracy vs Google Maps</h3>
-      <div class="space-y-2">
-        <div class="metric-row">
-          <span class="metric-row__label">Fréchet Distance:</span>
-          <span id="frechet-distance-value" class="metric-row__value text-primary">-- m</span>
-        </div>
-        <div class="metric-row">
-          <span class="metric-row__label">Segment Overlap:</span>
-          <span id="segment-overlap-value" class="metric-row__value text-success">--%</span>
-        </div>
-        <div class="metric-row">
-          <span class="metric-row__label">Status:</span>
-          <span id="frechet-status-value" class="metric-row__value text-success">--</span>
-        </div>
-      </div>
-      <button id="clear-google-comparison-btn" onclick="clearGoogleMapsComparison()"
-        class="btn btn--danger btn--sm btn--block mt-3">
-        Clear Comparison
       </button>
     </div>
   </div>

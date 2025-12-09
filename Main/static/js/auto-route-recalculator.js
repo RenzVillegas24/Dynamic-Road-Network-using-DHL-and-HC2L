@@ -27,6 +27,7 @@ async function triggerAutoRouteRecalculation() {
 
   try {
     console.log('[AutoRouteRecalculator] Triggering automatic route recalculation...');
+    showUpdateToast('🔄 Recalculating route with updated disruptions...', 'info');
     
     // Get stored route data
     const routeData = window.currentRouteData;
@@ -63,38 +64,66 @@ async function triggerAutoRouteRecalculation() {
       generateAlternatives = showAltRoutesToggle.checked;
     }
     
-    // Prepare request body matching the route computation API
+    // Get start and destination coordinates from snapped_point
+    const startLat = startSnap.snapped_point?.lat || window.startLocation?.lat;
+    const startLng = startSnap.snapped_point?.lng || window.startLocation?.lng;
+    const destLat = destSnap.snapped_point?.lat || window.destLocation?.lat;
+    const destLng = destSnap.snapped_point?.lng || window.destLocation?.lng;
+    
+    // Build OSM edge data - pass the entire snap data object as the backend expects
+    // The backend will extract what it needs from snapped_point and osm_nodes
+    const startOsmEdge = {
+      snapped_point: startSnap.snapped_point,
+      osm_nodes: startSnap.osm_nodes,
+      routing_nodes: startSnap.routing_nodes,
+      snap_position: startSnap.snap_position,
+      road_name: startSnap.road_name,
+      highway_type: startSnap.highway_type,
+      oneway: startSnap.oneway,
+      distance_m: startSnap.distance_m,
+      method: startSnap.method
+    };
+    
+    const destOsmEdge = {
+      snapped_point: destSnap.snapped_point,
+      osm_nodes: destSnap.osm_nodes,
+      routing_nodes: destSnap.routing_nodes,
+      snap_position: destSnap.snap_position,
+      road_name: destSnap.road_name,
+      highway_type: destSnap.highway_type,
+      oneway: destSnap.oneway,
+      distance_m: destSnap.distance_m,
+      method: destSnap.method
+    };
+    
+    // Prepare request body matching the existing compute route API format
     const requestBody = {
-      start_lat: startSnap.latitude || window.startLocation?.lat,
-      start_lng: startSnap.longitude || window.startLocation?.lng,
-      dest_lat: destSnap.latitude || window.destLocation?.lat,
-      dest_lng: destSnap.longitude || window.destLocation?.lng,
-      algorithm: algorithm,
+      start_lat: startLat,
+      start_lng: startLng,
+      dest_lat: destLat,
+      dest_lng: destLng,
       use_disruptions: useDisruptions,
       dataset_mode: datasetMode,
       tau_threshold: threshold,
       generate_alternatives: generateAlternatives,
-      // Add OSM edge data for routing
-      start_osm_edge: {
-        routing_nodes: startSnap.routing_nodes,
-        osm_nodes: startSnap.osm_nodes,
-        snap_position: startSnap.snap_position,
-        road_name: startSnap.road_name,
-        oneway: startSnap.oneway
-      },
-      dest_osm_edge: {
-        routing_nodes: destSnap.routing_nodes,
-        osm_nodes: destSnap.osm_nodes,
-        snap_position: destSnap.snap_position,
-        road_name: destSnap.road_name,
-        oneway: destSnap.oneway
-      }
+      start_osm_edge: startOsmEdge,
+      dest_osm_edge: destOsmEdge
     };
     
+    console.log('[AutoRouteRecalculator] Algorithm:', algorithm);
     console.log('[AutoRouteRecalculator] Request body:', requestBody);
     
+    // Clear previous routes before recalculating
+    if (typeof clearRoutes === 'function') {
+      clearRoutes();
+    }
+    
+    // Determine endpoint based on algorithm
+    const endpoint = algorithm === 'dhl' ? '/compute_dhl_route' : '/compute_dhc2l_route';
+    console.log('[AutoRouteRecalculator] Calling endpoint:', endpoint);
+    
     // Call backend endpoint
-    const response = await fetch('/trigger_route_recalculation', {
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(requestBody)
@@ -103,7 +132,7 @@ async function triggerAutoRouteRecalculation() {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('[AutoRouteRecalculator] HTTP error:', response.status, errorText);
-      showUpdateToast(`⚠️ Auto route update failed: HTTP ${response.status}`, 'warning');
+      showUpdateToast(`Auto route update failed: HTTP ${response.status}`, 'warning');
       return;
     }
     
@@ -111,7 +140,7 @@ async function triggerAutoRouteRecalculation() {
     
     if (!newRouteData.success) {
       console.error('[AutoRouteRecalculator] Backend error:', newRouteData.error);
-      showUpdateToast(`⚠️ Auto route update failed: ${newRouteData.error}`, 'warning');
+      showUpdateToast(`Auto route update failed: ${newRouteData.error}`, 'warning');
       return;
     }
     
@@ -140,11 +169,11 @@ async function triggerAutoRouteRecalculation() {
       updateCurrentPathPanel(newRouteData);
     }
     
-    showUpdateToast('✅ Route updated with latest disruptions', 'success');
+    showUpdateToast('Route updated with latest disruptions', 'success');
     
   } catch (error) {
     console.error('[AutoRouteRecalculator] Error:', error);
-    showUpdateToast(`⚠️ Error updating route: ${error.message}`, 'warning');
+    showUpdateToast(`Error updating route: ${error.message}`, 'error');
   }
 }
 

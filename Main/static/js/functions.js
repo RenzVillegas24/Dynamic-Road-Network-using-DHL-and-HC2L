@@ -1560,7 +1560,7 @@ function switchToAlternativeRoute(routeIndex) {
         return;
     }
 
-    showUpdateToast(`✅ Switched to Route ${routeIndex + 1}`, 'success');
+    showUpdateToast(`Switched to Route ${routeIndex + 1}`, 'success');
     console.log('Alternative route data:', altRouteData);
     
     // You could implement additional logic here to:
@@ -1602,27 +1602,6 @@ function resetCurrentPathPanel() {
     
     console.log('Current Path Panel reset to placeholder state');
 }
-
-function closeCurrentPathPanel({ resetPanelContent = true } = {}) {
-    if (!currentPathPanel) return;
-
-    currentPathPanel.classList.add('translate-x-full');
-
-    if (resetPanelContent) {
-      resetCurrentPathPanel();
-    }
-
-    if (mapContainer) {
-      mapContainer.style.marginRight = '0';
-    }
-
-    if (map) {
-      setTimeout(() => map.invalidateSize(), 350);
-    }
-}
-
-window.closeCurrentPathPanel = closeCurrentPathPanel;
-
 
 function highlightDisruptedSegments(disruptedSegments) {
     if (!map) return;

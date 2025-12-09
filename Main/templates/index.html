@@ -145,7 +145,7 @@
   <script src="{{ url_for('static', filename='js/location-combobox.js') }}"></script>
   <script src="{{ url_for('static', filename='js/auto-route-updater.js') }}"></script>
   <script src="{{ url_for('static', filename='js/auto-route-recalculator.js') }}"></script>
-  <!-- Disruption updater removed - route recalculation triggered by backend on incident add/remove -->
+  <script src="{{ url_for('static', filename='js/disruption-updater.js') }}"></script>
   <script src="{{ url_for('static', filename='js/google-maps-comparison.js') }}"></script>
   <script src="{{ url_for('static', filename='js/algorithm-comparison.js') }}"></script>
   <script src="{{ url_for('static', filename='js/update-regions.js') }}"></script>
@@ -1908,6 +1908,17 @@
         });
       }
 
+      // Expose handlers globally for disruption-updater.js to use
+      window.handleActiveIncidentsToggle = handleActiveIncidentsToggle;
+      window.handleTrafficOverlayToggle = handleTrafficOverlayToggle;
+      
+      // Function to clear cached incident payload (used when disruptions update)
+      window.clearCachedIncidentPayload = function() {
+        cachedIncidentPayload = null;
+        incidentFetchPromise = null;
+        console.log('[DisruptionCache] Cached incident payload cleared');
+      };
+
       if (trafficRouteOnly) {
         trafficRouteOnly.addEventListener('change', (e) => {
           localStorage.setItem('trafficRouteOnly', e.target.checked ? 'true' : 'false');
@@ -1982,12 +1993,12 @@
 
             // Show status message
             if (loadData.action === 'fetched') {
-              showUpdateToast('✅ Fresh disruptions loaded (was empty)', 'success');
+              showUpdateToast('Fresh disruptions loaded (was empty)', 'success');
             } else if (loadData.action === 'refreshed') {
-              showUpdateToast('✅ Disruptions refreshed (update interval expired)', 'info');
+              showUpdateToast('Disruptions refreshed (update interval expired)', 'info');
             } else if (loadData.action === 'cached') {
               showUpdateToast(
-                `📦 Using cached disruptions (${Math.ceil(loadData.time_until_next_fetch)}s until next update)`,
+                `Using cached disruptions (${Math.ceil(loadData.time_until_next_fetch)}s until next update)`,
                 'info'
               );
             }

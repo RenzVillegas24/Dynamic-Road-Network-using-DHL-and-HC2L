@@ -417,6 +417,16 @@ function clearTrafficOverlay() {
 }
 
 /**
+ * Clear cached traffic segments (forces fresh fetch on next load)
+ * Call this when disruptions are updated
+ */
+function clearTrafficCache() {
+  trafficVisualization.cachedSegments = null;
+  trafficVisualization.segmentsPromise = null;
+  console.log('[TrafficVisualization] Traffic cache cleared - will fetch fresh data on next load');
+}
+
+/**
  * Update current route for route-only traffic filtering
  * @param {Array} routePath - Array of node IDs representing the route
  */
@@ -452,5 +462,6 @@ window.loadActiveIncidents = loadActiveIncidents;
 window.clearActiveIncidents = clearActiveIncidents;
 window.applyTrafficOverlay = applyTrafficOverlay;
 window.clearTrafficOverlay = clearTrafficOverlay;
+window.clearTrafficCache = clearTrafficCache;
 window.hideTrafficOverlayLayer = hideTrafficOverlayLayer;
 window.updateCurrentRoute = updateCurrentRoute;

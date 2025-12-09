@@ -1041,15 +1041,17 @@ const DemoRunner = {
         
         console.log('🎬 Starting demo:', config.name);
         if (hasConfigDisruptions) {
-            console.log(`� Using ${Object.keys(configDisruptionSets).length} saved disruption sets from config`);
+            console.log(`📊 Using ${Object.keys(configDisruptionSets).length} saved disruption sets from config`);
         }
-        showUpdateToast(`🎬 Starting: ${config.name}`, 'info');
+        showUpdateToast(`Starting: ${config.name}`, 'info');
         
         this.showTab('running');
+        this.showLoadingAnimation('Initializing demo setup...');
         this.updateDetailedProgressUI();
 
         try {
             // Reset map
+            this.showLoadingAnimation('Resetting map...');
             await this.resetMap();
             
             // Get disruption config - use new format paths with fallbacks
@@ -1063,6 +1065,7 @@ const DemoRunner = {
             
             if (hasConfigDisruptions) {
                 // Use saved disruption sets from config - load from CSV files
+                this.showLoadingAnimation('Loading disruption sets...');
                 console.log(`📂 Loading ${Object.keys(configDisruptionSets).length} saved disruption sets (key: ${disruptionKey})`);
                 for (const [setKey, setData] of Object.entries(configDisruptionSets)) {
                     await this.activateConfigDisruptionSet(setKey, setData, this.currentDemoId, disruptionKey);
@@ -1081,6 +1084,9 @@ const DemoRunner = {
                 }
                 // For per-trial and per-trial-route, generate on-the-fly in the loop
             }
+            
+            // Setup complete - hide loading animation
+            this.hideLoadingAnimation();
             
             // Run for each trial
             for (let trial = 0; trial < trials; trial++) {
@@ -1140,7 +1146,7 @@ const DemoRunner = {
             if (this.isRunning) {
                 this.currentProgress.status = '✅ Demo completed!';
                 this.updateDetailedProgressUI();
-                showUpdateToast('✅ Demo completed!', 'success');
+                showUpdateToast('Demo completed!', 'success');
                 
                 // Clear routes from map
                 if (typeof clearRoutes === 'function') {
@@ -1403,7 +1409,7 @@ const DemoRunner = {
             console.log(`   Incidents: ${this.generatedDisruptions.incidents.length}, Flow: ${this.generatedDisruptions.flowSegments.length}`);
             
             this.currentPreviewSet = setKey;
-            this.refreshDisruptionDisplay();  // Respect checkbox states
+            await this.refreshDisruptionDisplay();  // Respect checkbox states
             this.showDisruptionSetsPreview();
         } else {
             console.warn(`⚠️ Disruption set not found for key: ${setKey}`);
@@ -1472,7 +1478,7 @@ const DemoRunner = {
             this.currentPreviewSet = setKey;
             
             // Update map visualization respecting checkbox states
-            this.refreshDisruptionDisplay();
+            await this.refreshDisruptionDisplay();
             
             // Update the disruption preview panel
             this.showDisruptionSetsPreview();
@@ -1535,21 +1541,17 @@ const DemoRunner = {
         const algorithmToTest = config.algorithm || 'hc2l';
         const algorithms = algorithmToTest === 'both' ? ['hc2l', 'dhl'] : [algorithmToTest];
 
-        // Set disruption mode
-        const disruption = config.disruptions?.mode || config.disruptionMode || 'none';
-        let datasetValue = 'none';
-        if (disruption.includes('flow') || disruption === 'random-both' || disruption === 'both') {
-            datasetValue = 'both';
-        } else if (disruption.includes('incident')) {
-            datasetValue = 'incidents';
-        }
-        
-        const disruptionRadio = document.querySelector(`input[name="dataset"][value="${datasetValue}"]`);
-        if (disruptionRadio) {
-            disruptionRadio.click();
-        }
+        // Note: Disruptions are handled separately via activateDisruptionSet/activateDisruptionSetByKey
+        // No need to set dataset radio here - disruptions are displayed via showGeneratedDisruptions
 
-        await this.delay(500);
+        await this.delay(300);
+        
+        // Ensure disruptions are displayed on the map
+        console.log('📍 About to refresh disruption display in processRouteWithProgress');
+        console.log('   generatedDisruptions:', this.generatedDisruptions);
+        console.log('   demoDisruptionLayers:', this.demoDisruptionLayers);
+        await this.refreshDisruptionDisplay();
+        console.log('   After refresh - demoDisruptionLayers:', this.demoDisruptionLayers);
 
         // Determine TAU values to test based on scope
         const tauScope = config.tau?.scope || config.sequence?.tauGenerationScope || 'all';
@@ -1957,6 +1959,33 @@ const DemoRunner = {
         return Math.min(100, (completedSteps / totalSteps) * 100);
     },
 
+    /**
+     * Show loading animation overlay with status message
+     * @param {string} message - Status message to display
+     */
+    showLoadingAnimation(message = 'Setting up...') {
+        const overlay = document.getElementById('demo-runner-loading-overlay');
+        const statusEl = document.getElementById('demo-loading-status');
+        if (overlay) {
+            overlay.classList.remove('hidden');
+            overlay.style.display = 'flex';
+            if (statusEl) {
+                statusEl.textContent = message;
+            }
+        }
+    },
+
+    /**
+     * Hide loading animation overlay
+     */
+    hideLoadingAnimation() {
+        const overlay = document.getElementById('demo-runner-loading-overlay');
+        if (overlay) {
+            overlay.classList.add('hidden');
+            overlay.style.display = 'none';
+        }
+    },
+
     // Toggle incident display during demo
     async toggleIncidents(checked) {
         const adminToggle = document.getElementById('show-active-incidents');
@@ -2180,16 +2209,30 @@ const DemoRunner = {
     // Show generated disruptions on map - mirrors DemoCreator.displayDisruptionsOnMap approach
     async showGeneratedDisruptions(showIncidents = true, showFlow = true) {
         console.log('🗺️ showGeneratedDisruptions called:', { showIncidents, showFlow });
+        
+        // Check if we have any disruptions to display
+        if (!this.generatedDisruptions) {
+            console.warn('⚠️ No generatedDisruptions data available');
+            return;
+        }
+        
         console.log('   Current disruption data:', {
             incidentCount: this.generatedDisruptions?.incidents?.length || 0,
             flowCount: this.generatedDisruptions?.flowSegments?.length || 0
         });
         
+        // If no disruptions to show, clear and return
+        if (!showIncidents && !showFlow) {
+            console.log('📍 Both disruption types disabled, clearing layers');
+            this.clearDemoDisruptionLayers();
+            return;
+        }
+        
         // Clear existing demo disruption layers
         this.clearDemoDisruptionLayers();
         
-        // Get map reference - try multiple options
-        const mapRef = window.map || (typeof map !== 'undefined' ? map : null);
+        // Get map reference - use global map object
+        const mapRef = (typeof map !== 'undefined') ? map : window.map;
         
         if (!mapRef) {
             console.warn('❌ Map not available for disruption display');
@@ -2234,6 +2277,12 @@ const DemoRunner = {
         
         // Use TrafficUtils unified display function
         // This ensures incidents are rendered ON TOP with icons inside markers
+        console.log(`📍 Calling TrafficUtils.displayDisruptionsOnMap with:`);
+        console.log(`   flowSegments: ${flowSegments.length} items`);
+        console.log(`   incidents: ${incidents.length} items`);
+        console.log(`   mapRef: ${mapRef ? 'OK' : 'NULL'}`);
+        console.log(`   layerStorage is array: ${Array.isArray(this.demoDisruptionLayers)}`);
+        
         TrafficUtils.displayDisruptionsOnMap({
             flowSegments: flowSegments,
             incidents: incidents,
@@ -2243,7 +2292,7 @@ const DemoRunner = {
             showIncidents: showIncidents
         });
         
-        console.log(`📊 Total demo disruption layers: ${this.demoDisruptionLayers.length}`);
+        console.log(`📊 After display - demoDisruptionLayers length: ${this.demoDisruptionLayers.length}`);
     },
     
     // Clear demo disruption layers from map
@@ -2524,10 +2573,24 @@ const DemoRunner = {
      * Refresh disruption display respecting current checkbox states
      * Use this instead of showGeneratedDisruptions(true, true) to respect user preferences
      */
-    refreshDisruptionDisplay() {
-        const { showIncidents, showFlow } = this.getDisruptionCheckboxStates();
+    async refreshDisruptionDisplay() {
+        // Get checkbox states, defaulting to true if not yet initialized
+        const incidentsCheckbox = document.getElementById('demo-show-incidents');
+        const flowCheckbox = document.getElementById('demo-show-flow');
+        
+        // Ensure checkboxes are checked if they exist
+        if (incidentsCheckbox && !incidentsCheckbox.checked) {
+            incidentsCheckbox.checked = true;
+        }
+        if (flowCheckbox && !flowCheckbox.checked) {
+            flowCheckbox.checked = true;
+        }
+        
+        const showIncidents = incidentsCheckbox ? incidentsCheckbox.checked : true;
+        const showFlow = flowCheckbox ? flowCheckbox.checked : true;
+        
         console.log(`📍 Refreshing disruption display: incidents=${showIncidents}, flow=${showFlow}`);
-        this.showGeneratedDisruptions(showIncidents, showFlow);
+        await this.showGeneratedDisruptions(showIncidents, showFlow);
         this.updateDisruptionPreview();
     },
 

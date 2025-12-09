@@ -3458,7 +3458,7 @@ const DemoCreator = {
         };
         
         console.log('🎬 Starting demo with detailed progress:', config.name);
-        showUpdateToast(`🎬 Starting: ${config.name}`, 'info');
+        showUpdateToast(`Starting: ${config.name}`, 'info');
         
         // Show running step
         this.goToStep('running');
@@ -3494,7 +3494,7 @@ const DemoCreator = {
             if (this.isRunning) {
                 this.currentProgress.status = '✅ Demo completed!';
                 this.updateProgressDisplay();
-                showUpdateToast('✅ Demo completed!', 'success');
+                showUpdateToast('Demo completed!', 'success');
             }
 
         } catch (error) {

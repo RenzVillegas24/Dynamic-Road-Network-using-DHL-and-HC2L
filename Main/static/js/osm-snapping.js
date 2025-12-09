@@ -544,13 +544,13 @@ async function handleOSMReportLocationPin(lat, lng) {
             });
             
         } else {
-            showUpdateToast('❌ Could not snap to road. Please try a different location.', 'warning');
+            showUpdateToast('Could not snap to road. Please try a different location.', 'error');
             console.warn('OSM snapping failed for incident location');
         }
         
     } catch (error) {
         console.error('Error in incident location pin:', error);
-        showUpdateToast('Error setting incident location', 'warning');
+        showUpdateToast('Error setting incident location', 'error');
     }
     
     pinningMode = null;

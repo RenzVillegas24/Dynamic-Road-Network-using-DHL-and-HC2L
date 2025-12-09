@@ -101,182 +101,89 @@ async function handleDisruptionUpdate(updateData) {
   isUpdating = true;
   
   try {
-    // Show notification to user
+    // Show toast notification that we're updating
+    showUpdateToast('🔄 Updating graph with new disruptions...', 'info');
+    console.log('[Disruption Monitor] Starting graph update...');
+    
+    // Clear any cached incident data to force fresh fetch
+    if (typeof window.clearCachedIncidentPayload === 'function') {
+      window.clearCachedIncidentPayload();
+      console.log('[Disruption Monitor] Cleared cached incident data');
+    }
+    
+    // Clear cached traffic data to force fresh fetch
+    if (typeof window.clearTrafficCache === 'function') {
+      window.clearTrafficCache();
+      console.log('[Disruption Monitor] Cleared cached traffic data');
+    }
+    
+    // Reload traffic/flow overlay if visible (Show Flow Overlay toggle)
+    const showTrafficOverlay = document.getElementById('show-traffic-overlay');
+    if (showTrafficOverlay?.checked) {
+      console.log('[Disruption Monitor] Reloading traffic overlay...');
+      if (typeof window.handleTrafficOverlayToggle === 'function') {
+        // Turn off and back on to refresh
+        await window.handleTrafficOverlayToggle(false, { silent: true });
+        await window.handleTrafficOverlayToggle(true, { silent: true });
+        console.log('[Disruption Monitor] Traffic overlay refreshed');
+      } else if (typeof applyTrafficOverlay === 'function') {
+        const trafficRouteOnly = document.getElementById('traffic-route-only');
+        const routeOnly = trafficRouteOnly ? trafficRouteOnly.checked : false;
+        await applyTrafficOverlay('both', routeOnly);
+        console.log('[Disruption Monitor] Traffic overlay reapplied');
+      }
+    }
+    
+    // Reload incident markers if visible (Show Active Incidents toggle)
+    const showActiveIncidents = document.getElementById('show-active-incidents');
+    if (showActiveIncidents?.checked) {
+      console.log('[Disruption Monitor] Reloading incident markers...');
+      if (typeof window.handleActiveIncidentsToggle === 'function') {
+        // Turn off and back on to refresh with fresh data
+        await window.handleActiveIncidentsToggle(false, { silent: true });
+        await window.handleActiveIncidentsToggle(true, { silent: true });
+        console.log('[Disruption Monitor] Incident markers refreshed');
+      } else if (typeof showAllDisruptionsOnMap === 'function') {
+        // Fallback: Fetch and display incidents manually
+        try {
+          const response = await fetch('/get_active_disruptions');
+          const data = await response.json();
+          if (data.success) {
+            if (typeof clearDisruptionMarkers === 'function') {
+              clearDisruptionMarkers();
+            }
+            showAllDisruptionsOnMap(data);
+            console.log('[Disruption Monitor] Incident markers refreshed via API');
+          }
+        } catch (err) {
+          console.error('[Disruption Monitor] Error refreshing incidents:', err);
+        }
+      }
+    }
+    
+    // Show success notification
     if (updateData.message) {
       showUpdateToast(updateData.message, updateData.notification_type || 'info');
       console.log('[Disruption Monitor] Notification shown:', updateData.message);
-    }
-    
-    // Reload traffic overlay if visible
-    if (typeof loadTrafficOverlay === 'function' && document.getElementById('trafficToggle')?.checked) {
-      console.log('[Disruption Monitor] Reloading traffic overlay...');
-      await loadTrafficOverlay();
-    }
-    
-    // Reload incident markers if visible
-    if (typeof loadIncidentMarkers === 'function' && document.getElementById('incidentToggle')?.checked) {
-      console.log('[Disruption Monitor] Reloading incident markers...');
-      await loadIncidentMarkers();
+    } else {
+      showUpdateToast('✅ Graph updated with new disruptions', 'success');
     }
     
     // Auto-recalculate route if enabled and route exists
     if (ENABLE_AUTO_ROUTE_UPDATE && window.currentRouteData) {
-      console.log('[Disruption Monitor] Recalculating route with new disruptions...');
-      showUpdateToast('🔄 Recalculating route with updated traffic data...', 'info');
+      console.log('[Disruption Monitor] Triggering automatic route recalculation...');
       
-      try {
-        // Get the stored route data
-        const routeData = window.currentRouteData;
-        
-        // Get algorithm from currently selected radio button
-        // First priority: UI selection (what user currently selected)
-        let algorithm = 'hc2l'; // Default fallback
-        
-        // Try using getSelectedAlgorithm() function if available (most reliable)
-        if (typeof getSelectedAlgorithm === 'function') {
-          algorithm = getSelectedAlgorithm();
-          console.log('[Disruption Monitor] Algorithm from getSelectedAlgorithm():', algorithm);
-        } else {
-          // Fallback: Direct radio button selection
-          const selectedAlgo = document.querySelector('input[name="algorithm"]:checked');
-          if (selectedAlgo && selectedAlgo.value) {
-            algorithm = selectedAlgo.value.toLowerCase();
-            console.log('[Disruption Monitor] Algorithm from UI radio button:', algorithm);
-          } else {
-            // Last resort: Use stored algorithm from route data
-            const storedAlgo = routeData?.metrics?.algorithm || routeData?.algorithm || 'hc2l';
-            algorithm = (storedAlgo.toLowerCase().includes('dhl') || storedAlgo.includes('DHL')) ? 'dhl' : 'hc2l';
-            console.log('[Disruption Monitor] Using stored algorithm:', algorithm, '(from:', storedAlgo, ')');
-          }
-        }
-        
-        console.log('[Disruption Monitor] Route algorithm (normalized):', algorithm);
-        console.log('[Disruption Monitor] Start:', routeData.input?.start_snap_lat, routeData.input?.start_snap_lng);
-        console.log('[Disruption Monitor] Destination:', routeData.input?.dest_snap_lat, routeData.input?.dest_snap_lng);
-        
-        // Clear previous routes
-        if (typeof clearRoutes === 'function') {
-          clearRoutes();
-        }
-        
-        // Recalculate route based on algorithm
-        let newRouteData = null;
-        
-        // Make direct API call instead of using frontend functions
-        // This ensures we have all the required snap point data
+      // Use the dedicated auto-route-recalculator if available
+      if (typeof window.triggerAutoRouteRecalculation === 'function') {
         try {
-          const startSnap = window.osmSnapMarkers?.start?.data;
-          const destSnap = window.osmSnapMarkers?.dest?.data;
-          
-          if (!startSnap || !destSnap) {
-            console.error('[Disruption Monitor] Missing snap point data:', { startSnap, destSnap });
-            showUpdateToast('⚠️ Error: Missing snap point data for route recalculation', 'warning');
-            return;
-          }
-          
-          console.log('[Disruption Monitor] Using snap points for recalculation:', {
-            start: { lat: startSnap.latitude, lng: startSnap.longitude, edge: startSnap.edge_id },
-            dest: { lat: destSnap.latitude, lng: destSnap.longitude, edge: destSnap.edge_id }
-          });
-          
-          if (algorithm === 'dhl') {
-            console.log('[Disruption Monitor] Recalculating DHL route with disruptions...');
-            const response = await fetch('/compute_dhl_route', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                start_pin_lat: routeData.input?.start_snap_lat || startSnap.latitude,
-                start_pin_lng: routeData.input?.start_snap_lng || startSnap.longitude,
-                dest_pin_lat: routeData.input?.dest_snap_lat || destSnap.latitude,
-                dest_pin_lng: routeData.input?.dest_snap_lng || destSnap.longitude,
-                start_snap_lat: startSnap.latitude,
-                start_snap_lng: startSnap.longitude,
-                dest_snap_lat: destSnap.latitude,
-                dest_snap_lng: destSnap.longitude,
-                start_edge_source: startSnap.edge_source || 0,
-                start_edge_target: startSnap.edge_target || 0,
-                start_edge_oneway: startSnap.oneway || 0,
-                dest_edge_source: destSnap.edge_source || 0,
-                dest_edge_target: destSnap.edge_target || 0,
-                dest_edge_oneway: destSnap.oneway || 0,
-                use_disruptions: true,
-                tau_threshold: 0.5,
-                generate_alternatives: false
-              })
-            });
-            
-            if (response.ok) {
-              newRouteData = await response.json();
-              if (newRouteData.success && typeof displayDHLRoute === 'function') {
-                displayDHLRoute(newRouteData);
-                console.log('[Disruption Monitor] DHL route recalculated successfully');
-              }
-            }
-          } else if (algorithm === 'hc2l') {
-            console.log('[Disruption Monitor] Recalculating HC2L route with disruptions...');
-            const threshold = routeData.metrics?.tau_threshold || 0.5;
-            const response = await fetch('/compute_dhc2l_route', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                start_pin_lat: routeData.input?.start_snap_lat || startSnap.latitude,
-                start_pin_lng: routeData.input?.start_snap_lng || startSnap.longitude,
-                dest_pin_lat: routeData.input?.dest_snap_lat || destSnap.latitude,
-                dest_pin_lng: routeData.input?.dest_snap_lng || destSnap.longitude,
-                start_snap_lat: startSnap.latitude,
-                start_snap_lng: startSnap.longitude,
-                dest_snap_lat: destSnap.latitude,
-                dest_snap_lng: destSnap.longitude,
-                start_edge_source: startSnap.edge_source || 0,
-                start_edge_target: startSnap.edge_target || 0,
-                start_edge_oneway: startSnap.oneway || 0,
-                dest_edge_source: destSnap.edge_source || 0,
-                dest_edge_target: destSnap.edge_target || 0,
-                dest_edge_oneway: destSnap.oneway || 0,
-                use_disruptions: true,
-                tau_threshold: threshold,
-                generate_alternatives: false
-              })
-            });
-            
-            if (response.ok) {
-              newRouteData = await response.json();
-              if (newRouteData.success && typeof displayDHC2LRoute === 'function') {
-                displayDHC2LRoute(newRouteData);
-                console.log('[Disruption Monitor] HC2L route recalculated successfully');
-              }
-            }
-          } else {
-            console.error('[Disruption Monitor] Unknown algorithm:', algorithm);
-          }
-        } catch (apiError) {
-          console.error('[Disruption Monitor] API call error:', apiError);
-          throw apiError;
+          await window.triggerAutoRouteRecalculation();
+        } catch (routeError) {
+          console.error('[Disruption Monitor] Route recalculation error:', routeError);
+          showUpdateToast('⚠️ Error recalculating route: ' + routeError.message, 'warning');
         }
-        
-        if (newRouteData) {
-          // Update stored route data with new metrics
-          window.currentRouteData = newRouteData;
-          
-          // Update UI panels
-          if (typeof updateRouteMetrics === 'function') {
-            updateRouteMetrics(newRouteData);
-          }
-          if (typeof updateAdminPerformanceMetrics === 'function') {
-            updateAdminPerformanceMetrics(newRouteData);
-          }
-          if (typeof updateCurrentPathPanel === 'function') {
-            updateCurrentPathPanel(newRouteData);
-          }
-          
-          showUpdateToast('✅ Route updated with latest disruptions', 'success');
-        } else {
-          showUpdateToast('⚠️ Route recalculation failed', 'warning');
-        }
-        
-      } catch (routeError) {
-        console.error('[Disruption Monitor] Route recalculation error:', routeError);
-        showUpdateToast('⚠️ Error recalculating route: ' + routeError.message, 'warning');
+      } else {
+        console.warn('[Disruption Monitor] triggerAutoRouteRecalculation not available');
+        showUpdateToast('⚠️ Route auto-update module not loaded', 'warning');
       }
     }
     

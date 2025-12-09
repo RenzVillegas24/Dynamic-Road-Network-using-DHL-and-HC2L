@@ -1,5 +1,5 @@
 /*
- * DHL Routing JSON API - REWRITTEN CLEAN VERSION
+ * DHL Routing JSON API - WITH PERFORMANCE METRICS
  * 
  * SIMPLIFIED ALGORITHM:
  *   1. Use DHL labels to compute distance between all candidate node pairs
@@ -7,6 +7,11 @@
  *   3. Use simple Dijkstra to find the path
  *   4. Ensure snap edges are included in output
  *   5. Clip geometry at snap points
+ * 
+ * PERFORMANCE METRICS:
+ *   - Query time tracking for comparison with HC2L
+ *   - Update time monitoring (full updates only, no lazy)
+ *   - Memory usage tracking
  * 
  * Algorithm: Dual-Hierarchy Labelling
  * Based on: https://github.com/mufarhan/Dual-Hierarchy-Labelling
@@ -17,6 +22,7 @@
 
 #include "road_network.h"
 #include "util.h"
+#include "dhl_metrics.h"  // DHL Performance Metrics
 #include "../../ApiUtils/src/routing_utils.h"
 #include <iomanip>
 #include <chrono>
@@ -24,6 +30,11 @@
 #include <algorithm>
 
 using namespace std;
+
+// Global DHL performance collector
+dhl_metrics::DHLPerformanceCollector& get_dhl_perf_collector() {
+    return dhl_metrics::get_dhl_performance_collector();
+}
 
 // Optimize I/O for large outputs
 inline void setup_fast_io() {
