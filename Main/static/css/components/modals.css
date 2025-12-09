@@ -11,17 +11,27 @@
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: var(--glass-blur-sm);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   z-index: var(--z-modal-backdrop);
   opacity: 0;
   visibility: hidden;
-  transition: opacity var(--transition-normal), visibility var(--transition-normal);
+  transition: opacity 300ms ease-in-out, visibility 300ms ease-in-out, backdrop-filter 300ms ease-in-out;
+  will-change: opacity, visibility;
+  pointer-events: none;
 }
 
 .modal-backdrop.active,
 .modal-backdrop.visible {
   opacity: 1;
   visibility: visible;
+  pointer-events: auto;
+}
+
+.modal-backdrop.closing {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 /* =====================
@@ -36,15 +46,39 @@
   align-items: center;
   justify-content: center;
   padding: var(--spacing-4);
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity var(--transition-normal), visibility var(--transition-normal);
+  pointer-events: none;
 }
 
 .modal.active,
 .modal.visible {
-  opacity: 1;
-  visibility: visible;
+  pointer-events: auto;
+}
+
+@keyframes modal-enter-bottom {
+  0% {
+    opacity: 0;
+    filter: blur(10px);
+    transform: translateY(100px) scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Exit animation - scale down and fade */
+@keyframes modal-exit-scale {
+  0% {
+    opacity: 1;
+    filter: blur(0);
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    filter: blur(4px);
+    transform: scale(0.85);
+  }
 }
 
 /* Modal dialog */
@@ -59,14 +93,16 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  transform: scale(0.95) translateY(20px);
-  transition: transform var(--transition-normal);
 }
 
 .modal.active .modal__dialog,
 .modal.visible .modal__dialog {
-  transform: scale(1) translateY(0);
+  animation: modal-enter-bottom 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
+
+.modal.closing .modal__dialog {
+  animation: modal-exit-scale 0.25s ease-out forwards;
+} 
 
 /* =====================
    MODAL SIZES

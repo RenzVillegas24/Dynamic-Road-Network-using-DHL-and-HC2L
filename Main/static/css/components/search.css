@@ -20,9 +20,11 @@
   align-items: center;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-2xl);
   transition: all var(--transition-fast);
+  padding: var(--spacing-3) var(--spacing-4);
   overflow: hidden;
+  gap: var(--spacing-3);
 }
 
 .search-combobox__input-wrapper:hover,
@@ -39,7 +41,7 @@
 
 .search-combobox__input {
   flex: 1;
-  padding: var(--spacing-3) var(--spacing-4);
+  padding: 0px !important;
   background: transparent;
   border: none;
   outline: none;
@@ -62,13 +64,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-right: var(--spacing-2);
-  border-radius: var(--radius-lg);
   border: none;
   cursor: pointer;
   transition: all var(--transition-fast);
   color: var(--color-text-inverse);
   background: var(--color-gray-400);
+  border-radius: var(--radius-xl);
   flex-shrink: 0;
 }
 
@@ -80,30 +81,19 @@
 
 .search-combobox__pin-btn:hover {
   transform: scale(1.05);
+  box-shadow: var(--shadow-sm);
 }
 
-.search-combobox__pin-btn--success {
-  background: var(--color-success);
-}
-
-.search-combobox__pin-btn--success:hover {
-  background: var(--color-success-hover);
+.search-combobox__pin-btn--success {  
+  background: var(--gradient-success);
 }
 
 .search-combobox__pin-btn--danger {
-  background: var(--color-danger);
-}
-
-.search-combobox__pin-btn--danger:hover {
-  background: var(--color-danger-hover);
+  background: var(--gradient-danger);
 }
 
 .search-combobox__pin-btn--primary {
   background: var(--color-primary);
-}
-
-.search-combobox__pin-btn--primary:hover {
-  background: var(--color-primary-hover);
 }
 
 .search-combobox__action {

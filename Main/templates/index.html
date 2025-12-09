@@ -127,35 +127,6 @@
 
 
 
-    <!-- Demo Stop Modal -->
-    <div id="demo-stop-modal" class="modal" data-backdrop-close="false" data-escape-close="true">
-      <div class="modal-backdrop"></div>
-      <div class="modal__dialog">
-        <div class="modal__header modal__header--warning">
-          <div class="modal__icon modal__icon--warning">
-            <i data-lucide="alert-circle" class="w-6 h-6"></i>
-          </div>
-          <div class="modal__title-group">
-            <h3 class="modal__title">Demo is Running</h3>
-            <p class="modal__subtitle">A demo is currently in progress</p>
-          </div>
-        </div>
-        <div class="modal__body">
-          <p class="text-sm text-slate-700 leading-relaxed">
-            You are attempting to navigate while the demo is running. Would you like to stop the demo and navigate, or cancel this action?
-          </p>
-        </div>
-        <div class="modal__footer modal__footer--right">
-          <button id="demo-stop-modal-cancel" class="btn btn--ghost" data-modal-close>
-            Cancel
-          </button>
-          <button id="demo-stop-modal-stop" class="btn btn--warning">
-            Stop Demo & Navigate
-          </button>
-        </div>
-      </div>
-    </div>
-
   </div>
 
 
@@ -2128,6 +2099,7 @@
 
   <!-- New Core UI Modules -->
   <script src="{{ url_for('static', filename='js/icons.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/core/universal-modal.js') }}"></script>
   <script src="{{ url_for('static', filename='js/core/panel-manager.js') }}"></script>
   <script src="{{ url_for('static', filename='js/core/sidebar.js') }}"></script>
   <script src="{{ url_for('static', filename='js/core/toast.js') }}"></script>

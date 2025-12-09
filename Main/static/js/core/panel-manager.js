@@ -3,7 +3,7 @@
  * Handles panel switching, visibility, and state management
  */
 
-const PanelManager = (function() {
+const PanelManager = (function () {
   'use strict';
 
   // Panel configuration - maps sidebar data-panel values to actual DOM IDs
@@ -12,55 +12,103 @@ const PanelManager = (function() {
       id: 'finder-panel',
       title: 'Route Finder',
       icon: 'navigation',
-      size: 'md'
+      size: 'md',
+      isPassable: () => {
+        if (isDemoRunning()) {
+          // Show modal dialog instead of toast
+          showDemoStopModal('route-finder', 'sidebar');
+          return false;
+        }
+        return true;
+      }
     },
     'current-route': {
       id: 'current-path-panel',
       title: 'Current Route',
       icon: 'route',
-      size: 'md'
+      size: 'md',
+      isPassable: () => {
+        if (isDemoRunning()) {
+          // Show modal dialog instead of toast
+          showDemoStopModal('current-route', 'sidebar');
+          return false;
+        }
+
+        if (window.currentRouteData == null) {
+          showNoRouteModal();
+          return false;
+        }
+        return true;
+      }
     },
     'report': {
       id: 'report-panel',
       title: 'Report Disruption',
       icon: 'alert-triangle',
-      size: 'lg'
+      size: 'lg',
+      isPassable: () => true
     },
     'disruptions': {
       id: 'disruptions-panel',
       title: 'Active Disruptions',
       icon: 'list',
-      size: 'lg'
+      size: 'lg',
+      isPassable: () => {
+        if (window.currentRouteData == null && !isDemoRunning()) {
+          showNoRouteModal();
+          return false;
+        }
+        return true;
+      }
     },
     'metrics': {
       id: 'route-metrics-panel',
       title: 'Route Metrics',
       icon: 'activity',
-      size: 'lg'
+      size: 'lg',
+      isPassable: () => true
     },
     'comparison': {
       id: 'algorithm-comparison-panel',
       title: 'Algorithm Comparison',
       icon: 'git-compare',
-      size: 'lg'
+      size: 'lg',
+      isPassable: () => {
+        if (isDemoRunning()) {
+          // Show modal dialog instead of toast
+          showDemoStopModal('comparison', 'sidebar');
+          return false;
+        }
+        return true;
+      }
     },
     'developer': {
       id: 'developer-view-panel',
       title: 'Developer Tools',
       icon: 'terminal',
-      size: 'xl'
+      size: 'xl',
+      isPassable: () => true
     },
     'demo-runner': {
       id: 'demo-runner-panel',
       title: 'Demo Runner',
       icon: 'play-circle',
-      size: 'lg'
+      size: 'lg',
+      isPassable: () => true
     },
     'demo-creator': {
       id: 'demo-creator-panel',
       title: 'Demo Creator',
       icon: 'plus-circle',
-      size: 'lg'
+      size: 'lg',
+      isPassable: () => {
+        if (isDemoRunning()) {
+          // Show modal dialog instead of toast
+          showDemoStopModal('demo-creator', 'sidebar');
+          return false;
+        }
+        return true;
+      }
     }
   };
 
@@ -77,19 +125,19 @@ const PanelManager = (function() {
   function init() {
     // Set up event delegation for panel triggers
     document.addEventListener('click', handlePanelTrigger);
-    
+
     // Set up close/back button handlers
     setupCloseBackButtons();
-    
+
     // Listen for keyboard shortcuts
     document.addEventListener('keydown', handleKeyboardShortcuts);
-    
+
     console.log('[PanelManager] Initialized');
   }
 
   function isDemoRunning() {
     return (typeof DemoRunner !== 'undefined' && DemoRunner.isRunning) ||
-           (typeof DemoCreator !== 'undefined' && DemoCreator.isRunning);
+      (typeof DemoCreator !== 'undefined' && DemoCreator.isRunning);
   }
 
   /**
@@ -101,7 +149,7 @@ const PanelManager = (function() {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        
+
         // Only go back if navigation came from within the panel
         if (panelHistory.length > 0 && navigationSource === 'panel') {
           goBack();
@@ -118,7 +166,7 @@ const PanelManager = (function() {
   function updateCloseBackButton(panelElement) {
     const closeBtn = panelElement?.querySelector('.panel__close');
     if (!closeBtn) return;
-    
+
     const icon = closeBtn.querySelector('[data-lucide]');
     if (icon) {
       // Show back arrow only if there's history AND navigation came from within panel
@@ -139,11 +187,11 @@ const PanelManager = (function() {
     if (trigger) {
       e.preventDefault();
       const panelKey = trigger.dataset.panel;
-      
+
       // Determine if this trigger is from sidebar or from within a panel
       const isFromSidebar = trigger.closest('#sidebar') || trigger.closest('.nav-item');
       const isFromPanel = trigger.closest('.panel') || trigger.closest('#right-panel-container');
-      
+
       if (isFromPanel && !isFromSidebar) {
         // Navigation from within a panel - add to history
         showPanel(panelKey, 'panel');
@@ -196,17 +244,12 @@ const PanelManager = (function() {
     }
 
     // Check if demo is running and prevent opening route-finder panel
-    if ( 
-      panelKey === 'route-finder'||
-      panelKey === 'current-route' ||
-      panelKey === 'comparison' || 
-      panelKey === 'demo-creator'
-    ) {
-      if (isDemoRunning()) {
-        // Show modal dialog instead of toast
-        showDemoStopModal(panelKey, source);
+    if (typeof panelConfig.isPassable === 'function') {
+      if (!panelConfig.isPassable()) {
         return;
       }
+    } else if (panelConfig.isPassable === false) {
+      return;
     }
 
     const panelElement = document.getElementById(panelConfig.id);
@@ -215,13 +258,13 @@ const PanelManager = (function() {
       return;
     }
 
-    // Update navigation source
-    navigationSource = source;
-
-    // If navigation is from sidebar, clear history
+    // If navigation is from sidebar, clear history BEFORE updating source
     if (source === 'sidebar') {
       panelHistory = [];
     }
+
+    // Update navigation source after validation
+    navigationSource = source;
 
     // Hide all panels (but don't close the container)
     hideAllPanelsInternal();
@@ -229,7 +272,7 @@ const PanelManager = (function() {
     // Show target panel with animation
     panelElement.classList.remove('hidden');
     panelElement.classList.add('active');
-    
+
     // Add slide-in animation
     panelElement.style.animation = 'slideInRight 0.3s ease-out';
 
@@ -244,7 +287,7 @@ const PanelManager = (function() {
     if (rightPanelContainer) {
       rightPanelContainer.classList.add('open');
       isRightPanelOpen = true;
-      
+
       // Set the width based on panel size
       const panelWidth = panelConfig.size || 'md';
       rightPanelContainer.classList.remove('split-view__secondary--sm', 'split-view__secondary--md', 'split-view__secondary--lg', 'split-view__secondary--xl', 'split-view__secondary--xxl');
@@ -269,8 +312,10 @@ const PanelManager = (function() {
     const previousPanel = activePanel;
     activePanel = panelKey;
 
-    // Update close/back button icon
-    updateCloseBackButton(panelElement);
+    // Update close/back button icon (after panel is visible)
+    setTimeout(() => {
+      updateCloseBackButton(panelElement);
+    }, 0);
 
     // Notify listeners
     notifyListeners({
@@ -280,6 +325,17 @@ const PanelManager = (function() {
       panelConfig,
       source
     });
+
+    // Trigger map resize to adjust to new container size
+    if (map) {
+      setTimeout(() => {
+        map.invalidateSize({
+          animate: true, // This is the default setting
+          pan: true      // This is also the default setting for the pan
+        });
+      }, 250); // Wait for transition to complete
+    }
+
 
     console.log(`[PanelManager] Switched to panel: ${panelKey} (source: ${source})`);
   }
@@ -314,7 +370,7 @@ const PanelManager = (function() {
     if (mainContentArea) {
       mainContentArea.classList.remove('panel-open', 'panel-lg');
     }
-    
+
     // Close the split-view secondary container
     const rightPanelContainer = document.getElementById('right-panel-container');
     if (rightPanelContainer) {
@@ -337,6 +393,17 @@ const PanelManager = (function() {
     hideAllPanelsInternal();
 
     console.log('[PanelManager] Right panel closed');
+
+    // Trigger map resize to adjust to new container size
+    if (map) {
+      setTimeout(() => {
+        map.invalidateSize({
+          animate: true, // This is the default setting
+          pan: true      // This is also the default setting for the pan
+        });
+      }, 250); // Wait for transition to complete
+    }
+
   }
 
   /**
@@ -455,68 +522,73 @@ const PanelManager = (function() {
   }
 
   /**
-   * Show demo stop modal dialog
+   * Show demo stop modal dialog using universal modal system
    * Allows user to stop demo and navigate or cancel
    * @param {string} targetPanelKey - Panel key to navigate to
    * @param {string} source - Navigation source ('sidebar' or 'panel')
    */
   function showDemoStopModal(targetPanelKey, source = 'sidebar') {
-    const modal = document.getElementById('demo-stop-modal');
-    if (!modal) {
-      console.warn('[PanelManager] demo-stop-modal not found');
+    if (typeof UniversalModal === 'undefined') {
+      console.error('[PanelManager] UniversalModal not loaded');
       return;
     }
 
-    // Set up modal buttons
-    const stopBtn = document.getElementById('demo-stop-modal-stop');
-    const cancelBtn = document.getElementById('demo-stop-modal-cancel');
-    const closeBtn = modal.querySelector('[data-modal-close]');
+    UniversalModal.showModal({
+      icon: 'alert-circle',
+      variant: 'warning',
+      title: 'Demo is Running',
+      subtitle: 'A demo is currently in progress',
+      body: '<p class="text-sm text-slate-700 leading-relaxed">You are attempting to navigate while the demo is running. Would you like to stop the demo and navigate, or cancel this action?</p>',
+      buttons: {
+        'Stop Demo & Navigate': (closeModal) => {
+          // Stop the demo
+          if (typeof DemoCreator !== 'undefined' && DemoCreator.isRunning) {
+            DemoCreator.stopDemo();
+          } else if (typeof DemoRunner !== 'undefined' && DemoRunner.isRunning) {
+            DemoRunner.stopDemo();
+          }
 
-    // Remove old event listeners by cloning
-    const stopBtnNew = stopBtn.cloneNode(true);
-    const cancelBtnNew = cancelBtn.cloneNode(true);
-    const closeBtnNew = closeBtn.cloneNode(true);
+          // Close modal
+          closeModal();
 
-    stopBtn.replaceWith(stopBtnNew);
-    cancelBtn.replaceWith(cancelBtnNew);
-    closeBtn.replaceWith(closeBtnNew);
-
-    // Get new references
-    const newStopBtn = document.getElementById('demo-stop-modal-stop');
-    const newCancelBtn = document.getElementById('demo-stop-modal-cancel');
-    const newCloseBtn = modal.querySelector('[data-modal-close]');
-
-    // Handle stop demo button
-    newStopBtn.addEventListener('click', () => {
-      // Stop the demo
-      if (typeof DemoCreator !== 'undefined' && DemoCreator.isRunning) {
-        DemoCreator.stopDemo();
-      } else if (typeof DemoRunner !== 'undefined' && DemoRunner.isRunning) {
-        DemoRunner.stopDemo();
-      }
-
-      // Close modal
-      modal.classList.remove('active');
-
-      // Navigate to target panel after a brief delay
-      setTimeout(() => {
-        showPanel(targetPanelKey, source);
-      }, 300);
+          // Navigate to target panel after a brief delay
+          setTimeout(() => {
+            showPanel(targetPanelKey, source);
+          }, 300);
+        }
+      },
+      closeBtn: {
+        'Cancel': (closeModal) => {
+          // Just close the modal, no additional action needed
+        }
+      },
+      backdropClose: false,
+      escapeClose: true
     });
-
-    // Handle cancel button
-    newCancelBtn.addEventListener('click', () => {
-      modal.classList.remove('active');
-    });
-
-    // Handle close button (same as cancel)
-    newCloseBtn.addEventListener('click', () => {
-      modal.classList.remove('active');
-    });
-
-    // Show modal
-    modal.classList.add('active');
   }
+
+  function showNoRouteModal() {
+    if (typeof UniversalModal === 'undefined') {
+      console.error('[PanelManager] UniversalModal not loaded');
+      return;
+    }
+
+    UniversalModal.showModal({
+      icon: 'alert-circle',
+      variant: 'warning',
+      title: 'No Active Route',
+      body: '<p class="text-sm text-slate-700 leading-relaxed">There is currently no active route to display. Please create a route first.</p>',
+      closeBtn: {
+        'OK': (closeModal) => {
+          // Just close the modal, no additional action needed
+        }
+      },
+      backdropClose: false,
+      escapeClose: true
+    });
+
+  }
+  
 
   // Public API
   return {

@@ -54,7 +54,7 @@ const Sidebar = (function () {
 
   function isDemoRunning() {
     return (typeof DemoRunner !== 'undefined' && DemoRunner.isRunning) ||
-           (typeof DemoCreator !== 'undefined' && DemoCreator.isRunning);
+      (typeof DemoCreator !== 'undefined' && DemoCreator.isRunning);
   }
 
   /**
@@ -168,11 +168,21 @@ const Sidebar = (function () {
    * Toggle sidebar
    */
   function toggle() {
+    if (map) {
+      setTimeout(() => {
+        map.invalidateSize({
+          animate: true, // This is the default setting
+          pan: true      // This is also the default setting for the pan
+        });
+      }, 150); // Wait for transition to complete
+    }
+    
     if (isCollapsed) {
       expand();
     } else {
       collapse();
     }
+
   }
 
   /**
@@ -312,11 +322,11 @@ const Sidebar = (function () {
    */
   function setActive(panelKey) {
     sidebarElement?.querySelectorAll('.nav-item').forEach(item => {
-      if (isDemoRunning() && 
-        ( 
-          panelKey === 'route-finder'||
+      if (isDemoRunning() &&
+        (
+          panelKey === 'route-finder' ||
           panelKey === 'current-route' ||
-          panelKey === 'comparison' || 
+          panelKey === 'comparison' ||
           panelKey === 'demo-creator'
         )) {
         return;

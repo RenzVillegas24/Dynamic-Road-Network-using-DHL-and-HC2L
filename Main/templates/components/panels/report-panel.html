@@ -107,7 +107,7 @@
           </div>
         </div>
 
-        <div class="stat-grid stat-grid--2">
+        <div class="grid grid-cols-1 md:grid-cols-2">
           <div class="form-group">
             <label class="form-group__label">Start Time</label>
             <input type="datetime-local" id="incident-start-time" class="form-input">
@@ -139,14 +139,14 @@
 
       <!-- Road Closure Section -->
       <div class="section-card section-card--error">
-        <div class="form-switch">
+        <label class="form-switch">
           <input type="checkbox" id="incident-road-closed" class="form-switch__input">
           <span class="form-switch__slider"></span>
           <div class="form-switch__label">
             <span class="font-semibold">Road is Completely Closed</span>
             <p class="text-xs text-muted">Mark as impassable</p>
           </div>
-        </div>
+        </label>
       </div>
 
       <!-- User-reported incidents management -->
