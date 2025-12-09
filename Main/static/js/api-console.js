@@ -815,10 +815,14 @@ class APIConsole {
       // Show visual feedback
       const copyBtn = document.getElementById('api-console-copy');
       if (copyBtn) {
-        const original = copyBtn.textContent;
-        copyBtn.textContent = 'Copied!';
+        // store the html content
+        const original = copyBtn.innerHTML;
+        // Lucid check mark
+        copyBtn.innerHTML = `<i data-lucide="check-circle" class="w-5 h-5 text-green-500"></i>`;
+        lucide.createIcons();
+        // revert after 2 seconds
         setTimeout(() => {
-          copyBtn.textContent = original;
+          copyBtn.innerHTML = original;
         }, 2000);
       }
     }).catch(err => {
@@ -833,7 +837,11 @@ class APIConsole {
     this.isRawMode = !this.isRawMode;
     const toggleBtn = document.getElementById('api-console-toggle-view');
     if (toggleBtn) {
-      toggleBtn.textContent = this.isRawMode ? 'Show Formatted' : 'Show Raw JSON';
+      toggleBtn.innerHTML =
+        this.isRawMode ? 
+        '<i data-lucide="list" class="w-5 h-5"></i>' :
+        '<i data-lucide="code" class="w-5 h-5"></i>';
+      lucide.createIcons();
     }
     this.render();
   }

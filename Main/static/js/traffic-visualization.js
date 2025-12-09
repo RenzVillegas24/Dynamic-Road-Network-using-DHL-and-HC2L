@@ -322,10 +322,10 @@ function renderTrafficSegments(segments, mode, routeOnly) {
         if (!onRoute) return;
       }
 
-      // Use TrafficUtils for consistent color determination
+      // Use TrafficUtils for consistent color determination (flow display uses gray for freeflow)
       const jamFactor = segment.jam_factor || 0;
       const isClosed = segment.is_closed || false;
-      const style = TrafficUtils.getDisruptionStyle(jamFactor, isClosed);
+      const style = TrafficUtils.getFlowDisruptionStyle(jamFactor, isClosed);
       const { color, weight } = style;
       const opacity = 0.55;
 

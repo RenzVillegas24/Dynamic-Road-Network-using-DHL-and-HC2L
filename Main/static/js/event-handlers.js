@@ -699,11 +699,8 @@ function initializeEventHandlers() {
   const adminResetBtn = document.getElementById('admin-reset-btn');
   if (adminResetBtn) {
     adminResetBtn.onclick = () => {
-      // Only clear routes if map is ready
-      if (map && directionsRenderer) {
-        clearRoutes(); // Clear routes when opening admin panel
-      }
-      // resetAll();
+      // Use the comprehensive system reset function
+      quickResetMap();
     };
   }
 

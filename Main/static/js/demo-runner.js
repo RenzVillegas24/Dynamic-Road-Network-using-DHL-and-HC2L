@@ -59,6 +59,9 @@ const DemoRunner = {
         results: []
     },
     
+    // Saved Route Finder state (to be restored after demo)
+    savedRouteFinderState: null,
+    
     // Location presets for Quezon City
     presetLocations: [
         { name: 'Quezon Memorial Circle', lat: 14.6540, lng: 121.0490 },
@@ -360,6 +363,80 @@ const DemoRunner = {
         }
         
         console.log('🔇 Admin toggles disabled for demo');
+    },
+
+    /**
+     * Save the current state of Route Finder UI elements
+     * This captures: Algorithm, Dataset, Threshold, Show Active Incidents, Show Flow Overlay
+     */
+    saveRouteFinderState() {
+        const algorithmRadio = document.querySelector('input[name="algorithm"]:checked');
+        const datasetRadio = document.querySelector('input[name="dataset"]:checked');
+        const thresholdInput = document.getElementById('threshold-input');
+        const incidentToggle = document.getElementById('show-active-incidents');
+        const flowToggle = document.getElementById('show-traffic-overlay');
+        
+        this.savedRouteFinderState = {
+            algorithm: algorithmRadio?.value || 'hc2l',
+            dataset: datasetRadio?.value || 'none',
+            threshold: parseFloat(thresholdInput?.value) || 0.5,
+            showIncidents: incidentToggle?.checked || false,
+            showFlow: flowToggle?.checked || false
+        };
+        
+        console.log('💾 Saved Route Finder state:', this.savedRouteFinderState);
+    },
+
+    /**
+     * Restore the saved state of Route Finder UI elements
+     */
+    restoreRouteFinderState() {
+        if (!this.savedRouteFinderState) {
+            console.log('⚠️ No saved Route Finder state to restore');
+            return;
+        }
+
+        const state = this.savedRouteFinderState;
+        
+        // Restore Algorithm
+        const algorithmRadio = document.querySelector(`input[name="algorithm"][value="${state.algorithm}"]`);
+        if (algorithmRadio) {
+            algorithmRadio.click();
+            console.log(`✅ Restored algorithm: ${state.algorithm}`);
+        }
+        
+        // Restore Dataset
+        const datasetRadio = document.querySelector(`input[name="dataset"][value="${state.dataset}"]`);
+        if (datasetRadio) {
+            datasetRadio.click();
+            console.log(`✅ Restored dataset: ${state.dataset}`);
+        }
+        
+        // Restore Threshold
+        const thresholdInput = document.getElementById('threshold-input');
+        if (thresholdInput) {
+            thresholdInput.value = state.threshold;
+            thresholdInput.dispatchEvent(new Event('input'));
+            console.log(`✅ Restored threshold: ${state.threshold}`);
+        }
+        
+        // Restore Show Active Incidents
+        const incidentToggle = document.getElementById('show-active-incidents');
+        if (incidentToggle && incidentToggle.checked !== state.showIncidents) {
+            incidentToggle.checked = state.showIncidents;
+            incidentToggle.dispatchEvent(new Event('change'));
+            console.log(`✅ Restored show incidents: ${state.showIncidents}`);
+        }
+        
+        // Restore Show Flow Overlay
+        const flowToggle = document.getElementById('show-traffic-overlay');
+        if (flowToggle && flowToggle.checked !== state.showFlow) {
+            flowToggle.checked = state.showFlow;
+            flowToggle.dispatchEvent(new Event('change'));
+            console.log(`✅ Restored show flow: ${state.showFlow}`);
+        }
+        
+        console.log('🔄 Route Finder state restored');
     },
 
     showTab(tabName) {
@@ -1002,6 +1079,22 @@ const DemoRunner = {
         this.currentDemo = config;
         this.currentDemoId = null;  // Track demoId for cleanup
         
+        // Save the current Route Finder state before making any changes
+        this.saveRouteFinderState();
+        
+        // Turn off admin panel toggles to prevent interference during demo
+        const incidentToggle = document.getElementById('show-active-incidents');
+        const flowToggle = document.getElementById('show-traffic-overlay');
+        
+        if (incidentToggle && incidentToggle.checked) {
+            incidentToggle.checked = false;
+            incidentToggle.dispatchEvent(new Event('change'));
+        }
+        if (flowToggle && flowToggle.checked) {
+            flowToggle.checked = false;
+            flowToggle.dispatchEvent(new Event('change'));
+        }
+        
         // Disable route finder UI when demo starts
         this.toggleRouteFinderUI(true);
         
@@ -1163,6 +1256,17 @@ const DemoRunner = {
                 this.currentResultsSavedPath = null; // Reset saved path on new run
                 console.log('✅ Demo completed, resultsSource set to "new", currentResultsSavedPath=', this.currentResultsSavedPath);
                 
+                // Use the comprehensive system reset function from functions.js
+                resetSystemState({
+                    clearLocation: true,
+                    clearDisruptions: true,
+                    clearUpdateRegions: true,
+                    clearGoogleMaps: true,
+                    clearExportData: true,
+                    resetUI: true,
+                    verbose: false
+                });
+
                 // Show results summary after a short delay
                 setTimeout(() => {
                     this.showResultsSummary();
@@ -1182,6 +1286,9 @@ const DemoRunner = {
             
             // Re-enable route finder UI when demo stops
             this.toggleRouteFinderUI(false);
+            
+            // Restore the saved Route Finder state
+            this.restoreRouteFinderState();
         }
     },
     
@@ -1197,6 +1304,7 @@ const DemoRunner = {
         
         if (mode === 'none') {
             this.demoDisruptionDir = null;
+            window.demoDisruptionDir = null;
             console.log('📍 Demo running without disruptions');
             return;
         }
@@ -1636,16 +1744,21 @@ const DemoRunner = {
                 const calcEndTime = performance.now();
                 const processTimeMs = calcEndTime - calcStartTime;
 
-                // Capture result with the effective tau used and process time
-                await this.delay(500);
+                // Wait longer for DOM to fully update with new metrics
+                // This ensures the distance and other metrics are displayed before we capture them
+                await this.delay(800);
+                
                 const result = this.captureCurrentResult(algo, effectiveTau, route, trialIndex, processTimeMs);
                 if (result) {
                     console.log(`✅ Captured ${algo.toUpperCase()} result:`, {
                         distance: result.metrics.displayDistance,
+                        calculatedDistance: result.metrics.calculatedDistance,
                         distanceKm: result.metrics.distanceKm,
                         tau: result.tau,
                         route: result.route,
-                        processTime: result.processTimeMs
+                        processTime: result.processTimeMs,
+                        queryTime: result.metrics.queryTime,
+                        pathLength: result.metrics.pathLength
                     });
                     this.currentProgress.lastResult = result;
                     this.currentProgress.results.push(result);
@@ -1704,18 +1817,46 @@ const DemoRunner = {
             result.metrics.timeImpact = getMetricValue('metrics-time-impact');
             result.metrics.disruptedEdges = getMetricValue('metrics-disrupted-edges');
             
-            // Distance - try multiple sources
-            result.metrics.distance = getMetricValue('metrics-distance');
+            // Distance - try multiple sources WITH CACHING PREVENTION
+            // First try direct DOM elements that get updated dynamically
+            const routeDistance = document.getElementById('route-distance')?.textContent?.trim();
+            const calculatedDistEl = document.getElementById('metrics-calculated-distance')?.textContent?.trim();
+            const metricsDistEl = getMetricValue('metrics-distance');
+            
+            // Use the most recently updated distance value
+            if (routeDistance && routeDistance !== '--') {
+                result.metrics.displayDistance = routeDistance;
+                // Extract numeric distance in km
+                const kmMatch = routeDistance.match(/([\d.]+)\s*km/i);
+                if (kmMatch) {
+                    result.metrics.distanceKm = parseFloat(kmMatch[1]);
+                }
+            }
+            
+            // Fallback to calculated distance if main route distance not available
+            if (!result.metrics.displayDistance && calculatedDistEl && calculatedDistEl !== '--') {
+                result.metrics.calculatedDistance = calculatedDistEl;
+                const kmMatch = calculatedDistEl.match(/([\d.]+)\s*km/i);
+                if (kmMatch) {
+                    result.metrics.distanceKm = parseFloat(kmMatch[1]);
+                }
+            }
+            
+            // Fallback to metrics distance panel
+            if (!result.metrics.displayDistance && !result.metrics.calculatedDistance && metricsDistEl) {
+                result.metrics.distance = metricsDistEl;
+            }
+            
             result.metrics.distanceNum = getNumericValue('metrics-distance');
             result.metrics.pathLength = getMetricValue('metrics-path-length');
             result.metrics.edgeCount = getMetricValue('metrics-edge-count');
             result.metrics.labelingTime = getMetricValue('metrics-labeling-time');
             result.metrics.labelingTimeNum = getNumericValue('metrics-labeling-time');
             result.metrics.labelingSize = getMetricValue('metrics-labeling-size');
-            result.metrics.calculatedDistance = getMetricValue('metrics-calculated-distance');
             result.metrics.calculatedDistanceNum = getNumericValue('metrics-calculated-distance');
 
-            // LazyHC2L Update Phase metrics
+            // LazyHC2L Update Phase metrics (may not be available in current system)
+            // These will be null until LazyHC2L update/repair metrics are implemented
             result.metrics.updateStrategy = getMetricValue('metrics-update-strategy');
             result.metrics.dirtyNodes = getMetricValue('metrics-dirty-nodes');
             result.metrics.dirtyNodesNum = getNumericValue('metrics-dirty-nodes');
@@ -1734,22 +1875,20 @@ const DemoRunner = {
             result.metrics.avgCutSize = getMetricValue('metrics-avg-cut-size');
             result.metrics.indexLoadTime = getMetricValue('metrics-index-load-time');
 
-            // Also try main route display elements
-            const routeDistance = document.getElementById('route-distance')?.textContent?.trim();
+            // Alternative ETA from route display
             const routeEta = document.getElementById('route-eta')?.textContent?.trim();
-            if (routeDistance && routeDistance !== '--') {
-                result.metrics.displayDistance = routeDistance;
-                // Extract numeric distance in km
-                const kmMatch = routeDistance.match(/([\d.]+)\s*km/i);
-                if (kmMatch) {
-                    result.metrics.distanceKm = parseFloat(kmMatch[1]);
-                }
-            }
             if (routeEta && routeEta !== '--') {
                 result.metrics.displayEta = routeEta;
             }
 
-            console.log('📊 Captured result metrics:', result.metrics);
+            console.log('📊 Captured result metrics:', {
+                distance: result.metrics.displayDistance,
+                calculatedDistance: result.metrics.calculatedDistance,
+                distanceNum: result.metrics.distanceNum,
+                queryTime: result.metrics.queryTime,
+                pathLength: result.metrics.pathLength,
+                ...result.metrics
+            });
             return result;
         } catch (e) {
             console.warn('Could not capture result metrics:', e);
@@ -2329,15 +2468,17 @@ const DemoRunner = {
         const sets = this.disruptionSets || {};
         const setKeys = Object.keys(sets);
         
+        // Always show the panel, even if there are no disruption sets
+        setsPanel.classList.remove('hidden');
+        
         if (setKeys.length === 0) {
-            setsPanel.classList.add('hidden');
+            // Show empty state with count badges
+            buttonsContainer.innerHTML = '<div class="text-xs text-gray-400 text-center py-2">No disruption sets</div>';
             previewContainer.innerHTML = this.renderCurrentDisruptionList();
             return;
         }
         
         // Show sets panel and render buttons
-        setsPanel.classList.remove('hidden');
-        
         buttonsContainer.innerHTML = setKeys.map(key => `
             <button onclick="DemoRunner.selectDisruptionSet('${key}')"
                     class="disruption-set-btn ${this.currentPreviewSet === key ? 'active' : ''}">
@@ -2769,6 +2910,7 @@ const DemoRunner = {
             // Step 4: Result captured (will be done by outer loop)
             this.currentProgress.subStep = 3;
             this.updateDetailedProgressUI();
+ 
         }
 
         // Compare algorithms if needed
@@ -2846,52 +2988,25 @@ const DemoRunner = {
         this.isPaused = false;
         this.updatePlayPauseButton();  // Reset button to pause state
         
-        // Clear all routes, disruptions, and markers using the same reset logic as Admin Panel
-        this.performFullReset();
+        // Use the comprehensive system reset function from functions.js
+        resetSystemState({
+            clearLocation: true,
+            clearDisruptions: true,
+            clearUpdateRegions: true,
+            clearGoogleMaps: true,
+            clearExportData: true,
+            resetUI: true,
+            verbose: false
+        });
         
         // Re-enable route finder UI when demo stops
         this.toggleRouteFinderUI(false);
         
+        // Restore the saved Route Finder state
+        this.restoreRouteFinderState();
+        
         showUpdateToast('Demo stopped', 'warning');
         this.showTab('main');
-    },
-
-    /**
-     * Perform a full reset of the map - clears routes, disruptions, and markers
-     * This is the same reset used by the Admin Panel's Reset button
-     */
-    performFullReset() {
-        // Clear all routes (including start/end markers)
-        if (typeof clearRoutes === 'function') {
-            clearRoutes();
-        }
-        // Clear disruption markers
-        if (typeof clearDisruptionMarkers === 'function') {
-            clearDisruptionMarkers();
-        }
-        // Clear our demo-specific disruption layers
-        this.clearDemoDisruptionLayers();
-        this.hideGeneratedDisruptions();
-        
-        // Clear Google Maps route
-        if (typeof clearGoogleMapsRoute === 'function') {
-            clearGoogleMapsRoute();
-        }
-        // Clear update regions
-        if (typeof clearUpdateRegions === 'function') {
-            clearUpdateRegions();
-        }
-        // Clear export data buffer
-        if (typeof clearExportData === 'function') {
-            clearExportData();
-        }
-        
-        // Reset internal disruption state
-        this.generatedDisruptions = { incidents: [], flowSegments: [] };
-        this.disruptionSets = {};
-        this.currentPreviewSet = null;
-        
-        console.log('🧹 Full reset performed: all routes and disruptions cleared');
     },
 
     // ==========================================================================
@@ -3047,12 +3162,12 @@ const DemoRunner = {
             `;
         }
 
-        // Update Phase (LazyHC2L metrics)
+        // Update Phase (LazyHC2L metrics) - Only shown if data is available
         if (stats.lazyRepairTime?.count > 0 || stats.dirtyNodes?.count > 0 || stats.impactScore?.count > 0) {
             statsHTML += `
                 <div class="bg-indigo-50 rounded-xl p-3 border border-indigo-200">
                     <h4 class="font-bold text-indigo-700 mb-2 flex items-center gap-1 text-xs">
-                        <i data-lucide="refresh-cw" class="w-4 h-4"></i> Update Phase
+                        <i data-lucide="refresh-cw" class="w-4 h-4"></i> Update Phase (LazyHC2L)
                     </h4>
                     <div class="space-y-1 text-xs">
                         ${stats.lazyRepairTime?.avg !== null ? `
@@ -3074,6 +3189,19 @@ const DemoRunner = {
                         </div>
                         ` : ''}
                     </div>
+                </div>
+            `;
+        } else {
+            // Show placeholder when LazyHC2L metrics not available
+            statsHTML += `
+                <div class="bg-indigo-50 rounded-xl p-3 border border-indigo-200 col-span-2">
+                    <h4 class="font-bold text-indigo-700 mb-2 flex items-center gap-1 text-xs">
+                        <i data-lucide="refresh-cw" class="w-4 h-4"></i> Update Phase (LazyHC2L)
+                    </h4>
+                    <p class="text-xs text-indigo-600 text-center py-2">
+                        <span class="text-indigo-500">ℹ️</span> LazyHC2L update metrics not available in current system
+                    </p>
+                    <p class="text-xs text-gray-500 text-center">These metrics track lazy repair time, dirty nodes, and impact scores during graph updates.</p>
                 </div>
             `;
         }

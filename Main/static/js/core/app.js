@@ -150,13 +150,14 @@ const App = (function() {
    */
   async function loadInitialData() {
     try {
-      // Fetch disruption count
-      const response = await fetch('/api/disruptions/count');
-      if (response.ok) {
-        const data = await response.json();
-        state.activeDisruptions = data.count || 0;
-        updateDisruptionBadge();
-      }
+      // NOTE: Disruption count endpoint not yet implemented
+      // Disruptions are loaded dynamically when routes are calculated
+      // const response = await fetch('/api/disruptions/count');
+      // if (response.ok) {
+      //   const data = await response.json();
+      //   state.activeDisruptions = data.count || 0;
+      //   updateDisruptionBadge();
+      // }
     } catch (error) {
       console.warn('[App] Could not load initial data:', error);
     }
@@ -181,13 +182,17 @@ const App = (function() {
   }
 
   /**
-   * Update disruption badge
+   * Update disruption badge with optional count parameter
+   * @param {number} count - Optional disruption count to set (if not provided, uses state.activeDisruptions)
    */
-  function updateDisruptionBadge() {
+  function updateDisruptionBadge(count) {
     const badge = document.querySelector('.disruption-badge');
     if (badge) {
-      badge.textContent = state.activeDisruptions;
-      badge.classList.toggle('hidden', state.activeDisruptions === 0);
+      // Use provided count, otherwise fall back to state
+      const disruptionCount = typeof count === 'number' ? count : state.activeDisruptions;
+      state.activeDisruptions = disruptionCount;
+      badge.textContent = disruptionCount;
+      badge.classList.toggle('hidden', disruptionCount === 0);
     }
   }
 

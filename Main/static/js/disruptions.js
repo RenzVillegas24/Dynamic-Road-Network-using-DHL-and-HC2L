@@ -519,11 +519,11 @@ function displayRouteDisruptionAlert_NewFormat(disruptionsSummary) {
     let lowCount = 0;
     
     if (disruptionsSummary.route) {
-      totalDisruptions = disruptionsSummary.route.total_disrupted_edges || 0;
-      timeImpact = disruptionsSummary.route.total_time_impact_seconds || 0;
-      highCount = disruptionsSummary.route.high || 0;
-      mediumCount = disruptionsSummary.route.medium || 0;
-      lowCount = disruptionsSummary.route.low || 0;
+      totalDisruptions = parseInt(disruptionsSummary.route.total_disrupted_edges) || 0;
+      timeImpact = parseInt(disruptionsSummary.route.total_time_impact_seconds) || 0;
+      highCount = parseInt(disruptionsSummary.route.high) || 0;
+      mediumCount = parseInt(disruptionsSummary.route.medium) || 0;
+      lowCount = parseInt(disruptionsSummary.route.low) || 0;
     }
     
     // Hide alert if no disruptions

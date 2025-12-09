@@ -283,16 +283,16 @@
 .bg-slate-900 { background-color: #0f172a; }
 
 /* Tailwind Gray Backgrounds */
-.bg-gray-50 { background-color: #f9fafb; }
-.bg-gray-100 { background-color: #f3f4f6; }
-.bg-gray-200 { background-color: #e5e7eb; }
-.bg-gray-300 { background-color: #d1d5db; }
-.bg-gray-400 { background-color: #9ca3af; }
-.bg-gray-500 { background-color: #6b7280; }
-.bg-gray-600 { background-color: #4b5563; }
-.bg-gray-700 { background-color: #374151; }
-.bg-gray-800 { background-color: #1f2937; }
-.bg-gray-900 { background-color: #111827; }
+.bg-gray-50 { background-color: #fafafa; }
+.bg-gray-100 { background-color: #f4f4f5; }
+.bg-gray-200 { background-color: #e4e4e7; }
+.bg-gray-300 { background-color: #d4d4d8; }
+.bg-gray-400 { background-color: #a1a1aa; }
+.bg-gray-500 { background-color: #71717a; }
+.bg-gray-600 { background-color: #52525b; }
+.bg-gray-700 { background-color: #3f3f46; }
+.bg-gray-800 { background-color: #27272a; }
+.bg-gray-900 { background-color: #18181b; }
 
 /* Tailwind Red Backgrounds */
 .bg-red-50 { background-color: #fef2f2; }

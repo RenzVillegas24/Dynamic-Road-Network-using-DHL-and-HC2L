@@ -66,7 +66,13 @@ const PanelManager = (function () {
       title: 'Route Metrics',
       icon: 'activity',
       size: 'lg',
-      isPassable: () => true
+      isPassable: () => {
+        if (window.currentRouteData == null && !isDemoRunning()) {
+          showNoRouteModal();
+          return false;
+        }
+        return true;
+      }
     },
     'comparison': {
       id: 'algorithm-comparison-panel',
@@ -74,9 +80,13 @@ const PanelManager = (function () {
       icon: 'git-compare',
       size: 'lg',
       isPassable: () => {
+        if (window.currentRouteData == null) {
+          showNoRouteModal();
+          return false;
+        }
         if (isDemoRunning()) {
           // Show modal dialog instead of toast
-          showDemoStopModal('comparison', 'sidebar');
+          showDemoStopModal('current-route', 'sidebar');
           return false;
         }
         return true;

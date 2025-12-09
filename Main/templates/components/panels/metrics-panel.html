@@ -98,6 +98,46 @@
       </div>
     </div>
 
+    <!-- LazyHC2L Update Info Section -->
+    <div id="hc2l-lazy-section" class="section-card section-card--info mb-5" style="display: none;">
+      <div class="section-card__header">
+        <div class="section-card__icon section-card__icon--info">
+          <i data-lucide="zap" class="w-5 h-5"></i>
+        </div>
+        <h3 class="section-card__title">LazyHC2L Update Strategy</h3>
+      </div>
+      <div class="space-y-2">
+        <div class="metric-row">
+          <span class="metric-row__label">Update Strategy:</span>
+          <span id="metrics-update-strategy" class="metric-row__value text-info">--</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row__label">Dirty Nodes Marked:</span>
+          <span id="metrics-dirty-nodes" class="metric-row__value text-info">--</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row__label">Lazy Repair Time:</span>
+          <span id="metrics-repair-time" class="metric-row__value text-info">--</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row__label">Nodes Repaired:</span>
+          <span id="metrics-nodes-repaired" class="metric-row__value text-info">--</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row__label">Cache Hit Status:</span>
+          <span id="metrics-cache-hit" class="metric-row__value text-info">--</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row__label">Disruption Impact Score:</span>
+          <span id="metrics-impact-score" class="metric-row__value text-info">--</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row__label">Tau Threshold:</span>
+          <span id="metrics-tau-threshold" class="metric-row__value text-info">--</span>
+        </div>
+      </div>
+    </div>
+
     <!-- HC2L Labeling Info Section -->
     <div id="hc2l-labeling-info-section" class="section-card section-card--info mb-5">
       <div class="section-card__header">
@@ -167,6 +207,89 @@
           <span class="metric-row__label">Construction Time:</span>
           <span id="dhl-metrics-construction-time" class="metric-row__value" style="color: #8b5cf6;">--</span>
         </div>
+      </div>
+    </div>
+
+    <!-- DHL Update Info Section -->
+    <div id="dhl-update-info-section" class="section-card section-card--purple mb-5" style="display: none;">
+      <div class="section-card__header">
+        <div class="section-card__icon section-card__icon--purple">
+          <i data-lucide="refresh-cw" class="w-5 h-5"></i>
+        </div>
+        <h3 class="section-card__title">DHL Update Information</h3>
+      </div>
+      <div class="space-y-2">
+        <div class="metric-row">
+          <span class="metric-row__label">Algorithm Type:</span>
+          <span id="metrics-algorithm-type" class="metric-row__value" style="color: #8b5cf6;">--</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row__label">Update Strategy:</span>
+          <span id="metrics-dhl-strategy" class="metric-row__value" style="color: #8b5cf6;">--</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row__label">Nodes Updated:</span>
+          <span id="metrics-nodes-updated" class="metric-row__value" style="color: #8b5cf6;">--</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row__label">Disruption Impact Score:</span>
+          <span id="metrics-dhl-impact" class="metric-row__value" style="color: #8b5cf6;">--</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Disruption Configuration Section -->
+    <div id="disruption-config-section" class="section-card section-card--amber mb-5" style="display: none;">
+      <div class="section-card__header">
+        <div class="section-card__icon section-card__icon--primary">
+          <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+        </div>
+        <h3 class="section-card__title">Disruption Configuration</h3>
+      </div>
+      <div class="space-y-2">
+        <div class="metric-row">
+          <span class="metric-row__label">Tau Threshold:</span>
+          <span id="metrics-config-tau" class="metric-row__value">--</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-row__label">Disruption File:</span>
+          <span id="metrics-disruption-file" class="metric-row__value break-all text-xs">--</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- API Console Section -->
+    <div id="metrics-console-section" class="section-card section-card--gray mb-5 bg-gray-800">
+      <div class="section-card__header">
+        <div class="section-card__icon section-card__icon--slate">
+          <i data-lucide="code" class="w-5 h-5"></i>
+        </div>
+        <h3 class="section-card__title text-gray-100">API Response Console</h3>
+        <div id="api-console-controls" class="flex gap-2 flex-shrink-0 ml-auto">
+          <button id="api-console-clear" class="btn btn--xs btn--slate" title="Clear console">
+            <i data-lucide="trash-2" class="w-5 h-5"></i></button>
+          <button id="api-console-copy" class="btn btn--xs btn--slate" title="Copy to clipboard">
+            <i data-lucide="clipboard" class="w-5 h-5"></i></button>
+          <button id="api-console-toggle-view" class="btn btn--xs btn--slate" title="Toggle view mode">
+            <i data-lucide="code" class="w-5 h-5"></i></button>
+        </div>
+      </div>
+      <div id="api-console-output" class="bg-gray-900 text-green-400 font-mono text-xs p-4 overflow-auto space-y-1"
+        style="max-height: 300px; white-space: pre-wrap; word-break: break-word;">
+        <!-- API output will be displayed here -->
+      </div>
+    </div>
+
+    <!-- Alternative Routes Section -->
+    <div id="metrics-alternative-routes-section" class="section-card section-card--slate mb-5 hidden">
+      <div class="section-card__header">
+        <div class="section-card__icon section-card__icon--primary">
+          <i data-lucide="map" class="w-5 h-5"></i>
+        </div>
+        <h3 class="section-card__title">Alternative Routes</h3>
+      </div>
+      <div id="metrics-alternative-routes-list" class="space-y-2">
+        <!-- Alternative routes will be populated here -->
       </div>
     </div>
   </div>

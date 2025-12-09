@@ -466,6 +466,11 @@ window.populateRouteMetricsPanel = function(routeData) {
       alternativeRoutesSection.classList.add('hidden');
     }
   }
+
+  // Populate API Console with raw response
+  if (typeof apiConsole !== 'undefined' && apiConsole) {
+    apiConsole.log(routeData);
+  }
   
   console.log('✅ Route Metrics Panel populated successfully with all fields');
 };
@@ -520,12 +525,20 @@ window.populateDisruptionsPanel = function(routeData) {
       : [];
   const resolvedRouteDisruptionTotal = typeof routeDisruptions.total_disrupted_edges === 'number'
     ? routeDisruptions.total_disrupted_edges
-    : allDisruptions.length || 0;
+    : (typeof routeDisruptions.total_disrupted_edges === 'string'
+        ? parseInt(routeDisruptions.total_disrupted_edges) || 0
+        : allDisruptions.length || 0);
   
   // Show disruption alert in Current Path Panel
   const alertContainer = document.getElementById('disruption-alert-container');
   if (alertContainer) {
-  const totalDisruptions = resolvedRouteDisruptionTotal;
+    const totalDisruptions = resolvedRouteDisruptionTotal;
+    
+    // Update the disruption badge in sidebar
+    if (typeof App !== 'undefined' && typeof App.updateDisruptionBadge === 'function') {
+      App.updateDisruptionBadge(totalDisruptions);
+    }
+    
     if (totalDisruptions > 0) {
       alertContainer.classList.remove('hidden');
       

@@ -227,7 +227,7 @@ const PopupStyles = {
       to = 0,
       distance_km = 0,
       highway_type = 'unknown',
-      flow_status = 'free',
+      severity = null,
       current_speed = 0,
       free_flow_speed = 50,
       jam_factor = 0,
@@ -239,7 +239,9 @@ const PopupStyles = {
       route_type = 'DHL'
     } = data;
 
-    const statusSeverityClass = flow_status.toLowerCase();
+    // Compute displaySeverity: use passed severity or fall back to computing from jam_factor
+    const displaySeverity = severity || (typeof TrafficUtils !== 'undefined' ? TrafficUtils.getSeverityFromJamFactor(jam_factor, is_closed) : 'FreeFlow');
+    const statusSeverityClass = displaySeverity.toLowerCase();
     const iconBadgeClass = route_type === 'DHL' ? 'popup-icon-badge-dhl' : 'popup-icon-badge-hc2l';
     
     return `
@@ -270,7 +272,7 @@ const PopupStyles = {
           <div class="popup-item">
             <span class="popup-item-label">Severity:</span>
             <span class="popup-item-value popup-severity-badge ${statusSeverityClass}">
-              ${flow_status.toUpperCase()}
+              ${displaySeverity.toUpperCase()}
             </span>
           </div>
         </div>

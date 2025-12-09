@@ -21,7 +21,10 @@ const TrafficUtils = {
         HEAVY: '#ef4444',       // Red - Heavy congestion (jam_factor >= 7.0)
         MEDIUM: '#f59e0b',      // Amber/Orange - Medium congestion (jam_factor >= 4.0)
         LIGHT: '#10b981',       // Green - Light congestion (jam_factor < 4.0)
-        FREE_FLOW: '#22c55e',   // Bright green - Free flow (jam_factor < 2.0)
+        LIGHT_FREE_FLOW: '#6ee7b7', // Light green - Light free flow (jam_factor < 2.0)
+
+        FREE_FLOW: '#a3a3a3',   // Bright green - Free flow (jam_factor < 2.0) - used for routes
+        FLOW_FREE_FLOW: '#a3a3a3', // Gray - Free flow for flow/disruption display (jam_factor < 2.0)
         
         // Route-specific default colors (when no traffic data)
         DHL_DEFAULT: '#8b5cf6', // Purple - DHL route default
@@ -42,6 +45,7 @@ const TrafficUtils = {
         HEAVY: 7.0,      // Heavy congestion
         MEDIUM: 4.0,     // Medium congestion
         LIGHT: 2.0,      // Light congestion (below this is free flow)
+        LIGHT_FREE_FLOW: 0.1     // Any positive jam_factor below LIGHT
     },
 
     // =========================================================================
@@ -61,12 +65,14 @@ const TrafficUtils = {
         if (jf >= this.THRESHOLDS.HEAVY) return 'Heavy';
         if (jf >= this.THRESHOLDS.MEDIUM) return 'Medium';
         if (jf >= this.THRESHOLDS.LIGHT) return 'Light';
+        if (jf >= this.THRESHOLDS.LIGHT_FREE_FLOW) return 'Light Free Flow';
         return 'FreeFlow';
     },
 
     /**
      * Get color for disruption based on jam_factor
      * This is the PRIMARY color function - use this for all traffic coloring
+     * Routes will show traffic colors for ANY jam_factor > 0
      * 
      * @param {number} jamFactor - Jam factor value (0.0 - 10.0)
      * @param {boolean} isClosed - Whether the road is closed
@@ -79,16 +85,17 @@ const TrafficUtils = {
         
         const jf = parseFloat(jamFactor) || 0;
         
-        // If jam factor is very low and we have a default, use it
-        if (jf < this.THRESHOLDS.LIGHT && defaultColor) {
+        // Only use default color if jam_factor is 0 (no disruption at all)
+        if (jf === 0 && defaultColor) {
             return defaultColor;
         }
         
-        // Determine color based on jam_factor
+        // Determine color based on jam_factor (show color for any jam_factor > 0)
         if (jf >= this.THRESHOLDS.BLOCKED) return this.COLORS.BLOCKED;
         if (jf >= this.THRESHOLDS.HEAVY) return this.COLORS.HEAVY;
         if (jf >= this.THRESHOLDS.MEDIUM) return this.COLORS.MEDIUM;
         if (jf >= this.THRESHOLDS.LIGHT) return this.COLORS.LIGHT;
+        if (jf >= this.THRESHOLDS.LIGHT_FREE_FLOW) return this.COLORS.LIGHT_FREE_FLOW;
         return this.COLORS.FREE_FLOW;
     },
 
@@ -138,6 +145,30 @@ const TrafficUtils = {
     },
 
     /**
+     * Get color for flow/disruption display based on jam_factor
+     * ONLY for flow visualization - uses gray for FreeFlow instead of green
+     * This is separate from getDisruptionColor to allow different coloring for routes vs flow display
+     * 
+     * @param {number} jamFactor - Jam factor value (0.0 - 10.0)
+     * @param {boolean} isClosed - Whether the road is closed
+     * @returns {string} Hex color code
+     */
+    getFlowDisruptionColor(jamFactor, isClosed = false) {
+        // Road closed takes precedence
+        if (isClosed) return this.COLORS.BLOCKED;
+        
+        const jf = parseFloat(jamFactor) || 0;
+        
+        // Determine color based on jam_factor
+        if (jf >= this.THRESHOLDS.BLOCKED) return this.COLORS.BLOCKED;
+        if (jf >= this.THRESHOLDS.HEAVY) return this.COLORS.HEAVY;
+        if (jf >= this.THRESHOLDS.MEDIUM) return this.COLORS.MEDIUM;
+        if (jf >= this.THRESHOLDS.LIGHT) return this.COLORS.LIGHT;
+        // Use GRAY for FreeFlow in flow display (not bright green)
+        return this.COLORS.FLOW_FREE_FLOW;
+    },
+
+    /**
      * Get Tailwind CSS text color class based on jam factor
      * Used for text styling in UI panels
      * @param {number} jamFactor - Jam factor value (0.0 - 10.0)
@@ -175,6 +206,36 @@ const TrafficUtils = {
             case 'FreeFlow':
             default:
                 return { color, weight: 4, opacity: 1};
+        }
+    },
+
+    /**
+     * Get complete style object for flow/disruption display
+     * Uses gray for FreeFlow instead of bright green
+     * 
+     * @param {number} jamFactor - Jam factor value (0.0 - 10.0)
+     * @param {boolean} isClosed - Whether the road is closed
+     * @returns {Object} Style object with color, weight, opacity
+     */
+    getFlowDisruptionStyle(jamFactor, isClosed = false) {
+        const color = this.getFlowDisruptionColor(jamFactor, isClosed);
+        const severity = this.getSeverityFromJamFactor(jamFactor, isClosed);
+        
+        // Weight and opacity based on severity
+        switch (severity) {
+            case 'Blocked':
+                return { color, weight: 7, opacity: 1 };
+            case 'Heavy':
+                return { color, weight: 6, opacity: 1};
+            case 'Medium':
+                return { color, weight: 5, opacity: 1 };
+            case 'Light':
+                return { color, weight: 4, opacity: 1 };
+            case 'Light Free Flow':
+                return { color, weight: 2, opacity: 0.8 };
+            case 'FreeFlow':
+            default:
+                return { color, weight: 1, opacity: 0.6 };  // Thinner and more transparent for gray freeflow
         }
     },
 

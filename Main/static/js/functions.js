@@ -1604,6 +1604,11 @@ function resetCurrentPathPanel() {
     alertContainer.classList.add('hidden');
   }
 
+  // Reset disruption badge to 0 when path is reset
+  if (typeof App !== 'undefined' && typeof App.updateDisruptionBadge === 'function') {
+    App.updateDisruptionBadge(0);
+  }
+
   console.log('Current Path Panel reset to placeholder state');
 }
 
@@ -1668,11 +1673,11 @@ function displayRouteDisruptionAlert(disruptionsSummary) {
 
   // Parse the new disruptions_summary format from C++ API
   if (disruptionsSummary.route) {
-    totalDisruptions = disruptionsSummary.route.total_disrupted_edges || 0;
-    timeImpact = disruptionsSummary.route.total_time_impact_seconds || 0;
-    highCount = disruptionsSummary.route.high || 0;
-    mediumCount = disruptionsSummary.route.medium || 0;
-    lowCount = disruptionsSummary.route.low || 0;
+    totalDisruptions = parseInt(disruptionsSummary.route.total_disrupted_edges) || 0;
+    timeImpact = parseInt(disruptionsSummary.route.total_time_impact_seconds) || 0;
+    highCount = parseInt(disruptionsSummary.route.high) || 0;
+    mediumCount = parseInt(disruptionsSummary.route.medium) || 0;
+    lowCount = parseInt(disruptionsSummary.route.low) || 0;
   }
 
   // Hide alert if no disruptions
@@ -2506,6 +2511,161 @@ function createGoogleRouteStepElement(stepNumber, instruction, distance, maneuve
     `;
 
   return stepDiv;
+}
+
+// ==================================================================================
+// GENERAL SYSTEM RESET FUNCTION - Used by Admin Panel and Demo Runner
+// ==================================================================================
+
+/**
+ * Comprehensive system reset function that clears all routes, disruptions, 
+ * markers, and UI state. This is the unified reset function used across the system
+ * (Admin Panel, Demo Runner, etc.)
+ * 
+ * @param {Object} options - Configuration options for the reset
+ * @param {boolean} options.clearLocation - Clear start/destination inputs and markers (default: true)
+ * @param {boolean} options.clearDisruptions - Clear disruption markers (default: true)
+ * @param {boolean} options.clearUpdateRegions - Clear update regions visualization (default: true)
+ * @param {boolean} options.clearGoogleMaps - Clear Google Maps route (default: true)
+ * @param {boolean} options.clearExportData - Clear export data buffer (default: true)
+ * @param {boolean} options.resetUI - Reset UI panels and info bars (default: true)
+ * @param {boolean} options.verbose - Log detailed reset info (default: false)
+ */
+function resetSystemState(options = {}) {
+  const {
+    clearLocation = true,
+    clearDisruptions = true,
+    clearUpdateRegions = true,
+    clearGoogleMaps = true,
+    clearExportData = true,
+    resetUI = true,
+    verbose = false
+  } = options;
+
+  const log = verbose ? console.log : () => {};
+
+  log('🔄 Starting comprehensive system reset...');
+
+  // 1. Clear all routes (including start/end markers)
+  if (typeof clearRoutes === 'function') {
+    log('  📍 Clearing routes...');
+    clearRoutes();
+  }
+
+  // 2. Clear disruption markers
+  if (clearDisruptions && typeof clearDisruptionMarkers === 'function') {
+    log('  ⚠️ Clearing disruption markers...');
+    clearDisruptionMarkers();
+  }
+
+  // 3. Clear demo-specific disruption layers (if demo runner is available)
+  if (clearDisruptions && typeof DemoRunner !== 'undefined' && typeof DemoRunner.clearDemoDisruptionLayers === 'function') {
+    log('  🎭 Clearing demo disruption layers...');
+    DemoRunner.clearDemoDisruptionLayers();
+  }
+
+  // 4. Clear Google Maps route
+  if (clearGoogleMaps && typeof clearGoogleMapsRoute === 'function') {
+    log('  🗺️ Clearing Google Maps route...');
+    clearGoogleMapsRoute();
+  }
+
+  // 5. Clear update regions visualization
+  if (clearUpdateRegions && typeof clearUpdateRegions === 'function') {
+    log('  🔲 Clearing update regions...');
+    clearUpdateRegions();
+  }
+
+  // 6. Clear export data buffer
+  if (clearExportData && typeof clearExportData === 'function') {
+    log('  💾 Clearing export data...');
+    clearExportData();
+  }
+
+  // 7. Clear location inputs and window variables if requested
+  if (clearLocation) {
+    log('  📍 Clearing location data...');
+    
+    // Clear window location variables
+    window.startLocation = null;
+    window.destLocation = null;
+
+    // Clear start and destination location input boxes
+    const startInput = document.getElementById('start-location-input');
+    if (startInput) startInput.value = '';
+
+    const destInput = document.getElementById('dest-location-input');
+    if (destInput) destInput.value = '';
+
+    // Clear OSM snap markers if they exist
+    if (typeof clearOSMSnapMarkers === 'function') {
+      clearOSMSnapMarkers('start');
+      clearOSMSnapMarkers('dest');
+    }
+  }
+
+  // 8. Reset UI panels and info bars if requested
+  if (resetUI) {
+    log('  🎨 Resetting UI panels...');
+    
+    // Reset bottom info bar
+    if (typeof resetBottomInfoBar === 'function') {
+      resetBottomInfoBar();
+    }
+
+    // Reset current path panel
+    if (typeof resetCurrentPathPanel === 'function') {
+      resetCurrentPathPanel();
+    }
+
+    // Reset comparison metrics
+    if (typeof resetComparisonMetrics === 'function') {
+      resetComparisonMetrics();
+    }
+
+    // Reset Fréchet distance
+    if (typeof resetFrechetDistance === 'function') {
+      resetFrechetDistance();
+    }
+  }
+
+  // 9. Clear demo-specific state if demo runner is active
+  if (typeof DemoRunner !== 'undefined') {
+    log('  🎭 Clearing demo state...');
+    DemoRunner.generatedDisruptions = { incidents: [], flowSegments: [] };
+    DemoRunner.disruptionSets = {};
+    DemoRunner.currentPreviewSet = null;
+    DemoRunner.demoDisruptionDir = null;
+    window.demoDisruptionDir = null;
+
+    // Clear disruption set buttons and preview
+    const setButtons = document.getElementById('demo-runner-set-buttons');
+    if (setButtons) setButtons.innerHTML = '';
+
+    const previewContainer = document.getElementById('demo-runner-disruption-preview');
+    if (previewContainer) {
+      previewContainer.innerHTML = '<div class="text-muted text-center py-2 text-sm">No disruptions loaded</div>';
+    }
+  }
+
+  log('✅ System reset completed');
+  console.log('✅ System reset completed');
+}
+
+/**
+ * Quick reset for admin panel - clears routes and disruptions
+ * This is the standard reset called by the admin reset button
+ */
+function quickResetMap() {
+  resetSystemState({
+    clearLocation: true,
+    clearDisruptions: true,
+    clearUpdateRegions: true,
+    clearGoogleMaps: true,
+    clearExportData: true,
+    resetUI: true,
+    verbose: true
+  });
 }
 
 
