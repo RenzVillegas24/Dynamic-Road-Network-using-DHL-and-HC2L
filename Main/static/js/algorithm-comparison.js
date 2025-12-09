@@ -496,7 +496,7 @@ function displayComparisonRoutesOnMap() {
         const polyline = L.polyline(coordinates, {
             color: color.primary,
             weight: 5,
-            opacity: 0.8,
+            opacity: 1.0,
             zIndex: algo === 'google' ? 100 : (algo === 'dhl' ? 101 : 102) // HC2L on top
         }).addTo(map);
         

@@ -326,7 +326,8 @@ function renderTrafficSegments(segments, mode, routeOnly) {
       const jamFactor = segment.jam_factor || 0;
       const isClosed = segment.is_closed || false;
       const style = TrafficUtils.getDisruptionStyle(jamFactor, isClosed);
-      const { color, weight, opacity } = style;
+      const { color, weight } = style;
+      const opacity = 0.55;
 
       if (!segment.geometry || !Array.isArray(segment.geometry) || segment.geometry.length < 2) {
         console.warn('   ⚠️  Skipping segment with invalid geometry:', segment);
@@ -345,7 +346,7 @@ function renderTrafficSegments(segments, mode, routeOnly) {
         color: color,
         weight: weight,
         opacity: opacity,
-        className: `traffic-segment traffic-${TrafficUtils.getSeverityFromJamFactor(jamFactor, isClosed).toLowerCase()}`
+        className: 'route-segment-clickable'
       });
 
       const icon = TrafficUtils.getIncidentIcon(segment.incident_type);

@@ -75,7 +75,7 @@ function makeMarkerDraggable(marker, type) {
       if (routePolylines && routePolylines.length > 0) {
         routePolylines.forEach(polyline => {
           if (polyline && map) {
-            polyline.setStyle({ opacity: 0.8 });
+            polyline.setStyle({ opacity: 1.0 });
           }
         });
       }
@@ -106,7 +106,7 @@ function makeMarkerDraggable(marker, type) {
       if (routePolylines && routePolylines.length > 0) {
         routePolylines.forEach(polyline => {
           if (polyline && map) {
-            polyline.setStyle({ opacity: 0.8 });
+            polyline.setStyle({ opacity: 1.0 });
           }
         });
       }

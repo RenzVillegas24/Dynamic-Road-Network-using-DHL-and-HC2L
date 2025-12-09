@@ -2,53 +2,53 @@
 // Function to show update toast messages
 // Now uses the new Toast module when available, falls back to DOM element
 function showUpdateToast(message, type = 'info') {
-    // Use new Toast system if available
-    if (typeof Toast !== 'undefined' && Toast.show) {
-        Toast.show({
-            message: message,
-            type: type,
-            duration: 4000
-        });
-        return;
-    }
-    
-    // Fallback to original implementation
-    const toast = document.getElementById("update-toast");
-    const msg = document.getElementById("update-toast-message");
+  // Use new Toast system if available
+  if (typeof Toast !== 'undefined' && Toast.show) {
+    Toast.show({
+      message: message,
+      type: type,
+      duration: 4000
+    });
+    return;
+  }
 
-    if (!toast || !msg) return;
+  // Fallback to original implementation
+  const toast = document.getElementById("update-toast");
+  const msg = document.getElementById("update-toast-message");
 
-    toast.classList.remove("border-orange-500", "text-orange-700", "border-emerald-500", "text-emerald-700", "border-blue-500", "text-blue-700", "border-red-500", "text-red-700");
+  if (!toast || !msg) return;
 
-    toast.classList.remove("hidden");
-    msg.textContent = message;
+  toast.classList.remove("border-orange-500", "text-orange-700", "border-emerald-500", "text-emerald-700", "border-blue-500", "text-blue-700", "border-red-500", "text-red-700");
 
-    if (type === 'warning') {
-        toast.classList.add("border-orange-500", "text-orange-700");
-    } else if (type === 'success') {
-        toast.classList.add("border-emerald-500", "text-emerald-700");
-    } else if (type === 'error') {
-        toast.classList.add("border-red-500", "text-red-700");
-    } else {
-        toast.classList.add("border-blue-500", "text-blue-700");
-    }
+  toast.classList.remove("hidden");
+  msg.textContent = message;
 
-    setTimeout(() => {
-        toast.classList.add("hidden");
-    }, 4000);
+  if (type === 'warning') {
+    toast.classList.add("border-orange-500", "text-orange-700");
+  } else if (type === 'success') {
+    toast.classList.add("border-emerald-500", "text-emerald-700");
+  } else if (type === 'error') {
+    toast.classList.add("border-red-500", "text-red-700");
+  } else {
+    toast.classList.add("border-blue-500", "text-blue-700");
+  }
+
+  setTimeout(() => {
+    toast.classList.add("hidden");
+  }, 4000);
 }
 
 
 // Toggle Route Details Panel
 function toggleRouteDetailsPanel() {
-    const panel = document.getElementById('route-details-panel');
-    const arrow = document.getElementById('route-details-arrow');
-    if (panel) {
-        panel.classList.toggle('hidden');
-        if (arrow) {
-            arrow.style.transform = panel.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(180deg)';
-        }
+  const panel = document.getElementById('route-details-panel');
+  const arrow = document.getElementById('route-details-arrow');
+  if (panel) {
+    panel.classList.toggle('hidden');
+    if (arrow) {
+      arrow.style.transform = panel.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(180deg)';
     }
+  }
 }
 
 
@@ -67,126 +67,126 @@ function toggleRouteDetailsPanel() {
 
 // Function to clear routes and reset related UI components
 function clearRoutes() {
-    console.log('Clearing routes...');
+  console.log('Clearing routes...');
 
-    // Clear existing route polylines (Leaflet)
-    if (routePolylines && routePolylines.length > 0) {
-        routePolylines.forEach(polyline => {
-            if (polyline && map) {
-                map.removeLayer(polyline);
-            }
-        });
-        console.log('Cleared', routePolylines.length, 'route polylines');
-        routePolylines = [];
-    }
-    
-    // Make routePolylines globally accessible
-    window.routePolylines = routePolylines || [];
+  // Clear existing route polylines (Leaflet)
+  if (routePolylines && routePolylines.length > 0) {
+    routePolylines.forEach(polyline => {
+      if (polyline && map) {
+        map.removeLayer(polyline);
+      }
+    });
+    console.log('Cleared', routePolylines.length, 'route polylines');
+    routePolylines = [];
+  }
 
-    // Clear alternative route polylines (Leaflet)
-    if (window.alternativeRoutePolylines && window.alternativeRoutePolylines.length > 0) {
-        window.alternativeRoutePolylines.forEach(polyline => {
-            if (polyline && map) {
-                map.removeLayer(polyline);
-            }
-        });
-        console.log('Cleared', window.alternativeRoutePolylines.length, 'alternative route polylines');
-        window.alternativeRoutePolylines = [];
-    }
+  // Make routePolylines globally accessible
+  window.routePolylines = routePolylines || [];
 
-    // Clear start and destination markers (Leaflet)
-    if (startMarker && map) {
-        map.removeLayer(startMarker);
-        startMarker = null;
-        console.log('Cleared start marker');
-    }
+  // Clear alternative route polylines (Leaflet)
+  if (window.alternativeRoutePolylines && window.alternativeRoutePolylines.length > 0) {
+    window.alternativeRoutePolylines.forEach(polyline => {
+      if (polyline && map) {
+        map.removeLayer(polyline);
+      }
+    });
+    console.log('Cleared', window.alternativeRoutePolylines.length, 'alternative route polylines');
+    window.alternativeRoutePolylines = [];
+  }
 
-    if (destMarker && map) {
-        map.removeLayer(destMarker);
-        destMarker = null;
-        console.log('Cleared destination marker');
-    }
+  // Clear start and destination markers (Leaflet)
+  if (startMarker && map) {
+    map.removeLayer(startMarker);
+    startMarker = null;
+    console.log('Cleared start marker');
+  }
 
-    // Clear report marker if exists (Leaflet)
-    if (reportMarker && map) {
-        map.removeLayer(reportMarker);
-        reportMarker = null;
-        console.log('Cleared report marker');
-    }
+  if (destMarker && map) {
+    map.removeLayer(destMarker);
+    destMarker = null;
+    console.log('Cleared destination marker');
+  }
 
-    // Clear current route data
-    window.currentRouteData = null;
+  // Clear report marker if exists (Leaflet)
+  if (reportMarker && map) {
+    map.removeLayer(reportMarker);
+    reportMarker = null;
+    console.log('Cleared report marker');
+  }
 
-    // Reset Current Path Panel to placeholder
-    resetCurrentPathPanel();
+  // Clear current route data
+  window.currentRouteData = null;
 
-    // Reset bottom info bar
-    resetBottomInfoBar();
+  // Reset Current Path Panel to placeholder
+  resetCurrentPathPanel();
 
-    console.log('✅ Route clearing complete (Leaflet)');
+  // Reset bottom info bar
+  resetBottomInfoBar();
+
+  console.log('✅ Route clearing complete (Leaflet)');
 }
 
 // Function to reset alternative route highlights to normal display
 function resetAlternativeRouteHighlights() {
-    console.log('🔄 Resetting alternative route highlights...');
-    
-    if (!window.alternativeRoutePolylines || window.alternativeRoutePolylines.length === 0) {
-        return;
-    }
-    
-    // Reset all polylines to normal state
+  console.log('🔄 Resetting alternative route highlights...');
+
+  if (!window.alternativeRoutePolylines || window.alternativeRoutePolylines.length === 0) {
+    return;
+  }
+
+  // Reset all polylines to normal state
   window.alternativeRoutePolylines.forEach((p) => {
     if (p && p.setStyle) {
       p.setStyle({
         opacity: 0.35,  // Return to original transparency
         weight: 4,      // Return to original weight
-        dashArray: '8, 4'  // Return to original dash pattern
+        dashArray: '1, 1'  // Return to original dash pattern
       });
       p._isHighlighted = false;
     }
   });
-    
+
   console.log('✅ Alternative route highlights reset');
 }
 
 // Function to reset the Bottom Information Bar
 function resetBottomInfoBar() {
-    const etaElement = document.getElementById('bottom-info-eta');
-    const distanceElement = document.getElementById('bottom-info-distance');
-    const metricLabelElement = document.getElementById('bottom-info-metric-label');
-    const metricValueElement = document.getElementById('bottom-info-metric-value');
+  const etaElement = document.getElementById('bottom-info-eta');
+  const distanceElement = document.getElementById('bottom-info-distance');
+  const metricLabelElement = document.getElementById('bottom-info-metric-label');
+  const metricValueElement = document.getElementById('bottom-info-metric-value');
 
-    if (etaElement) {
-        etaElement.textContent = '--';
-        etaElement.classList.remove('text-slate-800');
-        etaElement.classList.add('text-slate-400');
-    }
+  if (etaElement) {
+    etaElement.textContent = '--';
+    etaElement.classList.remove('text-slate-800');
+    etaElement.classList.add('text-slate-400');
+  }
 
-    if (distanceElement) {
-        distanceElement.textContent = '--';
-        distanceElement.classList.remove('text-slate-800');
-        distanceElement.classList.add('text-slate-400');
-    }
+  if (distanceElement) {
+    distanceElement.textContent = '--';
+    distanceElement.classList.remove('text-slate-800');
+    distanceElement.classList.add('text-slate-400');
+  }
 
-    if (metricLabelElement) {
-        metricLabelElement.textContent = 'Query Time';
-    }
+  if (metricLabelElement) {
+    metricLabelElement.textContent = 'Query Time';
+  }
 
-    if (metricValueElement) {
-        metricValueElement.textContent = '--';
-        metricValueElement.classList.remove('text-slate-800');
-        metricValueElement.classList.add('text-slate-400');
-    }
+  if (metricValueElement) {
+    metricValueElement.textContent = '--';
+    metricValueElement.classList.remove('text-slate-800');
+    metricValueElement.classList.add('text-slate-400');
+  }
 
-    // Reset Fréchet distance and segment overlap
-    resetComparisonMetrics();
+  // Reset Fréchet distance and segment overlap
+  resetComparisonMetrics();
 
-    console.log('📊 Bottom info bar reset');
+  console.log('📊 Bottom info bar reset');
 }
 
 // Function to clear the distruption markers from the map
 function clearDisruptionMarkers() {
-    disruptionMarkers.forEach(marker => {
+  disruptionMarkers.forEach(marker => {
     if (marker && typeof marker.remove === 'function') {
       marker.remove();
     } else if (marker && map && typeof map.removeLayer === 'function') {
@@ -194,27 +194,27 @@ function clearDisruptionMarkers() {
     } else if (marker && typeof marker.setMap === 'function') {
       marker.setMap(null);
     }
-    });
-    disruptionMarkers = [];
+  });
+  disruptionMarkers = [];
   window.disruptionMarkers = disruptionMarkers;
   window.currentDisruptions = [];
 }
 
 // Function to get selected algorithm from admin panel
 function getSelectedAlgorithm() {
-    const selectedRadio = document.querySelector('input[name="algorithm"]:checked');
-    return selectedRadio ? selectedRadio.value : 'hc2l';
+  const selectedRadio = document.querySelector('input[name="algorithm"]:checked');
+  return selectedRadio ? selectedRadio.value : 'hc2l';
 }
 
 // Function to update the Alternative Route UI based on current state
 function updateAlternativeRouteUI() {
-    // Update the alternative route details to show it's now active
-    const altRouteToggle = document.getElementById('alt-route-toggle');
-    const altRouteDetails = document.getElementById('alt-route-details');
+  // Update the alternative route details to show it's now active
+  const altRouteToggle = document.getElementById('alt-route-toggle');
+  const altRouteDetails = document.getElementById('alt-route-details');
 
-    if (useDisruptions) {
-        // Show that alternative route is now active
-        altRouteToggle.innerHTML = `
+  if (useDisruptions) {
+    // Show that alternative route is now active
+    altRouteToggle.innerHTML = `
         <div class="flex items-center">
             <div class="bg-gradient-to-br from-emerald-600 to-green-600 rounded-xl p-2 mr-3">
             <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -227,20 +227,20 @@ function updateAlternativeRouteUI() {
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"></path>
         </svg>
         `;
-        altRouteToggle.className = "w-full bg-gradient-to-br from-emerald-50 to-green-50 border-2 border-emerald-300 rounded-2xl p-4 mb-5 flex items-center justify-between transition-all duration-300 shadow-md";
-        
-        // Update the button inside alt-route-details to "Switch to Normal Route"
-        setTimeout(() => {
-        const switchButton = altRouteDetails.querySelector('button');
-        if (switchButton) {
-            switchButton.innerHTML = 'Switch to Normal Route';
-            switchButton.className = "w-full bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white py-3 rounded-xl font-bold text-sm shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105";
-        }
-        }, 100);
-        
-    } else {
-        // Restore original appearance for normal route
-        altRouteToggle.innerHTML = `
+    altRouteToggle.className = "w-full bg-gradient-to-br from-emerald-50 to-green-50 border-2 border-emerald-300 rounded-2xl p-4 mb-5 flex items-center justify-between transition-all duration-300 shadow-md";
+
+    // Update the button inside alt-route-details to "Switch to Normal Route"
+    setTimeout(() => {
+      const switchButton = altRouteDetails.querySelector('button');
+      if (switchButton) {
+        switchButton.innerHTML = 'Switch to Normal Route';
+        switchButton.className = "w-full bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white py-3 rounded-xl font-bold text-sm shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105";
+      }
+    }, 100);
+
+  } else {
+    // Restore original appearance for normal route
+    altRouteToggle.innerHTML = `
         <div class="flex items-center">
             <div class="bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl p-2 mr-3">
             <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -253,17 +253,17 @@ function updateAlternativeRouteUI() {
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"></path>
         </svg>
         `;
-        altRouteToggle.className = "w-full bg-gradient-to-br from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 border-2 border-blue-300 rounded-2xl p-4 mb-5 flex items-center justify-between transition-all duration-300 shadow-md hover:shadow-lg";
-        
-        // Update the button inside alt-route-details back to "Switch to This Route"
-        setTimeout(() => {
-        const switchButton = altRouteDetails.querySelector('button');
-        if (switchButton) {
-            switchButton.innerHTML = 'Switch to This Route';
-            switchButton.className = "w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white py-3 rounded-xl font-bold text-sm shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105";
-        }
-        }, 100);
-    }
+    altRouteToggle.className = "w-full bg-gradient-to-br from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 border-2 border-blue-300 rounded-2xl p-4 mb-5 flex items-center justify-between transition-all duration-300 shadow-md hover:shadow-lg";
+
+    // Update the button inside alt-route-details back to "Switch to This Route"
+    setTimeout(() => {
+      const switchButton = altRouteDetails.querySelector('button');
+      if (switchButton) {
+        switchButton.innerHTML = 'Switch to This Route';
+        switchButton.className = "w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white py-3 rounded-xl font-bold text-sm shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105";
+      }
+    }, 100);
+  }
 }
 
 
@@ -333,7 +333,7 @@ async function showAllNodes() {
         fillOpacity: 0.9
       });
       // Lightweight popup with id
-      m.bindTooltip(String(n.node_id), {permanent: false, direction: 'top', opacity: 0.8});
+      m.bindTooltip(String(n.node_id), { permanent: false, direction: 'top', opacity: 0.8 });
       markers.push(m);
     }
 
@@ -358,255 +358,255 @@ function hideAllNodes() {
     showUpdateToast('No node layer to hide', 'warning');
   }
 }
-  
+
 function updateRouteHeaderMetrics(route, metrics) {
-    try {
-      // Debug: Log the actual structure of metrics and route
-      console.log('Debug - Metrics object:', metrics);
-      console.log('Debug - Route object keys:', Object.keys(route));
-      console.log('Debug - Road segments:', route.road_segments);
-      
-      // Try multiple possible field names for distance
-      let distanceM = 0;
-      let distanceSource = 'unknown';
-      
-      // Always try to calculate from road segments first (most accurate for display)
-      if (route && route.road_segments && route.road_segments.length > 0) {
-        let segmentTotal = 0;
-        console.log('Calculating distance from road segments:');
-        route.road_segments.forEach((segment, index) => {
-          const segmentLength = segment.length_meters || segment.length || 0;
-          console.log(`  Segment ${index + 1}: ${segment.road_name} = ${segmentLength}m`);
-          segmentTotal += segmentLength;
-        });
-        
-        if (segmentTotal > 0) {
-          distanceM = segmentTotal;
-          distanceSource = 'road_segments';
-          console.log('✅ Using distance from road segments:', distanceM, 'meters from', route.road_segments.length, 'segments');
-        }
+  try {
+    // Debug: Log the actual structure of metrics and route
+    console.log('Debug - Metrics object:', metrics);
+    console.log('Debug - Route object keys:', Object.keys(route));
+    console.log('Debug - Road segments:', route.road_segments);
+
+    // Try multiple possible field names for distance
+    let distanceM = 0;
+    let distanceSource = 'unknown';
+
+    // Always try to calculate from road segments first (most accurate for display)
+    if (route && route.road_segments && route.road_segments.length > 0) {
+      let segmentTotal = 0;
+      console.log('Calculating distance from road segments:');
+      route.road_segments.forEach((segment, index) => {
+        const segmentLength = segment.length_meters || segment.length || 0;
+        console.log(`  Segment ${index + 1}: ${segment.road_name} = ${segmentLength}m`);
+        segmentTotal += segmentLength;
+      });
+
+      if (segmentTotal > 0) {
+        distanceM = segmentTotal;
+        distanceSource = 'road_segments';
+        console.log('✅ Using distance from road segments:', distanceM, 'meters from', route.road_segments.length, 'segments');
       }
-      
-      // Fallback to metrics if road segments calculation failed
-      if (distanceM === 0) {
-        if (metrics && metrics.total_distance_meters && metrics.total_distance_meters > 0) {
-          distanceM = metrics.total_distance_meters;
-          distanceSource = 'metrics.total_distance_meters';
-          console.log('Using total_distance_meters:', distanceM);
-        } else if (metrics && metrics.total_distance_m && metrics.total_distance_m > 0) {
-          distanceM = metrics.total_distance_m;
-          distanceSource = 'metrics.total_distance_m';
-          console.log('Using total_distance_m:', distanceM);
-        } else if (metrics && metrics.total_distance && metrics.total_distance > 0) {
-          distanceM = metrics.total_distance;
-          distanceSource = 'metrics.total_distance';
-          console.log('Using total_distance:', distanceM);
-        }
-      }
-      
-      // Final fallback: estimate from coordinates
-      if (distanceM === 0) {
-        console.warn('No distance data found in metrics or route segments');
-        if (route && route.coordinates && route.coordinates.length >= 2) {
-          const start = route.coordinates[0];
-          const end = route.coordinates[route.coordinates.length - 1];
-          if (start && end && start.lat && start.lng && end.lat && end.lng) {
-            distanceM = calculateHaversineDistance(start.lat, start.lng, end.lat, end.lng);
-            distanceSource = 'coordinate_estimation';
-            console.log('Estimated distance from coordinates:', distanceM);
-          }
-        }
-      }
-      
-      const distanceKm = (distanceM / 1000).toFixed(1);
-      
-      console.log(`📏 Final distance calculation: ${distanceM}m (${distanceKm}km) from ${distanceSource}`);
-      
-      // Estimate duration (simple calculation: 30 km/h average in urban areas)
-      const avgSpeedKmh = 30;
-      const durationMinutes = Math.round((distanceM / 1000) / avgSpeedKmh * 60);
-      
-      // Count steps
-      const turnDirections = route.turn_by_turn_directions || [];
-      const stepCount = turnDirections.length;
-      
-      // Update distance metric
-      const distanceElement = document.querySelector('#current-path-panel .text-xl.font-bold.text-emerald-600');
-      if (distanceElement) {
-        distanceElement.textContent = `${distanceKm} km`;
-        console.log('✅ Updated distance element with:', `${distanceKm} km`);
-      } else {
-        console.error('❌ Distance element not found with selector: #current-path-panel .text-xl.font-bold.text-emerald-600');
-        // Try alternative selector
-        const allDistanceElements = document.querySelectorAll('.text-xl.font-bold.text-emerald-600');
-        console.log('Found distance elements:', allDistanceElements.length);
-        if (allDistanceElements.length > 0) {
-          allDistanceElements[0].textContent = `${distanceKm} km`;
-          console.log('✅ Updated first distance element as fallback');
-        }
-      }
-      
-      // Update duration metric
-      const durationElement = document.querySelector('#current-path-panel .text-xl.font-bold.text-blue-600');
-      if (durationElement) {
-        durationElement.textContent = `${durationMinutes} min`;
-        console.log('✅ Updated duration element with:', `${durationMinutes} min`);
-      } else {
-        console.error('❌ Duration element not found with selector: #current-path-panel .text-xl.font-bold.text-blue-600');
-        // Try alternative selector
-        const allDurationElements = document.querySelectorAll('.text-xl.font-bold.text-blue-600');
-        console.log('Found duration elements:', allDurationElements.length);
-        if (allDurationElements.length > 0) {
-          allDurationElements[0].textContent = `${durationMinutes} min`;
-          console.log('✅ Updated first duration element as fallback');
-        }
-      }
-      
-      // Update steps count
-      const stepsElement = document.querySelector('#current-path-panel .text-xl.font-bold.text-purple-600');
-      if (stepsElement) {
-        stepsElement.textContent = stepCount.toString();
-        console.log('✅ Updated steps element with:', stepCount.toString());
-      } else {
-        console.error('❌ Steps element not found with selector: #current-path-panel .text-xl.font-bold.text-purple-600');
-        // Try alternative selector
-        const allStepsElements = document.querySelectorAll('.text-xl.font-bold.text-purple-600');
-        console.log('Found steps elements:', allStepsElements.length);
-        if (allStepsElements.length > 0) {
-          allStepsElements[0].textContent = stepCount.toString();
-          console.log('✅ Updated first steps element as fallback');
-        }
-      }
-      
-      console.log(`Route metrics updated: ${distanceKm}km, ${durationMinutes}min, ${stepCount} steps`);
-      
-    } catch (error) {
-      console.error('Error updating route header metrics:', error);
     }
+
+    // Fallback to metrics if road segments calculation failed
+    if (distanceM === 0) {
+      if (metrics && metrics.total_distance_meters && metrics.total_distance_meters > 0) {
+        distanceM = metrics.total_distance_meters;
+        distanceSource = 'metrics.total_distance_meters';
+        console.log('Using total_distance_meters:', distanceM);
+      } else if (metrics && metrics.total_distance_m && metrics.total_distance_m > 0) {
+        distanceM = metrics.total_distance_m;
+        distanceSource = 'metrics.total_distance_m';
+        console.log('Using total_distance_m:', distanceM);
+      } else if (metrics && metrics.total_distance && metrics.total_distance > 0) {
+        distanceM = metrics.total_distance;
+        distanceSource = 'metrics.total_distance';
+        console.log('Using total_distance:', distanceM);
+      }
+    }
+
+    // Final fallback: estimate from coordinates
+    if (distanceM === 0) {
+      console.warn('No distance data found in metrics or route segments');
+      if (route && route.coordinates && route.coordinates.length >= 2) {
+        const start = route.coordinates[0];
+        const end = route.coordinates[route.coordinates.length - 1];
+        if (start && end && start.lat && start.lng && end.lat && end.lng) {
+          distanceM = calculateHaversineDistance(start.lat, start.lng, end.lat, end.lng);
+          distanceSource = 'coordinate_estimation';
+          console.log('Estimated distance from coordinates:', distanceM);
+        }
+      }
+    }
+
+    const distanceKm = (distanceM / 1000).toFixed(1);
+
+    console.log(`📏 Final distance calculation: ${distanceM}m (${distanceKm}km) from ${distanceSource}`);
+
+    // Estimate duration (simple calculation: 30 km/h average in urban areas)
+    const avgSpeedKmh = 30;
+    const durationMinutes = Math.round((distanceM / 1000) / avgSpeedKmh * 60);
+
+    // Count steps
+    const turnDirections = route.turn_by_turn_directions || [];
+    const stepCount = turnDirections.length;
+
+    // Update distance metric
+    const distanceElement = document.querySelector('#current-path-panel .text-xl.font-bold.text-emerald-600');
+    if (distanceElement) {
+      distanceElement.textContent = `${distanceKm} km`;
+      console.log('✅ Updated distance element with:', `${distanceKm} km`);
+    } else {
+      console.error('❌ Distance element not found with selector: #current-path-panel .text-xl.font-bold.text-emerald-600');
+      // Try alternative selector
+      const allDistanceElements = document.querySelectorAll('.text-xl.font-bold.text-emerald-600');
+      console.log('Found distance elements:', allDistanceElements.length);
+      if (allDistanceElements.length > 0) {
+        allDistanceElements[0].textContent = `${distanceKm} km`;
+        console.log('✅ Updated first distance element as fallback');
+      }
+    }
+
+    // Update duration metric
+    const durationElement = document.querySelector('#current-path-panel .text-xl.font-bold.text-blue-600');
+    if (durationElement) {
+      durationElement.textContent = `${durationMinutes} min`;
+      console.log('✅ Updated duration element with:', `${durationMinutes} min`);
+    } else {
+      console.error('❌ Duration element not found with selector: #current-path-panel .text-xl.font-bold.text-blue-600');
+      // Try alternative selector
+      const allDurationElements = document.querySelectorAll('.text-xl.font-bold.text-blue-600');
+      console.log('Found duration elements:', allDurationElements.length);
+      if (allDurationElements.length > 0) {
+        allDurationElements[0].textContent = `${durationMinutes} min`;
+        console.log('✅ Updated first duration element as fallback');
+      }
+    }
+
+    // Update steps count
+    const stepsElement = document.querySelector('#current-path-panel .text-xl.font-bold.text-purple-600');
+    if (stepsElement) {
+      stepsElement.textContent = stepCount.toString();
+      console.log('✅ Updated steps element with:', stepCount.toString());
+    } else {
+      console.error('❌ Steps element not found with selector: #current-path-panel .text-xl.font-bold.text-purple-600');
+      // Try alternative selector
+      const allStepsElements = document.querySelectorAll('.text-xl.font-bold.text-purple-600');
+      console.log('Found steps elements:', allStepsElements.length);
+      if (allStepsElements.length > 0) {
+        allStepsElements[0].textContent = stepCount.toString();
+        console.log('✅ Updated first steps element as fallback');
+      }
+    }
+
+    console.log(`Route metrics updated: ${distanceKm}km, ${durationMinutes}min, ${stepCount} steps`);
+
+  } catch (error) {
+    console.error('Error updating route header metrics:', error);
+  }
 }
-  
+
 function calculateHaversineDistance(lat1, lng1, lat2, lng2) {
-    const R = 6371000; // Earth's radius in meters
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLng = (lng2 - lng1) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-              Math.sin(dLng/2) * Math.sin(dLng/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
+  const R = 6371000; // Earth's radius in meters
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
 }
 
 // Function to make a hex color lighter (for unhighlighted segments)
 function lightenColor(hex, percent) {
-    // Remove # if present
-    hex = hex.replace('#', '');
-    
-    // Convert to RGB
-    let r = parseInt(hex.substring(0, 2), 16);
-    let g = parseInt(hex.substring(2, 4), 16);
-    let b = parseInt(hex.substring(4, 6), 16);
-    
-    // Lighten by mixing with white
-    r = Math.min(255, Math.floor(r + (255 - r) * percent));
-    g = Math.min(255, Math.floor(g + (255 - g) * percent));
-    b = Math.min(255, Math.floor(b + (255 - b) * percent));
-    
-    // Convert back to hex
-    const rr = r.toString(16).padStart(2, '0');
-    const gg = g.toString(16).padStart(2, '0');
-    const bb = b.toString(16).padStart(2, '0');
-    
-    return `#${rr}${gg}${bb}`;
+  // Remove # if present
+  hex = hex.replace('#', '');
+
+  // Convert to RGB
+  let r = parseInt(hex.substring(0, 2), 16);
+  let g = parseInt(hex.substring(2, 4), 16);
+  let b = parseInt(hex.substring(4, 6), 16);
+
+  // Lighten by mixing with white
+  r = Math.min(255, Math.floor(r + (255 - r) * percent));
+  g = Math.min(255, Math.floor(g + (255 - g) * percent));
+  b = Math.min(255, Math.floor(b + (255 - b) * percent));
+
+  // Convert back to hex
+  const rr = r.toString(16).padStart(2, '0');
+  const gg = g.toString(16).padStart(2, '0');
+  const bb = b.toString(16).padStart(2, '0');
+
+  return `#${rr}${gg}${bb}`;
 }
 
 
 function formatDuration(seconds) {
-    if (!seconds || seconds < 0) return '0 min';
-    
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    
-    if (hours > 0) {
-        return `${hours}h ${minutes}m`;
-    } else if (minutes > 0) {
-        return `${minutes} min`;
-    } else {
-        return '< 1 min';
-    }
+  if (!seconds || seconds < 0) return '0 min';
+
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  } else if (minutes > 0) {
+    return `${minutes} min`;
+  } else {
+    return '< 1 min';
+  }
 }
 
-  
+
 function updateRouteSteps(route) {
-    try {
-      const turnDirections = route.turn_by_turn_directions || [];
-      const roadSegments = route.road_segments || [];
-      
-      if (turnDirections.length === 0) {
-        console.warn('No turn-by-turn directions available');
-        return;
-      }
-      
-      // Find the route steps container
-      const stepsContainer = document.getElementById('route-steps');
-      if (!stepsContainer) {
-        console.error('Route steps container not found');
-        return;
-      }
-      
-      // Hide placeholder
-      const placeholder = document.getElementById('route-steps-placeholder');
-      if (placeholder) {
-        placeholder.style.display = 'none';
-      }
-      
-      // Clear existing steps (except placeholder)
-      const existingSteps = stepsContainer.querySelectorAll('.flex.gap-4.items-start');
-      existingSteps.forEach(step => step.remove());
-      
-      // Add each direction as a step
-      turnDirections.forEach((direction, index) => {
-        const stepNumber = index + 1;
-        const isLastStep = index === turnDirections.length - 1;
-        
-        // Get corresponding road segment for additional info
-        const roadSegment = roadSegments[index] || {};
-        const roadName = roadSegment.road_name || 'Unknown Road';
-        const distance = roadSegment.length_meters || 0;
-        
-        // Create step element
-        const stepElement = createRouteStepElement(stepNumber, direction, roadName, distance, isLastStep);
-        stepsContainer.appendChild(stepElement);
-      });
-      
-      console.log(`Added ${turnDirections.length} route steps to Current Path Panel`);
-      
-    } catch (error) {
-      console.error('Error updating route steps:', error);
+  try {
+    const turnDirections = route.turn_by_turn_directions || [];
+    const roadSegments = route.road_segments || [];
+
+    if (turnDirections.length === 0) {
+      console.warn('No turn-by-turn directions available');
+      return;
     }
+
+    // Find the route steps container
+    const stepsContainer = document.getElementById('route-steps');
+    if (!stepsContainer) {
+      console.error('Route steps container not found');
+      return;
+    }
+
+    // Hide placeholder
+    const placeholder = document.getElementById('route-steps-placeholder');
+    if (placeholder) {
+      placeholder.style.display = 'none';
+    }
+
+    // Clear existing steps (except placeholder)
+    const existingSteps = stepsContainer.querySelectorAll('.flex.gap-4.items-start');
+    existingSteps.forEach(step => step.remove());
+
+    // Add each direction as a step
+    turnDirections.forEach((direction, index) => {
+      const stepNumber = index + 1;
+      const isLastStep = index === turnDirections.length - 1;
+
+      // Get corresponding road segment for additional info
+      const roadSegment = roadSegments[index] || {};
+      const roadName = roadSegment.road_name || 'Unknown Road';
+      const distance = roadSegment.length_meters || 0;
+
+      // Create step element
+      const stepElement = createRouteStepElement(stepNumber, direction, roadName, distance, isLastStep);
+      stepsContainer.appendChild(stepElement);
+    });
+
+    console.log(`Added ${turnDirections.length} route steps to Current Path Panel`);
+
+  } catch (error) {
+    console.error('Error updating route steps:', error);
+  }
 }
-  
+
 function createRouteStepElement(stepNumber, instruction, roadName, distanceMeters, isLastStep) {
-    const stepDiv = document.createElement('div');
-    stepDiv.className = 'flex gap-4 items-start';
-    
-    // Determine step colors
-    const stepColors = isLastStep 
-      ? 'bg-gradient-to-br from-rose-500 to-red-600 text-white'
-      : 'bg-gradient-to-br from-emerald-500 to-green-600 text-white';
-    
-    const contentColors = isLastStep
-      ? 'bg-gradient-to-br from-rose-50 to-red-50 border-2 border-rose-300'
-      : 'bg-slate-50 border border-slate-200';
-    
-    const distanceColor = isLastStep ? 'text-rose-600' : 'text-emerald-600';
-    
-    // Clean up instruction text (remove step numbers if present)
-    const cleanInstruction = instruction.replace(/^\d+\.\s*/, '');
-    
-    // Format distance
-    const distanceText = distanceMeters > 0 ? `${(distanceMeters / 1000).toFixed(1)} km` : '';
-    
-    stepDiv.innerHTML = `
+  const stepDiv = document.createElement('div');
+  stepDiv.className = 'flex gap-4 items-start';
+
+  // Determine step colors
+  const stepColors = isLastStep
+    ? 'bg-gradient-to-br from-rose-500 to-red-600 text-white'
+    : 'bg-gradient-to-br from-emerald-500 to-green-600 text-white';
+
+  const contentColors = isLastStep
+    ? 'bg-gradient-to-br from-rose-50 to-red-50 border-2 border-rose-300'
+    : 'bg-slate-50 border border-slate-200';
+
+  const distanceColor = isLastStep ? 'text-rose-600' : 'text-emerald-600';
+
+  // Clean up instruction text (remove step numbers if present)
+  const cleanInstruction = instruction.replace(/^\d+\.\s*/, '');
+
+  // Format distance
+  const distanceText = distanceMeters > 0 ? `${(distanceMeters / 1000).toFixed(1)} km` : '';
+
+  stepDiv.innerHTML = `
       <div class="${stepColors} w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm flex-shrink-0 shadow-md">
         ${stepNumber}
       </div>
@@ -618,803 +618,804 @@ function createRouteStepElement(stepNumber, instruction, roadName, distanceMeter
         </div>
       </div>
     `;
-    
-    return stepDiv;
+
+  return stepDiv;
 }
-  
+
 function updateComparisonMetrics(routeData) {
-    try {
-      // Check algorithm type to determine behavior
-      const metrics = routeData.metrics || {};
-      const algorithm = routeData.algorithm || metrics.algorithm || 'Unknown';
-      
-      // Check if algorithm is Comparison mode - if so, set metrics to "--"
-      if (algorithm.includes('Comparison')) {
-        console.log('Comparison mode detected - setting Fréchet distance and segment overlap to "--"');
-        
-        // Set Fréchet Distance to "--" for Comparison mode
-        const frechetElement = document.getElementById('frechet-distance-value');
-        if (frechetElement) {
-          frechetElement.textContent = '--';
-          frechetElement.classList.remove('text-slate-800');
-          frechetElement.classList.add('text-slate-400');
-        }
-        
-        // Also update the old selector for backwards compatibility
-        const frechetElementOld = document.querySelector('#current-path-panel .flex.justify-between .font-bold.text-blue-700');
-        if (frechetElementOld) {
-          frechetElementOld.textContent = '--';
-        }
-        
-        // Set Segment Overlap to "--" for Comparison mode
-        const overlapElement = document.getElementById('segment-overlap-value');
-        if (overlapElement) {
-          overlapElement.textContent = '--';
-          overlapElement.classList.remove('text-slate-800');
-          overlapElement.classList.add('text-slate-400');
-        }
-        
-        // Also update the old selector for backwards compatibility
-        const overlapElementOld = document.querySelector('#current-path-panel .flex.justify-between .font-bold.text-emerald-700');
-        if (overlapElementOld) {
-          overlapElementOld.textContent = '--';
-        }
-        
-        console.log('✅ Fréchet distance and segment overlap set to "--" for Comparison mode');
-        return; // Exit early for Comparison mode
+  try {
+    // Check algorithm type to determine behavior
+    const metrics = routeData.metrics || {};
+    const algorithm = routeData.algorithm || metrics.algorithm || 'Unknown';
+
+    // Check if algorithm is Comparison mode - if so, set metrics to "--"
+    if (algorithm.includes('Comparison')) {
+      console.log('Comparison mode detected - setting Fréchet distance and segment overlap to "--"');
+
+      // Set Fréchet Distance to "--" for Comparison mode
+      const frechetElement = document.getElementById('frechet-distance-value');
+      if (frechetElement) {
+        frechetElement.textContent = '--';
+        frechetElement.classList.remove('text-slate-800');
+        frechetElement.classList.add('text-slate-400');
       }
-      
-      // Check if algorithm is DHL - if so, set metrics to "--"
-      if (algorithm.includes('DHL')) {
-        console.log('DHL algorithm detected - setting Fréchet distance and segment overlap to "--"');
-        
-        // Set Fréchet Distance to "--" for DHL
-        const frechetElement = document.getElementById('frechet-distance-value');
-        if (frechetElement) {
-          frechetElement.textContent = '--';
-          frechetElement.classList.remove('text-slate-800');
-          frechetElement.classList.add('text-slate-400');
-        }
-        
-        // Also update the old selector for backwards compatibility
-        const frechetElementOld = document.querySelector('#current-path-panel .flex.justify-between .font-bold.text-blue-700');
-        if (frechetElementOld) {
-          frechetElementOld.textContent = '--';
-        }
-        
-        // Set Segment Overlap to "--" for DHL
-        const overlapElement = document.getElementById('segment-overlap-value');
-        if (overlapElement) {
-          overlapElement.textContent = '--';
-          overlapElement.classList.remove('text-slate-800');
-          overlapElement.classList.add('text-slate-400');
-        }
-        
-        // Also update the old selector for backwards compatibility
-        const overlapElementOld = document.querySelector('#current-path-panel .flex.justify-between .font-bold.text-emerald-700');
-        if (overlapElementOld) {
-          overlapElementOld.textContent = '--';
-        }
-        
-        console.log('✅ Fréchet distance and segment overlap set to "--" for DHL algorithm');
-        return; // Exit early for DHL
+
+      // Also update the old selector for backwards compatibility
+      const frechetElementOld = document.querySelector('#current-path-panel .flex.justify-between .font-bold.text-blue-700');
+      if (frechetElementOld) {
+        frechetElementOld.textContent = '--';
       }
-      
-      // For D-HC2L algorithms, compute the metrics as before
-      if (window.googleRouteMetadata && routeData) {
-        console.log('Computing Fréchet distance for comparison (D-HC2L algorithm)...');
-        
-        // Get Google Maps route with coordinates
-        getGoogleMapsRouteWithCoordinates(startLocation.lat, startLocation.lng, destLocation.lat, destLocation.lng)
-          .then(googleRouteWithCoords => {
-            const frechetResult = computeDiscreteFrechetDistance(routeData, googleRouteWithCoords);
-            
-            if (frechetResult.success) {
-              // Update Fréchet Distance display
-              const frechetElement = document.getElementById('frechet-distance-value');
-              if (frechetElement) {
-                frechetElement.textContent = `${frechetResult.distance_m} m`;
-                frechetElement.classList.remove('text-slate-400');
-                frechetElement.classList.add('text-slate-800');
-                console.log(`✅ Fréchet distance updated: ${frechetResult.distance_m} m`);
-              }
-              
-              // Also update the old selector for backwards compatibility
-              const frechetElementOld = document.querySelector('#current-path-panel .flex.justify-between .font-bold.text-blue-700');
-              if (frechetElementOld) {
-                frechetElementOld.textContent = `${frechetResult.distance_m} m`;
-              }
-            } else {
-              console.warn('Failed to compute Fréchet distance:', frechetResult.error);
-              // Show error state
-              const frechetElement = document.getElementById('frechet-distance-value');
-              if (frechetElement) {
-                frechetElement.textContent = 'Error';
-              }
-            }
-            
-            // Compute Segment Overlap
-            console.log('Computing segment overlap for comparison...');
-            const overlapResult = computeSegmentOverlap(routeData, googleRouteWithCoords);
-            
-            if (overlapResult.success) {
-              // Update Segment Overlap display
-              const overlapElement = document.getElementById('segment-overlap-value');
-              if (overlapElement) {
-                overlapElement.textContent = overlapResult.overlap_percentage_formatted;
-                overlapElement.classList.remove('text-slate-400');
-                overlapElement.classList.add('text-slate-800');
-                console.log(`✅ Segment overlap updated: ${overlapResult.overlap_percentage_formatted}`);
-              }
-              
-              // Also update the old selector for backwards compatibility
-              const overlapElementOld = document.querySelector('#current-path-panel .flex.justify-between .font-bold.text-emerald-700');
-              if (overlapElementOld) {
-                overlapElementOld.textContent = overlapResult.overlap_percentage_formatted;
-              }
-            } else {
-              console.warn('Failed to compute segment overlap:', overlapResult.error);
-              // Show error state
-              const overlapElement = document.getElementById('segment-overlap-value');
-              if (overlapElement) {
-                overlapElement.textContent = 'Error';
-              }
-            }
-          })
-          .catch(error => {
-            console.error('Error getting Google Maps route for Fréchet computation:', error);
+
+      // Set Segment Overlap to "--" for Comparison mode
+      const overlapElement = document.getElementById('segment-overlap-value');
+      if (overlapElement) {
+        overlapElement.textContent = '--';
+        overlapElement.classList.remove('text-slate-800');
+        overlapElement.classList.add('text-slate-400');
+      }
+
+      // Also update the old selector for backwards compatibility
+      const overlapElementOld = document.querySelector('#current-path-panel .flex.justify-between .font-bold.text-emerald-700');
+      if (overlapElementOld) {
+        overlapElementOld.textContent = '--';
+      }
+
+      console.log('✅ Fréchet distance and segment overlap set to "--" for Comparison mode');
+      return; // Exit early for Comparison mode
+    }
+
+    // Check if algorithm is DHL - if so, set metrics to "--"
+    if (algorithm.includes('DHL')) {
+      console.log('DHL algorithm detected - setting Fréchet distance and segment overlap to "--"');
+
+      // Set Fréchet Distance to "--" for DHL
+      const frechetElement = document.getElementById('frechet-distance-value');
+      if (frechetElement) {
+        frechetElement.textContent = '--';
+        frechetElement.classList.remove('text-slate-800');
+        frechetElement.classList.add('text-slate-400');
+      }
+
+      // Also update the old selector for backwards compatibility
+      const frechetElementOld = document.querySelector('#current-path-panel .flex.justify-between .font-bold.text-blue-700');
+      if (frechetElementOld) {
+        frechetElementOld.textContent = '--';
+      }
+
+      // Set Segment Overlap to "--" for DHL
+      const overlapElement = document.getElementById('segment-overlap-value');
+      if (overlapElement) {
+        overlapElement.textContent = '--';
+        overlapElement.classList.remove('text-slate-800');
+        overlapElement.classList.add('text-slate-400');
+      }
+
+      // Also update the old selector for backwards compatibility
+      const overlapElementOld = document.querySelector('#current-path-panel .flex.justify-between .font-bold.text-emerald-700');
+      if (overlapElementOld) {
+        overlapElementOld.textContent = '--';
+      }
+
+      console.log('✅ Fréchet distance and segment overlap set to "--" for DHL algorithm');
+      return; // Exit early for DHL
+    }
+
+    // For D-HC2L algorithms, compute the metrics as before
+    if (window.googleRouteMetadata && routeData) {
+      console.log('Computing Fréchet distance for comparison (D-HC2L algorithm)...');
+
+      // Get Google Maps route with coordinates
+      getGoogleMapsRouteWithCoordinates(startLocation.lat, startLocation.lng, destLocation.lat, destLocation.lng)
+        .then(googleRouteWithCoords => {
+          const frechetResult = computeDiscreteFrechetDistance(routeData, googleRouteWithCoords);
+
+          if (frechetResult.success) {
+            // Update Fréchet Distance display
             const frechetElement = document.getElementById('frechet-distance-value');
             if (frechetElement) {
-              frechetElement.textContent = 'N/A';
+              frechetElement.textContent = `${frechetResult.distance_m} m`;
+              frechetElement.classList.remove('text-slate-400');
+              frechetElement.classList.add('text-slate-800');
+              console.log(`✅ Fréchet distance updated: ${frechetResult.distance_m} m`);
             }
+
+            // Also update the old selector for backwards compatibility
+            const frechetElementOld = document.querySelector('#current-path-panel .flex.justify-between .font-bold.text-blue-700');
+            if (frechetElementOld) {
+              frechetElementOld.textContent = `${frechetResult.distance_m} m`;
+            }
+          } else {
+            console.warn('Failed to compute Fréchet distance:', frechetResult.error);
+            // Show error state
+            const frechetElement = document.getElementById('frechet-distance-value');
+            if (frechetElement) {
+              frechetElement.textContent = 'Error';
+            }
+          }
+
+          // Compute Segment Overlap
+          console.log('Computing segment overlap for comparison...');
+          const overlapResult = computeSegmentOverlap(routeData, googleRouteWithCoords);
+
+          if (overlapResult.success) {
+            // Update Segment Overlap display
             const overlapElement = document.getElementById('segment-overlap-value');
             if (overlapElement) {
-              overlapElement.textContent = 'N/A';
+              overlapElement.textContent = overlapResult.overlap_percentage_formatted;
+              overlapElement.classList.remove('text-slate-400');
+              overlapElement.classList.add('text-slate-800');
+              console.log(`✅ Segment overlap updated: ${overlapResult.overlap_percentage_formatted}`);
             }
-          });
-      } else {
-        // No Google Maps data available, show placeholder
-        const frechetElement = document.getElementById('frechet-distance-value');
-        if (frechetElement) {
-          frechetElement.textContent = '-- m';
-        }
-        const overlapElement = document.getElementById('segment-overlap-value');
-        if (overlapElement) {
-          overlapElement.textContent = '--%';
-        }
-        console.log('No Google Maps route data available for comparison metrics computation');
+
+            // Also update the old selector for backwards compatibility
+            const overlapElementOld = document.querySelector('#current-path-panel .flex.justify-between .font-bold.text-emerald-700');
+            if (overlapElementOld) {
+              overlapElementOld.textContent = overlapResult.overlap_percentage_formatted;
+            }
+          } else {
+            console.warn('Failed to compute segment overlap:', overlapResult.error);
+            // Show error state
+            const overlapElement = document.getElementById('segment-overlap-value');
+            if (overlapElement) {
+              overlapElement.textContent = 'Error';
+            }
+          }
+        })
+        .catch(error => {
+          console.error('Error getting Google Maps route for Fréchet computation:', error);
+          const frechetElement = document.getElementById('frechet-distance-value');
+          if (frechetElement) {
+            frechetElement.textContent = 'N/A';
+          }
+          const overlapElement = document.getElementById('segment-overlap-value');
+          if (overlapElement) {
+            overlapElement.textContent = 'N/A';
+          }
+        });
+    } else {
+      // No Google Maps data available, show placeholder
+      const frechetElement = document.getElementById('frechet-distance-value');
+      if (frechetElement) {
+        frechetElement.textContent = '-- m';
       }
-      
-    } catch (error) {
-      console.error('Error updating comparison metrics:', error);
+      const overlapElement = document.getElementById('segment-overlap-value');
+      if (overlapElement) {
+        overlapElement.textContent = '--%';
+      }
+      console.log('No Google Maps route data available for comparison metrics computation');
     }
+
+  } catch (error) {
+    console.error('Error updating comparison metrics:', error);
+  }
 }
 
 // Function to reset Fréchet distance display
 function resetFrechetDistance() {
-    const frechetElement = document.getElementById('frechet-distance-value');
-    if (frechetElement) {
-        frechetElement.textContent = '-- m';
-    }
+  const frechetElement = document.getElementById('frechet-distance-value');
+  if (frechetElement) {
+    frechetElement.textContent = '-- m';
+  }
 }
 
 // Function to reset comparison metrics display
 function resetComparisonMetrics() {
-    const frechetElement = document.getElementById('frechet-distance-value');
-    if (frechetElement) {
-        frechetElement.textContent = '--';
-        frechetElement.classList.remove('text-slate-800');
-        frechetElement.classList.add('text-slate-400');
-    }
-    
-    const overlapElement = document.getElementById('segment-overlap-value');
-    if (overlapElement) {
-        overlapElement.textContent = '--';
-        overlapElement.classList.remove('text-slate-800');
-        overlapElement.classList.add('text-slate-400');
-    }
+  const frechetElement = document.getElementById('frechet-distance-value');
+  if (frechetElement) {
+    frechetElement.textContent = '--';
+    frechetElement.classList.remove('text-slate-800');
+    frechetElement.classList.add('text-slate-400');
+  }
+
+  const overlapElement = document.getElementById('segment-overlap-value');
+  if (overlapElement) {
+    overlapElement.textContent = '--';
+    overlapElement.classList.remove('text-slate-800');
+    overlapElement.classList.add('text-slate-400');
+  }
 }
 
-  // DHL Route Display Functions
+// DHL Route Display Functions
 function displayDHLRoute(routeData) {
-    console.log('Displaying DHL route:', routeData);
-    
-    // Clear only route polylines, keep location markers
-    if (routePolylines && routePolylines.length > 0) {
-        routePolylines.forEach(polyline => {
-            if (polyline && map) {
-                map.removeLayer(polyline);
-            }
-        });
-        routePolylines = [];
-        window.routePolylines = routePolylines;
-    }
-    
-    if (!routeData.success || !routeData.route) {
-      console.error('Invalid DHL route data:', routeData);
-      return;
-    }
-    
-    const route = routeData.route;
-    
-    // Display route geometry with colors on map using Leaflet
-    if (route.geometry && route.geometry.length > 0) {
-      route.geometry.forEach((segment, index) => {
-        // Extract coordinates from segment (might be string or already parsed)
-        let coords = segment.coordinates;
-        
-        // If coordinates is a string, parse it
-        if (typeof coords === 'string') {
-          try {
-            coords = JSON.parse(coords);
-            console.log(`Parsed DHL coordinates from string for segment ${index}`);
-          } catch (e) {
-            console.error(`Failed to parse DHL coordinates string for segment ${index}:`, coords, e);
-            return;
-          }
-        }
-        
-        if (!coords || coords.length < 2) {
-          console.warn('DHL Segment has insufficient coordinates:', segment);
-          return;
-        }
-        
-  // Convert coordinates to Leaflet format [lng, lat] -> [lat, lng]
-  const pathCoords = coords.map(coord => [coord[1], coord[0]]);
-  const flowInfo = segment.flow || {};
-        
-  // Get color from TrafficUtils based on jam_factor (unified color logic)
-  const jam_factor = TrafficUtils.extractJamFactor(segment);
-  const is_closed = TrafficUtils.extractIsClosed(segment);
-  const segmentColor = TrafficUtils.getDisruptionColor(jam_factor, is_closed, TrafficUtils.COLORS.DHL_DEFAULT);
-  const segmentStyle = TrafficUtils.getDisruptionStyle(jam_factor, is_closed, TrafficUtils.COLORS.DHL_DEFAULT);
-        
-        // Create polyline with segment-specific color
-        const polyline = L.polyline(pathCoords, {
-          color: segmentColor,
-          opacity: segmentStyle.opacity,
-          weight: segmentStyle.weight,
-          className: 'route-segment-clickable'
-        }).addTo(map);
-        
-        // Build comprehensive popup with all edge details
-  const distance_m = segment.distance_meters || 0;
-  const distance_km = (distance_m / 1000).toFixed(2);
-  const highway_type = segment.highway_type || 'unknown';
-  const free_flow_speed = segment.free_flow_speed_kmh ?? flowInfo.free_flow_kph ?? 0;
-  const current_speed = flowInfo.speed_kph ?? segment.speed_kmh ?? free_flow_speed;
-  const severity = TrafficUtils.getSeverityFromJamFactor(jam_factor, is_closed);
-        const incident_type = segment.incident_type || 'none';
-        const incident_confidence = segment.incident_confidence || 0;
-        
-        // Use PopupStyles for consistent route segment popup formatting
-        const popupContent = PopupStyles.createRouteSegmentPopup({
-          road_name: segment.road_name || segment.name || 'Unknown Road',
-          from: segment.from,
-          to: segment.to,
-          distance_km: distance_km,
-          highway_type: highway_type,
-          severity: severity,
-          current_speed: current_speed,
-          free_flow_speed: free_flow_speed,
-          jam_factor: jam_factor,
-          is_closed: is_closed,
-          incident_type: incident_type,
-          incident_confidence: incident_confidence,
-          segment_index: index,
-          total_segments: route.geometry.length,
-          route_type: 'DHL'
-        });
-        
-        polyline.bindPopup(popupContent, {
-          maxWidth: 320,
-          className: 'route-segment-popup'
-        });
-        
-        // Store original color and segment data for each polyline
-        polyline._originalColor = segmentColor;
-        polyline._segmentIndex = index;
-        polyline._segmentData = segment; // Store complete segment data for lookup
-        
-        // Add click event to highlight and show details
-        polyline.on('click', function(e) {
-          console.log(`🖱️ Clicked DHL segment ${index + 1}:`, segment);
-          
-          // Highlight this segment and lighten others
-          routePolylines.forEach((p, i) => {
-            if (i === index) {
-              p.setStyle({ weight: 10, color: p._originalColor });
-              p._isHighlighted = true;
-            } else {
-              p.setStyle({ weight: 6, color: lightenColor(p._originalColor, 0.5) });
-              p._isHighlighted = false;
-            }
-          });
-          
-          // Open popup
-          polyline.openPopup();
-        });
-        
-        // Reset all segments when popup closes
-        polyline.on('popupclose', function(e) {
-          routePolylines.forEach(p => {
-            p.setStyle({ weight: 6, color: p._originalColor });
-            p._isHighlighted = false;
-          });
-        });
-        
-        // Add hover effect
-        polyline.on('mouseover', function(e) {
-          if (this.getElement()) {
-            this.setStyle({ weight: 8 });
-          }
-        });
-        
-        polyline.on('mouseout', function(e) {
-          // Check if this segment is highlighted
-          const isHighlighted = this.options.weight === 10;
-          if (!isHighlighted) {
-            this.setStyle({ weight: 6 });
-          }
-        });
-        
-        routePolylines.push(polyline);
-      });
-      
-      console.log(`✅ Added ${route.geometry.length} colored DHL segments to map`);
-    } else if (route.polylines && route.polylines.length > 0) {
-      // Legacy fallback for old polylines format
-      route.polylines.forEach(polylineData => {
-        let pathCoords;
-        if (polylineData.path) {
-          pathCoords = polylineData.path.map(p => [p.lat, p.lng]);
-        } else if (polylineData.coordinates) {
-          pathCoords = polylineData.coordinates.map(coord => {
-            if (Array.isArray(coord)) {
-              return [coord[0], coord[1]];
-            } else {
-              return [coord.lat, coord.lng];
-            }
-          });
-        } else {
-          return;
-        }
-        
-        const polyline = L.polyline(pathCoords, {
-          color: polylineData.strokeColor || polylineData.color || '#8b5cf6',
-          opacity: 0.8,
-          weight: 5
-        }).addTo(map);
-        
-        routePolylines.push(polyline);
-      });
-      
-      console.log(`✅ Added ${route.polylines.length} DHL polylines (legacy)`);
-    } else {
-      console.warn('No valid geometry or polyline data found in DHL route');
-    }
-    
-    // Add connector polylines from pinned locations to route start/end nodes
-    addDHLConnectorPolylines(routeData);
-    
-    // Fit map to show the route (including connectors) using Leaflet
-    if (routePolylines.length > 0) {
-      const bounds = L.latLngBounds();
-      
-      // Add route points to bounds
-      routePolylines.forEach(polyline => {
-        const latLngs = polyline.getLatLngs();
-        latLngs.forEach(latLng => bounds.extend(latLng));
-      });
-      
-      // Add pinned locations to bounds
-      if (startLocation) bounds.extend([startLocation.lat, startLocation.lng]);
-      if (destLocation) bounds.extend([destLocation.lat, destLocation.lng]);
-      
-      map.fitBounds(bounds);
-    }
-    
-    // Update route metrics in bottom info bar
-    if (routeData.metrics) {
-      updateRouteMetrics(routeData);
-    }
+  console.log('Displaying DHL route:', routeData);
 
-    // Update disruption alert banner when summary available
-    if (routeData.disruptions_summary) {
-      window.currentDisruptionsSummary = routeData.disruptions_summary;
-      displayRouteDisruptionAlert(routeData.disruptions_summary);
-    } else {
-      window.currentDisruptionsSummary = null;
-      displayRouteDisruptionAlert(null);
-    }
-
-    // Display alternative routes with transparent overlay
-    if (routeData.alternative_routes && routeData.alternative_routes.length > 0) {
-      displayAlternativeRoutes(routeData.alternative_routes);
-    }
-
-
-
-    // Populate both metrics and disruption panels
-    if (typeof populateAllPanels === 'function') {
-      populateAllPanels(routeData);
-    } else if (typeof window.populateRouteMetricsPanel === 'function') {
-      // Fallback: call the panel-population.js functions directly
-      window.populateRouteMetricsPanel(routeData);
-      if (typeof window.populateDisruptionsPanel === 'function') {
-        window.populateDisruptionsPanel(routeData);
+  // Clear only route polylines, keep location markers
+  if (routePolylines && routePolylines.length > 0) {
+    routePolylines.forEach(polyline => {
+      if (polyline && map) {
+        map.removeLayer(polyline);
       }
+    });
+    routePolylines = [];
+    window.routePolylines = routePolylines;
+  }
+
+  if (!routeData.success || !routeData.route) {
+    console.error('Invalid DHL route data:', routeData);
+    return;
+  }
+
+  const route = routeData.route;
+
+  // Display route geometry with colors on map using Leaflet
+  if (route.geometry && route.geometry.length > 0) {
+    route.geometry.forEach((segment, index) => {
+      // Extract coordinates from segment (might be string or already parsed)
+      let coords = segment.coordinates;
+
+      // If coordinates is a string, parse it
+      if (typeof coords === 'string') {
+        try {
+          coords = JSON.parse(coords);
+          console.log(`Parsed DHL coordinates from string for segment ${index}`);
+        } catch (e) {
+          console.error(`Failed to parse DHL coordinates string for segment ${index}:`, coords, e);
+          return;
+        }
+      }
+
+      if (!coords || coords.length < 2) {
+        console.warn('DHL Segment has insufficient coordinates:', segment);
+        return;
+      }
+
+      // Convert coordinates to Leaflet format [lng, lat] -> [lat, lng]
+      const pathCoords = coords.map(coord => [coord[1], coord[0]]);
+      const flowInfo = segment.flow || {};
+
+      // Get color from TrafficUtils based on jam_factor (unified color logic)
+      const jam_factor = TrafficUtils.extractJamFactor(segment);
+      const is_closed = TrafficUtils.extractIsClosed(segment);
+      const segmentColor = TrafficUtils.getDisruptionColor(jam_factor, is_closed, TrafficUtils.COLORS.DHL_DEFAULT);
+      const segmentStyle = TrafficUtils.getDisruptionStyle(jam_factor, is_closed, TrafficUtils.COLORS.DHL_DEFAULT);
+
+      // Create polyline with segment-specific color
+      const polyline = L.polyline(pathCoords, {
+        color: segmentColor,
+        opacity: segmentStyle.opacity,
+        weight: segmentStyle.weight,
+        className: 'route-segment-clickable'
+      }).addTo(map);
+
+      // Build comprehensive popup with all edge details
+      const distance_m = segment.distance_meters || 0;
+      const distance_km = (distance_m / 1000).toFixed(2);
+      const highway_type = segment.highway_type || 'unknown';
+      const free_flow_speed = segment.free_flow_speed_kmh ?? flowInfo.free_flow_kph ?? 0;
+      const current_speed = flowInfo.speed_kph ?? segment.speed_kmh ?? free_flow_speed;
+      const severity = TrafficUtils.getSeverityFromJamFactor(jam_factor, is_closed);
+      const incident_type = segment.incident_type || 'none';
+      const incident_confidence = segment.incident_confidence || 0;
+
+      // Use PopupStyles for consistent route segment popup formatting
+      const popupContent = PopupStyles.createRouteSegmentPopup({
+        road_name: segment.road_name || segment.name || 'Unknown Road',
+        from: segment.from,
+        to: segment.to,
+        distance_km: distance_km,
+        highway_type: highway_type,
+        severity: severity,
+        current_speed: current_speed,
+        free_flow_speed: free_flow_speed,
+        jam_factor: jam_factor,
+        is_closed: is_closed,
+        incident_type: incident_type,
+        incident_confidence: incident_confidence,
+        segment_index: index,
+        total_segments: route.geometry.length,
+        route_type: 'DHL'
+      });
+
+      polyline.bindPopup(popupContent, {
+        maxWidth: 320,
+        className: 'route-segment-popup'
+      });
+
+      // Store original color and segment data for each polyline
+      polyline._originalColor = segmentColor;
+      polyline._segmentIndex = index;
+      polyline._segmentData = segment; // Store complete segment data for lookup
+
+      // Add click event to highlight and show details
+      polyline.on('click', function (e) {
+        console.log(`🖱️ Clicked DHL segment ${index + 1}:`, segment);
+
+        // Highlight this segment and lighten others
+        routePolylines.forEach((p, i) => {
+          if (i === index) {
+            p.setStyle({ weight: 10, color: p._originalColor });
+            p._isHighlighted = true;
+          } else {
+            p.setStyle({ weight: 6, color: lightenColor(p._originalColor, 0.5) });
+            p._isHighlighted = false;
+          }
+        });
+
+        // Open popup
+        polyline.openPopup();
+      });
+
+      // Reset all segments when popup closes
+      polyline.on('popupclose', function (e) {
+        routePolylines.forEach(p => {
+          p.setStyle({ weight: 6, color: p._originalColor });
+          p._isHighlighted = false;
+        });
+      });
+
+      // Add hover effect
+      polyline.on('mouseover', function (e) {
+        if (this.getElement()) {
+          this.setStyle({ weight: 6 });
+        }
+      });
+
+      polyline.on('mouseout', function (e) {
+        // Check if this segment is highlighted
+        const isHighlighted = this.options.weight === 10;
+        if (!isHighlighted) {
+          this.setStyle({ weight: 4 });
+        }
+      });
+
+      routePolylines.push(polyline);
+    });
+
+    console.log(`✅ Added ${route.geometry.length} colored DHL segments to map`);
+  } else if (route.polylines && route.polylines.length > 0) {
+    // Legacy fallback for old polylines format
+    route.polylines.forEach(polylineData => {
+      let pathCoords;
+      if (polylineData.path) {
+        pathCoords = polylineData.path.map(p => [p.lat, p.lng]);
+      } else if (polylineData.coordinates) {
+        pathCoords = polylineData.coordinates.map(coord => {
+          if (Array.isArray(coord)) {
+            return [coord[0], coord[1]];
+          } else {
+            return [coord.lat, coord.lng];
+          }
+        });
+      } else {
+        return;
+      }
+
+      const polyline = L.polyline(pathCoords, {
+        color: polylineData.strokeColor || polylineData.color || '#8b5cf6',
+        opacity: 1.0,
+        weight: 5
+      }).addTo(map);
+
+      routePolylines.push(polyline);
+    });
+
+    console.log(`✅ Added ${route.polylines.length} DHL polylines (legacy)`);
+  } else {
+    console.warn('No valid geometry or polyline data found in DHL route');
+  }
+
+  // Add connector polylines from pinned locations to route start/end nodes
+  addDHLConnectorPolylines(routeData);
+
+  // Fit map to show the route (including connectors) using Leaflet
+  if (routePolylines.length > 0) {
+    const bounds = L.latLngBounds();
+
+    // Add route points to bounds
+    routePolylines.forEach(polyline => {
+      const latLngs = polyline.getLatLngs();
+      latLngs.forEach(latLng => bounds.extend(latLng));
+    });
+
+    // Add pinned locations to bounds
+    if (startLocation) bounds.extend([startLocation.lat, startLocation.lng]);
+    if (destLocation) bounds.extend([destLocation.lat, destLocation.lng]);
+
+    map.fitBounds(bounds);
+  }
+
+  // Update route metrics in bottom info bar
+  if (routeData.metrics) {
+    updateRouteMetrics(routeData);
+  }
+
+  // Update disruption alert banner when summary available
+  if (routeData.disruptions_summary) {
+    window.currentDisruptionsSummary = routeData.disruptions_summary;
+    displayRouteDisruptionAlert(routeData.disruptions_summary);
+  } else {
+    window.currentDisruptionsSummary = null;
+    displayRouteDisruptionAlert(null);
+  }
+
+  // Display alternative routes with transparent overlay
+  if (routeData.alternative_routes && routeData.alternative_routes.length > 0) {
+    displayAlternativeRoutes(routeData.alternative_routes);
+  }
+
+
+
+  // Populate both metrics and disruption panels
+  if (typeof populateAllPanels === 'function') {
+    populateAllPanels(routeData);
+  } else if (typeof window.populateRouteMetricsPanel === 'function') {
+    // Fallback: call the panel-population.js functions directly
+    window.populateRouteMetricsPanel(routeData);
+    if (typeof window.populateDisruptionsPanel === 'function') {
+      window.populateDisruptionsPanel(routeData);
     }
+  }
 }
 
 // HC2L Route Display Function (same features as DHL)
 function displayDHC2LRoute(routeData) {
-    console.log('🔵 Displaying HC2L route:', routeData);
-    
-    // Clear only route polylines, keep location markers
-    if (routePolylines && routePolylines.length > 0) {
-        routePolylines.forEach(polyline => {
-            if (polyline && map) {
-                map.removeLayer(polyline);
-            }
-        });
-        routePolylines = [];
-        window.routePolylines = routePolylines;
-    }
-    
-    if (!routeData.success || !routeData.route) {
-      console.error('❌ Invalid HC2L route data:', routeData);
-      return;
-    }
-    
-    const route = routeData.route;
-    window.currentRouteData = routeData;
-    window.currentRouteGeometry = route.geometry || [];
-    window.currentDisruptionsSummary = routeData.disruptions_summary || null;
-    window.currentDisruptions = [];
-    
-    // Debug: Check if geometry exists
-    console.log('🔍 HC2L route.geometry:', route.geometry);
-    console.log('🔍 HC2L geometry length:', route.geometry ? route.geometry.length : 'undefined');
-    if (route.geometry && route.geometry.length > 0) {
-      console.log('🔍 HC2L First segment:', route.geometry[0]);
-    }
-    
-    // Display route geometry with colors on map using Leaflet
-    if (route.geometry && route.geometry.length > 0) {
-      console.log(`✅ HC2L: Processing ${route.geometry.length} geometry segments`);
-      route.geometry.forEach((segment, index) => {
-        // Extract coordinates from segment (might be string or already parsed)
-        let coords = segment.coordinates;
-        
-        // If coordinates is a string, parse it
-        if (typeof coords === 'string') {
-          try {
-            coords = JSON.parse(coords);
-            console.log(`Parsed HC2L coordinates from string for segment ${index}`);
-          } catch (e) {
-            console.error(`Failed to parse HC2L coordinates string for segment ${index}:`, coords, e);
-            return;
-          }
-        }
-        
-        if (!coords || coords.length < 2) {
-          console.warn('HC2L Segment has insufficient coordinates:', segment);
-          return;
-        }
-        
-  // Convert coordinates to Leaflet format [lng, lat] -> [lat, lng]
-  const pathCoords = coords.map(coord => [coord[1], coord[0]]);
-  const flowInfo = segment.flow || {};
-        
-  // Get color from TrafficUtils based on jam_factor (unified color logic)
-  const jam_factor = TrafficUtils.extractJamFactor(segment);
-  const is_closed = TrafficUtils.extractIsClosed(segment);
-  const segmentColor = TrafficUtils.getDisruptionColor(jam_factor, is_closed, TrafficUtils.COLORS.HC2L_DEFAULT);
-  const segmentStyle = TrafficUtils.getDisruptionStyle(jam_factor, is_closed, TrafficUtils.COLORS.HC2L_DEFAULT);
-        
-        // Create polyline with segment-specific color
-        const polyline = L.polyline(pathCoords, {
-          color: segmentColor,
-          opacity: segmentStyle.opacity,
-          weight: segmentStyle.weight,
-          className: 'route-segment-clickable'
-        }).addTo(map);
-        
-        // Build comprehensive popup with all edge details
-  const distance_m = segment.distance_meters || 0;
-  const distance_km = (distance_m / 1000).toFixed(2);
-  const highway_type = segment.highway_type || 'unknown';
-  const free_flow_speed = segment.free_flow_speed_kmh ?? flowInfo.free_flow_kph ?? 0;
-  const current_speed = flowInfo.speed_kph ?? segment.speed_kmh ?? free_flow_speed;
-  const severity = TrafficUtils.getSeverityFromJamFactor(jam_factor, is_closed);
-        const incident_type = segment.incident_type || 'none';
-        const incident_confidence = segment.incident_confidence || 0;
-        
-        // Use PopupStyles for consistent route segment popup formatting
-        const popupContent = PopupStyles.createRouteSegmentPopup({
-          road_name: segment.road_name || segment.name || 'Unknown Road',
-          from: segment.from,
-          to: segment.to,
-          distance_km: distance_km,
-          highway_type: highway_type,
-          severity: severity,
-          current_speed: current_speed,
-          free_flow_speed: free_flow_speed,
-          jam_factor: jam_factor,
-          is_closed: is_closed,
-          incident_type: incident_type,
-          incident_confidence: incident_confidence,
-          segment_index: index,
-          total_segments: route.geometry.length,
-          route_type: 'HC2L'
-        });
-        
-        polyline.bindPopup(popupContent, {
-          maxWidth: 320,
-          className: 'route-segment-popup'
-        });
-        
-        // Store original color and segment data for each polyline
-        polyline._originalColor = segmentColor;
-        polyline._segmentIndex = index;
-        polyline._segmentData = segment; // Store complete segment data for lookup
-        
-        // Add click event to highlight and show details
-        polyline.on('click', function(e) {
-          console.log(`🖱️ Clicked HC2L segment ${index + 1}:`, segment);
-          
-          // Highlight this segment and lighten others
-          routePolylines.forEach((p, i) => {
-            if (i === index) {
-              p.setStyle({ weight: 10, color: p._originalColor });
-              p._isHighlighted = true;
-            } else {
-              p.setStyle({ weight: 6, color: lightenColor(p._originalColor, 0.5) });
-              p._isHighlighted = false;
-            }
-          });
-          
-          // Open popup
-          polyline.openPopup();
-        });
-        
-        // Reset all segments when popup closes
-        polyline.on('popupclose', function(e) {
-          routePolylines.forEach(p => {
-            p.setStyle({ weight: 6, color: p._originalColor });
-            p._isHighlighted = false;
-          });
-        });
-        
-        // Add hover effect
-        polyline.on('mouseover', function(e) {
-          if (this.getElement() && !this._isHighlighted) {
-            this.setStyle({ weight: 8 });
-          }
-        });
-        
-        polyline.on('mouseout', function(e) {
-          // Reset weight if not highlighted
-          if (!this._isHighlighted) {
-            this.setStyle({ weight: 6 });
-          }
-        });
-        
-        routePolylines.push(polyline);
-      });
-      
-      console.log(`✅ Added ${route.geometry.length} colored HC2L segments to map`);
-    } else if (route.polylines && route.polylines.length > 0) {
-      // Legacy fallback for old polylines format
-      route.polylines.forEach(polylineData => {
-        let pathCoords;
-        if (polylineData.path) {
-          pathCoords = polylineData.path.map(p => [p.lat, p.lng]);
-        } else if (polylineData.coordinates) {
-          pathCoords = polylineData.coordinates.map(coord => {
-            if (Array.isArray(coord)) {
-              return [coord[0], coord[1]];
-            } else {
-              return [coord.lat, coord.lng];
-            }
-          });
-        } else {
-          return;
-        }
-        
-        const polyline = L.polyline(pathCoords, {
-          color: polylineData.strokeColor || polylineData.color || '#0066FF',
-          opacity: 0.8,
-          weight: 5
-        }).addTo(map);
-        
-        routePolylines.push(polyline);
-      });
-      
-      console.log(`✅ Added ${route.polylines.length} HC2L polylines (legacy)`);
-    } else {
-      console.warn('No valid geometry or polyline data found in HC2L route');
-    }
-    
-    // Fit map to show the route using Leaflet
-    if (routePolylines.length > 0) {
-      const bounds = L.latLngBounds();
-      
-      // Add route points to bounds
-      routePolylines.forEach(polyline => {
-        const latLngs = polyline.getLatLngs();
-        latLngs.forEach(latLng => bounds.extend(latLng));
-      });
-      
-      // Add pinned locations to bounds
-      if (startLocation) bounds.extend([startLocation.lat, startLocation.lng]);
-      if (destLocation) bounds.extend([destLocation.lat, destLocation.lng]);
-      
-      map.fitBounds(bounds);
-    }
-    
-    // Update route metrics in bottom info bar
-    if (routeData.metrics) {
-      updateRouteMetrics(routeData);
-    }
+  console.log('🔵 Displaying HC2L route:', routeData);
 
-    // Update disruption alert banner when summary available
-    if (routeData.disruptions_summary) {
-      window.currentDisruptionsSummary = routeData.disruptions_summary;
-      displayRouteDisruptionAlert(routeData.disruptions_summary);
-    } else {
-      window.currentDisruptionsSummary = null;
-      displayRouteDisruptionAlert(null);
-    }
-
-    // Display alternative routes with transparent overlay
-    if (routeData.alternative_routes && routeData.alternative_routes.length > 0) {
-      displayAlternativeRoutes(routeData.alternative_routes);
-    }
-
-    // Populate extended route details panel
-    if (typeof populateRouteDetails === 'function') {
-      populateRouteDetails(routeData);
-    }
-
-    // Populate both metrics and disruption panels
-    if (typeof populateAllPanels === 'function') {
-      populateAllPanels(routeData);
-    } else if (typeof window.populateRouteMetricsPanel === 'function') {
-      // Fallback: call the panel-population.js functions directly
-      window.populateRouteMetricsPanel(routeData);
-      if (typeof window.populateDisruptionsPanel === 'function') {
-        window.populateDisruptionsPanel(routeData);
+  // Clear only route polylines, keep location markers
+  if (routePolylines && routePolylines.length > 0) {
+    routePolylines.forEach(polyline => {
+      if (polyline && map) {
+        map.removeLayer(polyline);
       }
+    });
+    routePolylines = [];
+    window.routePolylines = routePolylines;
+  }
+
+  if (!routeData.success || !routeData.route) {
+    console.error('❌ Invalid HC2L route data:', routeData);
+    return;
+  }
+
+  const route = routeData.route;
+  window.currentRouteData = routeData;
+  window.currentRouteGeometry = route.geometry || [];
+  window.currentDisruptionsSummary = routeData.disruptions_summary || null;
+  window.currentDisruptions = [];
+
+  // Debug: Check if geometry exists
+  console.log('🔍 HC2L route.geometry:', route.geometry);
+  console.log('🔍 HC2L geometry length:', route.geometry ? route.geometry.length : 'undefined');
+  if (route.geometry && route.geometry.length > 0) {
+    console.log('🔍 HC2L First segment:', route.geometry[0]);
+  }
+
+  // Display route geometry with colors on map using Leaflet
+  if (route.geometry && route.geometry.length > 0) {
+    console.log(`✅ HC2L: Processing ${route.geometry.length} geometry segments`);
+    route.geometry.forEach((segment, index) => {
+      // Extract coordinates from segment (might be string or already parsed)
+      let coords = segment.coordinates;
+
+      // If coordinates is a string, parse it
+      if (typeof coords === 'string') {
+        try {
+          coords = JSON.parse(coords);
+          console.log(`Parsed HC2L coordinates from string for segment ${index}`);
+        } catch (e) {
+          console.error(`Failed to parse HC2L coordinates string for segment ${index}:`, coords, e);
+          return;
+        }
+      }
+
+      if (!coords || coords.length < 2) {
+        console.warn('HC2L Segment has insufficient coordinates:', segment);
+        return;
+      }
+
+      // Convert coordinates to Leaflet format [lng, lat] -> [lat, lng]
+      const pathCoords = coords.map(coord => [coord[1], coord[0]]);
+      const flowInfo = segment.flow || {};
+
+      // Get color from TrafficUtils based on jam_factor (unified color logic)
+      const jam_factor = TrafficUtils.extractJamFactor(segment);
+      const is_closed = TrafficUtils.extractIsClosed(segment);
+      const segmentColor = TrafficUtils.getDisruptionColor(jam_factor, is_closed, TrafficUtils.COLORS.HC2L_DEFAULT);
+      const segmentStyle = TrafficUtils.getDisruptionStyle(jam_factor, is_closed, TrafficUtils.COLORS.HC2L_DEFAULT);
+
+      // Create polyline with segment-specific color
+      const polyline = L.polyline(pathCoords, {
+        color: segmentColor,
+        opacity: segmentStyle.opacity,
+        weight: segmentStyle.weight,
+        className: 'route-segment-clickable'
+      }).addTo(map);
+
+      // Build comprehensive popup with all edge details
+      const distance_m = segment.distance_meters || 0;
+      const distance_km = (distance_m / 1000).toFixed(2);
+      const highway_type = segment.highway_type || 'unknown';
+      const free_flow_speed = segment.free_flow_speed_kmh ?? flowInfo.free_flow_kph ?? 0;
+      const current_speed = flowInfo.speed_kph ?? segment.speed_kmh ?? free_flow_speed;
+      const severity = TrafficUtils.getSeverityFromJamFactor(jam_factor, is_closed);
+      const incident_type = segment.incident_type || 'none';
+      const incident_confidence = segment.incident_confidence || 0;
+
+      // Use PopupStyles for consistent route segment popup formatting
+      const popupContent = PopupStyles.createRouteSegmentPopup({
+        road_name: segment.road_name || segment.name || 'Unknown Road',
+        from: segment.from,
+        to: segment.to,
+        distance_km: distance_km,
+        highway_type: highway_type,
+        severity: severity,
+        current_speed: current_speed,
+        free_flow_speed: free_flow_speed,
+        jam_factor: jam_factor,
+        is_closed: is_closed,
+        incident_type: incident_type,
+        incident_confidence: incident_confidence,
+        segment_index: index,
+        total_segments: route.geometry.length,
+        route_type: 'HC2L'
+      });
+
+      polyline.bindPopup(popupContent, {
+        maxWidth: 320,
+        className: 'route-segment-popup'
+      });
+
+      // Store original color and segment data for each polyline
+      polyline._originalColor = segmentColor;
+      polyline._segmentIndex = index;
+      polyline._segmentData = segment; // Store complete segment data for lookup
+
+      // Add click event to highlight and show details
+      polyline.on('click', function (e) {
+        console.log(`🖱️ Clicked HC2L segment ${index + 1}:`, segment);
+
+        // Highlight this segment and lighten others
+        routePolylines.forEach((p, i) => {
+          if (i === index) {
+            p.setStyle({ weight: 10, color: p._originalColor });
+            p._isHighlighted = true;
+          } else {
+            p.setStyle({ weight: 6, color: lightenColor(p._originalColor, 0.5) });
+            p._isHighlighted = false;
+          }
+        });
+
+        // Open popup
+        polyline.openPopup();
+      });
+
+      // Reset all segments when popup closes
+      polyline.on('popupclose', function (e) {
+        routePolylines.forEach(p => {
+          p.setStyle({ weight: 6, color: p._originalColor });
+          p._isHighlighted = false;
+        });
+      });
+
+      // Add hover effect
+      polyline.on('mouseover', function (e) {
+        if (this.getElement()) {
+          this.setStyle({ weight: 6 });
+        }
+      });
+
+      polyline.on('mouseout', function (e) {
+        // Check if this segment is highlighted
+        const isHighlighted = this.options.weight === 10;
+        if (!isHighlighted) {
+          this.setStyle({ weight: 4 });
+        }
+      });
+
+      routePolylines.push(polyline);
+    });
+
+    console.log(`✅ Added ${route.geometry.length} colored HC2L segments to map`);
+  } else if (route.polylines && route.polylines.length > 0) {
+    // Legacy fallback for old polylines format
+    route.polylines.forEach(polylineData => {
+      let pathCoords;
+      if (polylineData.path) {
+        pathCoords = polylineData.path.map(p => [p.lat, p.lng]);
+      } else if (polylineData.coordinates) {
+        pathCoords = polylineData.coordinates.map(coord => {
+          if (Array.isArray(coord)) {
+            return [coord[0], coord[1]];
+          } else {
+            return [coord.lat, coord.lng];
+          }
+        });
+      } else {
+        return;
+      }
+
+      const polyline = L.polyline(pathCoords, {
+        color: polylineData.strokeColor || polylineData.color || '#0066FF',
+        opacity: 1.0,
+        weight: 5
+      }).addTo(map);
+
+      routePolylines.push(polyline);
+    });
+
+    console.log(`✅ Added ${route.polylines.length} HC2L polylines (legacy)`);
+  } else {
+    console.warn('No valid geometry or polyline data found in HC2L route');
+  }
+
+  // Fit map to show the route using Leaflet
+  if (routePolylines.length > 0) {
+    const bounds = L.latLngBounds();
+
+    // Add route points to bounds
+    routePolylines.forEach(polyline => {
+      const latLngs = polyline.getLatLngs();
+      latLngs.forEach(latLng => bounds.extend(latLng));
+    });
+
+    // Add pinned locations to bounds
+    if (startLocation) bounds.extend([startLocation.lat, startLocation.lng]);
+    if (destLocation) bounds.extend([destLocation.lat, destLocation.lng]);
+
+    map.fitBounds(bounds);
+  }
+
+  // Update route metrics in bottom info bar
+  if (routeData.metrics) {
+    updateRouteMetrics(routeData);
+  }
+
+  // Update disruption alert banner when summary available
+  if (routeData.disruptions_summary) {
+    window.currentDisruptionsSummary = routeData.disruptions_summary;
+    displayRouteDisruptionAlert(routeData.disruptions_summary);
+  } else {
+    window.currentDisruptionsSummary = null;
+    displayRouteDisruptionAlert(null);
+  }
+
+  // Display alternative routes with transparent overlay
+  if (routeData.alternative_routes && routeData.alternative_routes.length > 0) {
+    displayAlternativeRoutes(routeData.alternative_routes);
+  }
+
+  // Populate extended route details panel
+  if (typeof populateRouteDetails === 'function') {
+    populateRouteDetails(routeData);
+  }
+
+  // Populate both metrics and disruption panels
+  if (typeof populateAllPanels === 'function') {
+    populateAllPanels(routeData);
+  } else if (typeof window.populateRouteMetricsPanel === 'function') {
+    // Fallback: call the panel-population.js functions directly
+    window.populateRouteMetricsPanel(routeData);
+    if (typeof window.populateDisruptionsPanel === 'function') {
+      window.populateDisruptionsPanel(routeData);
     }
+  }
 }
- 
+
 
 function displayAlternativeRoutes(alternativeRoutes) {
-    console.log('🔀 Displaying alternative routes:', alternativeRoutes);
+  console.log('🔀 Displaying alternative routes:', alternativeRoutes);
 
-    // Clear previous alternative route layers
-    if (window.alternativeRoutePolylines && window.alternativeRoutePolylines.length > 0) {
-        window.alternativeRoutePolylines.forEach(polyline => {
-            if (polyline && map) {
-                map.removeLayer(polyline);
-            }
-        });
+  // Clear previous alternative route layers
+  if (window.alternativeRoutePolylines && window.alternativeRoutePolylines.length > 0) {
+    window.alternativeRoutePolylines.forEach(polyline => {
+      if (polyline && map) {
+        map.removeLayer(polyline);
+      }
+    });
+    window.alternativeRoutePolylines = [];
+  }
+
+  if (!alternativeRoutes || alternativeRoutes.length === 0) {
+    console.warn('No alternative routes to display');
+    return;
+  }
+
+  // Get primary route color from the main route polyline
+  let primaryRouteColor = '#3b82f6'; // Default blue
+  if (window.routePolylines && window.routePolylines.length > 0) {
+    const mainPolyline = window.routePolylines[0];
+    if (mainPolyline && mainPolyline.options && mainPolyline.options.color) {
+      primaryRouteColor = mainPolyline.options.color;
+    }
+  }
+
+  // Filter out rank 1 routes (fastest route - already the main route)
+  const filteredRoutes = alternativeRoutes.filter(r => r.rank > 1);
+
+  if (filteredRoutes.length === 0) {
+    console.warn('No alternative routes to display after filtering rank 1');
+    return;
+  }
+
+  filteredRoutes.forEach((route, routeIndex) => {
+    // Check if route has geometry segments (NEW: all geometry is now in geometry array)
+    if (!route.geometry || route.geometry.length === 0) {
+      console.warn(`Alternative route ${route.rank} has no geometry segments`);
+      return;
+    }
+
+    // Use primary route color for all alternatives with slight variation
+    let routeColor = primaryRouteColor;
+    let opacity = 0.35;  // 35% opacity for alternative routes
+
+    // Slightly vary the color intensity based on rank
+    if (routeIndex === 1) {
+      opacity = 0.4;  // Slightly more opaque for first alternative
+    }
+
+    console.log(`🔀 Alternative route ${route.rank} has ${route.geometry.length} geometry segments`);
+
+    // Display using detailed geometry segments (all geometry now contained within geometry array)
+    route.geometry.forEach((segment, segIndex) => {
+      // Coordinates might be a string (from C++ JSON output) or already parsed array
+      let coords = segment.coordinates;
+
+      // If coordinates is a string, parse it
+      if (typeof coords === 'string') {
+        try {
+          coords = JSON.parse(coords);
+          console.log(`Parsed coordinates from string for segment ${segIndex}:`, coords);
+        } catch (e) {
+          console.error(`Failed to parse coordinates string for segment ${segIndex}:`, coords, e);
+          return;
+        }
+      }
+
+      if (!coords || coords.length < 2) {
+        console.warn(`Segment ${segIndex} has insufficient coordinates after parsing:`, segment);
+        return;
+      }
+
+      // Convert coordinates to Leaflet format [lng, lat] -> [lat, lng]
+      const pathCoords = coords.map(coord => [coord[1], coord[0]]);
+
+      // Create polyline for this segment
+      const polyline = L.polyline(pathCoords, {
+        color: routeColor,
+        opacity: opacity,
+        weight: 4,
+        // dashArray: '8, 6',  // Dashed line to differentiate from primary route
+        // lineCap: 'round',
+        // lineJoin: 'round',
+        className: 'route-segment-clickable'
+      }).addTo(map);
+
+      // Store metadata for highlighting
+      polyline._routeIndex = routeIndex;  // Which alternative route this belongs to
+      polyline._alternativeRoute = true;
+
+      // Check if toggle is unchecked and hide immediately if so
+      const showAlternativeRoutesToggle = document.getElementById('show-alternative-routes');
+      if (showAlternativeRoutesToggle && !showAlternativeRoutesToggle.checked) {
+        map.removeLayer(polyline);
+      }
+
+      // Store in window array for later clearing
+      if (!window.alternativeRoutePolylines) {
         window.alternativeRoutePolylines = [];
-    }
-
-    if (!alternativeRoutes || alternativeRoutes.length === 0) {
-        console.warn('No alternative routes to display');
-        return;
-    }
-
-    // Get primary route color from the main route polyline
-    let primaryRouteColor = '#3b82f6'; // Default blue
-    if (window.routePolylines && window.routePolylines.length > 0) {
-        const mainPolyline = window.routePolylines[0];
-        if (mainPolyline && mainPolyline.options && mainPolyline.options.color) {
-            primaryRouteColor = mainPolyline.options.color;
-        }
-    }
-
-    // Filter out rank 1 routes (fastest route - already the main route)
-    const filteredRoutes = alternativeRoutes.filter(r => r.rank > 1);
-
-    if (filteredRoutes.length === 0) {
-        console.warn('No alternative routes to display after filtering rank 1');
-        return;
-    }
-
-    filteredRoutes.forEach((route, routeIndex) => {
-        // Check if route has geometry segments (NEW: all geometry is now in geometry array)
-        if (!route.geometry || route.geometry.length === 0) {
-            console.warn(`Alternative route ${route.rank} has no geometry segments`);
-            return;
-        }
-
-        // Use primary route color for all alternatives with slight variation
-        let routeColor = primaryRouteColor;
-        let opacity = 0.35;  // 35% opacity for alternative routes
-        
-        // Slightly vary the color intensity based on rank
-        if (routeIndex === 1) {
-            opacity = 0.4;  // Slightly more opaque for first alternative
-        }
-
-        console.log(`🔀 Alternative route ${route.rank} has ${route.geometry.length} geometry segments`);
-        
-        // Display using detailed geometry segments (all geometry now contained within geometry array)
-        route.geometry.forEach((segment, segIndex) => {
-            // Coordinates might be a string (from C++ JSON output) or already parsed array
-            let coords = segment.coordinates;
-            
-            // If coordinates is a string, parse it
-            if (typeof coords === 'string') {
-                try {
-                    coords = JSON.parse(coords);
-                    console.log(`Parsed coordinates from string for segment ${segIndex}:`, coords);
-                } catch (e) {
-                    console.error(`Failed to parse coordinates string for segment ${segIndex}:`, coords, e);
-                    return;
-                }
-            }
-            
-            if (!coords || coords.length < 2) {
-                console.warn(`Segment ${segIndex} has insufficient coordinates after parsing:`, segment);
-                return;
-            }
-            
-            // Convert coordinates to Leaflet format [lng, lat] -> [lat, lng]
-            const pathCoords = coords.map(coord => [coord[1], coord[0]]);
-            
-            // Create polyline for this segment
-            const polyline = L.polyline(pathCoords, {
-                color: routeColor,
-                opacity: opacity,
-                weight: 4,
-                dashArray: '8, 4',  // Dashed line to differentiate from primary route
-                lineCap: 'round',
-                lineJoin: 'round',
-                className: 'alternative-route-polyline'
-            }).addTo(map);
-            
-            // Store metadata for highlighting
-            polyline._routeIndex = routeIndex;  // Which alternative route this belongs to
-            polyline._alternativeRoute = true;
-            
-            // Check if toggle is unchecked and hide immediately if so
-            const showAlternativeRoutesToggle = document.getElementById('show-alternative-routes');
-            if (showAlternativeRoutesToggle && !showAlternativeRoutesToggle.checked) {
-                map.removeLayer(polyline);
-            }
-            
-            // Store in window array for later clearing
-            if (!window.alternativeRoutePolylines) {
-                window.alternativeRoutePolylines = [];
-            }
-            window.alternativeRoutePolylines.push(polyline);
-        });
+      }
+      window.alternativeRoutePolylines.push(polyline);
+    });
 
 
-        // Build popup content (same for all polylines of this route)
-        const distance_m = route.distance_meters || 0;
-        const distance_km = (distance_m / 1000).toFixed(2);
-        const eta_seconds = route.eta_seconds || 0;
-        const eta_formatted = route.eta_formatted || formatDuration(eta_seconds);
-        const avg_jam_factor = route.avg_jam_factor || 0;
-        const path_length = route.path_length || route.path_nodes.length;
-        const rank = route.rank || (routeIndex + 1);
-        const description = route.description || `Alternative Route ${rank}`;
+    // Build popup content (same for all polylines of this route)
+    const distance_m = route.distance_meters || 0;
+    const distance_km = (distance_m / 1000).toFixed(2);
+    const eta_seconds = route.eta_seconds || 0;
+    const eta_formatted = route.eta_formatted || formatDuration(eta_seconds);
+    const avg_jam_factor = route.avg_jam_factor || 0;
+    const path_length = route.path_length || route.path_nodes.length;
+    const rank = route.rank || (routeIndex + 1);
+    const description = route.description || `Alternative Route ${rank}`;
 
-        // Determine jam factor color
-        let jamColor = '#10b981'; // green
-        if (avg_jam_factor > 7) jamColor = '#ef4444'; // red
-        else if (avg_jam_factor > 5) jamColor = '#dc2626'; // dark red
-        else if (avg_jam_factor > 3) jamColor = '#f59e0b'; // orange
-        else if (avg_jam_factor > 1) jamColor = '#fbbf24'; // yellow
+    // Determine jam factor color
+    let jamColor = '#10b981'; // green
+    if (avg_jam_factor > 7) jamColor = '#ef4444'; // red
+    else if (avg_jam_factor > 5) jamColor = '#dc2626'; // dark red
+    else if (avg_jam_factor > 3) jamColor = '#f59e0b'; // orange
+    else if (avg_jam_factor > 1) jamColor = '#fbbf24'; // yellow
 
-        const popupContent = `
+    const popupContent = `
             <div class="p-3" style="min-width: 300px;">
                 <div class="font-bold text-base mb-2 border-b pb-2">
                     🛣️ ${description}
@@ -1455,1040 +1456,1043 @@ function displayAlternativeRoutes(alternativeRoutes) {
                 </div>
             </div>
         `;
-        
-        // Helper function to bind popup and events to a polyline
-        function attachPolylineEvents(polyline, routeData, routeIdx) {
-            polyline.bindPopup(popupContent, {
-                maxWidth: 340,
-                className: 'alternative-route-popup'
-            });
 
-            // Store metadata for this alternative route
-            polyline._alternativeRouteIndex = routeIdx;
-            polyline._alternativeRouteData = routeData;
-            polyline._isAlternativeRoute = true;
+    // Helper function to bind popup and events to a polyline
+    function attachPolylineEvents(polyline, routeData, routeIdx) {
+      polyline.bindPopup(popupContent, {
+        maxWidth: 340,
+        className: 'alternative-route-popup'
+      });
 
-            // Add click event to show details
-            polyline.on('click', function(e) {
-                console.log(`🖱️ Clicked alternative route ${routeIdx + 1}:`, routeData);
-                
-                // Highlight this route and dim others
-                if (window.alternativeRoutePolylines) {
-                    window.alternativeRoutePolylines.forEach((p, i) => {
-                        if (i === routeIdx) {
-                            p.setStyle({ 
-                                weight: 6,
-                                opacity: 0.7  // Make more visible when clicked
-                            });
-                            p._isHighlighted = true;
-                        } else {
-                            p.setStyle({ 
-                                weight: 4,
-                                opacity: 0.25  // Dim other routes
-                            });
-                            p._isHighlighted = false;
-                        }
-                    });
-                }
-                
-                L.DomEvent.stop(e);
-                polyline.openPopup();
-            });
+      // Store metadata for this alternative route
+      polyline._alternativeRouteIndex = routeIdx;
+      polyline._alternativeRouteData = routeData;
+      polyline._isAlternativeRoute = true;
 
-            // Reset highlight when popup closes
-            polyline.on('popupclose', function(e) {
-                if (window.alternativeRoutePolylines) {
-                    window.alternativeRoutePolylines.forEach((p, i) => {
-                        p.setStyle({ 
-                            weight: 4,
-                            opacity: 0.35  // Reset to 35%
-                        });
-                        p._isHighlighted = false;
-                    });
-                }
-            });
+      // Add click event to show details
+      polyline.on('click', function (e) {
+        console.log(`🖱️ Clicked alternative route ${routeIdx + 1}:`, routeData);
 
-            // Add hover effect
-            polyline.on('mouseover', function(e) {
-                if (!this._isHighlighted) {
-                    this.setStyle({ 
-                        weight: 5,
-                        opacity: 0.6
-                    });
-                }
-            });
-
-            polyline.on('mouseout', function(e) {
-                if (!this._isHighlighted) {
-                    this.setStyle({ 
-                        weight: 4,
-                        opacity: 0.35  // Reset to 35%
-                    });
-                }
-            });
-        }
-        
-        // Attach events to all polylines in the route (whether from geometry or fallback)
+        // Highlight this route and dim others
         if (window.alternativeRoutePolylines) {
-            const routePolylines = window.alternativeRoutePolylines.filter(p => 
-                p._alternativeRouteIndex === undefined || p._alternativeRouteIndex === routeIndex
-            );
-            routePolylines.forEach(polyline => {
-                if (polyline && !polyline._eventsAttached) {
-                    attachPolylineEvents(polyline, route, routeIndex);
-                    polyline._eventsAttached = true;
-                }
-            });
+          window.alternativeRoutePolylines.forEach((p, i) => {
+            if (i === routeIdx) {
+              p.setStyle({
+                weight: 6,
+                opacity: 0.7  // Make more visible when clicked
+              });
+              p._isHighlighted = true;
+            } else {
+              p.setStyle({
+                weight: 4,
+                opacity: 0.25  // Dim other routes
+              });
+              p._isHighlighted = false;
+            }
+          });
         }
-    });
 
-    console.log(`✅ Displayed ${alternativeRoutes.length} alternative routes on map`);
+        L.DomEvent.stop(e);
+        polyline.openPopup();
+      });
+
+      // Reset highlight when popup closes
+      polyline.on('popupclose', function (e) {
+        if (window.alternativeRoutePolylines) {
+          window.alternativeRoutePolylines.forEach((p, i) => {
+            p.setStyle({
+              weight: 4,
+              opacity: 0.35  // Reset to 35%
+            });
+            p._isHighlighted = false;
+          });
+        }
+      });
+
+      // Add hover effect
+      polyline.on('mouseover', function (e) {
+        if (this.getElement()) {
+          this.setStyle({
+            weight: 5,
+            opacity: 0.6
+          });
+        }
+      });
+
+      polyline.on('mouseout', function (e) {
+        // Check if this segment is highlighted
+        const isHighlighted = this.options.weight === 10;
+        if (!isHighlighted) {
+          this.setStyle({
+            weight: 4,
+            opacity: 0.35  // Reset to 35%
+          });
+        }
+      });
+
+    }
+
+    // Attach events to all polylines in the route (whether from geometry or fallback)
+    if (window.alternativeRoutePolylines) {
+      const routePolylines = window.alternativeRoutePolylines.filter(p =>
+        p._alternativeRouteIndex === undefined || p._alternativeRouteIndex === routeIndex
+      );
+      routePolylines.forEach(polyline => {
+        if (polyline && !polyline._eventsAttached) {
+          attachPolylineEvents(polyline, route, routeIndex);
+          polyline._eventsAttached = true;
+        }
+      });
+    }
+  });
+
+  console.log(`✅ Displayed ${alternativeRoutes.length} alternative routes on map`);
 }
 
 
 function switchToAlternativeRoute(routeIndex) {
-    console.log(`🔄 Switching to alternative route ${routeIndex + 1}`);
-    
-    if (!window.alternativeRoutePolylines || !window.alternativeRoutePolylines[routeIndex]) {
-        console.error('Alternative route polyline not found');
-        return;
-    }
+  console.log(`🔄 Switching to alternative route ${routeIndex + 1}`);
 
-    const altRouteData = window.alternativeRoutePolylines[routeIndex]._alternativeRouteData;
-    if (!altRouteData) {
-        console.error('Alternative route data not found');
-        return;
-    }
+  if (!window.alternativeRoutePolylines || !window.alternativeRoutePolylines[routeIndex]) {
+    console.error('Alternative route polyline not found');
+    return;
+  }
 
-    showUpdateToast(`Switched to Route ${routeIndex + 1}`, 'success');
-    console.log('Alternative route data:', altRouteData);
-    
-    // You could implement additional logic here to:
-    // 1. Make this route the primary route
-    // 2. Recalculate metrics based on this route
-    // 3. Update the Route Analysis panel
+  const altRouteData = window.alternativeRoutePolylines[routeIndex]._alternativeRouteData;
+  if (!altRouteData) {
+    console.error('Alternative route data not found');
+    return;
+  }
+
+  showUpdateToast(`Switched to Route ${routeIndex + 1}`, 'success');
+  console.log('Alternative route data:', altRouteData);
+
+  // You could implement additional logic here to:
+  // 1. Make this route the primary route
+  // 2. Recalculate metrics based on this route
+  // 3. Update the Route Analysis panel
 }
 
 
 function resetCurrentPathPanel() {
-    // Show placeholder in route steps
-    const placeholder = document.getElementById('route-steps-placeholder');
-    if (placeholder) {
-      placeholder.style.display = 'block';
-    }
-    
-    // Clear any dynamic route steps
-    const stepsContainer = document.getElementById('route-steps');
-    if (stepsContainer) {
-      const existingSteps = stepsContainer.querySelectorAll('.flex.gap-4.items-start');
-      existingSteps.forEach(step => step.remove());
-    }
-    
-    // Reset metrics to defaults
-    const distanceElement = document.querySelector('#current-path-panel .text-xl.font-bold.text-emerald-600');
-    if (distanceElement) distanceElement.textContent = '0.0 km';
-    
-    const durationElement = document.querySelector('#current-path-panel .text-xl.font-bold.text-blue-600');
-    if (durationElement) durationElement.textContent = '0 min';
-    
-    const stepsElement = document.querySelector('#current-path-panel .text-xl.font-bold.text-purple-600');
-    if (stepsElement) stepsElement.textContent = '0';
-    
-    // Hide route disruption alert when resetting
-    const alertContainer = document.getElementById('disruption-alert-container');
-    if (alertContainer) {
-      alertContainer.classList.add('hidden');
-    }
-    
-    console.log('Current Path Panel reset to placeholder state');
+  // Show placeholder in route steps
+  const placeholder = document.getElementById('route-steps-placeholder');
+  if (placeholder) {
+    placeholder.style.display = 'block';
+  }
+
+  // Clear any dynamic route steps
+  const stepsContainer = document.getElementById('route-steps');
+  if (stepsContainer) {
+    const existingSteps = stepsContainer.querySelectorAll('.flex.gap-4.items-start');
+    existingSteps.forEach(step => step.remove());
+  }
+
+  // Reset metrics to defaults
+  const distanceElement = document.querySelector('#current-path-panel .text-xl.font-bold.text-emerald-600');
+  if (distanceElement) distanceElement.textContent = '0.0 km';
+
+  const durationElement = document.querySelector('#current-path-panel .text-xl.font-bold.text-blue-600');
+  if (durationElement) durationElement.textContent = '0 min';
+
+  const stepsElement = document.querySelector('#current-path-panel .text-xl.font-bold.text-purple-600');
+  if (stepsElement) stepsElement.textContent = '0';
+
+  // Hide route disruption alert when resetting
+  const alertContainer = document.getElementById('disruption-alert-container');
+  if (alertContainer) {
+    alertContainer.classList.add('hidden');
+  }
+
+  console.log('Current Path Panel reset to placeholder state');
 }
 
 function highlightDisruptedSegments(disruptedSegments) {
-    if (!map) return;
-    
-    // Clear any existing highlights
-    if (window.disruptionHighlights) {
-      window.disruptionHighlights.forEach(highlight => map.removeLayer(highlight));
-    }
-    window.disruptionHighlights = [];
-    
-    disruptedSegments.forEach(segment => {
-      // Create a visual highlight for each disrupted segment using Leaflet
-      const svgIcon = L.divIcon({
-        html: `<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+  if (!map) return;
+
+  // Clear any existing highlights
+  if (window.disruptionHighlights) {
+    window.disruptionHighlights.forEach(highlight => map.removeLayer(highlight));
+  }
+  window.disruptionHighlights = [];
+
+  disruptedSegments.forEach(segment => {
+    // Create a visual highlight for each disrupted segment using Leaflet
+    const svgIcon = L.divIcon({
+      html: `<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <circle cx="12" cy="12" r="10" fill="#ef4444" stroke="white" stroke-width="2"/>
                 <text x="12" y="16" text-anchor="middle" fill="white" font-size="10" font-weight="bold">!</text>
               </svg>`,
-        className: 'custom-disruption-marker bounce-animation',
-        iconSize: [24, 24],
-        iconAnchor: [12, 12]
-      });
-      
-      const marker = L.marker([
-        segment.sourceNode?.lat || 0, 
-        segment.sourceNode?.lng || 0
-      ], { 
-        icon: svgIcon,
-        title: `${segment.incidentType} on ${segment.roadName}`
-      }).addTo(map);
-      
-      // Stop animation after 3 seconds (handled via CSS class)
-      setTimeout(() => {
-        const element = marker.getElement();
-        if (element) {
-          element.classList.remove('bounce-animation');
-        }
-      }, 3000);
-      
-      window.disruptionHighlights.push(marker);
+      className: 'custom-disruption-marker bounce-animation',
+      iconSize: [24, 24],
+      iconAnchor: [12, 12]
     });
+
+    const marker = L.marker([
+      segment.sourceNode?.lat || 0,
+      segment.sourceNode?.lng || 0
+    ], {
+      icon: svgIcon,
+      title: `${segment.incidentType} on ${segment.roadName}`
+    }).addTo(map);
+
+    // Stop animation after 3 seconds (handled via CSS class)
+    setTimeout(() => {
+      const element = marker.getElement();
+      if (element) {
+        element.classList.remove('bounce-animation');
+      }
+    }, 3000);
+
+    window.disruptionHighlights.push(marker);
+  });
 }
 
-  
+
 function displayRouteDisruptionAlert(disruptionsSummary) {
-    const alertContainer = document.getElementById('disruption-alert-container');
-    
-    // Handle both old format (array) and new format (object with route/network data)
-    let totalDisruptions = 0;
-    let timeImpact = 0;
-    let highCount = 0;
-    let mediumCount = 0;
-    let lowCount = 0;
-    
-    if (!disruptionsSummary) {
-      if (alertContainer) {
-        alertContainer.classList.add('hidden');
-      }
-      return;
+  const alertContainer = document.getElementById('disruption-alert-container');
+
+  // Handle both old format (array) and new format (object with route/network data)
+  let totalDisruptions = 0;
+  let timeImpact = 0;
+  let highCount = 0;
+  let mediumCount = 0;
+  let lowCount = 0;
+
+  if (!disruptionsSummary) {
+    if (alertContainer) {
+      alertContainer.classList.add('hidden');
     }
-    
-    // Parse the new disruptions_summary format from C++ API
-    if (disruptionsSummary.route) {
-      totalDisruptions = disruptionsSummary.route.total_disrupted_edges || 0;
-      timeImpact = disruptionsSummary.route.total_time_impact_seconds || 0;
-      highCount = disruptionsSummary.route.high || 0;
-      mediumCount = disruptionsSummary.route.medium || 0;
-      lowCount = disruptionsSummary.route.low || 0;
+    return;
+  }
+
+  // Parse the new disruptions_summary format from C++ API
+  if (disruptionsSummary.route) {
+    totalDisruptions = disruptionsSummary.route.total_disrupted_edges || 0;
+    timeImpact = disruptionsSummary.route.total_time_impact_seconds || 0;
+    highCount = disruptionsSummary.route.high || 0;
+    mediumCount = disruptionsSummary.route.medium || 0;
+    lowCount = disruptionsSummary.route.low || 0;
+  }
+
+  // Hide alert if no disruptions
+  if (totalDisruptions === 0) {
+    if (alertContainer) {
+      alertContainer.classList.add('hidden');
     }
-    
-    // Hide alert if no disruptions
-    if (totalDisruptions === 0) {
-      if (alertContainer) {
-        alertContainer.classList.add('hidden');
-      }
-      return;
-    }
-    
-    // Show alert and update content
-    alertContainer.classList.remove('hidden');
-    
-    // Determine severity level
-    let severityLevel = 'low';
-    if (highCount > 0) {
-      severityLevel = 'high';
-    } else if (mediumCount > 0) {
-      severityLevel = 'medium';
-    }
-    
-    // Create description text
-    let description = '';
-    if (totalDisruptions === 1) {
-      description = `1 disrupted segment on route`;
-    } else {
-      description = `${totalDisruptions} disrupted segments: ${highCount} high, ${mediumCount} medium, ${lowCount} low severity`;
-    }
-    
-    // Update alert content
-    const titleElement = document.getElementById('disruption-alert-title');
-    const summaryElement = document.getElementById('disruption-alert-summary');
-    const impactElement = document.getElementById('disruption-alert-impact');
-    
-    if (titleElement) {
-      titleElement.textContent = `${totalDisruptions} Disruption${totalDisruptions > 1 ? 's' : ''} Detected`;
-    }
-    
-    if (summaryElement) {
-      summaryElement.textContent = description;
-    }
-    
-    if (impactElement && timeImpact > 0) {
-      const timeMin = Math.round(timeImpact / 60);
-      impactElement.textContent = `Time Impact: +${timeMin} min`;
-    } else if (impactElement) {
-      impactElement.textContent = 'Time Impact: Minimal';
-    }
-    
-    console.log(`Route passes through ${totalDisruptions} disrupted segment(s), impact: ${timeImpact}s`);
+    return;
+  }
+
+  // Show alert and update content
+  alertContainer.classList.remove('hidden');
+
+  // Determine severity level
+  let severityLevel = 'low';
+  if (highCount > 0) {
+    severityLevel = 'high';
+  } else if (mediumCount > 0) {
+    severityLevel = 'medium';
+  }
+
+  // Create description text
+  let description = '';
+  if (totalDisruptions === 1) {
+    description = `1 disrupted segment on route`;
+  } else {
+    description = `${totalDisruptions} disrupted segments: ${highCount} high, ${mediumCount} medium, ${lowCount} low severity`;
+  }
+
+  // Update alert content
+  const titleElement = document.getElementById('disruption-alert-title');
+  const summaryElement = document.getElementById('disruption-alert-summary');
+  const impactElement = document.getElementById('disruption-alert-impact');
+
+  if (titleElement) {
+    titleElement.textContent = `${totalDisruptions} Disruption${totalDisruptions > 1 ? 's' : ''} Detected`;
+  }
+
+  if (summaryElement) {
+    summaryElement.textContent = description;
+  }
+
+  if (impactElement && timeImpact > 0) {
+    const timeMin = Math.round(timeImpact / 60);
+    impactElement.textContent = `Time Impact: +${timeMin} min`;
+  } else if (impactElement) {
+    impactElement.textContent = 'Time Impact: Minimal';
+  }
+
+  console.log(`Route passes through ${totalDisruptions} disrupted segment(s), impact: ${timeImpact}s`);
 }
-  
+
 function showRouteDisruptionsDetail(disruptedSegments) {
-    // Show a detailed modal or toast with all disruptions on the route
-    const segmentList = disruptedSegments.map(segment => 
-      `• ${segment.roadName} - ${segment.incidentType} (${segment.severity})`
-    ).join('\n');
-    
-    
-    showUpdateToast(`Route disruptions:\n${segmentList}`, 'warning');
-    
-    // Optionally highlight the disrupted segments on the map
-    highlightDisruptedSegments(disruptedSegments);
+  // Show a detailed modal or toast with all disruptions on the route
+  const segmentList = disruptedSegments.map(segment =>
+    `• ${segment.roadName} - ${segment.incidentType} (${segment.severity})`
+  ).join('\n');
+
+
+  showUpdateToast(`Route disruptions:\n${segmentList}`, 'warning');
+
+  // Optionally highlight the disrupted segments on the map
+  highlightDisruptedSegments(disruptedSegments);
 }
 
 // Function to compute discrete Fréchet distance between two routes
 function computeDiscreteFrechetDistance(dhc2lRouteData, googleMapsRouteData) {
-    try {
-        console.log('🧮 Starting Fréchet distance computation...');
-        console.log('D-HC2L Route Data:', dhc2lRouteData);
-        console.log('Google Maps Route Data:', googleMapsRouteData);
-        
-        // Extract coordinate arrays from both routes
-        const dhc2lCoords = extractDHC2LCoordinates(dhc2lRouteData);
-        const googleCoords = extractGoogleMapsCoordinates(googleMapsRouteData);
-        
-        if (!dhc2lCoords || dhc2lCoords.length === 0) {
-            console.warn('❌ Failed to extract D-HC2L coordinates');
-            return {
-                success: false,
-                error: 'Failed to extract D-HC2L coordinates',
-                distance: null
-            };
-        }
-        
-        if (!googleCoords || googleCoords.length === 0) {
-            console.warn('❌ Failed to extract Google Maps coordinates');
-            return {
-                success: false,
-                error: 'Failed to extract Google Maps coordinates',
-                distance: null
-            };
-        }
-        
-        console.log(`✅ Computing Fréchet distance: D-HC2L (${dhc2lCoords.length} points) vs Google Maps (${googleCoords.length} points)`);
-        
-        // Validate coordinate data
-        const validDhc2l = dhc2lCoords.every(coord => 
-            coord && typeof coord.lat === 'number' && typeof coord.lng === 'number' && 
-            !isNaN(coord.lat) && !isNaN(coord.lng)
-        );
-        const validGoogle = googleCoords.every(coord => 
-            coord && typeof coord.lat === 'number' && typeof coord.lng === 'number' && 
-            !isNaN(coord.lat) && !isNaN(coord.lng)
-        );
-        
-        if (!validDhc2l) {
-            console.warn('❌ Invalid D-HC2L coordinate data detected');
-            return {
-                success: false,
-                error: 'Invalid D-HC2L coordinate data',
-                distance: null
-            };
-        }
-        
-        if (!validGoogle) {
-            console.warn('❌ Invalid Google Maps coordinate data detected');
-            return {
-                success: false,
-                error: 'Invalid Google Maps coordinate data',
-                distance: null
-            };
-        }
-        
-        // Compute discrete Fréchet distance
-        const frechetDistance = discreteFrechetDistance(dhc2lCoords, googleCoords);
-        
-        console.log(`✅ Fréchet distance computed: ${frechetDistance.toFixed(1)}m`);
-        
-        return {
-            success: true,
-            distance: frechetDistance,
-            dhc2l_points: dhc2lCoords.length,
-            google_points: googleCoords.length,
-            distance_km: (frechetDistance / 1000).toFixed(3),
-            distance_m: frechetDistance.toFixed(1)
-        };
-        
-    } catch (error) {
-        console.error('❌ Error computing Fréchet distance:', error);
-        return {
-            success: false,
-            error: error.message,
-            distance: null
-        };
+  try {
+    console.log('🧮 Starting Fréchet distance computation...');
+    console.log('D-HC2L Route Data:', dhc2lRouteData);
+    console.log('Google Maps Route Data:', googleMapsRouteData);
+
+    // Extract coordinate arrays from both routes
+    const dhc2lCoords = extractDHC2LCoordinates(dhc2lRouteData);
+    const googleCoords = extractGoogleMapsCoordinates(googleMapsRouteData);
+
+    if (!dhc2lCoords || dhc2lCoords.length === 0) {
+      console.warn('❌ Failed to extract D-HC2L coordinates');
+      return {
+        success: false,
+        error: 'Failed to extract D-HC2L coordinates',
+        distance: null
+      };
     }
+
+    if (!googleCoords || googleCoords.length === 0) {
+      console.warn('❌ Failed to extract Google Maps coordinates');
+      return {
+        success: false,
+        error: 'Failed to extract Google Maps coordinates',
+        distance: null
+      };
+    }
+
+    console.log(`✅ Computing Fréchet distance: D-HC2L (${dhc2lCoords.length} points) vs Google Maps (${googleCoords.length} points)`);
+
+    // Validate coordinate data
+    const validDhc2l = dhc2lCoords.every(coord =>
+      coord && typeof coord.lat === 'number' && typeof coord.lng === 'number' &&
+      !isNaN(coord.lat) && !isNaN(coord.lng)
+    );
+    const validGoogle = googleCoords.every(coord =>
+      coord && typeof coord.lat === 'number' && typeof coord.lng === 'number' &&
+      !isNaN(coord.lat) && !isNaN(coord.lng)
+    );
+
+    if (!validDhc2l) {
+      console.warn('❌ Invalid D-HC2L coordinate data detected');
+      return {
+        success: false,
+        error: 'Invalid D-HC2L coordinate data',
+        distance: null
+      };
+    }
+
+    if (!validGoogle) {
+      console.warn('❌ Invalid Google Maps coordinate data detected');
+      return {
+        success: false,
+        error: 'Invalid Google Maps coordinate data',
+        distance: null
+      };
+    }
+
+    // Compute discrete Fréchet distance
+    const frechetDistance = discreteFrechetDistance(dhc2lCoords, googleCoords);
+
+    console.log(`✅ Fréchet distance computed: ${frechetDistance.toFixed(1)}m`);
+
+    return {
+      success: true,
+      distance: frechetDistance,
+      dhc2l_points: dhc2lCoords.length,
+      google_points: googleCoords.length,
+      distance_km: (frechetDistance / 1000).toFixed(3),
+      distance_m: frechetDistance.toFixed(1)
+    };
+
+  } catch (error) {
+    console.error('❌ Error computing Fréchet distance:', error);
+    return {
+      success: false,
+      error: error.message,
+      distance: null
+    };
+  }
 }
 
 // Helper function to extract coordinates from D-HC2L route data
 function extractDHC2LCoordinates(dhc2lRouteData) {
-    console.log('🔍 Extracting D-HC2L coordinates from:', dhc2lRouteData);
-    
-    if (!dhc2lRouteData || !dhc2lRouteData.route) {
-        console.warn('❌ Invalid D-HC2L route data structure:', dhc2lRouteData);
+  console.log('🔍 Extracting D-HC2L coordinates from:', dhc2lRouteData);
+
+  if (!dhc2lRouteData || !dhc2lRouteData.route) {
+    console.warn('❌ Invalid D-HC2L route data structure:', dhc2lRouteData);
+    return null;
+  }
+
+  // Try multiple sources for coordinates
+  let coordinates = [];
+
+  // First try: direct coordinates array
+  if (dhc2lRouteData.route.coordinates && dhc2lRouteData.route.coordinates.length > 0) {
+    console.log('✅ Found coordinates array with', dhc2lRouteData.route.coordinates.length, 'points');
+    coordinates = dhc2lRouteData.route.coordinates.map(coord => {
+      // Handle both object format {lat: x, lng: y} and array format [lat, lng]
+      if (typeof coord === 'object' && coord.lat !== undefined && coord.lng !== undefined) {
+        return { lat: coord.lat, lng: coord.lng };
+      } else if (Array.isArray(coord) && coord.length >= 2) {
+        return { lat: coord[0], lng: coord[1] };
+      } else {
+        console.warn('⚠️ Invalid coordinate format:', coord);
         return null;
+      }
+    }).filter(coord => coord !== null);
+  }
+  // Second try: polylines path
+  else if (dhc2lRouteData.route.polylines && dhc2lRouteData.route.polylines.length > 0) {
+    console.log('✅ Found polylines array with', dhc2lRouteData.route.polylines.length, 'polylines');
+    // Extract from first polyline
+    const firstPolyline = dhc2lRouteData.route.polylines[0];
+    if (firstPolyline.path && firstPolyline.path.length > 0) {
+      console.log('✅ Using polyline path with', firstPolyline.path.length, 'points');
+      coordinates = firstPolyline.path.map(point => ({
+        lat: point.lat,
+        lng: point.lng
+      }));
     }
-    
-    // Try multiple sources for coordinates
-    let coordinates = [];
-    
-    // First try: direct coordinates array
-    if (dhc2lRouteData.route.coordinates && dhc2lRouteData.route.coordinates.length > 0) {
-        console.log('✅ Found coordinates array with', dhc2lRouteData.route.coordinates.length, 'points');
-        coordinates = dhc2lRouteData.route.coordinates.map(coord => {
-            // Handle both object format {lat: x, lng: y} and array format [lat, lng]
-            if (typeof coord === 'object' && coord.lat !== undefined && coord.lng !== undefined) {
-                return { lat: coord.lat, lng: coord.lng };
-            } else if (Array.isArray(coord) && coord.length >= 2) {
-                return { lat: coord[0], lng: coord[1] };
-            } else {
-                console.warn('⚠️ Invalid coordinate format:', coord);
-                return null;
-            }
-        }).filter(coord => coord !== null);
-    }
-    // Second try: polylines path
-    else if (dhc2lRouteData.route.polylines && dhc2lRouteData.route.polylines.length > 0) {
-        console.log('✅ Found polylines array with', dhc2lRouteData.route.polylines.length, 'polylines');
-        // Extract from first polyline
-        const firstPolyline = dhc2lRouteData.route.polylines[0];
-        if (firstPolyline.path && firstPolyline.path.length > 0) {
-            console.log('✅ Using polyline path with', firstPolyline.path.length, 'points');
-            coordinates = firstPolyline.path.map(point => ({
-                lat: point.lat,
-                lng: point.lng
-            }));
-        }
-    }
-    // Third try: road segments with various coordinate formats
-    else if (dhc2lRouteData.route.road_segments && dhc2lRouteData.route.road_segments.length > 0) {
-        console.log('✅ Found road segments array with', dhc2lRouteData.route.road_segments.length, 'segments');
-        // Extract coordinates from road segments
-        dhc2lRouteData.route.road_segments.forEach((segment, segIndex) => {
-            // Try different coordinate sources in segments
-            if (segment.coordinates && segment.coordinates.length > 0) {
-                console.log(`  Segment ${segIndex}: found coordinates array with ${segment.coordinates.length} points`);
-                segment.coordinates.forEach(coord => {
-                    if (typeof coord === 'object' && coord.lat !== undefined && coord.lng !== undefined) {
-                        coordinates.push({ lat: coord.lat, lng: coord.lng });
-                    } else if (Array.isArray(coord) && coord.length >= 2) {
-                        coordinates.push({ lat: coord[0], lng: coord[1] });
-                    }
-                });
-            }
-            // Fallback: try to use source/target coordinates
-            else if (segment.source_lat !== undefined && segment.source_lng !== undefined) {
-                console.log(`  Segment ${segIndex}: using source coordinates`);
-                coordinates.push({ lat: segment.source_lat, lng: segment.source_lng });
-                if (segment.target_lat !== undefined && segment.target_lng !== undefined) {
-                    coordinates.push({ lat: segment.target_lat, lng: segment.target_lng });
-                }
-            }
+  }
+  // Third try: road segments with various coordinate formats
+  else if (dhc2lRouteData.route.road_segments && dhc2lRouteData.route.road_segments.length > 0) {
+    console.log('✅ Found road segments array with', dhc2lRouteData.route.road_segments.length, 'segments');
+    // Extract coordinates from road segments
+    dhc2lRouteData.route.road_segments.forEach((segment, segIndex) => {
+      // Try different coordinate sources in segments
+      if (segment.coordinates && segment.coordinates.length > 0) {
+        console.log(`  Segment ${segIndex}: found coordinates array with ${segment.coordinates.length} points`);
+        segment.coordinates.forEach(coord => {
+          if (typeof coord === 'object' && coord.lat !== undefined && coord.lng !== undefined) {
+            coordinates.push({ lat: coord.lat, lng: coord.lng });
+          } else if (Array.isArray(coord) && coord.length >= 2) {
+            coordinates.push({ lat: coord[0], lng: coord[1] });
+          }
         });
-    }
-    
-    console.log(`🎯 Extracted ${coordinates.length} D-HC2L coordinates`);
-    return coordinates.length > 0 ? coordinates : null;
+      }
+      // Fallback: try to use source/target coordinates
+      else if (segment.source_lat !== undefined && segment.source_lng !== undefined) {
+        console.log(`  Segment ${segIndex}: using source coordinates`);
+        coordinates.push({ lat: segment.source_lat, lng: segment.source_lng });
+        if (segment.target_lat !== undefined && segment.target_lng !== undefined) {
+          coordinates.push({ lat: segment.target_lat, lng: segment.target_lng });
+        }
+      }
+    });
+  }
+
+  console.log(`🎯 Extracted ${coordinates.length} D-HC2L coordinates`);
+  return coordinates.length > 0 ? coordinates : null;
 }
 
 // Helper function to extract coordinates from Google Maps route data
 function extractGoogleMapsCoordinates(googleMapsRouteData) {
-    console.log('🔍 Extracting Google Maps coordinates from:', googleMapsRouteData);
-    
-    if (!googleMapsRouteData) {
-        console.warn('❌ No Google Maps route data provided');
-        return null;
+  console.log('🔍 Extracting Google Maps coordinates from:', googleMapsRouteData);
+
+  if (!googleMapsRouteData) {
+    console.warn('❌ No Google Maps route data provided');
+    return null;
+  }
+
+  let coordinates = [];
+
+  // Check if it has a coordinates array (from our enhanced getGoogleMapsRouteWithCoordinates)
+  if (googleMapsRouteData.coordinates && googleMapsRouteData.coordinates.length > 0) {
+    console.log('✅ Found coordinates array with', googleMapsRouteData.coordinates.length, 'points');
+    coordinates = googleMapsRouteData.coordinates.map(coord => ({
+      lat: coord.lat,
+      lng: coord.lng
+    }));
+  }
+  // If it's a DirectionsResult object from Google Maps API
+  else if (googleMapsRouteData.routes && googleMapsRouteData.routes.length > 0) {
+    console.log('✅ Found DirectionsResult with', googleMapsRouteData.routes.length, 'routes');
+    const route = googleMapsRouteData.routes[0];
+    if (route.overview_path && route.overview_path.length > 0) {
+      console.log('✅ Using overview_path with', route.overview_path.length, 'points');
+      coordinates = route.overview_path.map(point => ({
+        lat: point.lat(),
+        lng: point.lng()
+      }));
     }
-    
-    let coordinates = [];
-    
-    // Check if it has a coordinates array (from our enhanced getGoogleMapsRouteWithCoordinates)
-    if (googleMapsRouteData.coordinates && googleMapsRouteData.coordinates.length > 0) {
-        console.log('✅ Found coordinates array with', googleMapsRouteData.coordinates.length, 'points');
-        coordinates = googleMapsRouteData.coordinates.map(coord => ({
-            lat: coord.lat,
-            lng: coord.lng
-        }));
-    }
-    // If it's a DirectionsResult object from Google Maps API
-    else if (googleMapsRouteData.routes && googleMapsRouteData.routes.length > 0) {
-        console.log('✅ Found DirectionsResult with', googleMapsRouteData.routes.length, 'routes');
-        const route = googleMapsRouteData.routes[0];
-        if (route.overview_path && route.overview_path.length > 0) {
-            console.log('✅ Using overview_path with', route.overview_path.length, 'points');
-            coordinates = route.overview_path.map(point => ({
-                lat: point.lat(),
-                lng: point.lng()
-            }));
+    // Fallback: extract from legs
+    else if (route.legs && route.legs.length > 0) {
+      console.log('✅ Extracting from route legs');
+      route.legs.forEach(leg => {
+        if (leg.steps && leg.steps.length > 0) {
+          leg.steps.forEach(step => {
+            if (step.path && step.path.length > 0) {
+              step.path.forEach(point => {
+                coordinates.push({
+                  lat: point.lat(),
+                  lng: point.lng()
+                });
+              });
+            }
+          });
         }
-        // Fallback: extract from legs
-        else if (route.legs && route.legs.length > 0) {
-            console.log('✅ Extracting from route legs');
-            route.legs.forEach(leg => {
-                if (leg.steps && leg.steps.length > 0) {
-                    leg.steps.forEach(step => {
-                        if (step.path && step.path.length > 0) {
-                            step.path.forEach(point => {
-                                coordinates.push({
-                                    lat: point.lat(),
-                                    lng: point.lng()
-                                });
-                            });
-                        }
-                    });
-                }
-            });
-        }
+      });
     }
-    // Check if it has a directionsResult property
-    else if (googleMapsRouteData.directionsResult && googleMapsRouteData.directionsResult.routes) {
-        console.log('✅ Found directionsResult property');
-        const route = googleMapsRouteData.directionsResult.routes[0];
-        if (route.overview_path && route.overview_path.length > 0) {
-            console.log('✅ Using overview_path with', route.overview_path.length, 'points');
-            coordinates = route.overview_path.map(point => ({
-                lat: point.lat(),
-                lng: point.lng()
-            }));
-        }
+  }
+  // Check if it has a directionsResult property
+  else if (googleMapsRouteData.directionsResult && googleMapsRouteData.directionsResult.routes) {
+    console.log('✅ Found directionsResult property');
+    const route = googleMapsRouteData.directionsResult.routes[0];
+    if (route.overview_path && route.overview_path.length > 0) {
+      console.log('✅ Using overview_path with', route.overview_path.length, 'points');
+      coordinates = route.overview_path.map(point => ({
+        lat: point.lat(),
+        lng: point.lng()
+      }));
     }
-    // If it's our custom metadata object without coordinates
-    else if (googleMapsRouteData.steps && googleMapsRouteData.steps.length > 0) {
-        console.warn('⚠️ Google Maps metadata found but no coordinate data - need to request full route');
-        return null;
-    }
-    else {
-        console.warn('❌ Unrecognized Google Maps route data format:', Object.keys(googleMapsRouteData));
-    }
-    
-    console.log(`🎯 Extracted ${coordinates.length} Google Maps coordinates`);
-    return coordinates.length > 0 ? coordinates : null;
+  }
+  // If it's our custom metadata object without coordinates
+  else if (googleMapsRouteData.steps && googleMapsRouteData.steps.length > 0) {
+    console.warn('⚠️ Google Maps metadata found but no coordinate data - need to request full route');
+    return null;
+  }
+  else {
+    console.warn('❌ Unrecognized Google Maps route data format:', Object.keys(googleMapsRouteData));
+  }
+
+  console.log(`🎯 Extracted ${coordinates.length} Google Maps coordinates`);
+  return coordinates.length > 0 ? coordinates : null;
 }
 
 // Function to compute segment overlap percentage between HC2L and Google Maps routes
 function computeSegmentOverlap(dhc2lRouteData, googleMapsRouteData) {
-    try {
-        console.log('🔍 Computing segment overlap...');
-        console.log('D-HC2L Route Data:', dhc2lRouteData);
-        console.log('Google Maps Route Data:', googleMapsRouteData);
-        
-        // Extract road segments from D-HC2L route
-        const hc2lSegments = extractHC2LSegments(dhc2lRouteData);
-        if (!hc2lSegments || hc2lSegments.length === 0) {
-            console.warn('❌ Failed to extract HC2L segments');
-            return {
-                success: false,
-                error: 'Failed to extract HC2L segments',
-                overlap_percentage: 0
-            };
-        }
-        
-        // Extract road segments from Google Maps route (reference)
-        const googleSegments = extractGoogleMapsSegments(googleMapsRouteData);
-        if (!googleSegments || googleSegments.length === 0) {
-            console.warn('❌ Failed to extract Google Maps segments');
-            return {
-                success: false,
-                error: 'Failed to extract Google Maps segments',
-                overlap_percentage: 0
-            };
-        }
-        
-        // Count shared segments
-        const sharedSegments = findSharedSegments(hc2lSegments, googleSegments);
-        const totalGoogleSegments = googleSegments.length;
-        
-        // Calculate overlap percentage: (shared / total_google) * 100
-        const overlapPercentage = (sharedSegments / totalGoogleSegments) * 100;
-        
-        console.log(`✅ Segment overlap computed: ${sharedSegments}/${totalGoogleSegments} = ${overlapPercentage.toFixed(1)}%`);
-        
-        return {
-            success: true,
-            shared_segments: sharedSegments,
-            total_hc2l_segments: hc2lSegments.length,
-            total_google_segments: totalGoogleSegments,
-            overlap_percentage: overlapPercentage,
-            overlap_percentage_formatted: `${overlapPercentage.toFixed(1)}%`
-        };
-        
-    } catch (error) {
-        console.error('❌ Error computing segment overlap:', error);
-        return {
-            success: false,
-            error: error.message,
-            overlap_percentage: 0
-        };
+  try {
+    console.log('🔍 Computing segment overlap...');
+    console.log('D-HC2L Route Data:', dhc2lRouteData);
+    console.log('Google Maps Route Data:', googleMapsRouteData);
+
+    // Extract road segments from D-HC2L route
+    const hc2lSegments = extractHC2LSegments(dhc2lRouteData);
+    if (!hc2lSegments || hc2lSegments.length === 0) {
+      console.warn('❌ Failed to extract HC2L segments');
+      return {
+        success: false,
+        error: 'Failed to extract HC2L segments',
+        overlap_percentage: 0
+      };
     }
+
+    // Extract road segments from Google Maps route (reference)
+    const googleSegments = extractGoogleMapsSegments(googleMapsRouteData);
+    if (!googleSegments || googleSegments.length === 0) {
+      console.warn('❌ Failed to extract Google Maps segments');
+      return {
+        success: false,
+        error: 'Failed to extract Google Maps segments',
+        overlap_percentage: 0
+      };
+    }
+
+    // Count shared segments
+    const sharedSegments = findSharedSegments(hc2lSegments, googleSegments);
+    const totalGoogleSegments = googleSegments.length;
+
+    // Calculate overlap percentage: (shared / total_google) * 100
+    const overlapPercentage = (sharedSegments / totalGoogleSegments) * 100;
+
+    console.log(`✅ Segment overlap computed: ${sharedSegments}/${totalGoogleSegments} = ${overlapPercentage.toFixed(1)}%`);
+
+    return {
+      success: true,
+      shared_segments: sharedSegments,
+      total_hc2l_segments: hc2lSegments.length,
+      total_google_segments: totalGoogleSegments,
+      overlap_percentage: overlapPercentage,
+      overlap_percentage_formatted: `${overlapPercentage.toFixed(1)}%`
+    };
+
+  } catch (error) {
+    console.error('❌ Error computing segment overlap:', error);
+    return {
+      success: false,
+      error: error.message,
+      overlap_percentage: 0
+    };
+  }
 }
 
 // Helper function to extract road segments from HC2L route data
 function extractHC2LSegments(dhc2lRouteData) {
-    if (!dhc2lRouteData || !dhc2lRouteData.route) {
-        return null;
+  if (!dhc2lRouteData || !dhc2lRouteData.route) {
+    return null;
+  }
+
+  let segments = [];
+
+  // Extract from road_segments array
+  if (dhc2lRouteData.route.road_segments && dhc2lRouteData.route.road_segments.length > 0) {
+    console.log('✅ Found HC2L road segments:', dhc2lRouteData.route.road_segments.length);
+    segments = dhc2lRouteData.route.road_segments.map(segment => ({
+      road_name: segment.road_name || segment.name || 'Unknown Road',
+      source_lat: segment.source_lat || segment.start_lat,
+      source_lng: segment.source_lng || segment.start_lng,
+      target_lat: segment.target_lat || segment.end_lat,
+      target_lng: segment.target_lng || segment.end_lng,
+      length: segment.length_meters || segment.length || 0,
+      normalized_name: normalizeRoadName(segment.road_name || segment.name || 'Unknown Road')
+    }));
+  }
+  // Fallback: create segments from coordinates if road_segments not available
+  else if (dhc2lRouteData.route.coordinates && dhc2lRouteData.route.coordinates.length > 1) {
+    console.log('⚠️ No road segments found, creating from coordinates');
+    const coords = dhc2lRouteData.route.coordinates;
+    for (let i = 0; i < coords.length - 1; i++) {
+      const start = coords[i];
+      const end = coords[i + 1];
+      segments.push({
+        road_name: 'Unknown Road',
+        source_lat: start.lat || start[0],
+        source_lng: start.lng || start[1],
+        target_lat: end.lat || end[0],
+        target_lng: end.lng || end[1],
+        length: calculateHaversineDistance(
+          start.lat || start[0], start.lng || start[1],
+          end.lat || end[0], end.lng || end[1]
+        ),
+        normalized_name: normalizeRoadName('Unknown Road')
+      });
     }
-    
-    let segments = [];
-    
-    // Extract from road_segments array
-    if (dhc2lRouteData.route.road_segments && dhc2lRouteData.route.road_segments.length > 0) {
-        console.log('✅ Found HC2L road segments:', dhc2lRouteData.route.road_segments.length);
-        segments = dhc2lRouteData.route.road_segments.map(segment => ({
-            road_name: segment.road_name || segment.name || 'Unknown Road',
-            source_lat: segment.source_lat || segment.start_lat,
-            source_lng: segment.source_lng || segment.start_lng,
-            target_lat: segment.target_lat || segment.end_lat,
-            target_lng: segment.target_lng || segment.end_lng,
-            length: segment.length_meters || segment.length || 0,
-            normalized_name: normalizeRoadName(segment.road_name || segment.name || 'Unknown Road')
-        }));
-    }
-    // Fallback: create segments from coordinates if road_segments not available
-    else if (dhc2lRouteData.route.coordinates && dhc2lRouteData.route.coordinates.length > 1) {
-        console.log('⚠️ No road segments found, creating from coordinates');
-        const coords = dhc2lRouteData.route.coordinates;
-        for (let i = 0; i < coords.length - 1; i++) {
-            const start = coords[i];
-            const end = coords[i + 1];
-            segments.push({
-                road_name: 'Unknown Road',
-                source_lat: start.lat || start[0],
-                source_lng: start.lng || start[1],
-                target_lat: end.lat || end[0],
-                target_lng: end.lng || end[1],
-                length: calculateHaversineDistance(
-                    start.lat || start[0], start.lng || start[1],
-                    end.lat || end[0], end.lng || end[1]
-                ),
-                normalized_name: normalizeRoadName('Unknown Road')
-            });
-        }
-    }
-    
-    console.log(`🎯 Extracted ${segments.length} HC2L segments`);
-    return segments.length > 0 ? segments : null;
+  }
+
+  console.log(`🎯 Extracted ${segments.length} HC2L segments`);
+  return segments.length > 0 ? segments : null;
 }
 
 // Helper function to extract road segments from Google Maps route data
 function extractGoogleMapsSegments(googleMapsRouteData) {
-    if (!googleMapsRouteData) {
-        return null;
-    }
-    
-    let segments = [];
-    
-    // Extract from Google Maps steps (turn-by-turn directions)
-    if (googleMapsRouteData.steps && googleMapsRouteData.steps.length > 0) {
-        console.log('✅ Found Google Maps steps:', googleMapsRouteData.steps.length);
-        segments = googleMapsRouteData.steps.map((step, index) => {
-            // Extract road name from instruction (basic parsing)
-            const roadName = extractRoadNameFromInstruction(step.instruction);
-            return {
-                road_name: roadName,
-                step_index: index,
-                instruction: step.instruction,
-                distance: step.distance,
-                duration: step.duration,
-                normalized_name: normalizeRoadName(roadName)
-            };
-        });
-    }
-    // Fallback: extract from DirectionsResult if available
-    else if (googleMapsRouteData.directionsResult && googleMapsRouteData.directionsResult.routes) {
-        console.log('✅ Extracting from DirectionsResult');
-        const route = googleMapsRouteData.directionsResult.routes[0];
-        if (route.legs && route.legs.length > 0) {
-            route.legs.forEach(leg => {
-                if (leg.steps && leg.steps.length > 0) {
-                    leg.steps.forEach((step, index) => {
-                        const roadName = extractRoadNameFromInstruction(step.instructions);
-                        segments.push({
-                            road_name: roadName,
-                            step_index: index,
-                            instruction: step.instructions,
-                            distance: step.distance.text,
-                            duration: step.duration.text,
-                            normalized_name: normalizeRoadName(roadName)
-                        });
-                    });
-                }
+  if (!googleMapsRouteData) {
+    return null;
+  }
+
+  let segments = [];
+
+  // Extract from Google Maps steps (turn-by-turn directions)
+  if (googleMapsRouteData.steps && googleMapsRouteData.steps.length > 0) {
+    console.log('✅ Found Google Maps steps:', googleMapsRouteData.steps.length);
+    segments = googleMapsRouteData.steps.map((step, index) => {
+      // Extract road name from instruction (basic parsing)
+      const roadName = extractRoadNameFromInstruction(step.instruction);
+      return {
+        road_name: roadName,
+        step_index: index,
+        instruction: step.instruction,
+        distance: step.distance,
+        duration: step.duration,
+        normalized_name: normalizeRoadName(roadName)
+      };
+    });
+  }
+  // Fallback: extract from DirectionsResult if available
+  else if (googleMapsRouteData.directionsResult && googleMapsRouteData.directionsResult.routes) {
+    console.log('✅ Extracting from DirectionsResult');
+    const route = googleMapsRouteData.directionsResult.routes[0];
+    if (route.legs && route.legs.length > 0) {
+      route.legs.forEach(leg => {
+        if (leg.steps && leg.steps.length > 0) {
+          leg.steps.forEach((step, index) => {
+            const roadName = extractRoadNameFromInstruction(step.instructions);
+            segments.push({
+              road_name: roadName,
+              step_index: index,
+              instruction: step.instructions,
+              distance: step.distance.text,
+              duration: step.duration.text,
+              normalized_name: normalizeRoadName(roadName)
             });
+          });
         }
+      });
     }
-    
-    console.log(`🎯 Extracted ${segments.length} Google Maps segments`);
-    return segments.length > 0 ? segments : null;
+  }
+
+  console.log(`🎯 Extracted ${segments.length} Google Maps segments`);
+  return segments.length > 0 ? segments : null;
 }
 
 // Helper function to normalize road names for comparison
 function normalizeRoadName(roadName) {
-    if (!roadName || roadName === 'Unknown Road') {
-        return 'unknown';
-    }
-    
-    return roadName
-        .toLowerCase()
-        .replace(/\b(road|rd|street|st|avenue|ave|boulevard|blvd|highway|hwy|lane|ln)\b/g, '')
-        .replace(/[^a-z0-9\s]/g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
+  if (!roadName || roadName === 'Unknown Road') {
+    return 'unknown';
+  }
+
+  return roadName
+    .toLowerCase()
+    .replace(/\b(road|rd|street|st|avenue|ave|boulevard|blvd|highway|hwy|lane|ln)\b/g, '')
+    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 // Helper function to extract road name from Google Maps instruction
 function extractRoadNameFromInstruction(instruction) {
-    if (!instruction) return 'Unknown Road';
-    
-    // Remove HTML tags
-    const cleanInstruction = instruction.replace(/<[^>]*>/g, '');
-    
-    // Common patterns to extract road names
-    const patterns = [
-        /(?:on|onto|via|along)\s+([^,]+?)(?:\s+(?:for|toward|until))/i,
-        /(?:turn\s+(?:left|right)\s+onto)\s+([^,]+?)(?:\s|$)/i,
-        /(?:continue\s+on)\s+([^,]+?)(?:\s|$)/i,
-        /(?:head|go)\s+[^,]*?\s+on\s+([^,]+?)(?:\s|$)/i
-    ];
-    
-    for (const pattern of patterns) {
-        const match = cleanInstruction.match(pattern);
-        if (match && match[1]) {
-            return match[1].trim();
-        }
+  if (!instruction) return 'Unknown Road';
+
+  // Remove HTML tags
+  const cleanInstruction = instruction.replace(/<[^>]*>/g, '');
+
+  // Common patterns to extract road names
+  const patterns = [
+    /(?:on|onto|via|along)\s+([^,]+?)(?:\s+(?:for|toward|until))/i,
+    /(?:turn\s+(?:left|right)\s+onto)\s+([^,]+?)(?:\s|$)/i,
+    /(?:continue\s+on)\s+([^,]+?)(?:\s|$)/i,
+    /(?:head|go)\s+[^,]*?\s+on\s+([^,]+?)(?:\s|$)/i
+  ];
+
+  for (const pattern of patterns) {
+    const match = cleanInstruction.match(pattern);
+    if (match && match[1]) {
+      return match[1].trim();
     }
-    
-    // Fallback: look for capitalized words that might be road names
-    const words = cleanInstruction.split(/\s+/);
-    const capitalizedWords = words.filter(word => 
-        word.length > 2 && 
-        word[0] === word[0].toUpperCase() &&
-        !/^(turn|left|right|continue|head|go|toward|for|until|then|and|the|on|onto|via|along)$/i.test(word)
-    );
-    
-    if (capitalizedWords.length > 0) {
-        return capitalizedWords.slice(0, 2).join(' '); // Take first 1-2 capitalized words
-    }
-    
-    return 'Unknown Road';
+  }
+
+  // Fallback: look for capitalized words that might be road names
+  const words = cleanInstruction.split(/\s+/);
+  const capitalizedWords = words.filter(word =>
+    word.length > 2 &&
+    word[0] === word[0].toUpperCase() &&
+    !/^(turn|left|right|continue|head|go|toward|for|until|then|and|the|on|onto|via|along)$/i.test(word)
+  );
+
+  if (capitalizedWords.length > 0) {
+    return capitalizedWords.slice(0, 2).join(' '); // Take first 1-2 capitalized words
+  }
+
+  return 'Unknown Road';
 }
 
 // Helper function to find shared segments between HC2L and Google Maps
 function findSharedSegments(hc2lSegments, googleSegments) {
-    let sharedCount = 0;
-    
-    // Create a set of normalized HC2L road names for efficient lookup
-    const hc2lRoadNames = new Set(hc2lSegments.map(segment => segment.normalized_name));
-    
-    // Count how many Google segments have matching road names in HC2L
-    googleSegments.forEach(googleSegment => {
-        if (hc2lRoadNames.has(googleSegment.normalized_name)) {
-            sharedCount++;
-            console.log(`✅ Shared segment: ${googleSegment.road_name} (${googleSegment.normalized_name})`);
-        } else {
-            console.log(`❌ Unmatched Google segment: ${googleSegment.road_name} (${googleSegment.normalized_name})`);
-        }
-    });
-    
-    return sharedCount;
+  let sharedCount = 0;
+
+  // Create a set of normalized HC2L road names for efficient lookup
+  const hc2lRoadNames = new Set(hc2lSegments.map(segment => segment.normalized_name));
+
+  // Count how many Google segments have matching road names in HC2L
+  googleSegments.forEach(googleSegment => {
+    if (hc2lRoadNames.has(googleSegment.normalized_name)) {
+      sharedCount++;
+      console.log(`✅ Shared segment: ${googleSegment.road_name} (${googleSegment.normalized_name})`);
+    } else {
+      console.log(`❌ Unmatched Google segment: ${googleSegment.road_name} (${googleSegment.normalized_name})`);
+    }
+  });
+
+  return sharedCount;
 }
 
 // Core discrete Fréchet distance algorithm
 function discreteFrechetDistance(curve1, curve2) {
-    const n = curve1.length;
-    const m = curve2.length;
-    
-    // Create memoization table
-    const memo = Array(n).fill(null).map(() => Array(m).fill(-1));
-    
-    // Distance function between two points (Haversine distance in meters)
-    function pointDistance(p1, p2) {
-        return calculateHaversineDistance(p1.lat, p1.lng, p2.lat, p2.lng);
+  const n = curve1.length;
+  const m = curve2.length;
+
+  // Create memoization table
+  const memo = Array(n).fill(null).map(() => Array(m).fill(-1));
+
+  // Distance function between two points (Haversine distance in meters)
+  function pointDistance(p1, p2) {
+    return calculateHaversineDistance(p1.lat, p1.lng, p2.lat, p2.lng);
+  }
+
+  // Recursive function with memoization
+  function frechetRecursive(i, j) {
+    if (memo[i][j] !== -1) {
+      return memo[i][j];
     }
-    
-    // Recursive function with memoization
-    function frechetRecursive(i, j) {
-        if (memo[i][j] !== -1) {
-            return memo[i][j];
-        }
-        
-        const dist = pointDistance(curve1[i], curve2[j]);
-        
-        if (i === 0 && j === 0) {
-            memo[i][j] = dist;
-        } else if (i === 0) {
-            memo[i][j] = Math.max(dist, frechetRecursive(i, j - 1));
-        } else if (j === 0) {
-            memo[i][j] = Math.max(dist, frechetRecursive(i - 1, j));
-        } else {
-            memo[i][j] = Math.max(dist, Math.min(
-                frechetRecursive(i - 1, j),
-                frechetRecursive(i, j - 1),
-                frechetRecursive(i - 1, j - 1)
-            ));
-        }
-        
-        return memo[i][j];
+
+    const dist = pointDistance(curve1[i], curve2[j]);
+
+    if (i === 0 && j === 0) {
+      memo[i][j] = dist;
+    } else if (i === 0) {
+      memo[i][j] = Math.max(dist, frechetRecursive(i, j - 1));
+    } else if (j === 0) {
+      memo[i][j] = Math.max(dist, frechetRecursive(i - 1, j));
+    } else {
+      memo[i][j] = Math.max(dist, Math.min(
+        frechetRecursive(i - 1, j),
+        frechetRecursive(i, j - 1),
+        frechetRecursive(i - 1, j - 1)
+      ));
     }
-    
-    return frechetRecursive(n - 1, m - 1);
+
+    return memo[i][j];
+  }
+
+  return frechetRecursive(n - 1, m - 1);
 }
 
 // Function to get Google Maps route with full coordinate data
 async function getGoogleMapsRouteWithCoordinates(startLat, startLng, destLat, destLng) {
-    return new Promise((resolve, reject) => {
-        if (!directionsService) {
-            reject(new Error('Google Maps DirectionsService not available'));
-            return;
+  return new Promise((resolve, reject) => {
+    if (!directionsService) {
+      reject(new Error('Google Maps DirectionsService not available'));
+      return;
+    }
+
+    const request = {
+      origin: { lat: startLat, lng: startLng },
+      destination: { lat: destLat, lng: destLng },
+      travelMode: google.maps.TravelMode.DRIVING,
+      unitSystem: google.maps.UnitSystem.METRIC,
+      avoidHighways: false,
+      avoidTolls: false
+    };
+
+    directionsService.route(request, (result, status) => {
+      if (status === 'OK' && result) {
+        console.log('Google Maps route with coordinates received');
+
+        const route = result.routes[0];
+        const leg = route.legs[0];
+
+        // Extract full path coordinates
+        let pathCoordinates = [];
+        if (route.overview_path && route.overview_path.length > 0) {
+          pathCoordinates = route.overview_path.map(point => ({
+            lat: point.lat(),
+            lng: point.lng()
+          }));
         }
 
-        const request = {
-            origin: { lat: startLat, lng: startLng },
-            destination: { lat: destLat, lng: destLng },
-            travelMode: google.maps.TravelMode.DRIVING,
-            unitSystem: google.maps.UnitSystem.METRIC,
-            avoidHighways: false,
-            avoidTolls: false
+        // Enhanced metadata with coordinates
+        const routeMetadata = {
+          success: true,
+          distance: leg.distance.text,
+          distanceValue: leg.distance.value,
+          duration: leg.duration.text,
+          durationValue: leg.duration.value,
+          startAddress: leg.start_address,
+          endAddress: leg.end_address,
+          coordinates: pathCoordinates,
+          directionsResult: result, // Store the full result for coordinate extraction
+          steps: leg.steps.map(step => ({
+            instruction: step.instructions.replace(/<[^>]*>/g, ''),
+            distance: step.distance.text,
+            duration: step.duration.text,
+            maneuver: step.maneuver || 'straight'
+          })),
+          overview_polyline: route.overview_polyline.points,
+          bounds: {
+            northeast: route.bounds.getNorthEast().toJSON(),
+            southwest: route.bounds.getSouthWest().toJSON()
+          },
+          warnings: route.warnings || [],
+          copyrights: route.copyrights
         };
 
-        directionsService.route(request, (result, status) => {
-            if (status === 'OK' && result) {
-                console.log('Google Maps route with coordinates received');
-                
-                const route = result.routes[0];
-                const leg = route.legs[0];
-                
-                // Extract full path coordinates
-                let pathCoordinates = [];
-                if (route.overview_path && route.overview_path.length > 0) {
-                    pathCoordinates = route.overview_path.map(point => ({
-                        lat: point.lat(),
-                        lng: point.lng()
-                    }));
-                }
-                
-                // Enhanced metadata with coordinates
-                const routeMetadata = {
-                    success: true,
-                    distance: leg.distance.text,
-                    distanceValue: leg.distance.value,
-                    duration: leg.duration.text,
-                    durationValue: leg.duration.value,
-                    startAddress: leg.start_address,
-                    endAddress: leg.end_address,
-                    coordinates: pathCoordinates,
-                    directionsResult: result, // Store the full result for coordinate extraction
-                    steps: leg.steps.map(step => ({
-                        instruction: step.instructions.replace(/<[^>]*>/g, ''),
-                        distance: step.distance.text,
-                        duration: step.duration.text,
-                        maneuver: step.maneuver || 'straight'
-                    })),
-                    overview_polyline: route.overview_polyline.points,
-                    bounds: {
-                        northeast: route.bounds.getNorthEast().toJSON(),
-                        southwest: route.bounds.getSouthWest().toJSON()
-                    },
-                    warnings: route.warnings || [],
-                    copyrights: route.copyrights
-                };
-
-                resolve(routeMetadata);
-            } else {
-                console.error('Google Maps route request failed:', status);
-                const errorMessage = `Route request failed: ${status}`;
-                reject(new Error(errorMessage));
-            }
-        });
+        resolve(routeMetadata);
+      } else {
+        console.error('Google Maps route request failed:', status);
+        const errorMessage = `Route request failed: ${status}`;
+        reject(new Error(errorMessage));
+      }
     });
+  });
 }
-  
 
-  
+
+
 
 // Function to get Google Maps route suggestion
 async function getGoogleMapsRoute(startLat, startLng, destLat, destLng) {
-    return new Promise((resolve, reject) => {
-        if (!directionsService) {
-            reject(new Error('Google Maps DirectionsService not available'));
-            return;
-        }
+  return new Promise((resolve, reject) => {
+    if (!directionsService) {
+      reject(new Error('Google Maps DirectionsService not available'));
+      return;
+    }
 
-        const request = {
-            origin: { lat: startLat, lng: startLng },
-            destination: { lat: destLat, lng: destLng },
-            travelMode: google.maps.TravelMode.DRIVING,
-            unitSystem: google.maps.UnitSystem.METRIC,
-            avoidHighways: false,
-            avoidTolls: false
+    const request = {
+      origin: { lat: startLat, lng: startLng },
+      destination: { lat: destLat, lng: destLng },
+      travelMode: google.maps.TravelMode.DRIVING,
+      unitSystem: google.maps.UnitSystem.METRIC,
+      avoidHighways: false,
+      avoidTolls: false
+    };
+
+    console.log('Requesting Google Maps route:', request);
+    showUpdateToast('Getting Google Maps route suggestion...', 'info');
+
+    directionsService.route(request, (result, status) => {
+      if (status === 'OK' && result) {
+        console.log('Google Maps route received:', result);
+
+        const route = result.routes[0];
+        const leg = route.legs[0];
+
+        // Extract metadata
+        const routeMetadata = {
+          success: true,
+          distance: leg.distance.text,
+          distanceValue: leg.distance.value, // in meters
+          duration: leg.duration.text,
+          durationValue: leg.duration.value, // in seconds
+          startAddress: leg.start_address,
+          endAddress: leg.end_address,
+          steps: leg.steps.map(step => ({
+            instruction: step.instructions.replace(/<[^>]*>/g, ''), // Remove HTML tags
+            distance: step.distance.text,
+            duration: step.duration.text,
+            maneuver: step.maneuver || 'straight'
+          })),
+          overview_polyline: route.overview_polyline.points,
+          bounds: {
+            northeast: route.bounds.getNorthEast().toJSON(),
+            southwest: route.bounds.getSouthWest().toJSON()
+          },
+          warnings: route.warnings || [],
+          copyrights: route.copyrights
         };
 
-        console.log('Requesting Google Maps route:', request);
-        showUpdateToast('Getting Google Maps route suggestion...', 'info');
+        showUpdateToast(`Google route: ${routeMetadata.distance}, ${routeMetadata.duration}`, 'success');
+        resolve(routeMetadata);
+      } else {
+        console.error('Google Maps route request failed:', status, result);
+        const errorMessage = status === 'ZERO_RESULTS' ? 'No route found between the locations' :
+          status === 'OVER_QUERY_LIMIT' ? 'Google Maps query limit exceeded' :
+            status === 'REQUEST_DENIED' ? 'Google Maps request denied' :
+              status === 'INVALID_REQUEST' ? 'Invalid route request' :
+                status === 'UNKNOWN_ERROR' ? 'Unknown error occurred' :
+                  `Route request failed: ${status}`;
 
-        directionsService.route(request, (result, status) => {
-            if (status === 'OK' && result) {
-                console.log('Google Maps route received:', result);
-                
-                const route = result.routes[0];
-                const leg = route.legs[0];
-                
-                // Extract metadata
-                const routeMetadata = {
-                    success: true,
-                    distance: leg.distance.text,
-                    distanceValue: leg.distance.value, // in meters
-                    duration: leg.duration.text,
-                    durationValue: leg.duration.value, // in seconds
-                    startAddress: leg.start_address,
-                    endAddress: leg.end_address,
-                    steps: leg.steps.map(step => ({
-                        instruction: step.instructions.replace(/<[^>]*>/g, ''), // Remove HTML tags
-                        distance: step.distance.text,
-                        duration: step.duration.text,
-                        maneuver: step.maneuver || 'straight'
-                    })),
-                    overview_polyline: route.overview_polyline.points,
-                    bounds: {
-                        northeast: route.bounds.getNorthEast().toJSON(),
-                        southwest: route.bounds.getSouthWest().toJSON()
-                    },
-                    warnings: route.warnings || [],
-                    copyrights: route.copyrights
-                };
-
-                showUpdateToast(`Google route: ${routeMetadata.distance}, ${routeMetadata.duration}`, 'success');
-                resolve(routeMetadata);
-            } else {
-                console.error('Google Maps route request failed:', status, result);
-                const errorMessage = status === 'ZERO_RESULTS' ? 'No route found between the locations' :
-                                   status === 'OVER_QUERY_LIMIT' ? 'Google Maps query limit exceeded' :
-                                   status === 'REQUEST_DENIED' ? 'Google Maps request denied' :
-                                   status === 'INVALID_REQUEST' ? 'Invalid route request' :
-                                   status === 'UNKNOWN_ERROR' ? 'Unknown error occurred' :
-                                   `Route request failed: ${status}`;
-                
-                showUpdateToast(errorMessage, 'warning');
-                reject(new Error(errorMessage));
-            }
-        });
+        showUpdateToast(errorMessage, 'warning');
+        reject(new Error(errorMessage));
+      }
     });
+  });
 }
 
 // Function to display Google Maps route on the map
 function displayGoogleMapsRoute(routeMetadata) {
-    if (!directionsRenderer || !routeMetadata.success) {
-        console.error('Cannot display Google Maps route: renderer not available or invalid data');
-        return;
-    }
+  if (!directionsRenderer || !routeMetadata.success) {
+    console.error('Cannot display Google Maps route: renderer not available or invalid data');
+    return;
+  }
 
-    try {
-        // Clear existing routes first
-        clearRoutes();
-        directionsRenderer.setDirections(null);
+  try {
+    // Clear existing routes first
+    clearRoutes();
+    directionsRenderer.setDirections(null);
 
-        // Create a new directions request to get the full result object
-        const request = {
-            origin: { lat: startLocation.lat, lng: startLocation.lng },
-            destination: { lat: destLocation.lat, lng: destLocation.lng },
-            travelMode: google.maps.TravelMode.DRIVING,
-            unitSystem: google.maps.UnitSystem.METRIC
-        };
+    // Create a new directions request to get the full result object
+    const request = {
+      origin: { lat: startLocation.lat, lng: startLocation.lng },
+      destination: { lat: destLocation.lat, lng: destLocation.lng },
+      travelMode: google.maps.TravelMode.DRIVING,
+      unitSystem: google.maps.UnitSystem.METRIC
+    };
 
-        directionsService.route(request, (result, status) => {
-            if (status === 'OK') {
-                // Set the directions result to the renderer
-                directionsRenderer.setDirections(result);
-                
-                // Fit the map to show the route
-                const bounds = result.routes[0].bounds;
-                map.fitBounds(bounds);
-                
-                // Update Current Path Panel with Google Maps data
-                updateCurrentPathPanelWithGoogleRoute(routeMetadata);
-                
-                console.log('✅ Google Maps route displayed successfully');
-                showUpdateToast('Google Maps route displayed', 'success');
-            } else {
-                console.error('Failed to display Google Maps route:', status);
-                showUpdateToast('Failed to display Google Maps route', 'warning');
-            }
-        });
+    directionsService.route(request, (result, status) => {
+      if (status === 'OK') {
+        // Set the directions result to the renderer
+        directionsRenderer.setDirections(result);
 
-    } catch (error) {
-        console.error('Error displaying Google Maps route:', error);
-        showUpdateToast('Error displaying route', 'warning');
-    }
+        // Fit the map to show the route
+        const bounds = result.routes[0].bounds;
+        map.fitBounds(bounds);
+
+        // Update Current Path Panel with Google Maps data
+        updateCurrentPathPanelWithGoogleRoute(routeMetadata);
+
+        console.log('✅ Google Maps route displayed successfully');
+        showUpdateToast('Google Maps route displayed', 'success');
+      } else {
+        console.error('Failed to display Google Maps route:', status);
+        showUpdateToast('Failed to display Google Maps route', 'warning');
+      }
+    });
+
+  } catch (error) {
+    console.error('Error displaying Google Maps route:', error);
+    showUpdateToast('Error displaying route', 'warning');
+  }
 }
 
 // Function to update Current Path Panel with Google Maps route data
 function updateCurrentPathPanelWithGoogleRoute(routeMetadata) {
-    try {
-        // Update route header metrics with Google Maps data
-        const distanceElement = document.querySelector('#current-path-panel .text-xl.font-bold.text-emerald-600');
-        if (distanceElement) {
-            distanceElement.textContent = routeMetadata.distance;
-        }
-        
-        const durationElement = document.querySelector('#current-path-panel .text-xl.font-bold.text-blue-600');
-        if (durationElement) {
-            durationElement.textContent = routeMetadata.duration;
-        }
-        
-        const stepsElement = document.querySelector('#current-path-panel .text-xl.font-bold.text-purple-600');
-        if (stepsElement) {
-            stepsElement.textContent = routeMetadata.steps.length.toString();
-        }
-        
-        // Update route steps with Google Maps turn-by-turn directions
-        const stepsContainer = document.getElementById('route-steps');
-        if (stepsContainer) {
-            // Hide placeholder
-            const placeholder = document.getElementById('route-steps-placeholder');
-            if (placeholder) {
-                placeholder.style.display = 'none';
-            }
-            
-            // Clear existing steps (except placeholder)
-            const existingSteps = stepsContainer.querySelectorAll('.flex.gap-4.items-start');
-            existingSteps.forEach(step => step.remove());
-            
-            // Add each Google Maps step
-            routeMetadata.steps.forEach((step, index) => {
-                const stepNumber = index + 1;
-                const isLastStep = index === routeMetadata.steps.length - 1;
-                
-                // Create step element with Google Maps data
-                const stepElement = createGoogleRouteStepElement(stepNumber, step.instruction, step.distance, step.maneuver, isLastStep);
-                stepsContainer.appendChild(stepElement);
-            });
-        }
-        
-        // Hide route disruption alert (Google Maps routes don't show disruptions)
-        const alertContainer = document.getElementById('disruption-alert-container');
-        if (alertContainer) {
-            alertContainer.classList.add('hidden');
-        }
-        
-        console.log('Current Path Panel updated with Google Maps route data');
-        
-    } catch (error) {
-        console.error('Error updating Current Path Panel with Google route:', error);
+  try {
+    // Update route header metrics with Google Maps data
+    const distanceElement = document.querySelector('#current-path-panel .text-xl.font-bold.text-emerald-600');
+    if (distanceElement) {
+      distanceElement.textContent = routeMetadata.distance;
     }
+
+    const durationElement = document.querySelector('#current-path-panel .text-xl.font-bold.text-blue-600');
+    if (durationElement) {
+      durationElement.textContent = routeMetadata.duration;
+    }
+
+    const stepsElement = document.querySelector('#current-path-panel .text-xl.font-bold.text-purple-600');
+    if (stepsElement) {
+      stepsElement.textContent = routeMetadata.steps.length.toString();
+    }
+
+    // Update route steps with Google Maps turn-by-turn directions
+    const stepsContainer = document.getElementById('route-steps');
+    if (stepsContainer) {
+      // Hide placeholder
+      const placeholder = document.getElementById('route-steps-placeholder');
+      if (placeholder) {
+        placeholder.style.display = 'none';
+      }
+
+      // Clear existing steps (except placeholder)
+      const existingSteps = stepsContainer.querySelectorAll('.flex.gap-4.items-start');
+      existingSteps.forEach(step => step.remove());
+
+      // Add each Google Maps step
+      routeMetadata.steps.forEach((step, index) => {
+        const stepNumber = index + 1;
+        const isLastStep = index === routeMetadata.steps.length - 1;
+
+        // Create step element with Google Maps data
+        const stepElement = createGoogleRouteStepElement(stepNumber, step.instruction, step.distance, step.maneuver, isLastStep);
+        stepsContainer.appendChild(stepElement);
+      });
+    }
+
+    // Hide route disruption alert (Google Maps routes don't show disruptions)
+    const alertContainer = document.getElementById('disruption-alert-container');
+    if (alertContainer) {
+      alertContainer.classList.add('hidden');
+    }
+
+    console.log('Current Path Panel updated with Google Maps route data');
+
+  } catch (error) {
+    console.error('Error updating Current Path Panel with Google route:', error);
+  }
 }
 
 // Function to create route step element for Google Maps data
 function createGoogleRouteStepElement(stepNumber, instruction, distance, maneuver, isLastStep) {
-    const stepDiv = document.createElement('div');
-    stepDiv.className = 'flex gap-4 items-start';
-    
-    // Determine step colors (use Google's blue theme)
-    const stepColors = isLastStep 
-      ? 'bg-gradient-to-br from-red-500 to-rose-600 text-white'
-      : 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white';
-    
-    const contentColors = isLastStep
-      ? 'bg-gradient-to-br from-red-50 to-rose-50 border-2 border-red-300'
-      : 'bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-300';
-    
-    const distanceColor = isLastStep ? 'text-red-600' : 'text-blue-600';
-    
-    stepDiv.innerHTML = `
+  const stepDiv = document.createElement('div');
+  stepDiv.className = 'flex gap-4 items-start';
+
+  // Determine step colors (use Google's blue theme)
+  const stepColors = isLastStep
+    ? 'bg-gradient-to-br from-red-500 to-rose-600 text-white'
+    : 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white';
+
+  const contentColors = isLastStep
+    ? 'bg-gradient-to-br from-red-50 to-rose-50 border-2 border-red-300'
+    : 'bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-300';
+
+  const distanceColor = isLastStep ? 'text-red-600' : 'text-blue-600';
+
+  stepDiv.innerHTML = `
       <div class="${stepColors} w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm flex-shrink-0 shadow-md">
         ${stepNumber}
       </div>
@@ -2500,11 +2504,11 @@ function createGoogleRouteStepElement(stepNumber, instruction, distance, maneuve
         </div>
       </div>
     `;
-    
-    return stepDiv;
-}
-  
 
-  
+  return stepDiv;
+}
+
+
+
 
 

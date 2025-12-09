@@ -165,16 +165,16 @@ const TrafficUtils = {
         // Weight and opacity based on severity
         switch (severity) {
             case 'Blocked':
-                return { color, weight: 7, opacity: 0.95 };
+                return { color, weight: 7, opacity: 1 };
             case 'Heavy':
-                return { color, weight: 6, opacity: 0.85 };
+                return { color, weight: 6, opacity: 1};
             case 'Medium':
-                return { color, weight: 5, opacity: 0.75 };
+                return { color, weight: 5, opacity: 1 };
             case 'Light':
-                return { color, weight: 4, opacity: 0.65 };
+                return { color, weight: 4, opacity: 1 };
             case 'FreeFlow':
             default:
-                return { color, weight: 4, opacity: 0.55 };
+                return { color, weight: 4, opacity: 1};
         }
     },
 
@@ -257,7 +257,7 @@ const TrafficUtils = {
         return {
             color: defaultColor,
             weight: 5,
-            opacity: 0.8
+            opacity: 1.0
         };
     },
 
@@ -305,7 +305,7 @@ const TrafficUtils = {
             color: style.color,
             weight: style.weight,
             opacity: style.opacity,
-            className: `${className} disruption-${severity.toLowerCase()}`
+            className: 'route-segment-clickable'
         });
         
         // Add hover effects
@@ -476,7 +476,7 @@ const TrafficUtils = {
             color: style.color,
             weight: style.weight,
             opacity: style.opacity,
-            className: 'disruption-flow-segment'
+            className: 'route-segment-clickable'
         });
 
         // Create popup

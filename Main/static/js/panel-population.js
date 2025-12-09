@@ -1096,7 +1096,7 @@ window.highlightAlternativeRoute = function(routeIndex, altRoute) {
         p.setStyle({
           opacity: 0.35,
           weight: 4,
-          dashArray: '8, 4'
+          dashArray: '1, 1'
         });
         p._isHighlighted = false;
       });
@@ -1134,7 +1134,7 @@ window.highlightAlternativeRoute = function(routeIndex, altRoute) {
         p.setStyle({
           opacity: 0.15,
           weight: 3,
-          dashArray: '8, 4'
+          dashArray: '1, 1'
         });
         p._isHighlighted = false;
       }
@@ -1243,10 +1243,10 @@ window.resetAlternativeRoutesDisplay = function() {
   if (window.routePolylines && window.routePolylines.length > 0) {
     window.routePolylines.forEach(polyline => {
       if (polyline && polyline.setStyle) {
-        polyline.setStyle({ opacity: 0.8 });
+        polyline.setStyle({ opacity: 1.0 });
       }
     });
-    console.log('👁️ PRIMARY ROUTE: Restored (opacity: 0.8)');
+    console.log('👁️ PRIMARY ROUTE: Restored (opacity: 1.0)');
   } else {
     console.warn('⚠️ No primary route polylines found');
   }
@@ -1258,7 +1258,7 @@ window.resetAlternativeRoutesDisplay = function() {
         p.setStyle({
           opacity: 0.35,
           weight: 4,
-          dashArray: '8, 4'
+          dashArray: '1, 1'
         });
         p._isHighlighted = false;
       }
