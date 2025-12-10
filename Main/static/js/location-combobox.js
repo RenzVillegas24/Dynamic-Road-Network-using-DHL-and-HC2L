@@ -278,9 +278,9 @@ async function performLocationSearch(query, type) {
           hideComboboxDropdown(dropdown);
           
           if (locType === 'start') {
-            handleStartLocationPin(lat, lng, name);
+            handleOSMStartLocationPin(lat, lng);
           } else {
-            handleDestLocationPin(lat, lng, name);
+            handleOSMDestLocationPin(lat, lng);
           }
           
           if (map) {
