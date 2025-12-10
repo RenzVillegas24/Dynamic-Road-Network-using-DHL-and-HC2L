@@ -89,6 +89,33 @@ const PanelManager = (function () {
           showDemoStopModal('current-route', 'sidebar');
           return false;
         }
+
+        toggleRouteFinderUI(true);
+
+        // Clear existing route polylines (Leaflet)
+        if (routePolylines && routePolylines.length > 0) {
+          routePolylines.forEach(polyline => {
+            if (polyline && map) {
+              map.removeLayer(polyline);
+            }
+          });
+          console.log('Cleared', routePolylines.length, 'route polylines');
+          routePolylines = [];
+        }
+
+        // Clear alternative route polylines (Leaflet)
+        if (window.alternativeRoutePolylines && window.alternativeRoutePolylines.length > 0) {
+          window.alternativeRoutePolylines.forEach(polyline => {
+            if (polyline && map) {
+              map.removeLayer(polyline);
+            }
+          });
+          console.log('Cleared', window.alternativeRoutePolylines.length, 'alternative route polylines');
+          window.alternativeRoutePolylines = [];
+        }
+
+        runComparison();
+
         return true;
       }
     },
@@ -118,16 +145,23 @@ const PanelManager = (function () {
           return false;
         }
 
-        // Reset system state when demo creator is shown
-        resetSystemState({
-            clearLocation: true,
-            clearDisruptions: true,
-            clearUpdateRegions: true,
-            clearGoogleMaps: true,
-            clearExportData: true,
-            resetUI: true,
-            verbose: false
-        });
+        resetSystemState();
+
+        // Save the current Route Finder state before making any changes
+        saveRouteFinderState();
+
+        // Turn off admin panel toggles to prevent interference during demo
+        const incidentToggle = document.getElementById('show-active-incidents');
+        const flowToggle = document.getElementById('show-traffic-overlay');
+
+        if (incidentToggle && incidentToggle.checked) {
+          incidentToggle.checked = false;
+          incidentToggle.dispatchEvent(new Event('change'));
+        }
+        if (flowToggle && flowToggle.checked) {
+          flowToggle.checked = false;
+          flowToggle.dispatchEvent(new Event('change'));
+        }
 
         return true;
       }
@@ -174,8 +208,6 @@ const PanelManager = (function () {
           // Skip default close behavior - let the button's onclick handle it
           return;
         }
-
-
 
         e.preventDefault();
         e.stopPropagation();
@@ -618,7 +650,7 @@ const PanelManager = (function () {
     });
 
   }
-  
+
 
   // Public API
   return {

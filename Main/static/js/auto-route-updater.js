@@ -158,11 +158,11 @@ function triggerRouteRecalculation() {
     return;
   }
   
-  // Trigger the "Go" button click to recalculate
+  // Trigger the route recalculation using global function
   const goButton = document.getElementById('go-button');
   if (goButton && !goButton.disabled) {
-    console.log('🎯 Triggering route recalculation via Go button');
-    goButton.click();
+    console.log('🎯 Triggering route recalculation via global function');
+    handleGoButtonClick();
     
     // Visual feedback
     goButton.classList.add('animate-pulse');

@@ -86,12 +86,12 @@ function makeMarkerDraggable(marker, type) {
       if (window.startLocation && window.destLocation) {
         console.log(`🔄 Auto-recalculating route after drag`);
         
-        // Trigger route recalculation by clicking Go button
+        // Trigger route recalculation using global function
         // This reuses existing logic and respects current algorithm selection
-        setTimeout(() => {
+        setTimeout(async () => {
           const goButton = document.getElementById('go-button');
           if (goButton && !goButton.disabled) {
-            goButton.click();
+            await handleGoButtonClick();
           } else {
             showUpdateToast('Click "Go" to calculate route', 'info');
           }

@@ -221,43 +221,6 @@ const DemoRunner = {
         });
     },
 
-    /**
-     * Toggle route finder UI elements based on demo running state
-     */
-    toggleRouteFinderUI(disable = false) {
-        // Go button
-        const goButton = document.getElementById('go-button');
-        if (goButton) {
-            goButton.style.display = disable ? 'none' : '';
-        }
-
-        // Algorithm dropdown
-        const algoDropdown = document.getElementById('algo-dropdown');
-        if (algoDropdown) {
-            algoDropdown.style.display = disable ? 'none' : '';
-        }
-
-        // Traffic dropdown
-        const trafficDropdown = document.getElementById('traffic-dropdown');
-        if (trafficDropdown) {
-            trafficDropdown.style.display = disable ? 'none' : '';
-        }
-
-        // Start location input
-        const startInput = document.getElementById('start-location-input');
-        if (startInput) {
-            startInput.disabled = disable;
-            startInput.style.opacity = disable ? '0.5' : '1';
-        }
-
-        // Destination location input
-        const destInput = document.getElementById('dest-location-input');
-        if (destInput) {
-            destInput.disabled = disable;
-            destInput.style.opacity = disable ? '0.5' : '1';
-        }
-    },
-
     // ==========================================================================
     // PANEL CONTROLS
     // ==========================================================================
@@ -363,80 +326,6 @@ const DemoRunner = {
         }
 
         console.log('🔇 Admin toggles disabled for demo');
-    },
-
-    /**
-     * Save the current state of Route Finder UI elements
-     * This captures: Algorithm, Dataset, Threshold, Show Active Incidents, Show Flow Overlay
-     */
-    saveRouteFinderState() {
-        const algorithmRadio = document.querySelector('input[name="algorithm"]:checked');
-        const datasetRadio = document.querySelector('input[name="dataset"]:checked');
-        const thresholdInput = document.getElementById('threshold-input');
-        const incidentToggle = document.getElementById('show-active-incidents');
-        const flowToggle = document.getElementById('show-traffic-overlay');
-
-        this.savedRouteFinderState = {
-            algorithm: algorithmRadio?.value || 'hc2l',
-            dataset: datasetRadio?.value || 'none',
-            threshold: parseFloat(thresholdInput?.value) || 0.5,
-            showIncidents: incidentToggle?.checked || false,
-            showFlow: flowToggle?.checked || false
-        };
-
-        console.log('💾 Saved Route Finder state:', this.savedRouteFinderState);
-    },
-
-    /**
-     * Restore the saved state of Route Finder UI elements
-     */
-    restoreRouteFinderState() {
-        if (!this.savedRouteFinderState) {
-            console.log('⚠️ No saved Route Finder state to restore');
-            return;
-        }
-
-        const state = this.savedRouteFinderState;
-
-        // Restore Algorithm
-        const algorithmRadio = document.querySelector(`input[name="algorithm"][value="${state.algorithm}"]`);
-        if (algorithmRadio) {
-            algorithmRadio.click();
-            console.log(`✅ Restored algorithm: ${state.algorithm}`);
-        }
-
-        // Restore Dataset
-        const datasetRadio = document.querySelector(`input[name="dataset"][value="${state.dataset}"]`);
-        if (datasetRadio) {
-            datasetRadio.click();
-            console.log(`✅ Restored dataset: ${state.dataset}`);
-        }
-
-        // Restore Threshold
-        const thresholdInput = document.getElementById('threshold-input');
-        if (thresholdInput) {
-            thresholdInput.value = state.threshold;
-            thresholdInput.dispatchEvent(new Event('input'));
-            console.log(`✅ Restored threshold: ${state.threshold}`);
-        }
-
-        // Restore Show Active Incidents
-        const incidentToggle = document.getElementById('show-active-incidents');
-        if (incidentToggle && incidentToggle.checked !== state.showIncidents) {
-            incidentToggle.checked = state.showIncidents;
-            incidentToggle.dispatchEvent(new Event('change'));
-            console.log(`✅ Restored show incidents: ${state.showIncidents}`);
-        }
-
-        // Restore Show Flow Overlay
-        const flowToggle = document.getElementById('show-traffic-overlay');
-        if (flowToggle && flowToggle.checked !== state.showFlow) {
-            flowToggle.checked = state.showFlow;
-            flowToggle.dispatchEvent(new Event('change'));
-            console.log(`✅ Restored show flow: ${state.showFlow}`);
-        }
-
-        console.log('🔄 Route Finder state restored');
     },
 
     showTab(tabName) {
@@ -1080,7 +969,7 @@ const DemoRunner = {
         this.currentDemoId = null;  // Track demoId for cleanup
 
         // Save the current Route Finder state before making any changes
-        this.saveRouteFinderState();
+        saveRouteFinderState();
 
         // Turn off admin panel toggles to prevent interference during demo
         const incidentToggle = document.getElementById('show-active-incidents');
@@ -1096,7 +985,7 @@ const DemoRunner = {
         }
 
         // Disable route finder UI when demo starts
-        this.toggleRouteFinderUI(true);
+        toggleRouteFinderUI(true);
 
         // Reset saved state for new demo run
         this.currentResultsSavedPath = null;
@@ -1145,15 +1034,7 @@ const DemoRunner = {
         try {
             // Reset map
             this.showLoadingAnimation('Resetting map...');
-            resetSystemState({
-                clearLocation: true,
-                clearDisruptions: true,
-                clearUpdateRegions: true,
-                clearGoogleMaps: true,
-                clearExportData: true,
-                resetUI: true,
-                verbose: false
-            });
+            resetSystemState();
 
 
             // Get disruption config - use new format paths with fallbacks
@@ -1266,15 +1147,7 @@ const DemoRunner = {
                 console.log('✅ Demo completed, resultsSource set to "new", currentResultsSavedPath=', this.currentResultsSavedPath);
 
                 // Use the comprehensive system reset function from functions.js
-                resetSystemState({
-                    clearLocation: true,
-                    clearDisruptions: true,
-                    clearUpdateRegions: true,
-                    clearGoogleMaps: true,
-                    clearExportData: true,
-                    resetUI: true,
-                    verbose: false
-                });
+                resetSystemState();
 
                 // Show results summary after a short delay
                 setTimeout(() => {
@@ -1294,10 +1167,10 @@ const DemoRunner = {
             this.demoDisruptionDir = null;
 
             // Re-enable route finder UI when demo stops
-            this.toggleRouteFinderUI(false);
+            toggleRouteFinderUI(false);
 
             // Restore the saved Route Finder state
-            this.restoreRouteFinderState();
+            restoreRouteFinderState();
         }
     },
 
@@ -3224,21 +3097,13 @@ const DemoRunner = {
         this.updatePlayPauseButton();  // Reset button to pause state
 
         // Use the comprehensive system reset function from functions.js
-        resetSystemState({
-            clearLocation: true,
-            clearDisruptions: true,
-            clearUpdateRegions: true,
-            clearGoogleMaps: true,
-            clearExportData: true,
-            resetUI: true,
-            verbose: false
-        });
+        resetSystemState();
 
         // Re-enable route finder UI when demo stops
-        this.toggleRouteFinderUI(false);
+        toggleRouteFinderUI(false);
 
         // Restore the saved Route Finder state
-        this.restoreRouteFinderState();
+        restoreRouteFinderState();
 
         showUpdateToast('Demo stopped', 'warning');
         this.showTab('main');

@@ -53,10 +53,10 @@ const DemoCreator = {
     // DEFAULT VALUES - Used for HTML element defaults and JS processing fallbacks
     // ==========================================================================
     DEFAULTS: DEMO_CREATOR_DEFAULTS,
-    
+
     // Mode: 'create' or 'edit'
     mode: 'create',
-    
+
     // State
     routes: [],
     currentRouteIndex: -1,
@@ -66,7 +66,7 @@ const DemoCreator = {
         randomFlowCount: DEMO_CREATOR_DEFAULTS.disruption.flowCount,
         randomIncidentCount: DEMO_CREATOR_DEFAULTS.disruption.incidentCount,
         severityMin: DEMO_CREATOR_DEFAULTS.disruption.severityMin,
-        severityMax:  DEMO_CREATOR_DEFAULTS.disruption.severityMax,
+        severityMax: DEMO_CREATOR_DEFAULTS.disruption.severityMax,
         customItems: [],
         // Store multiple disruption sets based on generation scope
         disruptionSets: {}  // Key: 'all', 'trial_0', 'route_1', 'trial_0_route_1', etc.
@@ -87,26 +87,26 @@ const DemoCreator = {
     routeMarkers: [],
     disruptionMarkers: [],
     matchedEdgeLayers: [],
-    
+
     // Quezon City boundary data (loaded from GeoJSON)
     qcBoundary: null,
     qcBoundingBox: null,
-    
+
     // Edit mode state
     editingConfigId: null,
-    
+
     // Track if disruptions need to be generated when entering step 2
     disruptionsNeedGeneration: true,
-    
+
     // Track if TAU values need to be generated when entering step 3
     tauNeedsGeneration: true,
-    
+
     // Track last generated trials/routes for change detection
     lastGeneratedTrials: undefined,
     lastGeneratedRoutes: undefined,
     lastGeneratedTauTrials: undefined,
     lastGeneratedTauRoutes: undefined,
-    
+
     // Running state
     isRunning: false,
     isPaused: false,
@@ -122,7 +122,7 @@ const DemoCreator = {
         status: '',
         lastResult: null
     },
-    
+
     // Preset locations
     presetLocations: [
         { name: 'Quezon Memorial Circle', lat: 14.6540, lng: 121.0490, type: 'landmark' },
@@ -233,66 +233,66 @@ const DemoCreator = {
         this.bindEvents();
         this.renderRoutesList();
     },
-    
+
     /**
      * Apply default values to UI elements
      */
     applyDefaultsToUI() {
         const d = DEMO_CREATOR_DEFAULTS;
-        
+
         // Disruption defaults
         const flowCountEl = document.getElementById('random-flow-count');
         if (flowCountEl) flowCountEl.value = d.disruption.flowCount;
-        
+
         const incidentCountEl = document.getElementById('random-incident-count');
         if (incidentCountEl) incidentCountEl.value = d.disruption.incidentCount;
-        
+
         const severityMinEl = document.getElementById('random-severity-min');
         if (severityMinEl) {
             severityMinEl.value = d.disruption.severityMin;
             const display = document.getElementById('random-severity-min-display');
             if (display) display.textContent = d.disruption.severityMin;
         }
-        
+
         const severityMaxEl = document.getElementById('random-severity-max');
         if (severityMaxEl) {
             severityMaxEl.value = d.disruption.severityMax;
             const display = document.getElementById('random-severity-max-display');
             if (display) display.textContent = d.disruption.severityMax;
         }
-        
+
         // TAU defaults
         const tauRandomMinEl = document.getElementById('demo-tau-random-min');
         if (tauRandomMinEl) tauRandomMinEl.value = d.sequence.tauRandomMin;
-        
+
         const tauRandomMaxEl = document.getElementById('demo-tau-random-max');
         if (tauRandomMaxEl) tauRandomMaxEl.value = d.sequence.tauRandomMax;
-        
+
         const stepDelayEl = document.getElementById('demo-step-delay');
         if (stepDelayEl) stepDelayEl.value = d.sequence.stepDelay;
-        
+
         const trialsEl = document.getElementById('demo-trials-count');
         if (trialsEl) trialsEl.value = d.sequence.trials;
-        
+
         // Set default radio selections
         const disruptionModeRadio = document.querySelector(`input[name="demo-disruption-mode"][value="${d.disruption.mode}"]`);
         if (disruptionModeRadio) disruptionModeRadio.checked = true;
-        
+
         const disruptionScopeRadio = document.querySelector(`input[name="disruption-generation-scope"][value="${d.disruption.generationScope}"]`);
         if (disruptionScopeRadio) disruptionScopeRadio.checked = true;
-        
+
         const algorithmRadio = document.querySelector(`input[name="demo-algorithm"][value="${d.sequence.algorithm}"]`);
         if (algorithmRadio) algorithmRadio.checked = true;
-        
+
         const tauModeRadio = document.querySelector(`input[name="demo-tau-mode"][value="${d.sequence.tauMode}"]`);
         if (tauModeRadio) tauModeRadio.checked = true;
-        
+
         const tauScopeRadio = document.querySelector(`input[name="tau-generation-scope"][value="${d.sequence.tauGenerationScope}"]`);
         if (tauScopeRadio) tauScopeRadio.checked = true;
-        
+
         console.log('✅ Applied default values to UI');
     },
-    
+
     /**
      * Load Quezon City boundary from GeoJSON file
      */
@@ -308,7 +308,7 @@ const DemoCreator = {
                     } else if (geometry.type === 'MultiPolygon') {
                         this.qcBoundary = geometry.coordinates[0][0];
                     }
-                    
+
                     if (this.qcBoundary) {
                         const lngs = this.qcBoundary.map(c => c[0]);
                         const lats = this.qcBoundary.map(c => c[1]);
@@ -332,7 +332,7 @@ const DemoCreator = {
             };
         }
     },
-    
+
     /**
      * Check if a point is inside Quezon City boundary using ray casting algorithm
      */
@@ -343,42 +343,42 @@ const DemoCreator = {
                 return false;
             }
         }
-        
+
         if (!this.qcBoundary) {
             return true;
         }
-        
+
         let inside = false;
         const polygon = this.qcBoundary;
-        
+
         for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
             const xi = polygon[i][0], yi = polygon[i][1];
             const xj = polygon[j][0], yj = polygon[j][1];
-            
+
             if (((yi > lat) !== (yj > lat)) &&
                 (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) {
                 inside = !inside;
             }
         }
-        
+
         return inside;
     },
-    
+
     /**
      * Generate a random location within Quezon City boundaries
      */
     getRandomLocationInQC() {
         const maxAttempts = 100;
-        
+
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
             const lat = this.qcBoundingBox.minLat + Math.random() * (this.qcBoundingBox.maxLat - this.qcBoundingBox.minLat);
             const lng = this.qcBoundingBox.minLng + Math.random() * (this.qcBoundingBox.maxLng - this.qcBoundingBox.minLng);
-            
+
             if (this.isPointInQC(lat, lng)) {
                 return { lat, lng, name: `Random (${lat.toFixed(4)}, ${lng.toFixed(4)})` };
             }
         }
-        
+
         // Fallback to preset
         const idx = Math.floor(Math.random() * this.presetLocations.length);
         return this.presetLocations[idx];
@@ -391,7 +391,7 @@ const DemoCreator = {
     bindEvents() {
         // Initialize LocationPicker components for route creation
         this.initializeLocationPickers();
-        
+
         // Note: All selections (tau mode, algorithm, disruption mode, disruption scope, tau scope)
         // now use radio buttons with onchange handlers in HTML
     },
@@ -448,7 +448,7 @@ const DemoCreator = {
 
     handleLocationSelect(type, result) {
         console.log(`📍 Demo Creator ${type} location selected:`, result);
-        
+
         const location = {
             name: result.name,
             lat: result.snappedPin?.lat || result.actualPin.lat,
@@ -457,24 +457,24 @@ const DemoCreator = {
             actualLng: result.actualPin.lng,
             snapData: result.snapData
         };
-        
+
         this.setRouteLocation(type, location);
     },
 
     handleLocationClear(type) {
         console.log(`🗑️ Demo Creator ${type} location cleared`);
-        
+
         if (this.currentEditRoute) {
             this.currentEditRoute[type] = null;
         }
-        
+
         // Remove preview marker
         const markerId = `preview-${type}`;
         if (this.markers[markerId]) {
             map.removeLayer(this.markers[markerId]);
             delete this.markers[markerId];
         }
-        
+
         this.updateAddRouteButtonState();
     },
 
@@ -510,17 +510,28 @@ const DemoCreator = {
         if (panel) {
             panel.classList.remove('translate-x-full');
 
+            // Save the current Route Finder state before making any changes
+            saveRouteFinderState();
+
+            // Turn off admin panel toggles to prevent interference during demo
+            const incidentToggle = document.getElementById('show-active-incidents');
+            const flowToggle = document.getElementById('show-traffic-overlay');
+
+            if (incidentToggle && incidentToggle.checked) {
+                incidentToggle.checked = false;
+                incidentToggle.dispatchEvent(new Event('change'));
+            }
+            if (flowToggle && flowToggle.checked) {
+                flowToggle.checked = false;
+                flowToggle.dispatchEvent(new Event('change'));
+            }
+
+            // Disable route finder UI when demo starts
+            toggleRouteFinderUI(true);
+
             // Reset system state when demo creator is shown
-            resetSystemState({
-                clearLocation: true,
-                clearDisruptions: true,
-                clearUpdateRegions: true,
-                clearGoogleMaps: true,
-                clearExportData: true,
-                resetUI: true,
-                verbose: false
-            });
-            
+            resetSystemState();
+
             // Set mode based on whether we're editing
             if (configToEdit) {
                 this.mode = 'edit';
@@ -533,17 +544,17 @@ const DemoCreator = {
                 // Apply defaults for create mode
                 this.applyDefaultsToUI();
             }
-            
+
             // Update panel title based on mode
             this.updatePanelTitle();
-            
+
             // Update route/disruption visibility for step 1
             this.updateMapLayerVisibility(1);
-            
+
             this.goToStep(1);
         }
     },
-    
+
     /**
      * Update panel title based on current mode (create/edit)
      */
@@ -610,7 +621,7 @@ const DemoCreator = {
             overlay.style.display = 'none';
         }
     },
-    
+
     /**
      * Update map layer visibility based on current step
      * Routes: only on steps 1 and 4 (Config and Review)
@@ -619,7 +630,7 @@ const DemoCreator = {
     updateMapLayerVisibility(step) {
         const showRoutes = step === 1 || step === 4;
         const showDisruptions = step === 2 || step === 4;
-        
+
         // Show/hide route markers
         this.routeMarkers.forEach(marker => {
             if (map && marker) {
@@ -630,7 +641,7 @@ const DemoCreator = {
                 }
             }
         });
-        
+
         // Show/hide disruption preview markers
         this.disruptionPreviewMarkers.forEach(marker => {
             if (map && marker) {
@@ -641,7 +652,7 @@ const DemoCreator = {
                 }
             }
         });
-        
+
         // Show/hide custom disruption markers
         this.disruptionMarkers.forEach(m => {
             if (map && m.marker) {
@@ -656,11 +667,11 @@ const DemoCreator = {
 
     async loadConfig(config) {
         console.log('📝 Loading config for editing:', config.name);
-        
+
         // Store editing state
         this.editingConfigId = config.id;
         this.mode = 'edit';
-        
+
         // Load routes (preserve trials[] array if present)
         this.routes = config.routes ? config.routes.map(r => ({
             id: r.id || `route-${Date.now()}-${Math.random()}`,
@@ -670,12 +681,12 @@ const DemoCreator = {
             trials: r.trials,  // Preserve trials array if present
             tauValues: r.tauValues  // Keep legacy for backward compat
         })) : [];
-        
+
         // Load disruptions - check both disruptionSets and savedSets
         if (config.disruptions) {
             // Use savedSets if available (Flask format), otherwise disruptionSets (in-memory format)
             const loadedSets = config.disruptions.savedSets || config.disruptions.disruptionSets || {};
-            
+
             this.disruptions = {
                 mode: config.disruptions.mode || config.disruptionMode || 'none',
                 generationScope: config.disruptions.scope || config.disruptions.generationScope || 'per-trial-route',
@@ -691,16 +702,16 @@ const DemoCreator = {
             this.disruptions.mode = config.disruptionMode || 'none';
             this.disruptions.disruptionSets = {};
         }
-        
+
         // Determine if we need to generate disruptions (only if no sets exist)
         const hasExistingDisruptions = Object.keys(this.disruptions.disruptionSets || {}).length > 0;
         this.disruptionsNeedGeneration = !hasExistingDisruptions;
-        
+
         // Load sequence settings - check both legacy and new format
         this.sequence.algorithm = config.settings?.algorithm || config.algorithm || 'both';
         this.sequence.trials = config.settings?.trials || config.trials || 1;
         this.sequence.stepDelay = config.settings?.stepDelay || config.stepDelay || 2000;
-        
+
         // Load tau settings from config.tau or from first route
         if (config.tau) {
             this.sequence.tauMode = config.tau.mode || 'random';
@@ -719,13 +730,13 @@ const DemoCreator = {
                 this.sequence.tauMode = 'random';  // Or sequence, depending on scope
             }
         }
-        
+
         // Preserve TAU values during UI update (don't regenerate saved values)
         // Only preserve if we have saved TAU sequence or if routes have trial data with tau
         const hasExistingTau = (this.sequence.tauSequence && this.sequence.tauSequence.length > 0) ||
-                               this.routes.some(r => r.trials && r.trials.some(t => t.tau !== undefined));
+            this.routes.some(r => r.trials && r.trials.some(t => t.tau !== undefined));
         this._preserveTauValues = hasExistingTau;
-        
+
         // CRITICAL: Populate generatedTauValues from saved sequence to prevent regeneration
         // when entering the Sequence Configuration step later
         if (hasExistingTau && this.sequence.tauSequence && this.sequence.tauSequence.length > 0) {
@@ -736,36 +747,36 @@ const DemoCreator = {
             this.tauNeedsGeneration = false;
             console.log(`🔒 Preserved ${this.generatedTauValues.length} TAU values from saved config`);
         }
-        
+
         // Update UI elements
         this.updateUIFromState();
-        
+
         // Clear the preserve flag after UI update
         this._preserveTauValues = false;
-        
+
         // Show routes on map
         this.clearAllRouteMarkers();
         if (this.routes.length > 0) {
             this.showRoutesOnMap(this.routes);
         }
-        
+
         // Render lists
         this.renderRoutesList();
         this.renderDisruptionsList();
-        
+
         // Set demo name
         const nameInput = document.getElementById('demo-v2-name');
         if (nameInput) {
             nameInput.value = config.name || '';
         }
-        
+
         // Show disruption sets if they exist
         const disruptionSets = this.disruptions.disruptionSets || {};
         const setKeys = Object.keys(disruptionSets);
         if (setKeys.length > 0) {
             console.log(`📦 Loaded ${setKeys.length} disruption sets:`, setKeys);
             this.currentPreviewSet = setKeys[0];
-            
+
             // Check if this is savedSets format (has disruption_dir) or in-memory format (has flow/incidents)
             const firstSet = disruptionSets[setKeys[0]];
             if (firstSet.disruption_dir && config.disruptionKey) {
@@ -775,17 +786,17 @@ const DemoCreator = {
                 // In-memory format - display directly
                 this.displayDisruptionsOnMap(firstSet);
             }
-            
+
             // Show preview after loading
             this.showDisruptionSetsPreview();
-            
+
             // Update the disruption set status text
             const statusEl = document.getElementById('disruption-sets-status');
             if (statusEl) {
                 statusEl.textContent = `${setKeys.length} set(s) loaded`;
             }
         }
-        
+
         showUpdateToast(`Loaded: ${config.name}`, 'info');
     },
 
@@ -796,7 +807,7 @@ const DemoCreator = {
      */
     async loadAllSavedDisruptionSets(disruptionKey, setKeys) {
         console.log(`📂 Loading ${setKeys.length} saved disruption sets from ${disruptionKey}...`);
-        
+
         for (const setKey of setKeys) {
             try {
                 const response = await fetch(`/api/demo/disruption-data/${disruptionKey}/${setKey}`);
@@ -804,7 +815,7 @@ const DemoCreator = {
                     console.warn(`Failed to load disruption set ${setKey}`);
                     continue;
                 }
-                
+
                 const data = await response.json();
                 if (data.success) {
                     // Convert savedSets format to in-memory disruptionSets format
@@ -840,7 +851,7 @@ const DemoCreator = {
                 console.error(`Error loading disruption set ${setKey}:`, error);
             }
         }
-        
+
         // Display the first set on map
         const firstSet = this.disruptions.disruptionSets[setKeys[0]];
         if (firstSet) {
@@ -861,16 +872,16 @@ const DemoCreator = {
                 console.warn(`Failed to load disruption set ${setKey} from ${disruptionKey}`);
                 return;
             }
-            
+
             const data = await response.json();
-            
+
             // Store the loaded disruption data
             this.disruptions.loadedSetKey = setKey;
             this.disruptions.loadedDisruptionKey = disruptionKey;
-            
+
             // Populate the customItems with loaded data for display
             this.disruptions.customItems = [];
-            
+
             // Add flows
             if (data.flows && Array.isArray(data.flows)) {
                 data.flows.forEach(flow => {
@@ -887,7 +898,7 @@ const DemoCreator = {
                     });
                 });
             }
-            
+
             // Add incidents
             if (data.incidents && Array.isArray(data.incidents)) {
                 data.incidents.forEach(incident => {
@@ -902,11 +913,11 @@ const DemoCreator = {
                     });
                 });
             }
-            
+
             // Update UI to show loaded disruptions
             this.updateDisruptionList();
             this.visualizeDisruptions();
-            
+
             console.log(`Loaded disruption set: ${setKey} (${this.disruptions.customItems.length} items)`);
         } catch (error) {
             console.error('Error loading saved disruption set:', error);
@@ -917,53 +928,53 @@ const DemoCreator = {
         // Update algorithm radio buttons
         const algorithmRadio = document.querySelector(`input[name="demo-algorithm"][value="${this.sequence.algorithm}"]`);
         if (algorithmRadio) algorithmRadio.checked = true;
-        
+
         // Update tau mode radio buttons
         const tauModeRadio = document.querySelector(`input[name="demo-tau-mode"][value="${this.sequence.tauMode}"]`);
         if (tauModeRadio) {
             tauModeRadio.checked = true;
             this.updateTauModeUI();
         }
-        
+
         // Update tau scope radio buttons
         const tauScopeRadio = document.querySelector(`input[name="tau-generation-scope"][value="${this.sequence.tauGenerationScope || 'all'}"]`);
         if (tauScopeRadio) tauScopeRadio.checked = true;
-        
+
         // Update tau values
         const tauFixed = document.getElementById('demo-tau-fixed');
         if (tauFixed) tauFixed.value = this.sequence.tauFixed;
-        
+
         const tauSequence = document.getElementById('demo-tau-sequence');
         if (tauSequence && Array.isArray(this.sequence.tauSequence)) {
             tauSequence.value = this.sequence.tauSequence.join(', ');
         }
-        
+
         // Update trials
         const trialsInput = document.getElementById('demo-trials-count');
         if (trialsInput) trialsInput.value = this.sequence.trials;
-        
+
         // Update step delay
         const stepDelay = document.getElementById('demo-step-delay');
         if (stepDelay) stepDelay.value = this.sequence.stepDelay;
-        
+
         // Update disruption mode radio buttons
         const disruptionModeRadio = document.querySelector(`input[name="demo-disruption-mode"][value="${this.disruptions.mode}"]`);
         if (disruptionModeRadio) {
             disruptionModeRadio.checked = true;
             this.updateDisruptionModeUI();
         }
-        
+
         // Update disruption scope radio buttons
         const disruptionScopeRadio = document.querySelector(`input[name="disruption-generation-scope"][value="${this.disruptions.generationScope || 'per-trial-route'}"]`);
         if (disruptionScopeRadio) disruptionScopeRadio.checked = true;
-        
+
         // Update disruption counts
         const flowCount = document.getElementById('random-flow-count');
         if (flowCount) flowCount.value = this.disruptions.randomFlowCount;
-        
+
         const incidentCount = document.getElementById('random-incident-count');
         if (incidentCount) incidentCount.value = this.disruptions.randomIncidentCount;
-        
+
         // Update severity sliders
         const severityMin = document.getElementById('random-severity-min');
         const severityMinDisplay = document.getElementById('random-severity-min-display');
@@ -971,7 +982,7 @@ const DemoCreator = {
             severityMin.value = this.disruptions.severityMin;
             if (severityMinDisplay) severityMinDisplay.textContent = this.disruptions.severityMin;
         }
-        
+
         const severityMax = document.getElementById('random-severity-max');
         const severityMaxDisplay = document.getElementById('random-severity-max-display');
         if (severityMax) {
@@ -982,11 +993,11 @@ const DemoCreator = {
 
     closePanel() {
         // Check if there are unsaved changes
-        const hasChanges = (this.routes && this.routes.length > 0) || 
-                          (this.disruptions.customItems && this.disruptions.customItems.length > 0) ||
-                          (this.disruptions.disruptionSets && Object.keys(this.disruptions.disruptionSets).length > 0) ||
-                          this.disruptions.mode !== 'random-both';
-        
+        const hasChanges = (this.routes && this.routes.length > 0) ||
+            (this.disruptions.customItems && this.disruptions.customItems.length > 0) ||
+            (this.disruptions.disruptionSets && Object.keys(this.disruptions.disruptionSets).length > 0) ||
+            this.disruptions.mode !== 'random-both';
+
         if (hasChanges) {
             // Use UniversalModal instead of confirm
             if (typeof UniversalModal !== 'undefined') {
@@ -1021,10 +1032,20 @@ const DemoCreator = {
                 }
                 this.performClose();
             }
+
         } else {
             // No changes, close immediately
             this.performClose();
         }
+
+        // Use the comprehensive system reset function from functions.js
+        resetSystemState();
+
+        // Re-enable route finder UI when demo stops
+        toggleRouteFinderUI(false);
+
+        // Restore the saved Route Finder state
+        restoreRouteFinderState();
     },
 
     /**
@@ -1034,7 +1055,7 @@ const DemoCreator = {
     performClose() {
         // Use resetForHandoff instead of resetAll to properly clean everything
         this.resetForHandoff();
-        
+
         // Delegate panel closing to PanelManager (which handles back navigation)
         if (typeof PanelManager !== 'undefined') {
             PanelManager.goBack();
@@ -1044,7 +1065,7 @@ const DemoCreator = {
             if (panel) {
                 panel.classList.add('translate-x-full');
             }
-            
+
             // Close the right panel container
             const rightPanelContainer = document.getElementById('right-panel-container');
             if (rightPanelContainer) {
@@ -1090,7 +1111,7 @@ const DemoCreator = {
         if (panel) {
             panel.classList.add('translate-x-full');
         }
-        
+
         if (typeof PanelManager !== 'undefined') {
             PanelManager.closeRightPanel();
         }
@@ -1102,11 +1123,11 @@ const DemoCreator = {
         this.clearAllRouteMarkers();
         this.clearAllDisruptionMarkers();
         this.clearDisruptionPreview(true);  // Also clear disruption preview polylines
-        
+
         // Reset routes
         this.routes = [];
         this.currentRouteIndex = -1;
-        
+
         // Reset disruptions
         this.disruptions = {
             mode: 'none',
@@ -1116,7 +1137,7 @@ const DemoCreator = {
             severityMax: 0.8,
             customItems: []
         };
-        
+
         // Reset sequence
         this.sequence = {
             algorithm: 'both',
@@ -1129,16 +1150,16 @@ const DemoCreator = {
             showMetrics: true,
             trials: 1
         };
-        
+
         // Reset currentEditRoute
         this.currentEditRoute = { start: null, end: null };
-        
-    // Reset edit mode and panel mode (default to create)
-    this.editingConfigId = null;
-    this.mode = 'create';
-    // Update panel title to reflect mode
-    try { this.updatePanelTitle(); } catch (e) { /* ignore if UI not initialized */ }
-        
+
+        // Reset edit mode and panel mode (default to create)
+        this.editingConfigId = null;
+        this.mode = 'create';
+        // Update panel title to reflect mode
+        try { this.updatePanelTitle(); } catch (e) { /* ignore if UI not initialized */ }
+
         // Reset running state
         this.isRunning = false;
         this.isPaused = false;
@@ -1154,51 +1175,51 @@ const DemoCreator = {
             status: '',
             lastResult: null
         };
-        
+
         // Reset UI elements
         this.renderRoutesList();
         this.renderDisruptionsList();
-        
+
         // Reset form inputs
         const startSearch = document.getElementById('demo-start-search');
         const endSearch = document.getElementById('demo-end-search');
         if (startSearch) startSearch.value = '';
         if (endSearch) endSearch.value = '';
-        
+
         // Reset disruption mode radio buttons
         const disruptionModeRadio = document.querySelector('input[name="demo-disruption-mode"][value="random-both"]');
         if (disruptionModeRadio) disruptionModeRadio.checked = true;
         this.disruptions.mode = 'random-both';
         this.updateDisruptionModeUI();
-        
+
         // Reset disruption scope radio buttons
         const disruptionScopeRadio = document.querySelector('input[name="disruption-generation-scope"][value="per-trial-route"]');
         if (disruptionScopeRadio) disruptionScopeRadio.checked = true;
-        
+
         // Reset algorithm radio buttons
         const algorithmRadio = document.querySelector('input[name="demo-algorithm"][value="both"]');
         if (algorithmRadio) algorithmRadio.checked = true;
-        
+
         // Reset tau mode radio buttons
         const tauModeRadio = document.querySelector('input[name="demo-tau-mode"][value="sequence"]');
         if (tauModeRadio) tauModeRadio.checked = true;
         this.updateTauModeUI();
-        
+
         // Reset tau scope radio buttons
         const tauScopeRadio = document.querySelector('input[name="tau-generation-scope"][value="all"]');
         if (tauScopeRadio) tauScopeRadio.checked = true;
-        
+
         // Reset trials
         const trialsInput = document.getElementById('demo-trials-count');
         if (trialsInput) trialsInput.value = '1';
-        
+
         // Reset demo name
         const nameInput = document.getElementById('demo-v2-name');
         if (nameInput) nameInput.value = '';
-        
+
         // Hide running step, show step 1
         document.getElementById('demo-v2-step-running')?.classList.add('hidden');
-        
+
         console.log('🔄 Demo Creator V2 reset');
     },
 
@@ -1211,10 +1232,10 @@ const DemoCreator = {
         // Reset mode
         this.mode = 'create';
         this.editingConfigId = null;
-        
+
         // Go back to step 1
         this.goToStep(1);
-        
+
         // Reset state but keep the panel structure
         this.routes = [];
         this.currentRouteIndex = -1;
@@ -1240,13 +1261,13 @@ const DemoCreator = {
             showMetrics: DEMO_CREATOR_DEFAULTS.sequence.showMetrics,
             trials: DEMO_CREATOR_DEFAULTS.sequence.trials
         };
-        
+
         // Clear UI elements
         this.renderRoutesList();
-        
+
         // Update panel title
         try { this.updatePanelTitle(); } catch (e) { /* ignore */ }
-        
+
         console.log('🔄 Demo Creator reset for handoff to Demo Runner');
     },
 
@@ -1273,31 +1294,31 @@ const DemoCreator = {
         [1, 2, 3, 4, 'running'].forEach(s => {
             document.getElementById(`demo-v2-step-${s}`)?.classList.add('hidden');
         });
-        
+
         // Show selected step
         document.getElementById(`demo-v2-step-${step}`)?.classList.remove('hidden');
-        
+
         // Update step indicators (only for numbered steps)
         if (typeof step === 'number') {
             [1, 2, 3, 4].forEach(s => {
                 const item = document.getElementById(`demo-v2-step-item-${s}`);
                 const indicator = document.getElementById(`demo-v2-indicator-${s}`);
                 const line = document.getElementById(`demo-v2-line-${s}`);
-                
+
                 if (item) {
                     if (s === step) {
                         item.classList.add('wizard-steps__item--active');
                     } else {
                         item.classList.remove('wizard-steps__item--active');
                     }
-                    
+
                     if (s < step) {
                         item.classList.add('wizard-steps__item--completed');
                     } else {
                         item.classList.remove('wizard-steps__item--completed');
                     }
                 }
-                
+
                 if (indicator) {
                     if (s === step) {
                         indicator.classList.add('wizard-steps__indicator--active');
@@ -1309,7 +1330,7 @@ const DemoCreator = {
                         indicator.classList.remove('wizard-steps__indicator--active', 'wizard-steps__indicator--completed');
                     }
                 }
-                
+
                 if (line) {
                     if (s < step) {
                         line.classList.add('wizard-steps__line--completed');
@@ -1318,49 +1339,49 @@ const DemoCreator = {
                     }
                 }
             });
-            
+
             // Update map layer visibility based on step
             this.updateMapLayerVisibility(step);
         }
-        
+
         // Update nav buttons based on current step
         const isRunning = step === 'running';
-        
+
         // Toggle navigation buttons (shown on steps 1-3)
         const navButtonsContainer = document.getElementById('demo-v2-nav-buttons');
         if (navButtonsContainer) {
             navButtonsContainer.classList.toggle('hidden', step === 4 || isRunning);
         }
-        
+
         // Toggle save buttons (shown only on step 4)
         const saveButtonsContainer = document.getElementById('demo-v2-save-buttons');
         if (saveButtonsContainer) {
             saveButtonsContainer.classList.toggle('hidden', step !== 4);
         }
-        
+
         // Update individual button visibility within navigation buttons
         document.getElementById('demo-v2-prev-btn')?.classList.toggle('hidden', step === 1 || isRunning);
         document.getElementById('demo-v2-next-btn')?.classList.toggle('hidden', step === 4 || isRunning);
-        
+
         // Show/hide step indicators during running
         document.querySelector('.sticky.top-\\[68px\\]')?.classList.toggle('opacity-50', isRunning);
-        
+
         // Step 2: Auto-generate disruptions if empty and entering disruption step
         if (step === 2) {
             this.handleDisruptionStepEntry();
         }
-        
+
         // Step 3: Auto-generate TAU values if needed when entering sequence step
         if (step === 3) {
             this.handleSequenceStepEntry();
         }
-        
+
         // Update review if on step 4
         if (step === 4) {
             this.updateReviewSummary();
         }
     },
-    
+
     /**
      * Handle entering the disruption step (step 2)
      * Auto-generates disruptions if the sets are empty or trials/routes changed
@@ -1368,23 +1389,23 @@ const DemoCreator = {
     handleDisruptionStepEntry() {
         const disruptionSets = this.disruptions.disruptionSets || {};
         const hasDisruptions = Object.keys(disruptionSets).length > 0;
-        
+
         // Get current trials and routes count
         const currentTrials = parseInt(document.getElementById('demo-trials-count')?.value) || 1;
         const currentRoutes = this.routes.length || 1;
-        
+
         // Check if trials or routes changed since last generation
         const trialsChanged = this.lastGeneratedTrials !== undefined && this.lastGeneratedTrials !== currentTrials;
         const routesChanged = this.lastGeneratedRoutes !== undefined && this.lastGeneratedRoutes !== currentRoutes;
-        
+
         if (trialsChanged || routesChanged) {
             console.log(`📦 Disruption regeneration needed: trials ${this.lastGeneratedTrials} → ${currentTrials}, routes ${this.lastGeneratedRoutes} → ${currentRoutes}`);
             this.disruptionsNeedGeneration = true;
         }
-        
+
         if ((!hasDisruptions || trialsChanged || routesChanged) && this.disruptionsNeedGeneration) {
             console.log('📦 Disruption step opened - auto-generating disruptions...');
-            
+
             // Trigger auto-generation with a small delay to let UI settle
             setTimeout(() => {
                 this.autoGenerateDisruptions();
@@ -1395,7 +1416,7 @@ const DemoCreator = {
             this.currentPreviewSet = setKeys[0];
             this.showDisruptionSetsPreview();
             this.displayDisruptionsOnMap(disruptionSets[setKeys[0]]);
-            
+
             console.log(`📦 Showing existing ${setKeys.length} disruption sets`);
         }
     },
@@ -1409,28 +1430,28 @@ const DemoCreator = {
         const currentTrials = parseInt(document.getElementById('demo-trials-count')?.value) || 1;
         const currentRoutes = this.routes.length || 1;
         const tauMode = this.getSelectedTauMode();
-        
+
         // IMPORTANT: Always update the TAU mode UI when entering this step
         // This ensures the correct UI (fixed/random settings) is displayed based on selected mode
         this.updateTauModeUI();
-        
+
         // Check if trials or routes changed since last TAU generation
         const trialsChanged = this.lastGeneratedTauTrials !== undefined && this.lastGeneratedTauTrials !== currentTrials;
         const routesChanged = this.lastGeneratedTauRoutes !== undefined && this.lastGeneratedTauRoutes !== currentRoutes;
-        
+
         if (trialsChanged || routesChanged) {
             console.log(`🎯 TAU regeneration needed: trials ${this.lastGeneratedTauTrials} → ${currentTrials}, routes ${this.lastGeneratedTauRoutes} → ${currentRoutes}`);
             this.tauNeedsGeneration = true;
         }
-        
+
         // Auto-generate TAU values if in random mode and needs generation
         if (tauMode === 'random' && (this.tauNeedsGeneration || !this.generatedTauValues || this.generatedTauValues.length === 0)) {
             console.log('🎯 Sequence step opened - auto-generating TAU values...');
-            
+
             // Store current trials/routes for change detection
             this.lastGeneratedTauTrials = currentTrials;
             this.lastGeneratedTauRoutes = currentRoutes;
-            
+
             // Trigger auto-generation with a small delay to let UI settle
             setTimeout(() => {
                 this.generateRandomTauValues();
@@ -1489,24 +1510,24 @@ const DemoCreator = {
         if (!this.currentEditRoute) {
             this.currentEditRoute = { id: `route-${Date.now()}`, start: null, end: null };
         }
-        
+
         this.currentEditRoute[type] = location;
-        
+
         // Add preview marker
         this.addPreviewMarker(type, location);
-        
+
         // Update button state
         this.updateAddRouteButtonState();
     },
 
     addPreviewMarker(type, location) {
         const markerId = `preview-${type}`;
-        
+
         // Remove existing marker
         if (this.markers[markerId]) {
             map.removeLayer(this.markers[markerId]);
         }
-        
+
         const isStart = type === 'start';
         const iconColor = isStart ? 'green' : 'red';
         const icon = L.icon({
@@ -1517,7 +1538,7 @@ const DemoCreator = {
             popupAnchor: [1, -34],
             shadowSize: [41, 41]
         });
-        
+
         // Create modern popup matching osm-snapping style
         const popupContent = `
             <div class="p-3 min-w-[250px]">
@@ -1533,11 +1554,11 @@ const DemoCreator = {
                 </div>
             </div>
         `;
-        
+
         this.markers[markerId] = L.marker([location.lat, location.lng], { icon })
             .bindPopup(popupContent)
             .addTo(map);
-        
+
         // Fit bounds to show both markers
         if (this.markers['preview-start'] && this.markers['preview-end']) {
             const bounds = L.latLngBounds([
@@ -1562,14 +1583,14 @@ const DemoCreator = {
             showUpdateToast('Please select both start and end locations', 'warning');
             return;
         }
-        
+
         const newRoute = {
             id: `route-${Date.now()}`,
             ...this.currentEditRoute
         };
         this.routes.push(newRoute);
         this.currentEditRoute = { start: null, end: null };
-        
+
         // Clear location pickers
         if (this.startPicker) {
             this.startPicker.clear();
@@ -1577,17 +1598,17 @@ const DemoCreator = {
         if (this.endPicker) {
             this.endPicker.clear();
         }
-        
+
         this.clearPreviewMarkers();
-        
+
         // Show the new route on map
         this.showRoutesOnMap([newRoute]);
-        
+
         this.renderRoutesList();
-        
+
         // Update button state
         this.updateAddRouteButtonState();
-        
+
         showUpdateToast('Route added successfully', 'success');
     },
 
@@ -1598,10 +1619,10 @@ const DemoCreator = {
         const R = 6371; // Earth's radius in km
         const dLat = (lat2 - lat1) * Math.PI / 180;
         const dLng = (lng2 - lng1) * Math.PI / 180;
-        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                  Math.sin(dLng/2) * Math.sin(dLng/2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLng / 2) * Math.sin(dLng / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         return R * c;
     },
 
@@ -1629,11 +1650,11 @@ const DemoCreator = {
      */
     async getValidatedRandomLocation() {
         const maxAttempts = 20;
-        
+
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
             const location = this.getRandomLocationInQC();
             const validation = await this.validateLocationNearRoad(location.lat, location.lng);
-            
+
             if (validation.valid) {
                 // Use snapped coordinates for accuracy
                 return {
@@ -1643,7 +1664,7 @@ const DemoCreator = {
                 };
             }
         }
-        
+
         // Fallback: return unvalidated location
         return this.getRandomLocationInQC();
     },
@@ -1666,7 +1687,7 @@ const DemoCreator = {
                 })
             });
             const result = await response.json();
-            
+
             if (result.success && result.points) {
                 return result.points.map(p => ({
                     lat: p.lat,
@@ -1687,53 +1708,53 @@ const DemoCreator = {
         const maxDistInput = document.getElementById('demo-random-max-dist');
         const validateRoadsCheckbox = document.getElementById('demo-random-validate-roads');
         const generateBtn = document.getElementById('demo-generate-routes-btn');
-        
+
         const count = parseInt(countInput?.value) || 3;
         const minDist = parseFloat(minDistInput?.value) || 1;
         const maxDist = parseFloat(maxDistInput?.value) || 10;
         const validateRoads = validateRoadsCheckbox?.checked !== false;
-        
+
         console.log(`🗺️ Generating ${count} random routes (${minDist}-${maxDist} km, validate: ${validateRoads})`);
-        
+
         // Disable button and show loading
         if (generateBtn) {
             generateBtn.disabled = true;
             generateBtn.innerHTML = '<span class="inline-block animate-spin mr-2">⏳</span> Generating...';
         }
-        
+
         try {
             const newRoutes = [];
-            
+
             if (validateRoads) {
                 // FAST PATH: Get all road points in one API call
                 // Request more points to allow for distance filtering and variety
                 const neededPoints = Math.max(count * 10, 50);
                 const roadPoints = await this.getRandomRoadPoints(neededPoints);
-                
+
                 if (roadPoints && roadPoints.length >= 2) {
                     let routesCreated = 0;
                     const usedPairs = new Set();
-                    
+
                     // Try to create routes with proper distance constraints
                     for (let attempts = 0; attempts < neededPoints * 5 && routesCreated < count; attempts++) {
                         // Pick two random points
                         const startIdx = Math.floor(Math.random() * roadPoints.length);
                         let endIdx = Math.floor(Math.random() * roadPoints.length);
-                        
+
                         // Ensure different points
                         while (endIdx === startIdx && roadPoints.length > 1) {
                             endIdx = Math.floor(Math.random() * roadPoints.length);
                         }
-                        
+
                         // Skip if already used this pair
                         const pairKey = `${startIdx}-${endIdx}`;
                         if (usedPairs.has(pairKey)) continue;
                         usedPairs.add(pairKey);
-                        
+
                         const start = roadPoints[startIdx];
                         const end = roadPoints[endIdx];
                         const distance = this.haversineDistance(start.lat, start.lng, end.lat, end.lng);
-                        
+
                         // Check distance constraints
                         if (distance >= minDist && distance <= maxDist) {
                             const route = {
@@ -1748,7 +1769,7 @@ const DemoCreator = {
                             console.log(`   ✅ Route ${routesCreated}: ${distance.toFixed(2)} km (${start.name} → ${end.name})`);
                         }
                     }
-                    
+
                     // If we couldn't find enough routes within constraints, relax them
                     if (routesCreated < count) {
                         console.warn(`   ⚠️ Only found ${routesCreated}/${count} routes within ${minDist}-${maxDist} km, relaxing constraints...`);
@@ -1756,7 +1777,7 @@ const DemoCreator = {
                             const start = roadPoints[i * 2 % roadPoints.length];
                             const end = roadPoints[(i * 2 + 1) % roadPoints.length];
                             const distance = this.haversineDistance(start.lat, start.lng, end.lat, end.lng);
-                            
+
                             const route = {
                                 id: `route-${Date.now()}-${i}`,
                                 start: { ...start },
@@ -1774,7 +1795,7 @@ const DemoCreator = {
                         const start = this.getRandomLocationInQC();
                         const end = this.getRandomLocationInQC();
                         const distance = this.haversineDistance(start.lat, start.lng, end.lat, end.lng);
-                        
+
                         const route = {
                             id: `route-${Date.now()}-${i}`,
                             start: { ...start },
@@ -1791,17 +1812,17 @@ const DemoCreator = {
                     let start, end, distance;
                     let attempts = 0;
                     const maxAttempts = 50;
-                    
+
                     do {
-                        start = this.qcBoundary ? this.getRandomLocationInQC() : 
-                                this.presetLocations[Math.floor(Math.random() * this.presetLocations.length)];
-                        end = this.qcBoundary ? this.getRandomLocationInQC() : 
-                              this.presetLocations[Math.floor(Math.random() * this.presetLocations.length)];
-                        
+                        start = this.qcBoundary ? this.getRandomLocationInQC() :
+                            this.presetLocations[Math.floor(Math.random() * this.presetLocations.length)];
+                        end = this.qcBoundary ? this.getRandomLocationInQC() :
+                            this.presetLocations[Math.floor(Math.random() * this.presetLocations.length)];
+
                         distance = this.haversineDistance(start.lat, start.lng, end.lat, end.lng);
                         attempts++;
                     } while (attempts < maxAttempts && (distance < minDist || distance > maxDist));
-                    
+
                     const route = {
                         id: `route-${Date.now()}-${i}`,
                         start: { ...start },
@@ -1812,13 +1833,13 @@ const DemoCreator = {
                     newRoutes.push(route);
                 }
             }
-            
+
             // Show markers on map for new routes
             this.showRoutesOnMap(newRoutes);
-            
+
             this.renderRoutesList();
             showUpdateToast(`Added ${newRoutes.length} random routes${validateRoads ? ' (road-validated)' : ''}`, 'success');
-            
+
         } catch (error) {
             console.error('Error generating routes:', error);
             showUpdateToast('Error generating routes: ' + error.message, 'error');
@@ -1834,12 +1855,12 @@ const DemoCreator = {
     showRoutesOnMap(routes) {
         const bounds = [];
         const colors = ['green', 'red', 'blue', 'orange', 'violet', 'yellow', 'grey', 'gold'];
-        
+
         routes.forEach((route, index) => {
             const colorIndex = (this.routes.indexOf(route)) % colors.length;
             const startColor = 'green';
             const endColor = 'red';
-            
+
             // Create start marker
             const startIcon = L.icon({
                 iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${startColor}.png`,
@@ -1849,11 +1870,11 @@ const DemoCreator = {
                 popupAnchor: [1, -34],
                 shadowSize: [41, 41]
             });
-            
+
             const startMarker = L.marker([route.start.lat, route.start.lng], { icon: startIcon })
                 .bindPopup(`<b>🟢 Route ${this.routes.indexOf(route) + 1} Start</b><br>${route.start.name}`)
                 .addTo(map);
-            
+
             // Create end marker
             const endIcon = L.icon({
                 iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${endColor}.png`,
@@ -1863,18 +1884,18 @@ const DemoCreator = {
                 popupAnchor: [1, -34],
                 shadowSize: [41, 41]
             });
-            
+
             const endMarker = L.marker([route.end.lat, route.end.lng], { icon: endIcon })
                 .bindPopup(`<b>🔴 Route ${this.routes.indexOf(route) + 1} End</b><br>${route.end.name}`)
                 .addTo(map);
-            
+
             // Store markers for later cleanup
             this.routeMarkers.push(startMarker, endMarker);
-            
+
             // Add to bounds
             bounds.push([route.start.lat, route.start.lng]);
             bounds.push([route.end.lat, route.end.lng]);
-            
+
             // Draw dashed line between start and end
             const line = L.polyline([
                 [route.start.lat, route.start.lng],
@@ -1885,10 +1906,10 @@ const DemoCreator = {
                 dashArray: '5, 10',
                 opacity: 0.7
             }).addTo(map);
-            
+
             this.routeMarkers.push(line);
         });
-        
+
         // Fit map to show all routes
         if (bounds.length > 0) {
             map.fitBounds(bounds, { padding: [50, 50] });
@@ -1915,7 +1936,7 @@ const DemoCreator = {
     renderRoutesList() {
         const container = document.getElementById('demo-routes-list');
         if (!container) return;
-        
+
         if (this.routes.length === 0) {
             container.innerHTML = `
                 <div class="text-center py-8 text-gray-400">
@@ -1929,13 +1950,13 @@ const DemoCreator = {
             `;
             return;
         }
-        
+
         container.innerHTML = this.routes.map((route, index) => {
             // Calculate distance if not already present
             const distance = route.distance || this.haversineDistance(
                 route.start.lat, route.start.lng, route.end.lat, route.end.lng
             ).toFixed(2);
-            
+
             return `
             <div class="bg-white rounded-xl p-4 border border-gray-200 shadow-sm hover:shadow-md transition-all">
                 <div class="flex items-start justify-between mb-3">
@@ -1982,21 +2003,21 @@ const DemoCreator = {
 
     updateDisruptionModeUI() {
         const mode = this.disruptions.mode;
-        
+
         // Clear the disruption preview when mode changes
         this.clearDisruptionPreview(true);
-        
-        document.getElementById('disruption-random-settings')?.classList.toggle('hidden', 
+
+        document.getElementById('disruption-random-settings')?.classList.toggle('hidden',
             mode === 'none' || mode === 'custom');
-        document.getElementById('disruption-custom-settings')?.classList.toggle('hidden', 
+        document.getElementById('disruption-custom-settings')?.classList.toggle('hidden',
             mode !== 'custom');
-        
+
         // Show/hide flow count based on mode
         document.getElementById('disruption-flow-count-row')?.classList.toggle('hidden',
             mode !== 'random-flow' && mode !== 'random-both');
         document.getElementById('disruption-incident-count-row')?.classList.toggle('hidden',
             mode !== 'random-incidents' && mode !== 'random-both');
-        
+
         // Update visual styling for radio options
         document.querySelectorAll('.disruption-mode-option').forEach(label => {
             const radio = label.querySelector('input[type="radio"]');
@@ -2035,7 +2056,7 @@ const DemoCreator = {
      */
     updateCustomDisruptionTypeUI() {
         const selectedType = document.querySelector('input[name="custom-disruption-type"]:checked')?.value || 'incident';
-        
+
         // Show/hide type-specific settings
         document.getElementById('custom-incident-settings')?.classList.toggle('hidden', selectedType !== 'incident');
         document.getElementById('custom-traffic-settings')?.classList.toggle('hidden', selectedType !== 'traffic');
@@ -2082,7 +2103,7 @@ const DemoCreator = {
     updateTauScopeDescription() {
         const scope = this.getSelectedTauScope();
         this.sequence.tauGenerationScope = scope;
-        
+
         const descriptions = {
             'all': 'All routes in all trials use the same TAU values in sequence',
             'per-trial': 'TAU sequence restarts for each trial',
@@ -2097,7 +2118,7 @@ const DemoCreator = {
 
     // Debounce timer for auto-generation
     disruptionGenerationTimer: null,
-    
+
     /**
      * Called when disruption scope or settings change - triggers auto-generation
      */
@@ -2107,7 +2128,7 @@ const DemoCreator = {
         // Trigger auto-generation with debounce
         this.onDisruptionSettingChange();
     },
-    
+
     /**
      * Called when any disruption setting changes - auto-generates disruptions
      */
@@ -2116,20 +2137,20 @@ const DemoCreator = {
         if (this.disruptionGenerationTimer) {
             clearTimeout(this.disruptionGenerationTimer);
         }
-        
+
         // Update status to show pending
         const statusText = document.getElementById('disruption-status-text');
         if (statusText) {
             statusText.textContent = 'Regenerating...';
             statusText.className = 'text-orange-500';
         }
-        
+
         // Debounce: wait 500ms before generating to avoid rapid calls
         this.disruptionGenerationTimer = setTimeout(() => {
             this.autoGenerateDisruptions();
         }, 500);
     },
-    
+
     /**
      * Auto-generate disruptions and show on map
      */
@@ -2141,26 +2162,26 @@ const DemoCreator = {
         const scope = this.getSelectedDisruptionScope();
         const trials = parseInt(document.getElementById('demo-trials-count')?.value) || 1;
         const routeCount = this.routes.length || 1;
-        
+
         // Show loading indicator
         const loadingIndicator = document.getElementById('disruption-loading-indicator');
         const loadingText = document.getElementById('disruption-loading-text');
         const statusText = document.getElementById('disruption-status-text');
-        
+
         if (loadingIndicator) loadingIndicator.classList.remove('hidden');
         if (statusText) statusText.textContent = 'Generating...';
-        
+
         // Disable navigation buttons while generating
         this.setNavigationButtonsEnabled(false);
-        
+
         try {
             // Calculate required sets
             const requiredSets = this.calculateRequiredSets();
             if (loadingText) loadingText.textContent = `Generating ${requiredSets} sets...`;
-            
+
             // Clear previous sets
             this.disruptions.disruptionSets = {};
-            
+
             // Generate set keys
             const setKeys = [];
             if (scope === 'all') {
@@ -2180,7 +2201,7 @@ const DemoCreator = {
                     }
                 }
             }
-            
+
             // Generate each set
             let generatedCount = 0;
             for (const setKey of setKeys) {
@@ -2194,9 +2215,9 @@ const DemoCreator = {
                         severity_max: severityMax
                     })
                 });
-                
+
                 const result = await response.json();
-                
+
                 if (result.success) {
                     this.disruptions.disruptionSets[setKey] = {
                         flow: result.flow || [],
@@ -2206,40 +2227,40 @@ const DemoCreator = {
                     };
                     generatedCount++;
                 }
-                
+
                 // Update progress
                 if (loadingText) loadingText.textContent = `Set ${generatedCount}/${setKeys.length}...`;
             }
-            
+
             // Show the first set on map
             const firstKey = setKeys[0];
             if (this.disruptions.disruptionSets[firstKey]) {
                 this.currentPreviewSet = firstKey;
                 this.displayDisruptionsOnMap(this.disruptions.disruptionSets[firstKey]);
             }
-            
+
             // Show sets list UI
             this.showDisruptionSetsPreview();
-            
+
             // Update status
             if (statusText) {
                 statusText.textContent = `✓ ${generatedCount} sets ready`;
                 statusText.className = 'text-green-600 font-medium';
             }
-            
+
             // Update status text below button
             const setsStatusEl = document.getElementById('disruption-sets-status');
             if (setsStatusEl) {
                 setsStatusEl.textContent = `${generatedCount} set(s) generated`;
             }
-            
+
             console.log(`📦 Auto-generated ${generatedCount} disruption sets for scope: ${scope}`);
-            
+
             // Track what trials/routes we generated for
             this.lastGeneratedTrials = trials;
             this.lastGeneratedRoutes = routeCount;
             this.disruptionsNeedGeneration = false;
-            
+
         } catch (error) {
             console.error('Error auto-generating disruptions:', error);
             if (statusText) {
@@ -2253,7 +2274,7 @@ const DemoCreator = {
             this.setNavigationButtonsEnabled(true);
         }
     },
-    
+
     /**
      * Generate random disruptions - called by button click
      * Similar to generateRandomTauValues()
@@ -2265,7 +2286,7 @@ const DemoCreator = {
             showUpdateToast('Disruption mode is set to None', 'warning');
             return;
         }
-        
+
         // Update button to show loading
         const btn = document.getElementById('generate-disruptions-btn');
         const originalContent = btn?.innerHTML;
@@ -2273,7 +2294,7 @@ const DemoCreator = {
             btn.disabled = true;
             btn.innerHTML = '<span class="animate-spin inline-block">⏳</span> Generating...';
         }
-        
+
         try {
             await this.autoGenerateDisruptions();
             showUpdateToast('Disruptions generated successfully!', 'success');
@@ -2287,7 +2308,7 @@ const DemoCreator = {
             }
         }
     },
-    
+
     /**
      * Enable/disable navigation buttons
      */
@@ -2305,7 +2326,7 @@ const DemoCreator = {
         const scope = document.getElementById('disruption-generation-scope')?.value || 'per-trial-route';
         const trials = parseInt(document.getElementById('demo-trials-count')?.value) || 1;
         const routeCount = this.routes.length || 1;
-        
+
         switch (scope) {
             case 'all':
                 return 1;
@@ -2371,24 +2392,24 @@ const DemoCreator = {
         const scope = document.getElementById('disruption-generation-scope')?.value || 'per-trial-route';
         const trials = parseInt(document.getElementById('demo-trials-count')?.value) || 1;
         const routeCount = this.routes.length || 1;
-        
+
         const btn = document.getElementById('preview-disruptions-btn');
         if (btn) {
             btn.disabled = true;
             btn.innerHTML = '<span class="inline-block animate-spin">⏳</span> Generating...';
         }
-        
+
         try {
             // Calculate required sets
             const requiredSets = this.calculateRequiredSets();
             console.log(`📦 Generating ${requiredSets} disruption sets for scope: ${scope}`);
-            
+
             // Clear previous sets
             this.disruptions.disruptionSets = {};
-            
+
             // Generate all required sets
             const setKeys = [];
-            
+
             if (scope === 'all') {
                 setKeys.push('set_all');
             } else if (scope === 'per-trial') {
@@ -2406,7 +2427,7 @@ const DemoCreator = {
                     }
                 }
             }
-            
+
             // Generate each set
             let generatedCount = 0;
             for (const setKey of setKeys) {
@@ -2420,9 +2441,9 @@ const DemoCreator = {
                         severity_max: severityMax
                     })
                 });
-                
+
                 const result = await response.json();
-                
+
                 if (result.success) {
                     this.disruptions.disruptionSets[setKey] = {
                         flow: result.flow || [],
@@ -2432,31 +2453,31 @@ const DemoCreator = {
                     };
                     generatedCount++;
                 }
-                
+
                 // Update progress
                 if (btn) {
                     btn.innerHTML = `<span class="inline-block animate-spin">⏳</span> Set ${generatedCount}/${setKeys.length}...`;
                 }
             }
-            
+
             // Show the first set on map
             const firstKey = setKeys[0];
             if (this.disruptions.disruptionSets[firstKey]) {
                 this.currentPreviewSet = firstKey;
                 this.displayDisruptionsOnMap(this.disruptions.disruptionSets[firstKey]);
             }
-            
+
             // Show sets list UI
             this.showDisruptionSetsPreview();
-            
+
             // Update status text
             const statusEl = document.getElementById('disruption-sets-status');
             if (statusEl) {
                 statusEl.textContent = `${generatedCount} set(s) generated`;
             }
-            
+
             showUpdateToast(`Generated ${generatedCount} disruption sets`, 'success');
-            
+
         } catch (error) {
             console.error('Error previewing disruptions:', error);
             showUpdateToast('Error generating disruptions', 'error');
@@ -2482,40 +2503,40 @@ const DemoCreator = {
     showDisruptionSetsPreview() {
         const panel = document.getElementById('disruption-preview-panel');
         const content = document.getElementById('disruption-preview-content');
-        
+
         if (!panel || !content) return;
-        
+
         panel.classList.remove('hidden');
-        
+
         const sets = this.disruptions.disruptionSets;
         const setKeys = Object.keys(sets);
-        
+
         if (setKeys.length === 0) {
             content.innerHTML = '<p class="text-gray-500 text-sm">No disruptions generated</p>';
             return;
         }
-        
+
         let html = `
             <div class="mb-3">
                 <div class="text-xs font-semibold text-purple-600 mb-2">📦 Disruption Sets (${setKeys.length})</div>
                 <div class="flex flex-wrap gap-1">
                     ${setKeys.map(key => `
                         <button onclick="DemoCreator.selectDisruptionSet('${key}')"
-                                class="px-2 py-1 text-xs rounded-lg transition-colors ${this.currentPreviewSet === key ? 
-                                    'bg-purple-600 text-white' : 'bg-purple-100 text-purple-700 hover:bg-purple-200'}">
+                                class="px-2 py-1 text-xs rounded-lg transition-colors ${this.currentPreviewSet === key ?
+                'bg-purple-600 text-white' : 'bg-purple-100 text-purple-700 hover:bg-purple-200'}">
                             ${this.getSetLabel(key)}
                         </button>
                     `).join('')}
                 </div>
             </div>
         `;
-        
+
         // Show current set details
         if (this.currentPreviewSet && sets[this.currentPreviewSet]) {
             const currentSet = sets[this.currentPreviewSet];
             html += this.renderDisruptionSetDetails(this.currentPreviewSet, currentSet);
         }
-        
+
         content.innerHTML = html;
     },
 
@@ -2524,7 +2545,7 @@ const DemoCreator = {
      */
     renderDisruptionSetDetails(setKey, setData) {
         let html = `<div class="border-t border-gray-200 pt-2 mt-2">`;
-        
+
         // Flow disruptions
         if (setData.flow && setData.flow.length > 0) {
             html += '<div class="text-xs font-semibold text-orange-600 mb-1">🚦 Traffic Flow</div>';
@@ -2542,7 +2563,7 @@ const DemoCreator = {
                 </div>
             `).join('');
         }
-        
+
         // Incidents
         if (setData.incidents && setData.incidents.length > 0) {
             html += '<div class="text-xs font-semibold text-red-600 mb-1 mt-2">🚨 Incidents</div>';
@@ -2560,11 +2581,11 @@ const DemoCreator = {
                 </div>
             `).join('');
         }
-        
+
         if ((!setData.flow || setData.flow.length === 0) && (!setData.incidents || setData.incidents.length === 0)) {
             html += '<p class="text-gray-500 text-xs">No disruptions in this set</p>';
         }
-        
+
         html += '</div>';
         return html;
     },
@@ -2574,7 +2595,7 @@ const DemoCreator = {
      */
     selectDisruptionSet(setKey) {
         if (!this.disruptions.disruptionSets[setKey]) return;
-        
+
         this.currentPreviewSet = setKey;
         this.displayDisruptionsOnMap(this.disruptions.disruptionSets[setKey]);
         this.showDisruptionSetsPreview();
@@ -2586,17 +2607,17 @@ const DemoCreator = {
     focusDisruption(type, index, setKey) {
         const set = this.disruptions.disruptionSets[setKey];
         if (!set) return;
-        
+
         const items = type === 'flow' ? set.flow : set.incidents;
         if (!items || !items[index]) return;
-        
+
         const item = items[index];
         const lat = (parseFloat(item.source_lat) + parseFloat(item.target_lat)) / 2;
         const lng = (parseFloat(item.source_lon || item.source_lng) + parseFloat(item.target_lon || item.target_lng)) / 2;
-        
+
         if (map && !isNaN(lat) && !isNaN(lng)) {
             map.setView([lat, lng], 16);
-            
+
             // Flash the polyline if it exists
             const markers = this.disruptionPreviewMarkers;
             if (markers[index]) {
@@ -2615,13 +2636,13 @@ const DemoCreator = {
     deleteDisruption(type, index, setKey) {
         const set = this.disruptions.disruptionSets[setKey];
         if (!set) return;
-        
+
         if (type === 'flow' && set.flow) {
             set.flow.splice(index, 1);
         } else if (type === 'incident' && set.incidents) {
             set.incidents.splice(index, 1);
         }
-        
+
         // Refresh display
         this.displayDisruptionsOnMap(set);
         this.showDisruptionSetsPreview();
@@ -2635,7 +2656,7 @@ const DemoCreator = {
     displayDisruptionsOnMap(data) {
         // Clear existing preview markers
         this.clearDisruptionPreview(false);
-        
+
         // Prepare flow segments with geometry handling
         const flowSegments = (data.flow || []).map(f => {
             // Process geometry if available
@@ -2648,7 +2669,7 @@ const DemoCreator = {
                     return null;
                 }).filter(c => c !== null);
             }
-            
+
             return {
                 ...f,
                 geometry: geometry,
@@ -2656,7 +2677,7 @@ const DemoCreator = {
                 target_lng: f.target_lon || f.target_lng
             };
         });
-        
+
         // Prepare incidents  
         const incidents = (data.incidents || []).map(inc => ({
             ...inc,
@@ -2664,7 +2685,7 @@ const DemoCreator = {
             target_lng: inc.target_lon || inc.target_lng,
             type: inc.type || 'Incident'
         }));
-        
+
         // Use TrafficUtils unified display function
         // This ensures incidents are rendered ON TOP with icons inside markers
         TrafficUtils.displayDisruptionsOnMap({
@@ -2675,7 +2696,7 @@ const DemoCreator = {
             showFlow: true,
             showIncidents: true
         });
-        
+
         // Fit map to show all markers if we have some
         if (this.disruptionPreviewMarkers.length > 0) {
             const group = L.featureGroup(this.disruptionPreviewMarkers);
@@ -2689,7 +2710,7 @@ const DemoCreator = {
     clearDisruptionPreview(hidePanel = true) {
         // Use TrafficUtils to clear layers
         TrafficUtils.clearDisruptionLayers(this.disruptionPreviewMarkers, map);
-        
+
         // Hide panel if requested
         if (hidePanel) {
             document.getElementById('disruption-preview-panel')?.classList.add('hidden');
@@ -2700,11 +2721,11 @@ const DemoCreator = {
     async addCustomDisruption() {
         showUpdateToast('Click on the map to add a disruption point', 'info');
         map.getContainer().style.cursor = 'crosshair';
-        
+
         const clickHandler = async (e) => {
             const lat = e.latlng.lat;
             const lng = e.latlng.lng;
-            
+
             try {
                 // Snap to nearest road
                 const response = await fetch('/find_nearest_osm_road', {
@@ -2712,12 +2733,12 @@ const DemoCreator = {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ lat, lng })
                 });
-                
+
                 const data = await response.json();
-                
+
                 if (data.success) {
                     const disruptionType = this.getCustomDisruptionType();
-                    
+
                     // Build disruption with type-specific properties
                     const disruption = {
                         id: `disruption-${Date.now()}`,
@@ -2728,24 +2749,24 @@ const DemoCreator = {
                         source: data.routing_nodes[0],
                         target: data.routing_nodes[1]
                     };
-                    
+
                     if (disruptionType === 'incident') {
                         // For incidents: store criticality
                         disruption.criticality = this.getCustomIncidentCriticality();
                         // Map criticality to severity for display
-                        disruption.severity = disruption.criticality === 'critical' ? 0.9 : 
-                                              disruption.criticality === 'major' ? 0.6 : 0.3;
+                        disruption.severity = disruption.criticality === 'critical' ? 0.9 :
+                            disruption.criticality === 'major' ? 0.6 : 0.3;
                     } else {
                         // For traffic: store jam factor
                         disruption.jamFactor = this.getCustomJamFactor();
                         // Map jam factor to severity for display (0-10 → 0-1)
                         disruption.severity = disruption.jamFactor / 10;
                     }
-                    
+
                     this.disruptions.customItems.push(disruption);
                     this.addDisruptionMarker(disruption);
                     this.renderDisruptionsList();
-                    
+
                     showUpdateToast(`Added ${disruptionType} disruption on ${disruption.roadName}`, 'success');
                 } else {
                     showUpdateToast('Could not snap to road', 'warning');
@@ -2754,28 +2775,28 @@ const DemoCreator = {
                 console.error('Error adding disruption:', error);
                 showUpdateToast('Error adding disruption', 'error');
             }
-            
+
             map.getContainer().style.cursor = '';
             map.off('click', clickHandler);
         };
-        
+
         map.once('click', clickHandler);
     },
 
     addDisruptionMarker(disruption) {
         const color = disruption.type === 'incident' ? 'red' : 'orange';
-        
+
         // Build popup content based on type
         let popupContent = `<b>${disruption.type === 'incident' ? '🚨 Incident' : '🚦 Traffic'}</b><br>${disruption.roadName}<br>`;
-        
+
         if (disruption.type === 'incident') {
-            const criticalityEmoji = disruption.criticality === 'critical' ? '🚫' : 
-                                     disruption.criticality === 'major' ? '🚧' : '⚠️';
+            const criticalityEmoji = disruption.criticality === 'critical' ? '🚫' :
+                disruption.criticality === 'major' ? '🚧' : '⚠️';
             popupContent += `Criticality: ${criticalityEmoji} ${disruption.criticality || 'major'}`;
         } else {
             popupContent += `Jam Factor: ${disruption.jamFactor?.toFixed(1) || (disruption.severity * 10).toFixed(1)}`;
         }
-        
+
         const marker = L.circleMarker([disruption.lat, disruption.lng], {
             radius: 10,
             fillColor: color,
@@ -2784,19 +2805,19 @@ const DemoCreator = {
             opacity: 1,
             fillOpacity: 0.8
         }).bindPopup(popupContent).addTo(map);
-        
+
         this.disruptionMarkers.push({ id: disruption.id, marker });
     },
 
     removeDisruption(disruptionId) {
         this.disruptions.customItems = this.disruptions.customItems.filter(d => d.id !== disruptionId);
-        
+
         const markerEntry = this.disruptionMarkers.find(m => m.id === disruptionId);
         if (markerEntry) {
             map.removeLayer(markerEntry.marker);
             this.disruptionMarkers = this.disruptionMarkers.filter(m => m.id !== disruptionId);
         }
-        
+
         this.renderDisruptionsList();
     },
 
@@ -2810,7 +2831,7 @@ const DemoCreator = {
     renderDisruptionsList() {
         const container = document.getElementById('demo-disruptions-list');
         if (!container) return;
-        
+
         if (this.disruptions.customItems.length === 0) {
             container.innerHTML = `
                 <div class="text-center py-4 text-gray-400 text-sm">
@@ -2819,18 +2840,18 @@ const DemoCreator = {
             `;
             return;
         }
-        
+
         container.innerHTML = this.disruptions.customItems.map(d => {
             // Build type-specific detail text
             let detailText;
             if (d.type === 'incident') {
-                const criticalityEmoji = d.criticality === 'critical' ? '🚫' : 
-                                         d.criticality === 'major' ? '🚧' : '⚠️';
+                const criticalityEmoji = d.criticality === 'critical' ? '🚫' :
+                    d.criticality === 'major' ? '🚧' : '⚠️';
                 detailText = `Criticality: ${criticalityEmoji} ${d.criticality || 'major'}`;
             } else {
                 detailText = `Jam Factor: ${d.jamFactor?.toFixed(1) || (d.severity * 10).toFixed(1)}`;
             }
-            
+
             return `
                 <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                     <span class="text-xl">${d.type === 'incident' ? '🚨' : '🚦'}</span>
@@ -2860,10 +2881,10 @@ const DemoCreator = {
         // Get the selected tau mode from radio buttons (fixed or random only)
         const selectedMode = this.getSelectedTauMode();
         this.sequence.tauMode = selectedMode;
-        
+
         document.getElementById('tau-fixed-setting')?.classList.toggle('hidden', selectedMode !== 'fixed');
         document.getElementById('tau-random-setting')?.classList.toggle('hidden', selectedMode !== 'random');
-        
+
         // Update visual styling for mode options
         document.querySelectorAll('.tau-mode-option').forEach(label => {
             const radio = label.querySelector('input[type="radio"]');
@@ -2873,10 +2894,10 @@ const DemoCreator = {
                 label.classList.remove('ring-2', 'ring-white', 'ring-offset-2', 'ring-offset-purple-100', 'shadow-lg');
             }
         });
-        
+
         // Update fixed value inputs based on scope
         this.updateTauInputs();
-        
+
         // Auto-generate random values when switching to random mode
         // But skip if we're loading saved TAU values in edit mode
         if (selectedMode === 'random' && !this._preserveTauValues) {
@@ -2887,7 +2908,7 @@ const DemoCreator = {
     updateTauScopeUI() {
         const scope = this.getSelectedTauScope();
         const mode = this.getSelectedTauMode();
-        
+
         // Update visual styling for scope options
         document.querySelectorAll('.tau-scope-option').forEach(label => {
             const radio = label.querySelector('input[type="radio"]');
@@ -2897,10 +2918,10 @@ const DemoCreator = {
                 label.classList.remove('ring-2', 'ring-white', 'ring-offset-2', 'ring-offset-purple-100', 'shadow-lg');
             }
         });
-        
+
         // Update tau inputs based on scope
         this.updateTauInputs();
-        
+
         // Auto-regenerate random values when scope changes (if in random mode)
         // But skip if we're loading saved TAU values in edit mode
         if (mode === 'random' && !this._preserveTauValues) {
@@ -2913,11 +2934,11 @@ const DemoCreator = {
         const mode = this.getSelectedTauMode();
         const trials = parseInt(document.getElementById('demo-trials-count')?.value) || 1;
         const routes = this.routes.length || 1;
-        
+
         // Calculate how many inputs we need
         let inputCount = 1;
         let inputLabels = ['All'];
-        
+
         switch (scope) {
             case 'all':
                 inputCount = 1;
@@ -2941,18 +2962,18 @@ const DemoCreator = {
                 }
                 break;
         }
-        
+
         // Update help text
         const helpEl = document.getElementById('tau-fixed-help');
         if (helpEl) {
             helpEl.textContent = `Enter τ values (0-1) for ${inputCount} ${scope === 'all' ? 'configuration' : 'item(s)'}`;
         }
-        
+
         // Generate dynamic inputs for fixed mode
         if (mode === 'fixed') {
             this.generateTauFixedInputs(inputCount, inputLabels);
         }
-        
+
         // Reset generated values display for random mode
         if (mode === 'random') {
             this.generatedTauValues = [];
@@ -2963,11 +2984,11 @@ const DemoCreator = {
     generateTauFixedInputs(count, labels) {
         const container = document.getElementById('tau-fixed-inputs-container');
         if (!container) return;
-        
+
         // Get existing values to preserve them
         const existingInputs = container.querySelectorAll('input[type="number"]');
         const existingValues = Array.from(existingInputs).map(input => parseFloat(input.value) || 0.5);
-        
+
         if (count <= 4) {
             // Show individual inputs with labels
             container.innerHTML = labels.map((label, i) => `
@@ -2981,8 +3002,8 @@ const DemoCreator = {
             `).join('');
         } else {
             // Show compact comma-separated input
-            const values = existingValues.length >= count 
-                ? existingValues.slice(0, count) 
+            const values = existingValues.length >= count
+                ? existingValues.slice(0, count)
                 : Array(count).fill(0.5);
             container.innerHTML = `
                 <div class="space-y-2">
@@ -3003,7 +3024,7 @@ const DemoCreator = {
         const max = parseFloat(document.getElementById('demo-tau-random-max')?.value) || 0.9;
         const trials = parseInt(document.getElementById('demo-trials-count')?.value) || 1;
         const routes = this.routes.length || 1;
-        
+
         // Calculate how many values we need
         let count = 1;
         switch (scope) {
@@ -3012,19 +3033,19 @@ const DemoCreator = {
             case 'per-route': count = routes; break;
             case 'per-trial-route': count = trials * routes; break;
         }
-        
+
         // Generate random values
-        this.generatedTauValues = Array(count).fill(0).map(() => 
+        this.generatedTauValues = Array(count).fill(0).map(() =>
             parseFloat((Math.random() * (max - min) + min).toFixed(2))
         );
-        
+
         // Display generated values
         const displayEl = document.getElementById('tau-random-values-display');
         const containerEl = document.getElementById('tau-random-generated');
-        
+
         if (displayEl && containerEl) {
             containerEl.classList.remove('hidden');
-            
+
             if (count <= 10) {
                 // Show detailed view
                 let labels = [];
@@ -3040,7 +3061,7 @@ const DemoCreator = {
                         }
                         break;
                 }
-                displayEl.innerHTML = this.generatedTauValues.map((v, i) => 
+                displayEl.innerHTML = this.generatedTauValues.map((v, i) =>
                     `<span class="inline-block bg-orange-200 px-2 py-0.5 rounded mr-1 mb-1">${labels[i]}: ${v}</span>`
                 ).join('');
             } else {
@@ -3048,7 +3069,7 @@ const DemoCreator = {
                 displayEl.innerHTML = `<span class="text-orange-700">${this.generatedTauValues.map(v => v.toFixed(2)).join(', ')}</span>`;
             }
         }
-        
+
         showUpdateToast(`Generated ${count} random τ values`, 'success');
     },
 
@@ -3094,13 +3115,13 @@ const DemoCreator = {
         const scope = this.getSelectedTauScope();
         const trials = parseInt(document.getElementById('demo-trials-count')?.value) || 1;
         const routes = this.routes.length || 1;
-        
+
         // Calculate needed count
         let needed = 1;
         if (scope === 'per-trial') needed = trials;
         else if (scope === 'per-route') needed = routes;
         else if (scope === 'per-trial-route') needed = trials * routes;
-        
+
         switch (mode) {
             case 'fixed':
                 // First try to get from individual number inputs
@@ -3112,31 +3133,31 @@ const DemoCreator = {
                     }
                     return vals.slice(0, needed);
                 }
-                
+
                 // Fall back to comma-separated text input
                 const fixedStr = document.getElementById('demo-tau-fixed-values')?.value || '0.5';
                 const fixedVals = fixedStr.split(',').map(v => parseFloat(v.trim())).filter(v => !isNaN(v));
-                
+
                 // Expand values if not enough provided
                 while (fixedVals.length < needed) {
                     fixedVals.push(fixedVals[fixedVals.length - 1] || 0.5);
                 }
                 return fixedVals.slice(0, needed);
-                
+
             case 'random':
                 // Use pre-generated values if available
                 if (this.generatedTauValues && this.generatedTauValues.length === needed) {
                     return this.generatedTauValues;
                 }
-                
+
                 // Otherwise generate new random values
                 const min = parseFloat(document.getElementById('demo-tau-random-min')?.value) || 0.1;
                 const max = parseFloat(document.getElementById('demo-tau-random-max')?.value) || 0.9;
-                
-                return Array(needed).fill(0).map(() => 
+
+                return Array(needed).fill(0).map(() =>
                     parseFloat((Math.random() * (max - min) + min).toFixed(2))
                 );
-                
+
             default:
                 return [0.5];
         }
@@ -3149,11 +3170,11 @@ const DemoCreator = {
     updateReviewSummary() {
         const container = document.getElementById('demo-v2-review-summary');
         if (!container) return;
-        
+
         // Sync state from GUI before reading values
         this.syncDisruptionsFromGUI();
         this.syncTauFromGUI();
-        
+
         const algorithm = this.getSelectedAlgorithm();
         const tauValues = this.getTauValues();
         const tauScope = this.getSelectedTauScope();
@@ -3161,14 +3182,14 @@ const DemoCreator = {
         const stepDelay = parseInt(document.getElementById('demo-step-delay')?.value) || 2000;
         const trials = parseInt(document.getElementById('demo-trials-count')?.value) || 1;
         const disruptionScope = document.querySelector('input[name="disruption-generation-scope"]:checked')?.value || 'per-trial-route';
-        
+
         // Build routes table with TAU values
         let routesTableHtml = '';
         if (this.routes.length > 0) {
             // Determine table columns based on TAU scope
             let tauColumns = '';
             let tauHeaders = '';
-            
+
             if (tauScope === 'all') {
                 tauHeaders = '<th class="px-2 py-1 text-left text-xs font-medium text-blue-600">τ Value</th>';
                 routesTableHtml = this.routes.map((r, i) => `
@@ -3180,7 +3201,7 @@ const DemoCreator = {
                     </tr>
                 `).join('');
             } else if (tauScope === 'per-trial') {
-                tauHeaders = Array(trials).fill(0).map((_, t) => 
+                tauHeaders = Array(trials).fill(0).map((_, t) =>
                     `<th class="px-2 py-1 text-left text-xs font-medium text-purple-600">T${t + 1}</th>`
                 ).join('');
                 routesTableHtml = this.routes.map((r, i) => `
@@ -3188,9 +3209,9 @@ const DemoCreator = {
                         <td class="px-2 py-1 text-xs text-blue-800 font-medium">${i + 1}</td>
                         <td class="px-2 py-1 text-xs text-blue-700">${r.start?.name || 'Unknown'}</td>
                         <td class="px-2 py-1 text-xs text-blue-700">${r.end?.name || 'Unknown'}</td>
-                        ${Array(trials).fill(0).map((_, t) => 
-                            `<td class="px-2 py-1 text-xs text-purple-600 font-mono">${tauValues[t]?.toFixed(2) || '0.50'}</td>`
-                        ).join('')}
+                        ${Array(trials).fill(0).map((_, t) =>
+                    `<td class="px-2 py-1 text-xs text-purple-600 font-mono">${tauValues[t]?.toFixed(2) || '0.50'}</td>`
+                ).join('')}
                     </tr>
                 `).join('');
             } else if (tauScope === 'per-route') {
@@ -3204,7 +3225,7 @@ const DemoCreator = {
                     </tr>
                 `).join('');
             } else { // per-trial-route
-                tauHeaders = Array(trials).fill(0).map((_, t) => 
+                tauHeaders = Array(trials).fill(0).map((_, t) =>
                     `<th class="px-2 py-1 text-left text-xs font-medium text-purple-600">T${t + 1}</th>`
                 ).join('');
                 routesTableHtml = this.routes.map((r, rIdx) => `
@@ -3213,13 +3234,13 @@ const DemoCreator = {
                         <td class="px-2 py-1 text-xs text-blue-700">${r.start?.name || 'Unknown'}</td>
                         <td class="px-2 py-1 text-xs text-blue-700">${r.end?.name || 'Unknown'}</td>
                         ${Array(trials).fill(0).map((_, tIdx) => {
-                            const valIdx = tIdx * this.routes.length + rIdx;
-                            return `<td class="px-2 py-1 text-xs text-purple-600 font-mono">${tauValues[valIdx]?.toFixed(2) || '0.50'}</td>`;
-                        }).join('')}
+                    const valIdx = tIdx * this.routes.length + rIdx;
+                    return `<td class="px-2 py-1 text-xs text-purple-600 font-mono">${tauValues[valIdx]?.toFixed(2) || '0.50'}</td>`;
+                }).join('')}
                     </tr>
                 `).join('');
             }
-            
+
             routesTableHtml = `
                 <table class="w-full text-left">
                     <thead>
@@ -3236,14 +3257,14 @@ const DemoCreator = {
                 </table>
             `;
         }
-        
+
         // Get algorithm display name
         const algorithmNames = {
             'both': 'HC2L + DHL',
             'hc2l': 'HC2L Only',
             'dhl': 'DHL Only'
         };
-        
+
         // Get scope display names
         const scopeNames = {
             'all': 'Same for All',
@@ -3251,7 +3272,7 @@ const DemoCreator = {
             'per-route': 'Per Route',
             'per-trial-route': 'Per Trial & Route'
         };
-        
+
         container.innerHTML = `
             <div class="space-y-3">
                 <!-- Routes Table -->
@@ -3321,23 +3342,23 @@ const DemoCreator = {
         // Sync all values from GUI before building config
         this.syncDisruptionsFromGUI();
         this.syncTauFromGUI();
-        
+
         const trials = parseInt(document.getElementById('demo-trials-count')?.value) || 1;
-        
+
         // Read TAU generation scope from radio buttons
         const tauScope = this.getSelectedTauScope();
         this.sequence.tauGenerationScope = tauScope;
-        
+
         // Get all TAU values - these will be distributed based on scope
         const allTauValues = this.getTauValues();
-        
+
         // Get disruption scope
         const disruptionScope = this.getSelectedDisruptionScope();
-        
+
         // Build routes with trials[] array - SIMPLIFIED: disruption is just setKey
         const routesWithTrials = this.routes.map((r, routeIdx) => {
             const trialsArray = [];
-            
+
             for (let t = 0; t < trials; t++) {
                 // Determine tau for this trial/route based on scope
                 let tau;
@@ -3358,7 +3379,7 @@ const DemoCreator = {
                     default:
                         tau = 0.5;
                 }
-                
+
                 // Determine disruption set key for this trial/route based on scope
                 let setKey;
                 switch (disruptionScope) {
@@ -3377,7 +3398,7 @@ const DemoCreator = {
                     default:
                         setKey = 'set_all';
                 }
-                
+
                 // SIMPLIFIED: disruption is just the setKey string
                 // Metadata (flowCount, incidentCount, disruption_dir) is stored in savedSets
                 trialsArray.push({
@@ -3386,7 +3407,7 @@ const DemoCreator = {
                     disruption: setKey  // Just the key, not an object
                 });
             }
-            
+
             return {
                 id: r.id,
                 start: r.start,
@@ -3395,19 +3416,19 @@ const DemoCreator = {
                 trials: trialsArray
             };
         });
-        
+
         // Build configuration object - CLEAN FORMAT (no duplicates)
         const config = {
             name: name || document.getElementById('demo-v2-name')?.value || `Custom Demo - ${new Date().toLocaleString()}`,
             routes: routesWithTrials,
-            
+
             // Settings block
             settings: {
                 algorithm: this.getSelectedAlgorithm(),
                 trials: trials,
                 stepDelay: parseInt(document.getElementById('demo-step-delay')?.value) || DEMO_CREATOR_DEFAULTS.sequence.stepDelay
             },
-            
+
             // TAU configuration (template for regeneration/editing)
             tau: {
                 mode: this.sequence.tauMode,
@@ -3417,7 +3438,7 @@ const DemoCreator = {
                 randomMax: this.sequence.tauRandomMax,
                 sequence: this.sequence.tauSequence || []
             },
-            
+
             // Disruption configuration (template settings + generated sets)
             disruptions: {
                 mode: this.disruptions.mode,
@@ -3430,7 +3451,7 @@ const DemoCreator = {
                 disruptionSets: this.disruptions.disruptionSets || {}
             }
         };
-        
+
         return config;
     },
 
@@ -3445,7 +3466,7 @@ const DemoCreator = {
                 isEditing ? 'Updating Demo' : 'Saving Demo',
                 'Processing configuration...'
             );
-            
+
             // Update button state
             if (saveBtn) {
                 saveBtn.disabled = true;
@@ -3457,13 +3478,13 @@ const DemoCreator = {
                     ${isEditing ? 'Updating...' : 'Saving...'}
                 `;
             }
-            
+
             // Build config using helper function
             const config = this.buildDemoConfig();
-            
+
             // Update loading status
             this.updateLoadingStatus('Saving to server...');
-            
+
             // If editing, update the config; otherwise save new
             if (isEditing) {
                 config.id = this.editingConfigId;
@@ -3473,25 +3494,25 @@ const DemoCreator = {
                 await DemoRunner.saveConfig(config);
                 showUpdateToast('Demo configuration saved!', 'success');
             }
-            
+
             // Update loading status
             this.updateLoadingStatus('Cleaning up...');
-            
+
             // Clear all disruption sets to prevent carrying over to next demo
             this.disruptions.disruptionSets = {};
             this.disruptions.customItems = [];
-            
+
             // Clear visual markers before reset
             this.clearPreviewMarkers();
             this.clearAllRouteMarkers();
             this.clearAllDisruptionMarkers();
-            
+
             // Small delay for visual feedback
             await new Promise(resolve => setTimeout(resolve, 300));
-            
+
             // Hide loading animation
             this.hideLoadingAnimation();
-            
+
             // Reset demo creator completely and go back to step 1
             this.resetForHandoff();
 
@@ -3516,11 +3537,11 @@ const DemoCreator = {
     async runOnly() {
         const runBtn = document.getElementById('demo-v2-run-btn');
         const originalContent = runBtn?.innerHTML;
-        
+
         try {
             // Show loading animation
             this.showLoadingAnimation('Starting Demo', 'Preparing configuration...');
-            
+
             // Update button state
             if (runBtn) {
                 runBtn.disabled = true;
@@ -3532,39 +3553,39 @@ const DemoCreator = {
                     Starting...
                 `;
             }
-            
+
             // Build config with temporary name
             const config = this.buildDemoConfig(`Temp Demo - ${new Date().toLocaleString()}`);
-            
+
             // Update loading status
             this.updateLoadingStatus('Cleaning up map layers...');
-            
+
             // Clear all disruption sets to prevent carrying over to next demo
             this.disruptions.disruptionSets = {};
             this.disruptions.customItems = [];
-            
+
             // Clear visual markers before handoff
             this.clearPreviewMarkers();
             this.clearAllRouteMarkers();
             this.clearAllDisruptionMarkers();
-            
+
             // Update loading status
             this.updateLoadingStatus('Switching to Demo Runner...');
-            
+
             // Small delay for visual feedback
             await new Promise(resolve => setTimeout(resolve, 200));
-            
+
             // Hide loading animation before panel transition
             this.hideLoadingAnimation();
-            
+
             // Reset Demo Creator state
             this.resetForHandoff();
-            
+
             PanelManager.showPanel('demo-runner');
-            
+
             // Delegate execution to Demo Runner (temporary config)
             await DemoRunner.runExternalConfig(config, true);
-            
+
         } catch (error) {
             console.error('Error running demo:', error);
             showUpdateToast('Error running demo: ' + error.message, 'error');
@@ -3580,7 +3601,7 @@ const DemoCreator = {
     async saveAndRun() {
         const runBtn = document.getElementById('demo-v2-save-run-btn');
         const originalContent = runBtn?.innerHTML;
-        
+
         try {
             // Show loading animation
             const isEditing = !!this.editingConfigId;
@@ -3588,7 +3609,7 @@ const DemoCreator = {
                 isEditing ? 'Updating & Starting Demo' : 'Saving & Starting Demo',
                 'Processing configuration...'
             );
-            
+
             // Update button state
             if (runBtn) {
                 runBtn.disabled = true;
@@ -3600,13 +3621,13 @@ const DemoCreator = {
                     ${isEditing ? 'Updating...' : 'Saving...'}
                 `;
             }
-            
+
             // Build config using helper function
             const config = this.buildDemoConfig();
-            
+
             // Update loading status
             this.updateLoadingStatus('Saving to server...');
-            
+
             // Save the configuration first
             if (isEditing) {
                 config.id = this.editingConfigId;
@@ -3616,39 +3637,39 @@ const DemoCreator = {
                 await DemoRunner.saveConfig(config);
                 showUpdateToast('Demo configuration saved!', 'success');
             }
-            
+
             // Update loading status
             this.updateLoadingStatus('Cleaning up map layers...');
-            
+
             // Clear all disruption sets to prevent carrying over to next demo
             this.disruptions.disruptionSets = {};
             this.disruptions.customItems = [];
-            
+
             // Clear visual markers before handoff
             this.clearPreviewMarkers();
             this.clearAllRouteMarkers();
             this.clearAllDisruptionMarkers();
-            
+
             // Update loading status
             this.updateLoadingStatus('Switching to Demo Runner...');
-            
+
             // Small delay for visual feedback
             await new Promise(resolve => setTimeout(resolve, 200));
-            
+
             // Hide loading animation before panel transition
             this.hideLoadingAnimation();
-            
+
             // Reset Demo Creator state
             this.resetForHandoff();
-            
+
             PanelManager.showPanel('demo-runner');
 
             runBtn.disabled = false;
             runBtn.innerHTML = originalContent;
-            
+
             // Delegate execution to Demo Runner (saved config, not temporary)
             await DemoRunner.runDemo(config);
-            
+
         } catch (error) {
             console.error('Error saving/running demo:', error);
             showUpdateToast('Error: ' + error.message, 'error');
@@ -3674,17 +3695,17 @@ const DemoCreator = {
 
         this.isRunning = true;
         this.isPaused = false;
-    // Update config list to reflect running state (disables run buttons)
-    if (typeof DemoRunner !== 'undefined' && DemoRunner.renderConfigList) DemoRunner.renderConfigList();
-        
+        // Update config list to reflect running state (disables run buttons)
+        if (typeof DemoRunner !== 'undefined' && DemoRunner.renderConfigList) DemoRunner.renderConfigList();
+
         // Disable route finder UI when demo starts
         if (typeof DemoRunner !== 'undefined' && DemoRunner.toggleRouteFinderUI) {
             DemoRunner.toggleRouteFinderUI(true);
         }
-        
+
         const trials = config.trials || config.settings?.trials || 1;
         const routes = config.routes || [];
-        
+
         // Initialize progress
         this.currentProgress = {
             trial: 0,
@@ -3699,10 +3720,10 @@ const DemoCreator = {
             lastResult: null,
             results: []
         };
-        
+
         console.log('🎬 Starting demo with detailed progress:', config.name);
         showUpdateToast(`Starting: ${config.name}`, 'info');
-        
+
         // Show running step
         this.goToStep('running');
         this.updateProgressDisplay();
@@ -3710,25 +3731,25 @@ const DemoCreator = {
         try {
             // Reset map
             await this.resetMap();
-            
+
             // Run for each trial
             for (let trial = 0; trial < trials; trial++) {
                 if (!this.isRunning) break;
-                
+
                 this.currentProgress.trial = trial + 1;
-                
+
                 // Process each route
                 for (let i = 0; i < routes.length; i++) {
                     if (!this.isRunning) break;
                     while (this.isPaused) {
                         await this.delay(100);
                     }
-                    
+
                     const route = routes[i];
                     this.currentProgress.route = i + 1;
                     this.currentProgress.status = `Setting up route ${i + 1}...`;
                     this.updateProgressDisplay();
-                    
+
                     await this.processRouteWithProgress(route, config, trial);
                     await this.delay(config.stepDelay || 2000);
                 }
@@ -3749,7 +3770,7 @@ const DemoCreator = {
             this.isRunning = false;
             // Update config list to reflect stopped state (re-enable buttons)
             if (typeof DemoRunner !== 'undefined' && DemoRunner.renderConfigList) DemoRunner.renderConfigList();
-            
+
             // Re-enable route finder UI when demo stops
             if (typeof DemoRunner !== 'undefined' && DemoRunner.toggleRouteFinderUI) {
                 DemoRunner.toggleRouteFinderUI(false);
@@ -3762,7 +3783,7 @@ const DemoCreator = {
         this.currentProgress.setupStep = 0;
         this.currentProgress.status = `Setting start: ${route.start.name}`;
         this.updateProgressDisplay();
-        
+
         if (typeof handleOSMStartLocationPin === 'function') {
             await handleOSMStartLocationPin(route.start.lat, route.start.lng);
         }
@@ -3772,7 +3793,7 @@ const DemoCreator = {
         this.currentProgress.setupStep = 1;
         this.currentProgress.status = `Setting destination: ${route.end.name}`;
         this.updateProgressDisplay();
-        
+
         if (typeof handleOSMDestLocationPin === 'function') {
             await handleOSMDestLocationPin(route.end.lat, route.end.lng);
         }
@@ -3782,7 +3803,7 @@ const DemoCreator = {
         this.currentProgress.setupStep = 2;
         this.currentProgress.status = `Configuring disruptions...`;
         this.updateProgressDisplay();
-        
+
         // Get algorithms to test
         const algorithmToTest = config.algorithm || 'hc2l';
         const algorithms = algorithmToTest === 'both' ? ['hc2l', 'dhl'] : [algorithmToTest];
@@ -3795,7 +3816,7 @@ const DemoCreator = {
         } else if (disruption.includes('incident')) {
             datasetValue = 'incidents';
         }
-        
+
         const disruptionRadio = document.querySelector(`input[name="dataset"][value="${datasetValue}"]`);
         if (disruptionRadio) {
             disruptionRadio.click();
@@ -3812,13 +3833,13 @@ const DemoCreator = {
         // Test each tau value
         const tauValues = route.tauValues || [0.5];
         this.currentProgress.totalTaus = tauValues.length;
-        
+
         for (let tauIdx = 0; tauIdx < tauValues.length; tauIdx++) {
             if (!this.isRunning) break;
             while (this.isPaused) {
                 await this.delay(100);
             }
-            
+
             const tau = tauValues[tauIdx];
             this.currentProgress.tauIndex = tauIdx + 1;
             this.currentProgress.currentTau = tau;
@@ -3835,10 +3856,10 @@ const DemoCreator = {
                 this.currentProgress.algorithm = algo.toUpperCase();
                 this.currentProgress.status = `Setting ${algo.toUpperCase()} with τ = ${tau.toFixed(2)}`;
                 this.updateProgressDisplay();
-                
+
                 // Set algorithm
                 document.querySelector(`input[name="algorithm"][value="${algo}"]`)?.click();
-                
+
                 // Set tau
                 const thresholdInput = document.getElementById('threshold-input');
                 if (thresholdInput) {
@@ -3852,7 +3873,7 @@ const DemoCreator = {
                 this.currentProgress.subStep = 1;
                 this.currentProgress.status = `Computing route (${algo.toUpperCase()}, τ = ${tau.toFixed(2)})...`;
                 this.updateProgressDisplay();
-                
+
                 if (typeof computeRouteBasedOnSelection === 'function') {
                     await computeRouteBasedOnSelection();
                 }
@@ -3861,9 +3882,9 @@ const DemoCreator = {
                 this.currentProgress.subStep = 2;
                 this.currentProgress.status = `Waiting for result...`;
                 this.updateProgressDisplay();
-                
+
                 await this.delay(config.stepDelay || 2000);
-                
+
                 // Sub-step 3: Capturing result
                 this.currentProgress.subStep = 3;
                 const result = this.captureCurrentResult(algo, tau, route, trialIndex);
@@ -3871,7 +3892,7 @@ const DemoCreator = {
                     this.currentProgress.lastResult = result;
                     this.currentProgress.results.push(result);
                 }
-                
+
                 this.updateProgressDisplay();
 
                 await this.delay(config.stepDelay || 2000);
@@ -4037,19 +4058,19 @@ const DemoCreator = {
     calculateOverallProgress() {
         const p = this.currentProgress;
         if (p.totalTrials === 0 || p.totalRoutes === 0) return 0;
-        
+
         // Each route has multiple sub-steps
         const totalTaus = p.totalTaus || 1;
         const stepsPerRoute = 3 + (totalTaus * 3);
         const totalSteps = p.totalTrials * p.totalRoutes * stepsPerRoute;
-        
+
         const completedTrials = (p.trial - 1) * p.totalRoutes * stepsPerRoute;
         const completedRoutes = (p.route - 1) * stepsPerRoute;
         const completedTauSteps = (p.tauIndex - 1) * 3 + (p.subStep || 0);
         const routeProgress = p.setupStep || 0;
-        
+
         const completedSteps = completedTrials + completedRoutes + routeProgress + completedTauSteps;
-        
+
         return Math.min(100, (completedSteps / totalSteps) * 100);
     },
 
@@ -4066,24 +4087,24 @@ const DemoCreator = {
     // Generate random incidents within Quezon City bounds
     generateRandomIncidents(count = 5, severityMin = 0.3, severityMax = 0.9) {
         const incidentTypes = [
-            'Accident', 'Road Closure', 'Construction', 
+            'Accident', 'Road Closure', 'Construction',
             'Road Hazard', 'Disabled Vehicle', 'Lane Restriction'
         ];
-        
+
         const severityLevels = ['Heavy', 'Medium', 'Light'];
-        
+
         // Quezon City bounds
         const bounds = {
             minLat: 14.58, maxLat: 14.72,
             minLng: 121.00, maxLng: 121.12
         };
-        
+
         const incidents = [];
         for (let i = 0; i < count; i++) {
             const lat = bounds.minLat + Math.random() * (bounds.maxLat - bounds.minLat);
             const lng = bounds.minLng + Math.random() * (bounds.maxLng - bounds.minLng);
             const severity = severityMin + Math.random() * (severityMax - severityMin);
-            
+
             incidents.push({
                 id: `demo-incident-${i}`,
                 type: incidentTypes[Math.floor(Math.random() * incidentTypes.length)],
@@ -4099,7 +4120,7 @@ const DemoCreator = {
                 custom: true
             });
         }
-        
+
         return incidents;
     },
 
@@ -4110,14 +4131,14 @@ const DemoCreator = {
             minLat: 14.58, maxLat: 14.72,
             minLng: 121.00, maxLng: 121.12
         };
-        
+
         const segments = [];
         for (let i = 0; i < count; i++) {
             const lat = bounds.minLat + Math.random() * (bounds.maxLat - bounds.minLat);
             const lng = bounds.minLng + Math.random() * (bounds.maxLng - bounds.minLng);
             const severity = severityMin + Math.random() * (severityMax - severityMin);
             const currentSpeed = Math.floor(10 + Math.random() * 40); // 10-50 kph
-            
+
             segments.push({
                 id: `demo-flow-${i}`,
                 type: 'Congestion',
@@ -4134,7 +4155,7 @@ const DemoCreator = {
                 custom: true
             });
         }
-        
+
         return segments;
     },
 
@@ -4145,14 +4166,14 @@ const DemoCreator = {
         const flowCount = config.disruptions?.randomFlowCount || this.disruptions.randomFlowCount || 1500;
         const severityMin = config.disruptions?.severityMin || this.disruptions.severityMin || 0.3;
         const severityMax = config.disruptions?.severityMax || this.disruptions.severityMax || 0.9;
-        
+
         console.log('🎲 Generating demo disruptions:', { mode, incidentCount, flowCount });
-        
+
         this.generatedDisruptions = {
             incidents: [],
             flowSegments: []
         };
-        
+
         switch (mode) {
             case 'random-both':
             case 'both':
@@ -4190,46 +4211,46 @@ const DemoCreator = {
                 // No disruptions
                 break;
         }
-        
+
         console.log('✅ Generated disruptions:', {
             incidents: this.generatedDisruptions.incidents.length,
             flowSegments: this.generatedDisruptions.flowSegments.length
         });
-        
+
         return this.generatedDisruptions;
     },
 
     // Show generated disruptions on map
     async showGeneratedDisruptions(showIncidents = true, showFlow = true) {
         console.log('🗺️ Showing generated disruptions:', { showIncidents, showFlow });
-        
+
         // Clear existing disruption markers first
         if (typeof clearDisruptionMarkers === 'function') {
             clearDisruptionMarkers();
         }
-        
+
         const allDisruptions = [];
-        
+
         if (showIncidents && this.generatedDisruptions.incidents.length > 0) {
             allDisruptions.push(...this.generatedDisruptions.incidents);
         }
-        
+
         if (showFlow && this.generatedDisruptions.flowSegments.length > 0) {
             allDisruptions.push(...this.generatedDisruptions.flowSegments);
         }
-        
+
         if (allDisruptions.length === 0) {
             console.log('No disruptions to display');
             return;
         }
-        
+
         // Format for showAllDisruptionsOnMap
         const disruptionData = {
             disruptions_by_type: {},
             total_disruptions: allDisruptions.length,
             severity_counts: { Heavy: 0, Medium: 0, Light: 0 }
         };
-        
+
         // Group by type
         allDisruptions.forEach(d => {
             const type = d.incident_type || d.type || 'Other';
@@ -4237,14 +4258,14 @@ const DemoCreator = {
                 disruptionData.disruptions_by_type[type] = [];
             }
             disruptionData.disruptions_by_type[type].push(d);
-            
+
             // Count severity
             const severity = d.severity || 'Medium';
             if (disruptionData.severity_counts[severity] !== undefined) {
                 disruptionData.severity_counts[severity]++;
             }
         });
-        
+
         // Show on map
         if (typeof showAllDisruptionsOnMap === 'function') {
             showAllDisruptionsOnMap(disruptionData);
@@ -4255,7 +4276,7 @@ const DemoCreator = {
     // Apply disruption visualization based on mode - NOW uses generated disruptions
     async applyDisruptionVisualization(mode, customItems) {
         console.log('🚦 Applying disruption visualization:', mode);
-        
+
         // Generate disruptions based on mode
         const config = {
             disruptions: {
@@ -4267,12 +4288,12 @@ const DemoCreator = {
                 severityMax: this.disruptions.severityMax
             }
         };
-        
+
         this.generateDemoDisruptions(config);
-        
+
         let showIncidents = false;
         let showFlow = false;
-        
+
         switch (mode) {
             case 'both':
             case 'random-both':
@@ -4298,10 +4319,10 @@ const DemoCreator = {
                 }
                 return;
         }
-        
+
         // Show the generated disruptions on map
         await this.showGeneratedDisruptions(showIncidents, showFlow);
-        
+
         // Set the dataset radio for the routing algorithm
         let datasetValue = 'none';
         if (showIncidents && showFlow) {
@@ -4311,7 +4332,7 @@ const DemoCreator = {
         } else if (showFlow) {
             datasetValue = 'both';
         }
-        
+
         const disruptionRadio = document.querySelector(`input[name="dataset"][value="${datasetValue}"]`);
         if (disruptionRadio) {
             disruptionRadio.click();
@@ -4321,9 +4342,9 @@ const DemoCreator = {
     // Show custom disruptions on map (legacy support)
     async showCustomDisruptionsOnMap(customItems) {
         if (!customItems || customItems.length === 0) return;
-        
+
         console.log('🚧 Showing custom disruptions on map:', customItems.length);
-        
+
         const formattedDisruptions = customItems.map((item, index) => ({
             id: `custom-${index}`,
             type: item.type || 'roadwork',
@@ -4334,11 +4355,11 @@ const DemoCreator = {
             description: item.description || `Custom Disruption ${index + 1}`,
             custom: true
         }));
-        
+
         if (typeof showAllDisruptionsOnMap === 'function') {
-            await showAllDisruptionsOnMap({ 
-                disruptions: formattedDisruptions, 
-                total_disruptions: formattedDisruptions.length 
+            await showAllDisruptionsOnMap({
+                disruptions: formattedDisruptions,
+                total_disruptions: formattedDisruptions.length
             });
         }
     },
@@ -4371,12 +4392,12 @@ const DemoCreator = {
         this.currentProgress.status = '⏹️ Stopped';
         this.updateProgressDisplay();
         showUpdateToast('Demo stopped', 'warning');
-        
+
         // Re-enable route finder UI when demo stops
         if (typeof DemoRunner !== 'undefined' && DemoRunner.toggleRouteFinderUI) {
             DemoRunner.toggleRouteFinderUI(false);
         }
-        
+
         // Return to step 1 after a short delay
         setTimeout(() => {
             // Revert to create mode when stopping the demo
@@ -4402,9 +4423,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // Global exports
 window.DemoCreator = DemoCreator;
 window.openDemoCreator = () => DemoCreator.openPanel();
-window.closeDemoCreator = () =>  {
-    DemoCreator.closePanel();
-}
+window.closeDemoCreator = () => DemoCreator.closePanel();
 
 
 console.log('✅ Demo Creator V2 module loaded');

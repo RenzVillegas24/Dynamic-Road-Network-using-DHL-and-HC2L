@@ -36,14 +36,14 @@ async function openComparisonPanel() {
     if (panel) {
         panel.classList.remove('translate-x-full');
         console.log('✅ Algorithm Comparison Panel opened');
-        
+
         // Check if start and destination are set
         if (window.startLocation && window.destLocation) {
             // Auto-run comparison with all algorithms by default
             document.getElementById('compare-google').checked = true;
             document.getElementById('compare-dhl').checked = true;
             document.getElementById('compare-hc2l').checked = true;
-            
+
             // Small delay for panel animation
             setTimeout(() => {
                 showUpdateToast('Running comparison...', 'info');
@@ -56,7 +56,7 @@ async function openComparisonPanel() {
 }
 
 // Close comparison panel
-function closeComparisonPanel() {
+async function closeComparisonPanel() {
     const panel = document.getElementById('algorithm-comparison-panel');
     if (panel) {
         panel.classList.add('translate-x-full');
@@ -64,6 +64,10 @@ function closeComparisonPanel() {
         
         // Clear comparison route overlays from map
         clearComparisonRoutes();
+        toggleRouteFinderUI(false);
+
+        await new Promise(resolve => setTimeout(resolve, 100));
+        await handleGoButtonClick(false);
     }
 }
 
@@ -81,40 +85,91 @@ function clearComparisonRoutes() {
     console.log('🧹 Comparison routes cleared from map');
 }
 
+function compareChanged() {
+    runComparison();
+}
+
+// on enter make the hovered element only this route wull be visible
+function compareEntered(event) {
+    const target = event.target;
+    let hoveredAlgo = null;
+    
+    // Find the label element (could be target or ancestor)
+    const label = target.closest('label');
+    if (!label) return;
+    
+    // Determine which algorithm based on the input id inside the label
+    const input = label.querySelector('input[type="checkbox"]');
+    if (input) {
+        if (input.id === 'compare-google') hoveredAlgo = 'google';
+        else if (input.id === 'compare-dhl') hoveredAlgo = 'dhl';
+        else if (input.id === 'compare-hc2l') hoveredAlgo = 'hc2l';
+    }
+    
+    if (!hoveredAlgo || !window.comparisonPolylines || window.comparisonPolylines.length === 0) return;
+    
+    // Check if the hovered algorithm actually has a route
+    const hasHoveredRoute = window.comparisonPolylines.some(polyline => polyline._algorithm === hoveredAlgo);
+    if (!hasHoveredRoute) return;
+    
+    // Set opacity: hovered route visible (1.0), others transparent (0.3)
+    window.comparisonPolylines.forEach((polyline) => {
+        if (polyline && polyline.setStyle) {
+            polyline.setStyle({
+                opacity: polyline._algorithm === hoveredAlgo ? 1.0 : 0.3
+            });
+        }
+    });
+}
+
+// on leave reset all routes to visible
+function compareLeft() {
+    if (!window.comparisonPolylines || window.comparisonPolylines.length === 0) return;
+    
+    // Reset all routes to full opacity
+    window.comparisonPolylines.forEach((polyline) => {
+        if (polyline && polyline.setStyle) {
+            polyline.setStyle({
+                opacity: 1.0
+            });
+        }
+    });
+}
+
 // Run algorithm comparison
 async function runComparison() {
     console.log('🚀 Running algorithm comparison...');
-    
+
     // Check if start and destination are set
     if (!window.startLocation || !window.destLocation) {
         showUpdateToast('Please set start and destination first', 'warning');
         return;
     }
-    
+
     // Get selected algorithms
     const compareGoogle = document.getElementById('compare-google')?.checked;
     const compareDHL = document.getElementById('compare-dhl')?.checked;
     const compareHC2L = document.getElementById('compare-hc2l')?.checked;
-    
+
     if (!compareGoogle && !compareDHL && !compareHC2L) {
         showUpdateToast('Please select at least one algorithm', 'warning');
         return;
     }
-    
+
     // Get current selections (dataset mode, threshold)
     const selections = getCurrentSelections();
     const useDisruptions = selections.dataset_mode !== 'none';
-    
+
     // Show loading state
     showUpdateToast('Computing routes for comparison...', 'info');
-    
+
     // Clear previous comparison results
     window.comparisonResults = { google: null, dhl: null, hc2l: null };
     clearComparisonRoutes();
-    
+
     // Compute routes in parallel (with is_comparison_mode=true to skip alternatives)
     const promises = [];
-    
+
     if (compareGoogle) {
         promises.push(
             computeGoogleMapsRoute()
@@ -128,7 +183,7 @@ async function runComparison() {
                 })
         );
     }
-    
+
     if (compareDHL) {
         promises.push(
             computeDHLRoute(useDisruptions, true) // true = is_comparison_mode (no alternatives)
@@ -142,7 +197,7 @@ async function runComparison() {
                 })
         );
     }
-    
+
     if (compareHC2L) {
         promises.push(
             computeDHC2LRoute(useDisruptions, selections.threshold, true) // true = is_comparison_mode
@@ -156,35 +211,35 @@ async function runComparison() {
                 })
         );
     }
-    
+
     // Wait for all computations to complete
     await Promise.all(promises);
-    
+
     // Display results
     displayComparisonResults();
-    
+
     showUpdateToast('Comparison complete', 'success');
 }
 
 // Display comparison results
 function displayComparisonResults() {
     console.log('📊 Displaying comparison results');
-    
+
     // Calculate comparison metrics between algorithms
     calculateComparisonMetrics();
-    
+
     // Show metrics container
     const metricsContainer = document.getElementById('comparison-metrics-container');
     if (metricsContainer) {
         metricsContainer.classList.remove('hidden');
     }
-    
+
     // Build comparison table
     buildComparisonTable();
-    
+
     // Display routes on map
     displayComparisonRoutesOnMap();
-    
+
     // Show route details
     buildRouteDetails();
 }
@@ -197,19 +252,19 @@ function calculateComparisonMetrics() {
         dhl: extractCoordinates(window.comparisonResults.dhl),
         hc2l: extractCoordinates(window.comparisonResults.hc2l)
     };
-    
+
     // Initialize comparison metrics storage
     if (!window.comparisonMetrics) {
         window.comparisonMetrics = {};
     }
-    
+
     // Calculate Fréchet Distance and Overlap between all pairs
     const algorithmPairs = [
         ['google', 'dhl'],
         ['google', 'hc2l'],
         ['dhl', 'hc2l']
     ];
-    
+
     algorithmPairs.forEach(([algo1, algo2]) => {
         if (routes[algo1] && routes[algo2] && routes[algo1].length > 0 && routes[algo2].length > 0) {
             const key = `${algo1}_${algo2}`;
@@ -225,10 +280,10 @@ function calculateComparisonMetrics() {
 // Extract coordinates from a route result
 function extractCoordinates(result) {
     if (!result || !result.success || !result.route) return [];
-    
+
     let coordinates = [];
     const route = result.route;
-    
+
     if (route.polylines && route.polylines.length > 0) {
         route.polylines.forEach(segment => {
             if (Array.isArray(segment)) {
@@ -248,17 +303,17 @@ function extractCoordinates(result) {
             }
         }
     }
-    
+
     return coordinates;
 }
 
 // Calculate Fréchet Distance (simplified discrete Fréchet distance)
 function calculateFrechetDistance(path1, path2) {
     if (path1.length === 0 || path2.length === 0) return 0;
-    
+
     // Simplified Hausdorff distance as approximation of Fréchet
     let maxDistance = 0;
-    
+
     // Forward direction: max distance from path1 points to path2
     for (let i = 0; i < path1.length; i++) {
         let minDistance = Infinity;
@@ -268,7 +323,7 @@ function calculateFrechetDistance(path1, path2) {
         }
         maxDistance = Math.max(maxDistance, minDistance);
     }
-    
+
     // Backward direction: max distance from path2 points to path1
     for (let i = 0; i < path2.length; i++) {
         let minDistance = Infinity;
@@ -278,16 +333,16 @@ function calculateFrechetDistance(path1, path2) {
         }
         maxDistance = Math.max(maxDistance, minDistance);
     }
-    
+
     return maxDistance;
 }
 
 // Calculate Segment Overlap (percentage of matching segments)
 function calculateSegmentOverlap(path1, path2, threshold = 50) {
     if (path1.length === 0) return 0;
-    
+
     let overlappingPoints = 0;
-    
+
     // Check each point in path1 against path2
     for (let i = 0; i < path1.length; i++) {
         for (let j = 0; j < path2.length; j++) {
@@ -298,7 +353,7 @@ function calculateSegmentOverlap(path1, path2, threshold = 50) {
             }
         }
     }
-    
+
     return (overlappingPoints / path1.length) * 100;
 }
 
@@ -308,14 +363,14 @@ function haversineDistance(coord1, coord2) {
     const lat2 = coord2[0] * Math.PI / 180;
     const deltaLat = (coord2[0] - coord1[0]) * Math.PI / 180;
     const deltaLng = (coord2[1] - coord1[1]) * Math.PI / 180;
-    
+
     const a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
-              Math.cos(lat1) * Math.cos(lat2) *
-              Math.sin(deltaLng / 2) * Math.sin(deltaLng / 2);
-    
+        Math.cos(lat1) * Math.cos(lat2) *
+        Math.sin(deltaLng / 2) * Math.sin(deltaLng / 2);
+
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     const R = 6371000; // Earth radius in meters
-    
+
     return R * c;
 }
 
@@ -323,17 +378,17 @@ function haversineDistance(coord1, coord2) {
 function buildComparisonTable() {
     const tableContainer = document.getElementById('comparison-metrics-table');
     if (!tableContainer) return;
-    
+
     const algorithms = [];
     if (window.comparisonResults.google) algorithms.push('google');
     if (window.comparisonResults.dhl) algorithms.push('dhl');
     if (window.comparisonResults.hc2l) algorithms.push('hc2l');
-    
+
     if (algorithms.length === 0) {
         tableContainer.innerHTML = '<p class="text-slate-500 text-center py-4">No results to display</p>';
         return;
     }
-    
+
     // Metrics to compare
     const metrics = [
         { key: 'distance', label: 'Distance', format: (v) => v ? `${v.toFixed(2)} km` : 'N/A' },
@@ -341,30 +396,30 @@ function buildComparisonTable() {
         { key: 'query_time_ms', label: 'Query Time', format: (v) => v !== undefined ? `${v.toFixed(1)} ms` : 'N/A' },
         { key: 'segments', label: 'Route Segments', format: (v) => v || 'N/A' }
     ];
-    
+
     let tableHTML = '<table class="w-full text-sm"><thead><tr class="border-b-2 border-slate-300">';
     tableHTML += '<th class="text-left py-2 px-3 font-bold text-slate-700">Metric</th>';
-    
+
     // Algorithm headers with colors
     algorithms.forEach(algo => {
         const color = ALGORITHM_COLORS[algo];
         tableHTML += `<th class="text-center py-2 px-3 font-bold" style="color: ${color.primary}">${color.name}</th>`;
     });
-    
+
     tableHTML += '</tr></thead><tbody>';
-    
+
     // Metric rows
     metrics.forEach(metric => {
         tableHTML += '<tr class="border-b border-slate-200">';
         tableHTML += `<td class="py-2 px-3 font-medium text-slate-700">${metric.label}</td>`;
-        
+
         algorithms.forEach(algo => {
             const result = window.comparisonResults[algo];
             let value = 'N/A';
-            
+
             if (result && result.success) {
                 let rawValue;
-                
+
                 // Handle different metric structures for different algorithms
                 if (metric.key === 'distance') {
                     // Google Maps: result.route.distance
@@ -389,25 +444,25 @@ function buildComparisonTable() {
                 } else if (metric.key === 'segments') {
                     // Google Maps: result.metrics.segments or result.route.point_count
                     // DHL/HC2L: result.route.path_nodes.length or result.metrics.nodes_on_path
-                    rawValue = result.metrics?.segments || 
-                               result.route?.path_nodes?.length || 
-                               result.metrics?.nodes_on_path;
+                    rawValue = result.metrics?.segments ||
+                        result.route?.path_nodes?.length ||
+                        result.metrics?.nodes_on_path;
                 }
-                
+
                 value = metric.format(rawValue);
             } else if (result && result.error) {
                 value = '<span class="text-red-600 text-xs">Error</span>';
             }
-            
+
             const color = ALGORITHM_COLORS[algo];
             tableHTML += `<td class="py-2 px-3 text-center font-semibold" style="color: ${color.primary}">${value}</td>`;
         });
-        
+
         tableHTML += '</tr>';
     });
-    
+
     tableHTML += '</tbody></table>';
-    
+
     // Add comparison metrics (Fréchet Distance and Segment Overlap)
     if (window.comparisonMetrics && Object.keys(window.comparisonMetrics).length > 0) {
         tableHTML += '<div class="mt-6 border-t-2 border-slate-300 pt-4">';
@@ -417,47 +472,47 @@ function buildComparisonTable() {
         tableHTML += '<th class="text-center py-2 px-3 font-bold text-slate-700">Fréchet Distance</th>';
         tableHTML += '<th class="text-center py-2 px-3 font-bold text-slate-700">Segment Overlap</th>';
         tableHTML += '</tr></thead><tbody>';
-        
+
         // Display comparison for each pair
         Object.entries(window.comparisonMetrics).forEach(([key, metrics]) => {
             const [algo1, algo2] = key.split('_');
             const color1 = ALGORITHM_COLORS[algo1];
             const color2 = ALGORITHM_COLORS[algo2];
-            
+
             tableHTML += '<tr class="border-b border-slate-200">';
             tableHTML += `<td class="py-2 px-3 font-medium"><span style="color: ${color1.primary}">●</span> ${color1.name} vs <span style="color: ${color2.primary}">●</span> ${color2.name}</td>`;
             tableHTML += `<td class="py-2 px-3 text-center font-semibold">${metrics.frechet_distance.toFixed(0)} m</td>`;
             tableHTML += `<td class="py-2 px-3 text-center font-semibold">${metrics.segment_overlap.toFixed(1)}%</td>`;
             tableHTML += '</tr>';
         });
-        
+
         tableHTML += '</tbody></table>';
         tableHTML += '</div>';
     }
-    
+
     tableContainer.innerHTML = tableHTML;
 }
 
 // Display comparison routes on map with proper colors
 function displayComparisonRoutesOnMap() {
     console.log('🗺️ Displaying comparison routes on map');
-    
+
     // Initialize polylines array
     window.comparisonPolylines = window.comparisonPolylines || [];
-    
+
     // Clear previous comparison routes
     clearComparisonRoutes();
-    
+
     // Draw each algorithm's route with its color
     const algorithms = ['google', 'dhl', 'hc2l'];
-    
+
     algorithms.forEach(algo => {
         const result = window.comparisonResults[algo];
         if (!result || !result.success || !result.route) return;
-        
+
         const color = ALGORITHM_COLORS[algo];
         const route = result.route;
-        
+
         // Extract coordinates
         let coordinates = [];
         if (route.polylines && route.polylines.length > 0) {
@@ -486,12 +541,12 @@ function displayComparisonRoutesOnMap() {
                 }
             }
         }
-        
+
         if (coordinates.length === 0) {
             console.warn(`No coordinates for ${algo} route`);
             return;
         }
-        
+
         // Create polyline with algorithm color
         const polyline = L.polyline(coordinates, {
             color: color.primary,
@@ -499,11 +554,14 @@ function displayComparisonRoutesOnMap() {
             opacity: 1.0,
             zIndex: algo === 'google' ? 100 : (algo === 'dhl' ? 101 : 102) // HC2L on top
         }).addTo(map);
-        
+
+        // Add algorithm identifier to polyline
+        polyline._algorithm = algo;
+
         // Add popup with correct metrics
         let distance = 0;
         let duration = 0;
-        
+
         // Extract distance
         if (route.distance) {
             distance = route.distance;
@@ -514,10 +572,10 @@ function displayComparisonRoutesOnMap() {
         } else if (result.metrics?.total_distance_units) {
             distance = result.metrics.total_distance_units / 1000; // Convert to km
         }
-        
+
         // Extract duration
         duration = route.duration || result.metrics?.eta_seconds || 0;
-        
+
         polyline.bindPopup(`
             <div class="p-2">
                 <h3 class="font-bold text-sm" style="color: ${color.primary}">${color.name}</h3>
@@ -525,12 +583,12 @@ function displayComparisonRoutesOnMap() {
                 <p class="text-xs">Duration: ${(duration / 60).toFixed(1)} min</p>
             </div>
         `);
-        
+
         window.comparisonPolylines.push(polyline);
-        
+
         console.log(`✅ ${color.name} route displayed on map`);
     });
-    
+
     // Fit map to show all routes
     if (window.comparisonPolylines.length > 0) {
         const group = L.featureGroup(window.comparisonPolylines);
@@ -542,26 +600,26 @@ function displayComparisonRoutesOnMap() {
 function buildRouteDetails() {
     const detailsContainer = document.getElementById('comparison-route-details');
     if (!detailsContainer) return;
-    
+
     detailsContainer.classList.remove('hidden');
     detailsContainer.innerHTML = '';
-    
+
     const algorithms = [];
     if (window.comparisonResults.google) algorithms.push('google');
     if (window.comparisonResults.dhl) algorithms.push('dhl');
     if (window.comparisonResults.hc2l) algorithms.push('hc2l');
-    
+
     algorithms.forEach(algo => {
         const result = window.comparisonResults[algo];
         if (!result || !result.success) return;
-        
+
         const color = ALGORITHM_COLORS[algo];
-        
+
         const detailCard = document.createElement('div');
         detailCard.className = `rounded-2xl p-4 border-2 shadow-sm`;
         detailCard.style.backgroundColor = color.bg;
         detailCard.style.borderColor = color.border;
-        
+
         let detailHTML = `
             <div class="flex items-center justify-between cursor-pointer" onclick="toggleRouteDetail('${algo}')">
                 <h4 class="font-bold text-lg" style="color: ${color.primary}">${color.name} Route Details</h4>
@@ -573,33 +631,30 @@ function buildRouteDetails() {
                 <div class="text-sm">
                     <div class="flex justify-between py-1">
                         <span class="text-slate-600">Total Distance:</span>
-                        <span class="font-bold">${
-                            (() => {
-                                if (result.route?.distance) return result.route.distance.toFixed(2);
-                                if (result.metrics?.calculated_distance_km) return result.metrics.calculated_distance_km.toFixed(2);
-                                if (result.metrics?.total_distance_meters) return (result.metrics.total_distance_meters / 1000).toFixed(2);
-                                if (result.metrics?.total_distance_units) return (result.metrics.total_distance_units / 1000).toFixed(2);
-                                return '0.00';
-                            })()
-                        } km</span>
+                        <span class="font-bold">${(() => {
+                if (result.route?.distance) return result.route.distance.toFixed(2);
+                if (result.metrics?.calculated_distance_km) return result.metrics.calculated_distance_km.toFixed(2);
+                if (result.metrics?.total_distance_meters) return (result.metrics.total_distance_meters / 1000).toFixed(2);
+                if (result.metrics?.total_distance_units) return (result.metrics.total_distance_units / 1000).toFixed(2);
+                return '0.00';
+            })()
+            } km</span>
                     </div>
                     <div class="flex justify-between py-1">
                         <span class="text-slate-600">Total Duration:</span>
-                        <span class="font-bold">${
-                            (() => {
-                                const seconds = result.route?.duration || result.metrics?.eta_seconds || 0;
-                                return (seconds / 60).toFixed(1);
-                            })()
-                        } min</span>
+                        <span class="font-bold">${(() => {
+                const seconds = result.route?.duration || result.metrics?.eta_seconds || 0;
+                return (seconds / 60).toFixed(1);
+            })()
+            } min</span>
                     </div>
                     <div class="flex justify-between py-1">
                         <span class="text-slate-600">Route Segments:</span>
-                        <span class="font-bold">${
-                            result.route?.path_nodes?.length || result.metrics?.nodes_on_path || result.route?.segments || 'N/A'
-                        }</span>
+                        <span class="font-bold">${result.route?.path_nodes?.length || result.metrics?.nodes_on_path || result.route?.segments || 'N/A'
+            }</span>
                     </div>
         `;
-        
+
         // Add algorithm-specific details
         if (algo === 'hc2l' && result.metrics) {
             detailHTML += `
@@ -664,12 +719,12 @@ function buildRouteDetails() {
                 </div>
             `;
         }
-        
+
         detailHTML += `
                 </div>
             </div>
         `;
-        
+
         detailCard.innerHTML = detailHTML;
         detailsContainer.appendChild(detailCard);
     });
@@ -679,7 +734,7 @@ function buildRouteDetails() {
 function toggleRouteDetail(algo) {
     const content = document.getElementById(`${algo}-detail-content`);
     const chevron = document.getElementById(`${algo}-detail-chevron`);
-    
+
     if (content && chevron) {
         content.classList.toggle('hidden');
         chevron.style.transform = content.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(180deg)';
@@ -690,14 +745,14 @@ function toggleRouteDetail(algo) {
 async function computeGoogleMapsRoute() {
     // This will use the existing Google Maps comparison function
     // but return it in a structured format for comparison
-    
+
     if (!window.startLocation || !window.destLocation) {
         throw new Error('Start and destination required');
     }
-    
+
     try {
         const startTime = performance.now(); // Track query time
-        
+
         const response = await fetch('/get_google_maps_route', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -708,19 +763,19 @@ async function computeGoogleMapsRoute() {
                 dest_lng: window.destLocation.lng
             })
         });
-        
+
         const queryTime = performance.now() - startTime; // Calculate query time
-        
+
         const data = await response.json();
-        
+
         if (!data.success) {
             throw new Error(data.error || 'Google Maps route failed');
         }
-        
+
         // Extract route data from the new endpoint format
         const routeData = data.route || {};
         const distanceKm = (routeData.distance_meters || 0) / 1000;
-        
+
         return {
             success: true,
             route: {

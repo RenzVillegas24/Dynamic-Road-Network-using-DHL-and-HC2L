@@ -23,23 +23,23 @@
         <h3 class="section-card__title">Select Algorithms to Compare</h3>
       </div>
       <div class="nav-select">
-        <label class="nav-select__option" data-color="amber">
-          <input type="checkbox" id="compare-google" class="nav-select__input">
+        <label class="nav-select__option" data-color="amber" onmouseenter="compareEntered(event)" onmouseleave="compareLeft()">
+          <input type="checkbox" id="compare-google" class="nav-select__input" onclick="compareChanged()">
           <div class="nav-select__icon"><i data-lucide="map" class="w-5 h-5"></i></div>
           <div class="nav-select__content">
             <span class="nav-select__title">Google Maps</span>
           </div>
         </label>
-        <label class="nav-select__option" data-color="emerald">
-          <input type="checkbox" id="compare-dhl" class="nav-select__input" checked>
+        <label class="nav-select__option" data-color="purple" onmouseenter="compareEntered(event)" onmouseleave="compareLeft()">
+          <input type="checkbox" id="compare-dhl" class="nav-select__input" checked onclick="compareChanged()">
           <div class="nav-select__icon"><i data-lucide="layers" class="w-5 h-5"></i></div>
           <div class="nav-select__content">
             <span class="nav-select__title">DHL</span>
             <span class="nav-select__description">Dual-Hierarchy Labeling</span>
           </div>
         </label>
-        <label class="nav-select__option" data-color="blue">
-          <input type="checkbox" id="compare-hc2l" class="nav-select__input" checked>
+        <label class="nav-select__option" data-color="blue" onmouseenter="compareEntered(event)" onmouseleave="compareLeft()">
+          <input type="checkbox" id="compare-hc2l" class="nav-select__input" checked onclick="compareChanged()">
           <div class="nav-select__icon"><i data-lucide="layers" class="w-5 h-5"></i></div>
           <div class="nav-select__content">
             <span class="nav-select__title">HC2L</span>

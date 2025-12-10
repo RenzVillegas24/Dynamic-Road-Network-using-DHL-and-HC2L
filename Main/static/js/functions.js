@@ -1,4 +1,3 @@
-
 // Function to show update toast messages
 // Now uses the new Toast module when available, falls back to DOM element
 function showUpdateToast(message, type = 'info') {
@@ -2523,6 +2522,7 @@ function createGoogleRouteStepElement(stepNumber, instruction, distance, maneuve
  * (Admin Panel, Demo Runner, etc.)
  * 
  * @param {Object} options - Configuration options for the reset
+ * @param {boolean} options.clearRoute - Clear all routes and markers (default: true)
  * @param {boolean} options.clearLocation - Clear start/destination inputs and markers (default: true)
  * @param {boolean} options.clearDisruptions - Clear disruption markers (default: true)
  * @param {boolean} options.clearUpdateRegions - Clear update regions visualization (default: true)
@@ -2533,6 +2533,7 @@ function createGoogleRouteStepElement(stepNumber, instruction, distance, maneuve
  */
 function resetSystemState(options = {}) {
   const {
+    clearRoute = true,
     clearLocation = true,
     clearDisruptions = true,
     clearUpdateRegions = true,
@@ -2542,12 +2543,12 @@ function resetSystemState(options = {}) {
     verbose = false
   } = options;
 
-  const log = verbose ? console.log : () => {};
+  const log = verbose ? console.log : () => { };
 
   log('🔄 Starting comprehensive system reset...');
 
   // 1. Clear all routes (including start/end markers)
-  if (typeof clearRoutes === 'function') {
+  if (clearRoute && typeof clearRoutes === 'function') {
     log('  📍 Clearing routes...');
     clearRoutes();
   }
@@ -2585,7 +2586,7 @@ function resetSystemState(options = {}) {
   // 7. Clear location inputs and window variables if requested
   if (clearLocation) {
     log('  📍 Clearing location data...');
-    
+
     // Clear window location variables
     window.startLocation = null;
     window.destLocation = null;
@@ -2633,7 +2634,7 @@ function resetSystemState(options = {}) {
   // 8. Reset UI panels and info bars if requested
   if (resetUI) {
     log('  🎨 Resetting UI panels...');
-    
+
     // Reset bottom info bar
     if (typeof resetBottomInfoBar === 'function') {
       resetBottomInfoBar();
@@ -2678,20 +2679,277 @@ function resetSystemState(options = {}) {
   console.log('✅ System reset completed');
 }
 
+
+// Global variable to store Route Finder state
+let savedRouteFinderState = null;
+
 /**
- * Quick reset for admin panel - clears routes and disruptions
- * This is the standard reset called by the admin reset button
+ * Save the current state of Route Finder UI elements
+ * This captures: Algorithm, Dataset, Threshold, Show Active Incidents, Show Flow Overlay
  */
-function quickResetMap() {
-  resetSystemState({
-    clearLocation: true,
-    clearDisruptions: true,
-    clearUpdateRegions: true,
-    clearGoogleMaps: true,
-    clearExportData: true,
-    resetUI: true,
-    verbose: true
-  });
+function saveRouteFinderState() {
+  const algorithmRadio = document.querySelector('input[name="algorithm"]:checked');
+  const datasetRadio = document.querySelector('input[name="dataset"]:checked');
+  const thresholdInput = document.getElementById('threshold-input');
+  const incidentToggle = document.getElementById('show-active-incidents');
+  const flowToggle = document.getElementById('show-traffic-overlay');
+  const showAltRoutesToggle = document.getElementById('show-alternative-routes');
+
+  savedRouteFinderState = {
+    algorithm: algorithmRadio?.value || 'hc2l',
+    dataset: datasetRadio?.value || 'none',
+    threshold: parseFloat(thresholdInput?.value) || 0.5,
+    showIncidents: incidentToggle?.checked || false,
+    showFlow: flowToggle?.checked || false,
+    showAlternativeRoutes: showAltRoutesToggle?.checked || false
+  };
+
+  console.log('💾 Saved Route Finder state:', savedRouteFinderState);
+}
+
+/**
+ * Restore the saved state of Route Finder UI elements
+ */
+function restoreRouteFinderState() {
+  if (!savedRouteFinderState) {
+    console.log('⚠️ No saved Route Finder state to restore');
+    return;
+  }
+
+  const state = savedRouteFinderState;
+
+  // Restore Algorithm
+  const algorithmRadio = document.querySelector(`input[name="algorithm"][value="${state.algorithm}"]`);
+  if (algorithmRadio) {
+    algorithmRadio.click();
+    console.log(`✅ Restored algorithm: ${state.algorithm}`);
+  }
+
+  // Restore Dataset
+  const datasetRadio = document.querySelector(`input[name="dataset"][value="${state.dataset}"]`);
+  if (datasetRadio) {
+    datasetRadio.click();
+    console.log(`✅ Restored dataset: ${state.dataset}`);
+  }
+
+  // Restore Threshold
+  const thresholdInput = document.getElementById('threshold-input');
+  if (thresholdInput) {
+    thresholdInput.value = state.threshold;
+    thresholdInput.dispatchEvent(new Event('input'));
+    console.log(`✅ Restored threshold: ${state.threshold}`);
+  }
+
+  // Restore Show Active Incidents
+  const incidentToggle = document.getElementById('show-active-incidents');
+  if (incidentToggle && incidentToggle.checked !== state.showIncidents) {
+    incidentToggle.checked = state.showIncidents;
+    incidentToggle.dispatchEvent(new Event('change'));
+    console.log(`✅ Restored show incidents: ${state.showIncidents}`);
+  }
+
+  // Restore Show Flow Overlay
+  const flowToggle = document.getElementById('show-traffic-overlay');
+  if (flowToggle && flowToggle.checked !== state.showFlow) {
+    flowToggle.checked = state.showFlow;
+    flowToggle.dispatchEvent(new Event('change'));
+    console.log(`✅ Restored show flow: ${state.showFlow}`);
+  }
+
+  // Restore Show Alternative Routes
+  const showAltRoutesToggle = document.getElementById('show-alternative-routes');
+  if (showAltRoutesToggle && showAltRoutesToggle.checked !== state.showAlternativeRoutes) {
+    showAltRoutesToggle.checked = state.showAlternativeRoutes;
+    showAltRoutesToggle.dispatchEvent(new Event('change'));
+    console.log(`✅ Restored show alternative routes: ${state.showAlternativeRoutes}`);
+  }
+
+  console.log('🔄 Route Finder state restored');
+}
+
+function toggleRouteFinderUI(disable = false) {
+  // Go button
+  const goButton = document.getElementById('go-button');
+  if (goButton) {
+    goButton.style.display = disable ? 'none' : '';
+  }
+
+  // Algorithm dropdown
+  const algoDropdown = document.getElementById('algo-dropdown');
+  if (algoDropdown) {
+    algoDropdown.style.display = disable ? 'none' : '';
+  }
+
+  // Traffic dropdown
+  const trafficDropdown = document.getElementById('traffic-dropdown');
+  if (trafficDropdown) {
+    trafficDropdown.style.display = disable ? 'none' : '';
+  }
+
+  // Start location input
+  const startInput = document.getElementById('start-location-input');
+  if (startInput) {
+    startInput.disabled = disable;
+    startInput.style.opacity = disable ? '0.5' : '1';
+  }
+
+  // Destination location input
+  const destInput = document.getElementById('dest-location-input');
+  if (destInput) {
+    destInput.disabled = disable;
+    destInput.style.opacity = disable ? '0.5' : '1';
+  }
+}
+
+/**
+ * Global function to handle the go button click event
+ * This function can be called from anywhere to trigger route calculation
+ */
+async function handleGoButtonClick(showPanel = true) {
+  // Debug logging
+  console.log('Go button clicked');
+  console.log('startLocation:', window.startLocation);
+  console.log('destLocation:', window.destLocation);
+  console.log('OSM start data:', window.osmSnapMarkers?.start?.data);
+  console.log('OSM dest data:', window.osmSnapMarkers?.dest?.data);
+
+  if (!window.startLocation || !window.destLocation) {
+    showUpdateToast("Please pin both starting location and destination", 'warning');
+    return;
+  }
+
+  if (!map) {
+    showUpdateToast("Please wait for the map to load", 'warning');
+    return;
+  }
+
+  // Get selected algorithm from admin panel
+  const selectedAlgorithm = getSelectedAlgorithm();
+  console.log('Selected algorithm:', selectedAlgorithm);
+
+  // Get dataset selection to determine if disruptions should be used
+  const datasetRadio = document.querySelector('input[name="dataset"]:checked');
+  const selectedDataset = datasetRadio ? datasetRadio.value : 'none';
+  const useDisruptions = selectedDataset !== 'none';
+  console.log('Selected dataset:', selectedDataset, 'useDisruptions:', useDisruptions);
+
+  // Clear any existing routes
+  clearRoutes();
+
+  // Show loading state
+  const goButton = document.getElementById("go-button");
+  const originalText = goButton.innerHTML;
+  goButton.innerHTML = '<span class="text-lg">Computing...</span>';
+  goButton.disabled = true;
+
+  try {
+    let routeData = null;
+
+    // Route computation based on selected algorithm
+    // isPreview=false because user clicked "Go" button - this is route CONFIRMATION with alternatives
+    switch (selectedAlgorithm) {
+      case 'dhl':
+        // DHL only
+        if (useDisruptions) {
+          // await loadActiveDisruptionsForAlgorithm('DHL');
+        } else {
+          clearDisruptionMarkers();
+        }
+        routeData = await computeDHLRoute(useDisruptions, false);
+        if (routeData) displayDHLRoute(routeData);
+        break;
+
+      case 'hc2l':
+        // HC2L only
+        if (useDisruptions) {
+          // await loadActiveDisruptionsForAlgorithm('HC2L');
+        } else {
+          clearDisruptionMarkers();
+        }
+        routeData = await computeDHC2LRoute(useDisruptions, currentThreshold, false);
+        if (routeData) displayDHC2LRoute(routeData);
+        break;
+
+      default:
+        console.warn('Unknown algorithm selected:', selectedAlgorithm);
+        // Fallback to HC2L with isPreview=false (confirmation with alternatives)
+        routeData = await computeDHC2LRoute(useDisruptions, currentThreshold, false);
+        if (routeData) displayDHC2LRoute(routeData);
+    }
+
+    if (routeData) {
+      // Store route data globally for Current Path Panel
+      // Add input coordinates for Google Maps comparison
+      routeData.input = {
+        start_snap_lat: window.osmSnapMarkers?.start?.data?.latitude,
+        start_snap_lng: window.osmSnapMarkers?.start?.data?.longitude,
+        dest_snap_lat: window.osmSnapMarkers?.dest?.data?.latitude,
+        dest_snap_lng: window.osmSnapMarkers?.dest?.data?.longitude
+      };
+
+      // Ensure metrics object exists and has algorithm name
+      if (!routeData.metrics) {
+        routeData.metrics = {};
+      }
+      routeData.metrics.algorithm = selectedAlgorithm;
+
+      window.currentRouteData = routeData;
+
+      console.log('✅ Route data stored with input coordinates:', {
+        algorithm: selectedAlgorithm,
+        startLat: routeData.input.start_snap_lat,
+        startLng: routeData.input.start_snap_lng,
+        destLat: routeData.input.dest_snap_lat,
+        destLng: routeData.input.dest_snap_lng
+      });
+
+      // Enable "Compare with Google Maps" button after route is calculated
+      const googleCompareBtn = document.getElementById('admin-google-compare-btn');
+      if (googleCompareBtn) {
+        googleCompareBtn.disabled = false;
+      }
+
+      // Update UI with route information
+      updateRouteMetrics(routeData);
+      updateAdminPerformanceMetrics(routeData);
+
+      // Update Current Path Panel with real route data
+      updateCurrentPathPanel(routeData);
+
+      // Show update region overlay if applicable
+      if (typeof showUpdateRegion === 'function') {
+        showUpdateRegion(routeData);
+      }
+
+      // Add route to CSV export buffer
+      if (typeof addRouteToExport === 'function') {
+        addRouteToExport(routeData);
+      }
+
+      setTimeout(() => {
+        const currentMode = updateModeBadge.textContent;
+        if (currentMode === "Lazy Update") {
+          showUpdateToast("Query triggered lazy repair...", "info");
+        } else {
+          showUpdateToast("Using updated labels for routing.", "info");
+        }
+      }, 500);
+
+      if (showPanel) {
+        PanelManager.showPanel('current-route');
+      }
+    } else {
+      showUpdateToast('Route calculation failed', 'warning');
+    }
+
+  } catch (error) {
+    showUpdateToast(`Error: ${error.message}`, 'warning');
+    console.error('Route calculation error:', error);
+  } finally {
+    // Restore button state
+    goButton.innerHTML = originalText;
+    goButton.disabled = false;
+  }
 }
 
 
