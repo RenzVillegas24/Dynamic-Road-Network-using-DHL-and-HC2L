@@ -13,7 +13,7 @@
 .inline-flex { display: inline-flex; }
 .grid { display: grid; }
 .inline-grid { display: inline-grid; }
-.hidden { display: none; visibility: collapse; }
+.hidden { display: none;}
 .contents { display: contents; }
 .flow-root { display: flow-root; }
 

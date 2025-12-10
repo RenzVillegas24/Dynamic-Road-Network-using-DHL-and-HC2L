@@ -2590,7 +2590,33 @@ function resetSystemState(options = {}) {
     window.startLocation = null;
     window.destLocation = null;
 
-    // Clear start and destination location input boxes
+    // Clear LocationPicker components (new system)
+    if (window.headerStartPicker && typeof window.headerStartPicker.clear === 'function') {
+      log('  📍 Clearing header start location picker...');
+      window.headerStartPicker.clear();
+    }
+    if (window.headerDestPicker && typeof window.headerDestPicker.clear === 'function') {
+      log('  📍 Clearing header destination location picker...');
+      window.headerDestPicker.clear();
+    }
+    if (window.reportLocationPicker && typeof window.reportLocationPicker.clear === 'function') {
+      log('  📍 Clearing report location picker...');
+      window.reportLocationPicker.clear();
+    }
+
+    // Clear DemoCreator location pickers (if Demo Creator is active)
+    if (typeof DemoCreator !== 'undefined') {
+      if (DemoCreator.startPicker && typeof DemoCreator.startPicker.clear === 'function') {
+        log('  📍 Clearing DemoCreator start location picker...');
+        DemoCreator.startPicker.clear();
+      }
+      if (DemoCreator.endPicker && typeof DemoCreator.endPicker.clear === 'function') {
+        log('  📍 Clearing DemoCreator end location picker...');
+        DemoCreator.endPicker.clear();
+      }
+    }
+
+    // Legacy: Clear start and destination location input boxes (if still exist)
     const startInput = document.getElementById('start-location-input');
     if (startInput) startInput.value = '';
 

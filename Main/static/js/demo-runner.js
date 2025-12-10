@@ -1634,7 +1634,8 @@ const DemoRunner = {
         if (typeof handleOSMStartLocationPin === 'function') {
             await handleOSMStartLocationPin(route.start.lat, route.start.lng);
         }
-        await this.delay(1000);
+        // Wait for the location to be set (check if snapping is complete)
+        await this.waitForLocationSet('start');
 
         // Set destination
         this.currentProgress.status = `Setting destination: ${route.end.name}`;
@@ -1643,7 +1644,8 @@ const DemoRunner = {
         if (typeof handleOSMDestLocationPin === 'function') {
             await handleOSMDestLocationPin(route.end.lat, route.end.lng);
         }
-        await this.delay(1000);
+        // Wait for the destination to be set
+        await this.waitForLocationSet('dest');
 
         // Get algorithms to test
         const algorithmToTest = config.algorithm || 'hc2l';
@@ -1651,8 +1653,6 @@ const DemoRunner = {
 
         // Note: Disruptions are handled separately via activateDisruptionSet/activateDisruptionSetByKey
         // No need to set dataset radio here - disruptions are displayed via showGeneratedDisruptions
-
-        await this.delay(300);
         
         // Ensure disruptions are displayed on the map
         console.log('📍 About to refresh disruption display in processRouteWithProgress');
@@ -1734,40 +1734,270 @@ const DemoRunner = {
                     thresholdInput.dispatchEvent(new Event('input'));
                 }
 
-                await this.delay(300);
-
-                // Calculate route with timing
+                // Calculate route and capture response directly from API
                 const calcStartTime = performance.now();
+                let routeData = null;
                 if (typeof computeRouteBasedOnSelection === 'function') {
-                    await computeRouteBasedOnSelection();
+                    routeData = await computeRouteBasedOnSelection();
                 }
                 const calcEndTime = performance.now();
                 const processTimeMs = calcEndTime - calcStartTime;
 
-                // Wait longer for DOM to fully update with new metrics
-                // This ensures the distance and other metrics are displayed before we capture them
-                await this.delay(800);
-                
-                const result = this.captureCurrentResult(algo, effectiveTau, route, trialIndex, processTimeMs);
+                // Capture result directly from API response - no need to wait for DOM
+                const result = this.captureResultFromAPIResponse(algo, effectiveTau, route, trialIndex, processTimeMs, routeData);
                 if (result) {
-                    console.log(`✅ Captured ${algo.toUpperCase()} result:`, {
+                    console.log(`✅ Captured ${algo.toUpperCase()} result from API:`, {
                         distance: result.metrics.displayDistance,
-                        calculatedDistance: result.metrics.calculatedDistance,
-                        distanceKm: result.metrics.distanceKm,
+                        calculatedDistanceMeters: result.metrics.calculatedDistanceMeters,
+                        calculatedDistanceKm: result.metrics.calculatedDistanceKm,
                         tau: result.tau,
                         route: result.route,
                         processTime: result.processTimeMs,
                         queryTime: result.metrics.queryTime,
-                        pathLength: result.metrics.pathLength
+                        pathLength: result.metrics.pathLength,
+                        etaFormatted: result.metrics.etaFormatted
                     });
                     this.currentProgress.lastResult = result;
                     this.currentProgress.results.push(result);
+                } else {
+                    console.warn(`⚠️ Failed to capture ${algo.toUpperCase()} result - routeData:`, routeData);
                 }
                 
                 this.updateDetailedProgressUI();
 
+                // Step delay for visualization purposes (user can observe the route)
                 await this.delay(config.stepDelay || 2000);
             }
+        }
+    },
+
+    /**
+     * Wait for a location (start or dest) to be properly set
+     * Polls until the location is available in window object
+     * @param {string} type - 'start' or 'dest'
+     * @param {number} maxWaitMs - Maximum time to wait in ms (default 5000)
+     */
+    async waitForLocationSet(type, maxWaitMs = 5000) {
+        const startTime = Date.now();
+        const checkInterval = 50;
+        
+        while (Date.now() - startTime < maxWaitMs) {
+            const location = type === 'start' ? window.startLocation : window.destLocation;
+            if (location && location.lat && location.lng) {
+                // Location is set, give a tiny delay for any UI updates
+                await this.delay(100);
+                return true;
+            }
+            await this.delay(checkInterval);
+        }
+        
+        console.warn(`⚠️ Timeout waiting for ${type} location to be set`);
+        return false;
+    },
+
+    /**
+     * Capture result directly from API response instead of reading from DOM
+     * This ensures we get accurate values without timing/latency issues
+     * @param {string} algorithm - Algorithm used ('hc2l' or 'dhl')
+     * @param {number} tau - Tau threshold value used
+     * @param {Object} route - Route configuration with start/end
+     * @param {number} trialIndex - Current trial index
+     * @param {number} processTimeMs - Time taken for the API call
+     * @param {Object} routeData - Direct API response from computeRouteBasedOnSelection
+     * @returns {Object|null} Captured result object
+     */
+    captureResultFromAPIResponse(algorithm, tau, route, trialIndex, processTimeMs, routeData) {
+        try {
+            if (!routeData || !routeData.success) {
+                console.warn('⚠️ Route computation failed or returned no data');
+                return null;
+            }
+
+            const metrics = routeData.metrics || {};
+            const updatePhase = routeData.update_phase || {};
+            const queryPhase = routeData.query_phase || {};
+            const lazyHc2l = routeData.lazy_hc2l || {};
+            const dhlUpdateInfo = routeData.dhl_update_info || {};
+            const disruptionConfig = routeData.disruption_config || {};
+            const disruptionsSummary = routeData.disruptions_summary || {};
+            const routeInfo = routeData.route || {};
+            const labelingInfo = metrics.labeling_info || {};
+
+            const result = {
+                trial: trialIndex + 1,
+                route: `${route.start.name} → ${route.end.name}`,
+                algorithm: algorithm.toUpperCase(),
+                tau: tau,
+                timestamp: new Date().toISOString(),
+                processTimeMs: processTimeMs,
+                metrics: {}
+            };
+
+            // ============================================================
+            // CORE METRICS FROM API (calculated_distance_meters, calculated_distance_km)
+            // ============================================================
+            
+            // Distance - use calculated values from C++ API (haversine calculation)
+            result.metrics.calculatedDistanceMeters = metrics.calculated_distance_meters || null;
+            result.metrics.calculatedDistanceKm = metrics.calculated_distance_km || null;
+            
+            // Format display distance
+            if (result.metrics.calculatedDistanceKm) {
+                result.metrics.displayDistance = `${result.metrics.calculatedDistanceKm.toFixed(2)} km`;
+                result.metrics.distanceKm = result.metrics.calculatedDistanceKm;
+            } else if (result.metrics.calculatedDistanceMeters) {
+                result.metrics.displayDistance = `${(result.metrics.calculatedDistanceMeters / 1000).toFixed(2)} km`;
+                result.metrics.distanceKm = result.metrics.calculatedDistanceMeters / 1000;
+            }
+            
+            // Fallback to other distance sources if calculated not available
+            if (!result.metrics.displayDistance) {
+                if (metrics.total_distance_meters && metrics.total_distance_meters < 2147483647) {
+                    result.metrics.displayDistance = `${(metrics.total_distance_meters / 1000).toFixed(2)} km`;
+                    result.metrics.distanceKm = metrics.total_distance_meters / 1000;
+                }
+            }
+
+            // ============================================================
+            // ETA METRICS FROM API
+            // ============================================================
+            result.metrics.etaSeconds = metrics.eta_seconds || null;
+            result.metrics.etaFormatted = metrics.eta_formatted || null;
+            result.metrics.displayEta = metrics.eta_formatted || (metrics.eta_seconds ? this.formatSeconds(metrics.eta_seconds) : null);
+            result.metrics.actualEta = result.metrics.displayEta;
+            
+            // Baseline vs Actual ETA from disruptions summary
+            const routeDisruptions = disruptionsSummary.route || {};
+            result.metrics.baselineEtaSeconds = routeDisruptions.baseline_eta_seconds || null;
+            result.metrics.actualEtaSeconds = routeDisruptions.actual_eta_seconds || null;
+            result.metrics.timeImpactSeconds = routeDisruptions.total_time_impact_seconds || null;
+            result.metrics.timeImpactPercent = routeDisruptions.percentage_increase || null;
+            
+            if (result.metrics.baselineEtaSeconds) {
+                result.metrics.baselineEta = this.formatSeconds(result.metrics.baselineEtaSeconds);
+            }
+            if (result.metrics.timeImpactSeconds) {
+                result.metrics.timeImpact = `+${result.metrics.timeImpactSeconds.toFixed(1)}s`;
+            }
+
+            // ============================================================
+            // QUERY PHASE METRICS
+            // ============================================================
+            result.metrics.queryTimeMs = queryPhase.avg_query_time_ms || metrics.query_time_ms || null;
+            result.metrics.queryTime = result.metrics.queryTimeMs ? `${result.metrics.queryTimeMs.toFixed(3)} ms` : null;
+            result.metrics.queriesCount = queryPhase.queries_count || 1;
+            result.metrics.usesLazyUpdates = queryPhase.uses_lazy_updates || false;
+
+            // ============================================================
+            // PATH METRICS
+            // ============================================================
+            result.metrics.pathLength = metrics.path_length || (routeInfo.path_nodes ? routeInfo.path_nodes.length : null);
+            result.metrics.pathNodes = routeInfo.path_nodes || [];
+            result.metrics.edgeCount = routeInfo.geometry ? routeInfo.geometry.length : null;
+
+            // ============================================================
+            // UPDATE PHASE METRICS
+            // ============================================================
+            result.metrics.lazyUpdateTimeMs = updatePhase.lazy_update_time_ms || null;
+            result.metrics.lazyUpdateTime = result.metrics.lazyUpdateTimeMs ? `${result.metrics.lazyUpdateTimeMs.toFixed(3)} ms` : null;
+            result.metrics.thresholdRebuildTimeMs = updatePhase.threshold_rebuild_time_ms || null;
+            result.metrics.thresholdRebuildTime = result.metrics.thresholdRebuildTimeMs ? `${result.metrics.thresholdRebuildTimeMs.toFixed(3)} ms` : null;
+            result.metrics.thresholdRebuildTriggered = updatePhase.threshold_rebuild_triggered || false;
+            result.metrics.edgesUpdated = updatePhase.edges_updated || null;
+            result.metrics.dirtyNodesCount = updatePhase.dirty_nodes_count || null;
+            result.metrics.dirtyNodes = result.metrics.dirtyNodesCount ? `${result.metrics.dirtyNodesCount} nodes` : null;
+            result.metrics.impactScoreNum = updatePhase.impact_score || null;
+            result.metrics.impactScore = result.metrics.impactScoreNum ? result.metrics.impactScoreNum.toFixed(3) : null;
+            
+            // Label size metrics
+            result.metrics.labelSizeBeforeMb = updatePhase.label_size_before_mb || null;
+            result.metrics.labelSizeAfterMb = updatePhase.label_size_after_mb || null;
+            result.metrics.labelSizeChangePct = updatePhase.label_size_change_pct || null;
+            result.metrics.peakLabelSizeMb = updatePhase.peak_label_size_mb || null;
+            result.metrics.peakLabelSize = result.metrics.peakLabelSizeMb ? `${result.metrics.peakLabelSizeMb.toFixed(2)} MB` : null;
+            result.metrics.labelSizeChange = result.metrics.labelSizeChangePct !== null ? `${result.metrics.labelSizeChangePct.toFixed(2)}%` : null;
+
+            // ============================================================
+            // LAZY HC2L SPECIFIC METRICS
+            // ============================================================
+            if (algorithm.toLowerCase() === 'hc2l' && Object.keys(lazyHc2l).length > 0) {
+                result.metrics.lazyEnabled = lazyHc2l.enabled || false;
+                result.metrics.updateStrategy = lazyHc2l.update_strategy || null;
+                result.metrics.updateReason = lazyHc2l.reason || null;
+                result.metrics.dirtyNodesMarked = lazyHc2l.dirty_nodes_marked || null;
+                result.metrics.dirtyNodesAffectedPath = lazyHc2l.dirty_nodes_affected_path || null;
+                result.metrics.lazyRepairTimeMs = lazyHc2l.lazy_repair_time_ms || null;
+                result.metrics.lazyRepairTime = result.metrics.lazyRepairTimeMs ? `${result.metrics.lazyRepairTimeMs.toFixed(3)} ms` : null;
+                result.metrics.nodesRepaired = lazyHc2l.nodes_repaired || null;
+                result.metrics.cacheHit = lazyHc2l.cache_hit || false;
+                result.metrics.tauThreshold = disruptionConfig.tau_threshold || tau;
+            }
+
+            // ============================================================
+            // DHL SPECIFIC METRICS
+            // ============================================================
+            if (algorithm.toLowerCase() === 'dhl' && Object.keys(dhlUpdateInfo).length > 0) {
+                result.metrics.updateStrategy = dhlUpdateInfo.update_strategy || 'immediate_update';
+                result.metrics.updateReason = dhlUpdateInfo.reason || null;
+                result.metrics.nodesUpdated = dhlUpdateInfo.nodes_updated || null;
+                result.metrics.algorithmType = dhlUpdateInfo.algorithm_type || 'baseline';
+            }
+
+            // ============================================================
+            // LABELING INFO
+            // ============================================================
+            result.metrics.totalLabels = labelingInfo.total_labels || null;
+            result.metrics.indexSizeMb = labelingInfo.index_size_mb || null;
+            result.metrics.labelingSize = result.metrics.indexSizeMb ? `${result.metrics.indexSizeMb.toFixed(2)} MB` : null;
+            result.metrics.indexLoadTimeMs = labelingInfo.index_load_time_ms || null;
+            result.metrics.labelingTime = result.metrics.indexLoadTimeMs ? `${result.metrics.indexLoadTimeMs.toFixed(3)} ms` : null;
+            result.metrics.maxLabelCountPerNode = labelingInfo.max_label_count_per_node || null;
+            result.metrics.averageCutSize = labelingInfo.average_cut_size || null;
+            result.metrics.avgCutSize = result.metrics.averageCutSize ? result.metrics.averageCutSize.toFixed(2) : null;
+
+            // ============================================================
+            // DISRUPTION METRICS
+            // ============================================================
+            result.metrics.usesDisruptions = metrics.uses_disruptions || false;
+            result.metrics.disruptedEdges = routeDisruptions.total_disrupted_edges || null;
+            result.metrics.disruptedEdgesDisplay = result.metrics.disruptedEdges ? `${result.metrics.disruptedEdges} edges` : null;
+
+            // Store raw API response for debugging/export
+            result.rawApiResponse = routeData;
+
+            console.log('📊 Captured result metrics from API:', {
+                distance: result.metrics.displayDistance,
+                calculatedDistanceMeters: result.metrics.calculatedDistanceMeters,
+                calculatedDistanceKm: result.metrics.calculatedDistanceKm,
+                queryTime: result.metrics.queryTime,
+                pathLength: result.metrics.pathLength,
+                etaFormatted: result.metrics.etaFormatted,
+                disruptedEdges: result.metrics.disruptedEdges
+            });
+
+            return result;
+        } catch (e) {
+            console.error('Error capturing result from API response:', e);
+            return null;
+        }
+    },
+
+    /**
+     * Format seconds into a human-readable string (e.g., "5m 30s" or "1h 2m 30s")
+     */
+    formatSeconds(seconds) {
+        if (seconds == null || isNaN(seconds)) return null;
+        
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const secs = Math.round(seconds % 60);
+        
+        if (hours > 0) {
+            return `${hours}h ${minutes}m ${secs}s`;
+        } else if (minutes > 0) {
+            return `${minutes}m ${secs}s`;
+        } else {
+            return `${secs}s`;
         }
     },
 
@@ -2029,7 +2259,7 @@ const DemoRunner = {
                             ${renderMetric('Min Query Time', p.lastResult.metrics.minQueryTime || 'N/A', 'text-indigo-600')}
                             ${renderMetric('Max Query Time', p.lastResult.metrics.maxQueryTime || 'N/A', 'text-purple-600')}
                             ${renderMetric('P95 Latency', p.lastResult.metrics.p95Latency || 'N/A', 'text-fuchsia-600')}
-                            ${renderMetric('Queries Count', p.lastResult.metrics.queriesProcessed || '1', 'text-pink-600')}
+                            ${renderMetric('Queries Count', p.lastResult.metrics.queriesCount || p.lastResult.metrics.queriesProcessed || '1', 'text-pink-600')}
                         </div>
                     </div>
                 </div>
@@ -4202,19 +4432,27 @@ const DemoRunner = {
         };
 
         // Extract all numeric values for various metrics
-        const queryTimes = results.map(r => getNumeric(r.metrics, 'queryTimeNum', 'queryTime')).filter(v => v !== null && v > 0);
+        const queryTimes = results.map(r => getNumeric(r.metrics, 'queryTimeMs', 'queryTimeNum', 'queryTime')).filter(v => v !== null && v > 0);
         const pathLengths = results.map(r => getNumeric(r.metrics, 'pathLength')).filter(v => v !== null && v > 0);
         const edgeCounts = results.map(r => getNumeric(r.metrics, 'edgeCount')).filter(v => v !== null && v > 0);
         const disruptedEdges = results.map(r => getNumeric(r.metrics, 'disruptedEdges')).filter(v => v !== null && v >= 0);
-        const labelingSizes = results.map(r => getNumeric(r.metrics, 'labelingSize')).filter(v => v !== null && v > 0);
-        const labelingTimes = results.map(r => getNumeric(r.metrics, 'labelingTimeNum', 'labelingTime')).filter(v => v !== null && v > 0);
+        const labelingSizes = results.map(r => getNumeric(r.metrics, 'indexSizeMb', 'labelingSize')).filter(v => v !== null && v > 0);
+        const labelingTimes = results.map(r => getNumeric(r.metrics, 'indexLoadTimeMs', 'labelingTimeNum', 'labelingTime')).filter(v => v !== null && v > 0);
+        
+        // Distance metrics (new API format uses calculated_distance_km)
+        const distances = results.map(r => getNumeric(r.metrics, 'calculatedDistanceKm', 'distanceKm', 'calculatedDistanceNum')).filter(v => v !== null && v > 0);
+        
+        // ETA metrics
+        const etaSeconds = results.map(r => getNumeric(r.metrics, 'etaSeconds', 'actualEtaSeconds')).filter(v => v !== null && v > 0);
         
         // LazyHC2L / Update Phase metrics
-        const lazyRepairTimes = results.map(r => getNumeric(r.metrics, 'lazyRepairTimeNum', 'lazyRepairTime')).filter(v => v !== null && v >= 0);
-        const dirtyNodes = results.map(r => getNumeric(r.metrics, 'dirtyNodesNum', 'dirtyNodes')).filter(v => v !== null && v >= 0);
-        const nodesRepaired = results.map(r => getNumeric(r.metrics, 'nodesRepairedNum', 'nodesRepaired')).filter(v => v !== null && v >= 0);
+        const lazyRepairTimes = results.map(r => getNumeric(r.metrics, 'lazyRepairTimeMs', 'lazyRepairTimeNum', 'lazyRepairTime')).filter(v => v !== null && v >= 0);
+        const lazyUpdateTimes = results.map(r => getNumeric(r.metrics, 'lazyUpdateTimeMs')).filter(v => v !== null && v >= 0);
+        const thresholdRebuildTimes = results.map(r => getNumeric(r.metrics, 'thresholdRebuildTimeMs')).filter(v => v !== null && v >= 0);
+        const dirtyNodes = results.map(r => getNumeric(r.metrics, 'dirtyNodesCount', 'dirtyNodesNum', 'dirtyNodes')).filter(v => v !== null && v >= 0);
+        const nodesRepaired = results.map(r => getNumeric(r.metrics, 'nodesRepaired', 'nodesRepairedNum')).filter(v => v !== null && v >= 0);
         const impactScores = results.map(r => getNumeric(r.metrics, 'impactScoreNum', 'impactScore')).filter(v => v !== null && v >= 0);
-        const tauThresholds = results.map(r => getNumeric(r.metrics, 'tauThresholdNum', 'tauThreshold')).filter(v => v !== null && v >= 0);
+        const tauThresholds = results.map(r => getNumeric(r.metrics, 'tauThreshold', 'tauThresholdNum')).filter(v => v !== null && v >= 0);
         
         // Process time (server request + response time)
         const processTimes = results.map(r => r.processTimeMs).filter(v => v !== null && v !== undefined && v > 0);
@@ -4304,10 +4542,15 @@ const DemoRunner = {
             disruptedEdges: calcStats(disruptedEdges),
             labelingSize: calcStats(labelingSizes),
             labelingTime: calcStats(labelingTimes),
+            // Distance and ETA stats
+            distance: calcStats(distances),
+            eta: calcStats(etaSeconds),
             // Process time (full server round-trip)
             processTime: calcStats(processTimes),
             // Update Phase stats
             lazyRepairTime: calcStats(lazyRepairTimes),
+            lazyUpdateTime: calcStats(lazyUpdateTimes),
+            thresholdRebuildTime: calcStats(thresholdRebuildTimes),
             dirtyNodes: calcStats(dirtyNodes),
             nodesRepaired: calcStats(nodesRepaired),
             impactScore: calcStats(impactScores),
