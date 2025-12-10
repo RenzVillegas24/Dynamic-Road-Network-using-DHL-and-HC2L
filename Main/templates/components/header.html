@@ -16,44 +16,16 @@
 
     <!-- Search Section -->
     <div class="header__search">
-        <!-- Start Location -->
-        <div class="search-combobox" id="start-location-search">
-            <div class="search-combobox__wrapper">
-                <input type="text" 
-                       id="start-location-input" 
-                       class="search-combobox__input" 
-                       placeholder="Search start location..."
-                       autocomplete="off">
-                <button class="search-combobox__pin-btn search-combobox__pin-btn--success" 
-                        id="start-location-pin-btn" 
-                        title="Pin on map">
-                    <i data-lucide="map-pin"></i>
-                </button>
-            </div>
-            <div class="search-combobox__dropdown" id="start-location-dropdown"></div>
-        </div>
+        <!-- Start Location - Container for LocationPicker -->
+        <div id="header-start-location-container"></div>
 
         <!-- Arrow Separator -->
         <div class="search-separator">
             <i data-lucide="chevron-right"></i>
         </div>
 
-        <!-- Destination Location -->
-        <div class="search-combobox" id="dest-location-search">
-            <div class="search-combobox__wrapper">
-                <input type="text" 
-                       id="dest-location-input" 
-                       class="search-combobox__input" 
-                       placeholder="Search destination..."
-                       autocomplete="off">
-                <button class="search-combobox__pin-btn search-combobox__pin-btn--danger" 
-                        id="dest-location-pin-btn" 
-                        title="Pin on map">
-                    <i data-lucide="map-pin"></i>
-                </button>
-            </div>
-            <div class="search-combobox__dropdown" id="dest-location-dropdown"></div>
-        </div>
+        <!-- Destination Location - Container for LocationPicker -->
+        <div id="header-dest-location-container"></div>
 
         <!-- Go Button -->
         <button id="go-button" class="header__go-btn">

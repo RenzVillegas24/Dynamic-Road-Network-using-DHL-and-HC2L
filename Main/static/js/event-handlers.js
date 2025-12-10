@@ -95,45 +95,8 @@ function initializeEventHandlers() {
     });
   });
 
-  const startLocationBtn = document.getElementById('start-location-btn');
-  if (startLocationBtn) {
-    startLocationBtn.addEventListener('click', () => {
-      if (!map) {
-        showUpdateToast("Please wait for the map to load", 'warning');
-        return;
-      }
-      pinningMode = 'start';
-      map.getContainer().style.cursor = 'crosshair';
-      showUpdateToast("Click on the map to pin starting location", 'info');
-    });
-  }
-
-  const destLocationBtn = document.getElementById('dest-location-btn');
-  if (destLocationBtn) {
-    destLocationBtn.addEventListener('click', () => {
-      if (!map) {
-        showUpdateToast("Please wait for the map to load", 'warning');
-        return;
-      }
-      pinningMode = 'dest';
-      map.getContainer().style.cursor = 'crosshair';
-      showUpdateToast("Click on the map to pin destination", 'info');
-    });
-  }
-
-  const pinDisruptionBtn = document.getElementById('pin-disruption-btn');
-  if (pinDisruptionBtn) {
-    pinDisruptionBtn.addEventListener('click', () => {
-      if (!map) {
-        showUpdateToast("Please wait for the map to load", 'warning');
-        return;
-      }
-      pinningMode = 'report';
-      map.getContainer().style.cursor = 'crosshair';
-      showUpdateToast("Click on the map to pin disruption location", 'info');
-    });
-  }
-
+  // NOTE: Location pinning is now handled by LocationPicker component
+  // See: header-location-pickers.js, report-location-picker.js, demo-creator.js
 
   const goButton = document.getElementById("go-button");
   if (goButton) {

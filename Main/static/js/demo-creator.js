@@ -378,100 +378,121 @@ const DemoCreator = {
         return this.presetLocations[idx];
     },
 
+    // Location pickers
+    startPicker: null,
+    endPicker: null,
+
     bindEvents() {
-        // Route search inputs
-        this.setupLocationSearch('demo-start-search', 'demo-start-dropdown', 'start');
-        this.setupLocationSearch('demo-end-search', 'demo-end-dropdown', 'end');
+        // Initialize LocationPicker components for route creation
+        this.initializeLocationPickers();
         
         // Note: All selections (tau mode, algorithm, disruption mode, disruption scope, tau scope)
         // now use radio buttons with onchange handlers in HTML
     },
 
-    setupLocationSearch(inputId, dropdownId, type) {
-        const input = document.getElementById(inputId);
-        const dropdown = document.getElementById(dropdownId);
-        
-        if (!input || !dropdown) return;
-        
-        let searchTimeout;
-        
-        input.addEventListener('input', (e) => {
-            clearTimeout(searchTimeout);
-            const query = e.target.value.trim().toLowerCase();
-            
-            if (query.length < 2) {
-                dropdown.classList.add('hidden');
-                return;
-            }
-            
-            searchTimeout = setTimeout(() => {
-                this.performLocalSearch(query, dropdown, type);
-            }, 200);
-        });
-        
-        input.addEventListener('focus', () => {
-            if (input.value.length >= 2) {
-                dropdown.classList.remove('hidden');
-            }
-        });
-        
-        // Close on outside click
-        document.addEventListener('click', (e) => {
-            if (!e.target.closest(`#${inputId}`) && !e.target.closest(`#${dropdownId}`)) {
-                dropdown.classList.add('hidden');
-            }
-        });
+    initializeLocationPickers() {
+        // Wait for map to be available
+        if (typeof map === 'undefined' || !map) {
+            setTimeout(() => this.initializeLocationPickers(), 100);
+            return;
+        }
+
+        // Initialize Start Location Picker
+        const startContainer = document.getElementById('demo-start-location-container');
+        if (startContainer && typeof LocationPicker !== 'undefined') {
+            this.startPicker = new LocationPicker({
+                containerId: 'demo-start-location-container',
+                variant: 'start',
+                placeholder: 'Search for start location...',
+                osmSnapping: true,
+                snapRadius: 25,
+                map: map,
+                onSelect: (result) => this.handleLocationSelect('start', result),
+                onClear: () => this.handleLocationClear('start'),
+                onPinModeStart: () => {
+                    if (this.endPicker && this.endPicker.isPinning) {
+                        this.endPicker._deactivatePinMode();
+                    }
+                }
+            });
+            console.log('✅ Demo Creator: Start location picker initialized');
+        }
+
+        // Initialize End Location Picker
+        const endContainer = document.getElementById('demo-end-location-container');
+        if (endContainer && typeof LocationPicker !== 'undefined') {
+            this.endPicker = new LocationPicker({
+                containerId: 'demo-end-location-container',
+                variant: 'destination',
+                placeholder: 'Search for destination...',
+                osmSnapping: true,
+                snapRadius: 25,
+                map: map,
+                onSelect: (result) => this.handleLocationSelect('end', result),
+                onClear: () => this.handleLocationClear('end'),
+                onPinModeStart: () => {
+                    if (this.startPicker && this.startPicker.isPinning) {
+                        this.startPicker._deactivatePinMode();
+                    }
+                }
+            });
+            console.log('✅ Demo Creator: End location picker initialized');
+        }
     },
 
-    performLocalSearch(query, dropdown, type) {
-        // Filter preset locations
-        const matches = this.presetLocations.filter(loc => 
-            loc.name.toLowerCase().includes(query)
-        ).slice(0, 6);
+    handleLocationSelect(type, result) {
+        console.log(`📍 Demo Creator ${type} location selected:`, result);
         
-        if (matches.length === 0) {
-            dropdown.innerHTML = `
-                <div class="p-4 text-center text-gray-400">
-                    <p class="text-sm">No locations found</p>
-                    <p class="text-xs mt-1">Try a different search or use map pin</p>
-                </div>
-            `;
-        } else {
-            const color = type === 'start' ? 'emerald' : 'rose';
-            dropdown.innerHTML = matches.map(loc => `
-                <div class="location-result px-4 py-3 hover:bg-${color}-50 cursor-pointer border-b border-gray-100 last:border-0 transition-colors"
-                     data-lat="${loc.lat}" data-lng="${loc.lng}" data-name="${loc.name}" data-type="${type}">
-                    <div class="flex items-center gap-3">
-                        <div class="w-8 h-8 rounded-full bg-${color}-100 flex items-center justify-center">
-                            <span class="text-${color}-600">${type === 'start' ? '🟢' : '🔴'}</span>
-                        </div>
-                        <div>
-                            <div class="font-semibold text-gray-800">${loc.name}</div>
-                            <div class="text-xs text-gray-500">${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}</div>
-                        </div>
-                    </div>
-                </div>
-            `).join('');
-            
-            // Add click handlers
-            dropdown.querySelectorAll('.location-result').forEach(el => {
-                el.addEventListener('click', () => {
-                    const lat = parseFloat(el.dataset.lat);
-                    const lng = parseFloat(el.dataset.lng);
-                    const name = el.dataset.name;
-                    const locType = el.dataset.type;
-                    
-                    this.setRouteLocation(locType, { name, lat, lng });
-                    dropdown.classList.add('hidden');
-                    
-                    // Update input
-                    const inputId = locType === 'start' ? 'demo-start-search' : 'demo-end-search';
-                    document.getElementById(inputId).value = name;
-                });
-            });
+        const location = {
+            name: result.name,
+            lat: result.snappedPin?.lat || result.actualPin.lat,
+            lng: result.snappedPin?.lng || result.actualPin.lng,
+            actualLat: result.actualPin.lat,
+            actualLng: result.actualPin.lng,
+            snapData: result.snapData
+        };
+        
+        this.setRouteLocation(type, location);
+    },
+
+    handleLocationClear(type) {
+        console.log(`🗑️ Demo Creator ${type} location cleared`);
+        
+        if (this.currentEditRoute) {
+            this.currentEditRoute[type] = null;
         }
         
-        dropdown.classList.remove('hidden');
+        // Remove preview marker
+        const markerId = `preview-${type}`;
+        if (this.markers[markerId]) {
+            map.removeLayer(this.markers[markerId]);
+            delete this.markers[markerId];
+        }
+        
+        this.updateAddRouteButtonState();
+    },
+
+    updateAddRouteButtonState() {
+        const btn = document.getElementById('demo-add-route-btn');
+        if (btn) {
+            if (this.currentEditRoute?.start && this.currentEditRoute?.end) {
+                btn.disabled = false;
+                btn.classList.remove('opacity-50', 'cursor-not-allowed');
+            } else {
+                btn.disabled = true;
+                btn.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+        }
+    },
+
+    // Legacy method removed - now using LocationPicker
+    setupLocationSearch(inputId, dropdownId, type) {
+        console.log(`⚠️ setupLocationSearch called for ${inputId} - now handled by LocationPicker`);
+    },
+
+    // Legacy method removed - now using LocationPicker
+    performLocalSearch(query, dropdown, type) {
+        console.log(`⚠️ performLocalSearch called - now handled by LocationPicker`);
     },
 
     // ==========================================================================
@@ -1360,10 +1381,8 @@ const DemoCreator = {
         // Add preview marker
         this.addPreviewMarker(type, location);
         
-        // Check if route is complete
-        if (this.currentEditRoute.start && this.currentEditRoute.end) {
-            document.getElementById('demo-add-route-btn')?.classList.remove('opacity-50', 'cursor-not-allowed');
-        }
+        // Update button state
+        this.updateAddRouteButtonState();
     },
 
     addPreviewMarker(type, location) {
@@ -1437,9 +1456,13 @@ const DemoCreator = {
         this.routes.push(newRoute);
         this.currentEditRoute = { start: null, end: null };
         
-        // Clear inputs
-        document.getElementById('demo-start-search').value = '';
-        document.getElementById('demo-end-search').value = '';
+        // Clear location pickers
+        if (this.startPicker) {
+            this.startPicker.clear();
+        }
+        if (this.endPicker) {
+            this.endPicker.clear();
+        }
         
         this.clearPreviewMarkers();
         
@@ -1448,8 +1471,8 @@ const DemoCreator = {
         
         this.renderRoutesList();
         
-        // Disable add button again
-        document.getElementById('demo-add-route-btn')?.classList.add('opacity-50', 'cursor-not-allowed');
+        // Update button state
+        this.updateAddRouteButtonState();
         
         showUpdateToast('Route added successfully', 'success');
     },

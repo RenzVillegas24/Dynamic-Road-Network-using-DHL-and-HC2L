@@ -15,14 +15,10 @@
 
   <div class="panel__body">
     <form class="space-y-5" id="report-form">
-      <!-- Incident Location -->
+      <!-- Incident Location - LocationPicker Container -->
       <div class="form-group">
         <label class="form-group__label">Incident Location</label>
-        <button type="button" id="pin-disruption-btn" class="pin-button">
-          <i data-lucide="map-pin" class="pin-button__icon"></i>
-          <span id="pin-disruption-text">Click to pin location on map</span>
-        </button>
-        <div id="disruption-coords" class="badge badge--primary badge--lg hidden mt-3 w-full justify-center"></div>
+        <div id="report-location-container"></div>
       </div>
 
       <!-- Incident Type & Criticality Section -->

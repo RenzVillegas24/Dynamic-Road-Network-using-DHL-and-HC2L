@@ -1,0 +1,228 @@
+/**
+ * Location Picker Component Styles
+ * Additional styles for the reusable LocationPicker component
+ */
+
+/* =====================
+   LOCATION PICKER BASE
+   ===================== */
+
+.location-picker {
+  position: relative;
+}
+
+.location-picker__coords {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono, monospace);
+  font-size: var(--text-xs);
+}
+
+/* Variant-specific icon colors */
+.search-result__icon--normal {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.search-result__tag--normal {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+/* Variant-specific spinner colors */
+.search-loading__spinner--normal {
+  border-top-color: var(--color-primary);
+}
+
+/* Variant-specific dropdown hover */
+.location-picker[data-variant="start"] .search-result:hover {
+  background: var(--color-success-light);
+}
+
+.location-picker[data-variant="destination"] .search-result:hover {
+  background: var(--color-danger-light);
+}
+
+.location-picker[data-variant="normal"] .search-result:hover {
+  background: var(--color-primary-light);
+}
+
+/* =====================
+   PIN MODE INDICATOR
+   ===================== */
+
+.location-picker--pinning {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-2xl);
+}
+
+.location-picker--pinning[data-variant="start"] {
+  outline-color: var(--color-success);
+}
+
+.location-picker--pinning[data-variant="destination"] {
+  outline-color: var(--color-danger);
+}
+
+.location-picker--pinning[data-variant="normal"] {
+  outline-color: var(--color-primary);
+}
+
+/* Pin button active state */
+.search-combobox__pin-btn--active {
+  animation: pulse-pin 1s ease-in-out infinite;
+}
+
+@keyframes pulse-pin {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 8px rgba(99, 102, 241, 0);
+  }
+}
+
+/* =====================
+   COMPACT VARIANT
+   ===================== */
+
+.location-picker--compact .search-combobox__wrapper {
+  padding: var(--spacing-2) var(--spacing-3);
+}
+
+.location-picker--compact .search-combobox__pin-btn {
+  width: 28px;
+  height: 28px;
+}
+
+.location-picker--compact .search-combobox__pin-btn svg,
+.location-picker--compact .search-combobox__pin-btn i {
+  width: 14px;
+  height: 14px;
+}
+
+.location-picker--compact .search-combobox__input {
+  font-size: var(--text-xs);
+}
+
+/* =====================
+   FORM INTEGRATION
+   ===================== */
+
+/* When used inside a form-group */
+.form-group .location-picker {
+  margin-top: var(--spacing-1);
+}
+
+/* When used inside a section-card */
+.section-card .location-picker {
+  margin-bottom: var(--spacing-3);
+}
+
+/* =====================
+   DISABLED STATE
+   ===================== */
+
+.location-picker--disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.location-picker--disabled .search-combobox__wrapper {
+  background: var(--color-gray-100);
+}
+
+.location-picker--disabled .search-combobox__input {
+  cursor: not-allowed;
+}
+
+.location-picker--disabled .search-combobox__pin-btn {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* =====================
+   SELECTED STATE
+   ===================== */
+
+.location-picker--selected .search-combobox__wrapper {
+  border-color: var(--color-success);
+}
+
+.location-picker[data-variant="destination"].location-picker--selected .search-combobox__wrapper {
+  border-color: var(--color-danger);
+}
+
+.location-picker[data-variant="normal"].location-picker--selected .search-combobox__wrapper {
+  border-color: var(--color-primary);
+}
+
+/* =====================
+   WALKING DISTANCE LABEL
+   (for snap connector lines)
+   ===================== */
+
+.walking-distance-label {
+  background: var(--color-surface) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: var(--radius-md) !important;
+  padding: var(--spacing-1) var(--spacing-2) !important;
+  font-size: var(--text-xs) !important;
+  font-weight: var(--font-semibold) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+.walking-distance-label::before {
+  display: none !important;
+}
+
+/* =====================
+   SNAP MARKER STYLES
+   ===================== */
+
+.location-picker-snap-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+/* =====================
+   RESPONSIVE ADJUSTMENTS
+   ===================== */
+
+@media (max-width: 640px) {
+  .location-picker .search-combobox__wrapper {
+    padding: var(--spacing-2) var(--spacing-3);
+  }
+  
+  .location-picker .search-combobox__pin-btn {
+    width: 32px;
+    height: 32px;
+  }
+  
+  .location-picker .search-combobox__dropdown {
+    max-height: 240px;
+  }
+}
+
+/* =====================
+   ANIMATION UTILITIES
+   ===================== */
+
+.location-picker-fade-in {
+  animation: location-picker-fade-in 0.2s ease-out;
+}
+
+@keyframes location-picker-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

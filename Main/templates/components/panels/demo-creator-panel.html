@@ -88,23 +88,16 @@
         <div class="section-card">
           <h4 class="text-sm font-semibold mb-3">Add Route</h4>
 
-          <!-- Start Location -->
-          <div class="mb-3 relative">
+          <!-- Start Location - LocationPicker Container -->
+          <div class="mb-3">
             <label class="form-group__label text-gray-600">Start Location</label>
-            <div class="flex gap-2">
-              <input type="text" id="demo-start-search" class="form-input flex-1"
-                placeholder="Search for start location...">
-            </div>
-            <div id="demo-start-dropdown" class="dropdown-menu hidden"></div>
+            <div id="demo-start-location-container"></div>
           </div>
 
-          <!-- End Location -->
-          <div class="mb-3 relative">
+          <!-- End Location - LocationPicker Container -->
+          <div class="mb-3">
             <label class="form-group__label text-gray-600">Destination</label>
-            <div class="flex gap-2">
-              <input type="text" id="demo-end-search" class="form-input flex-1" placeholder="Search for destination...">
-            </div>
-            <div id="demo-end-dropdown" class="dropdown-menu hidden"></div>
+            <div id="demo-end-location-container"></div>
           </div>
 
           <button id="demo-add-route-btn" onclick="DemoCreator.addRouteFromInputs()" class="btn btn--primary btn--block"
