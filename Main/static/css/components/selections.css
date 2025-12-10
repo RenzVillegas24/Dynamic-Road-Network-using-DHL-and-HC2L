@@ -791,13 +791,16 @@
   grid-template-columns: repeat(3, 1fr);
 }
 
+.nav-select--grid-row-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
 .nav-select--grid .nav-select__option {
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
   padding: var(--spacing-3);
-  min-height: 80px;
 }
 
 .nav-select--grid .nav-select__option[data-color] {

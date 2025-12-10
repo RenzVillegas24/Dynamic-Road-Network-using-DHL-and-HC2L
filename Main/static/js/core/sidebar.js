@@ -53,8 +53,7 @@ const Sidebar = (function () {
   }
 
   function isDemoRunning() {
-    return (typeof DemoRunner !== 'undefined' && DemoRunner.isRunning) ||
-      (typeof DemoCreator !== 'undefined' && DemoCreator.isRunning);
+    return (typeof DemoRunner !== 'undefined' && DemoRunner.isRunning);
   }
 
   /**

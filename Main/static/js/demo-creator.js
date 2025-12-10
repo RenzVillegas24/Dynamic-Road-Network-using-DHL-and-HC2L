@@ -9,44 +9,50 @@
  * - Easy-to-use interface
  */
 
+// ==========================================================================
+// DEFAULT VALUES - Used for HTML element defaults and JS processing fallbacks
+// ==========================================================================
+const DEMO_CREATOR_DEFAULTS = {
+    // Disruption settings
+    disruption: {
+        mode: 'random-both',
+        generationScope: 'per-trial-route',
+        flowCount: 1500,
+        incidentCount: 5,
+        severityMin: 0.1,
+        severityMax: 0.8,
+    },
+    // TAU/Algorithm settings
+    sequence: {
+        algorithm: 'both',
+        tauMode: 'random',
+        tauFixed: 0.5,
+        tauRandomMin: 0.1,
+        tauRandomMax: 0.9,
+        tauGenerationScope: 'per-trial-route',
+        stepDelay: 1000,
+        showMetrics: true,
+        trials: 1,
+    },
+    // Route generation
+    route: {
+        minDistance: 0.5,  // km
+        maxDistance: 10,   // km
+        randomCount: 3,
+    },
+    // Custom disruption
+    customDisruption: {
+        type: 'incident',
+        criticality: 'major',
+        jamFactor: 5,
+    }
+};
+
 const DemoCreator = {
     // ==========================================================================
     // DEFAULT VALUES - Used for HTML element defaults and JS processing fallbacks
     // ==========================================================================
-    DEFAULTS: {
-        // Disruption settings
-        disruption: {
-            mode: 'random-both',
-            generationScope: 'per-trial-route',
-            flowCount: 1500,
-            incidentCount: 5,
-            severityMin: 0.1,
-            severityMax: 0.7,
-        },
-        // TAU/Algorithm settings
-        sequence: {
-            algorithm: 'both',
-            tauMode: 'random',
-            tauFixed: 0.5,
-            tauRandomMin: 0.1,
-            tauRandomMax: 0.9,
-            tauGenerationScope: 'per-trial-route',
-            stepDelay: 2000,
-            trials: 1,
-        },
-        // Route generation
-        route: {
-            minDistance: 0.5,  // km
-            maxDistance: 10,   // km
-            randomCount: 3,
-        },
-        // Custom disruption
-        customDisruption: {
-            type: 'incident',
-            criticality: 'major',
-            jamFactor: 5,
-        }
-    },
+    DEFAULTS: DEMO_CREATOR_DEFAULTS,
     
     // Mode: 'create' or 'edit'
     mode: 'create',
@@ -55,27 +61,27 @@ const DemoCreator = {
     routes: [],
     currentRouteIndex: -1,
     disruptions: {
-        mode: 'random-both', // 'none', 'random-flow', 'random-incidents', 'random-both', 'custom'
-        generationScope: 'per-trial-route', // 'all', 'per-trial', 'per-route', 'per-trial-route'
-        randomFlowCount: 1500,
-        randomIncidentCount: 5,
-        severityMin: 0.1,
-        severityMax: 0.7,
+        mode: DEMO_CREATOR_DEFAULTS.disruption.mode, // 'none', 'random-flow', 'random-incidents', 'random-both', 'custom'
+        generationScope: DEMO_CREATOR_DEFAULTS.disruption.generationScope, // 'all', 'per-trial', 'per-route', 'per-trial-route'
+        randomFlowCount: DEMO_CREATOR_DEFAULTS.disruption.flowCount,
+        randomIncidentCount: DEMO_CREATOR_DEFAULTS.disruption.incidentCount,
+        severityMin: DEMO_CREATOR_DEFAULTS.disruption.severityMin,
+        severityMax:  DEMO_CREATOR_DEFAULTS.disruption.severityMax,
         customItems: [],
         // Store multiple disruption sets based on generation scope
         disruptionSets: {}  // Key: 'all', 'trial_0', 'route_1', 'trial_0_route_1', etc.
     },
     sequence: {
-        algorithm: 'both',
-        tauMode: 'random', // 'fixed', 'random'
-        tauFixed: 0.5,
+        algorithm: DEMO_CREATOR_DEFAULTS.sequence.algorithm, // 'hc2l', 'dhl', 'both'
+        tauMode: DEMO_CREATOR_DEFAULTS.sequence.tauMode, // 'fixed', 'random'
+        tauFixed: DEMO_CREATOR_DEFAULTS.sequence.tauFixed,
         tauSequence: [],
-        tauRandomMin: 0.1,
-        tauRandomMax: 0.9,
-        tauGenerationScope: 'per-trial-route', // 'all', 'per-trial', 'per-route', 'per-trial-route'
-        stepDelay: 2000,
-        showMetrics: true,
-        trials: 1
+        tauRandomMin: DEMO_CREATOR_DEFAULTS.sequence.tauRandomMin,
+        tauRandomMax: DEMO_CREATOR_DEFAULTS.sequence.tauRandomMax,
+        tauGenerationScope: DEMO_CREATOR_DEFAULTS.sequence.tauGenerationScope, // 'all', 'per-trial', 'per-route', 'per-trial-route'
+        stepDelay: DEMO_CREATOR_DEFAULTS.sequence.stepDelay,
+        showMetrics: DEMO_CREATOR_DEFAULTS.sequence.showMetrics,
+        trials: DEMO_CREATOR_DEFAULTS.sequence.trials
     },
     markers: {},
     routeMarkers: [],
@@ -232,7 +238,7 @@ const DemoCreator = {
      * Apply default values to UI elements
      */
     applyDefaultsToUI() {
-        const d = this.DEFAULTS;
+        const d = DEMO_CREATOR_DEFAULTS;
         
         // Disruption defaults
         const flowCountEl = document.getElementById('random-flow-count');
@@ -503,6 +509,17 @@ const DemoCreator = {
         const panel = document.getElementById('demo-creator-panel');
         if (panel) {
             panel.classList.remove('translate-x-full');
+
+            // Reset system state when demo creator is shown
+            resetSystemState({
+                clearLocation: true,
+                clearDisruptions: true,
+                clearUpdateRegions: true,
+                clearGoogleMaps: true,
+                clearExportData: true,
+                resetUI: true,
+                verbose: false
+            });
             
             // Set mode based on whether we're editing
             if (configToEdit) {
@@ -548,6 +565,49 @@ const DemoCreator = {
                     </span>
                 `;
             }
+        }
+    },
+
+    /**
+     * Show loading animation overlay with status message
+     * @param {string} title - Title to display (default: 'Processing')
+     * @param {string} message - Status message to display (default: 'Please wait...')
+     */
+    showLoadingAnimation(title = 'Processing', message = 'Please wait...') {
+        const overlay = document.getElementById('demo-creator-loading-overlay');
+        const titleEl = document.getElementById('demo-creator-loading-title');
+        const statusEl = document.getElementById('demo-creator-loading-status');
+        if (overlay) {
+            overlay.classList.remove('hidden');
+            overlay.style.display = 'flex';
+            if (titleEl) {
+                titleEl.textContent = title;
+            }
+            if (statusEl) {
+                statusEl.textContent = message;
+            }
+        }
+    },
+
+    /**
+     * Update loading animation status message
+     * @param {string} message - New status message
+     */
+    updateLoadingStatus(message) {
+        const statusEl = document.getElementById('demo-creator-loading-status');
+        if (statusEl) {
+            statusEl.textContent = message;
+        }
+    },
+
+    /**
+     * Hide loading animation overlay
+     */
+    hideLoadingAnimation() {
+        const overlay = document.getElementById('demo-creator-loading-overlay');
+        if (overlay) {
+            overlay.classList.add('hidden');
+            overlay.style.display = 'none';
         }
     },
     
@@ -924,19 +984,73 @@ const DemoCreator = {
         // Check if there are unsaved changes
         const hasChanges = (this.routes && this.routes.length > 0) || 
                           (this.disruptions.customItems && this.disruptions.customItems.length > 0) ||
-                          this.disruptions.mode !== 'none';
+                          (this.disruptions.disruptionSets && Object.keys(this.disruptions.disruptionSets).length > 0) ||
+                          this.disruptions.mode !== 'random-both';
         
         if (hasChanges) {
-            if (!confirm('You have unsaved changes. Are you sure you want to exit and discard them?')) {
-                return;
+            // Use UniversalModal instead of confirm
+            if (typeof UniversalModal !== 'undefined') {
+                UniversalModal.showModal({
+                    icon: 'alert-triangle',
+                    variant: 'warning',
+                    title: 'Discard Changes?',
+                    subtitle: 'You have unsaved changes',
+                    body: '<p class="text-sm text-slate-700 leading-relaxed">Are you sure you want to close the Demo Creator? All unsaved configurations and disruptions will be discarded.</p>',
+                    buttons: {
+                        'Discard & Close': (closeModal) => {
+                            closeModal();
+                            // Perform the close operation
+                            setTimeout(() => {
+                                this.clearAllRoutes();
+                                this.performClose();
+                            }, 100);
+                        }
+                    },
+                    closeBtn: {
+                        'Keep Changes': (closeModal) => {
+                            // Just close the modal, no additional action needed
+                        }
+                    },
+                    backdropClose: false,
+                    escapeClose: true
+                });
+            } else {
+                // Fallback if UniversalModal not available
+                if (!confirm('You have unsaved changes. Are you sure you want to exit and discard them?')) {
+                    return;
+                }
+                this.performClose();
+            }
+        } else {
+            // No changes, close immediately
+            this.performClose();
+        }
+    },
+
+    /**
+     * Perform the actual close operation
+     * Clears all state and closes the panel
+     */
+    performClose() {
+        // Use resetForHandoff instead of resetAll to properly clean everything
+        this.resetForHandoff();
+        
+        // Delegate panel closing to PanelManager (which handles back navigation)
+        if (typeof PanelManager !== 'undefined') {
+            PanelManager.goBack();
+        } else {
+            // Fallback: manually close the panel if PanelManager not available
+            const panel = document.getElementById('demo-creator-panel');
+            if (panel) {
+                panel.classList.add('translate-x-full');
+            }
+            
+            // Close the right panel container
+            const rightPanelContainer = document.getElementById('right-panel-container');
+            if (rightPanelContainer) {
+                rightPanelContainer.classList.remove('open');
             }
         }
-        
-        const panel = document.getElementById('demo-creator-panel');
-        if (panel) {
-            panel.classList.add('translate-x-full');
-        }
-        this.resetAll();
     },
 
     /**
@@ -996,10 +1110,10 @@ const DemoCreator = {
         // Reset disruptions
         this.disruptions = {
             mode: 'none',
-            randomFlowCount: 5,
-            randomIncidentCount: 3,
-            severityMin: 0.3,
-            severityMax: 0.9,
+            randomFlowCount: 1500,
+            randomIncidentCount: 5,
+            severityMin: 0.1,
+            severityMax: 0.8,
             customItems: []
         };
         
@@ -1011,7 +1125,7 @@ const DemoCreator = {
             tauSequence: [0.1, 0.3, 0.5, 0.7, 0.9],
             tauRandomMin: 0.1,
             tauRandomMax: 0.9,
-            stepDelay: 2000,
+            stepDelay: 1000,
             showMetrics: true,
             trials: 1
         };
@@ -1105,26 +1219,26 @@ const DemoCreator = {
         this.routes = [];
         this.currentRouteIndex = -1;
         this.disruptions = {
-            mode: 'random-both',
-            generationScope: 'per-trial-route',
-            randomFlowCount: 1500,
-            randomIncidentCount: 5,
-            severityMin: 0.1,
-            severityMax: 0.7,
+            mode: DEMO_CREATOR_DEFAULTS.disruption.mode,
+            generationScope: DEMO_CREATOR_DEFAULTS.disruption.generationScope,
+            randomFlowCount: DEMO_CREATOR_DEFAULTS.disruption.randomFlowCount,
+            randomIncidentCount: DEMO_CREATOR_DEFAULTS.disruption.randomIncidentCount,
+            severityMin: DEMO_CREATOR_DEFAULTS.disruption.severityMin,
+            severityMax: DEMO_CREATOR_DEFAULTS.disruption.severityMax,
             customItems: [],
             disruptionSets: {}
         };
         this.sequence = {
-            algorithm: 'both',
-            tauMode: 'random',
-            tauFixed: 0.5,
+            algorithm: DEMO_CREATOR_DEFAULTS.sequence.algorithm,
+            tauMode: DEMO_CREATOR_DEFAULTS.sequence.tauMode,
+            tauFixed: DEMO_CREATOR_DEFAULTS.sequence.tauFixed,
             tauSequence: [],
-            tauRandomMin: 0.1,
-            tauRandomMax: 0.9,
-            tauGenerationScope: 'per-trial-route',
-            stepDelay: 2000,
-            showMetrics: true,
-            trials: 1
+            tauRandomMin: DEMO_CREATOR_DEFAULTS.sequence.tauRandomMin,
+            tauRandomMax: DEMO_CREATOR_DEFAULTS.sequence.tauRandomMax,
+            tauGenerationScope: DEMO_CREATOR_DEFAULTS.sequence.tauGenerationScope,
+            stepDelay: DEMO_CREATOR_DEFAULTS.sequence.stepDelay,
+            showMetrics: DEMO_CREATOR_DEFAULTS.sequence.showMetrics,
+            trials: DEMO_CREATOR_DEFAULTS.sequence.trials
         };
         
         // Clear UI elements
@@ -3291,7 +3405,7 @@ const DemoCreator = {
             settings: {
                 algorithm: this.getSelectedAlgorithm(),
                 trials: trials,
-                stepDelay: parseInt(document.getElementById('demo-step-delay')?.value) || 1000
+                stepDelay: parseInt(document.getElementById('demo-step-delay')?.value) || DEMO_CREATOR_DEFAULTS.sequence.stepDelay
             },
             
             // TAU configuration (template for regeneration/editing)
@@ -3325,11 +3439,33 @@ const DemoCreator = {
         const originalContent = saveBtn?.innerHTML;
 
         try {
+            // Show loading animation
+            const isEditing = !!this.editingConfigId;
+            this.showLoadingAnimation(
+                isEditing ? 'Updating Demo' : 'Saving Demo',
+                'Processing configuration...'
+            );
+            
+            // Update button state
+            if (saveBtn) {
+                saveBtn.disabled = true;
+                saveBtn.innerHTML = `
+                    <svg class="animate-spin h-4 w-4 mr-2 inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    ${isEditing ? 'Updating...' : 'Saving...'}
+                `;
+            }
+            
             // Build config using helper function
             const config = this.buildDemoConfig();
             
+            // Update loading status
+            this.updateLoadingStatus('Saving to server...');
+            
             // If editing, update the config; otherwise save new
-            if (this.editingConfigId) {
+            if (isEditing) {
                 config.id = this.editingConfigId;
                 await DemoRunner.updateConfig(config);
                 showUpdateToast('Demo configuration updated!', 'success');
@@ -3338,15 +3474,33 @@ const DemoCreator = {
                 showUpdateToast('Demo configuration saved!', 'success');
             }
             
-            // Close the panel after saving
-            const panel = document.getElementById('demo-creator-panel');
-            if (panel) {
-                panel.classList.add('translate-x-full');
-            }
-            this.resetAll();
+            // Update loading status
+            this.updateLoadingStatus('Cleaning up...');
+            
+            // Clear all disruption sets to prevent carrying over to next demo
+            this.disruptions.disruptionSets = {};
+            this.disruptions.customItems = [];
+            
+            // Clear visual markers before reset
+            this.clearPreviewMarkers();
+            this.clearAllRouteMarkers();
+            this.clearAllDisruptionMarkers();
+            
+            // Small delay for visual feedback
+            await new Promise(resolve => setTimeout(resolve, 300));
+            
+            // Hide loading animation
+            this.hideLoadingAnimation();
+            
+            // Reset demo creator completely and go back to step 1
+            this.resetForHandoff();
+
+            PanelManager.showPanel('demo-runner');
+
         } catch (error) {
             console.error('Error saving configuration:', error);
             showUpdateToast('Error saving configuration: ' + error.message, 'error');
+            this.hideLoadingAnimation();
         } finally {
             // Restore button state
             if (saveBtn) {
@@ -3364,16 +3518,49 @@ const DemoCreator = {
         const originalContent = runBtn?.innerHTML;
         
         try {
+            // Show loading animation
+            this.showLoadingAnimation('Starting Demo', 'Preparing configuration...');
+            
+            // Update button state
+            if (runBtn) {
+                runBtn.disabled = true;
+                runBtn.innerHTML = `
+                    <svg class="animate-spin h-4 w-4 mr-2 inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Starting...
+                `;
+            }
+            
             // Build config with temporary name
             const config = this.buildDemoConfig(`Temp Demo - ${new Date().toLocaleString()}`);
+            
+            // Update loading status
+            this.updateLoadingStatus('Cleaning up map layers...');
+            
+            // Clear all disruption sets to prevent carrying over to next demo
+            this.disruptions.disruptionSets = {};
+            this.disruptions.customItems = [];
             
             // Clear visual markers before handoff
             this.clearPreviewMarkers();
             this.clearAllRouteMarkers();
             this.clearAllDisruptionMarkers();
             
+            // Update loading status
+            this.updateLoadingStatus('Switching to Demo Runner...');
+            
+            // Small delay for visual feedback
+            await new Promise(resolve => setTimeout(resolve, 200));
+            
+            // Hide loading animation before panel transition
+            this.hideLoadingAnimation();
+            
             // Reset Demo Creator state
             this.resetForHandoff();
+            
+            PanelManager.showPanel('demo-runner');
             
             // Delegate execution to Demo Runner (temporary config)
             await DemoRunner.runExternalConfig(config, true);
@@ -3381,6 +3568,7 @@ const DemoCreator = {
         } catch (error) {
             console.error('Error running demo:', error);
             showUpdateToast('Error running demo: ' + error.message, 'error');
+            this.hideLoadingAnimation();
             // Restore button state on error
             if (runBtn) {
                 runBtn.disabled = false;
@@ -3393,24 +3581,34 @@ const DemoCreator = {
         const runBtn = document.getElementById('demo-v2-save-run-btn');
         const originalContent = runBtn?.innerHTML;
         
-        // Show loading state
-        if (runBtn) {
-            runBtn.disabled = true;
-            runBtn.innerHTML = `
-                <svg class="animate-spin h-5 w-5 mr-2 inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Saving...
-            `;
-        }
-        
         try {
+            // Show loading animation
+            const isEditing = !!this.editingConfigId;
+            this.showLoadingAnimation(
+                isEditing ? 'Updating & Starting Demo' : 'Saving & Starting Demo',
+                'Processing configuration...'
+            );
+            
+            // Update button state
+            if (runBtn) {
+                runBtn.disabled = true;
+                runBtn.innerHTML = `
+                    <svg class="animate-spin h-4 w-4 mr-2 inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    ${isEditing ? 'Updating...' : 'Saving...'}
+                `;
+            }
+            
             // Build config using helper function
             const config = this.buildDemoConfig();
             
+            // Update loading status
+            this.updateLoadingStatus('Saving to server...');
+            
             // Save the configuration first
-            if (this.editingConfigId) {
+            if (isEditing) {
                 config.id = this.editingConfigId;
                 await DemoRunner.updateConfig(config);
                 showUpdateToast('Demo configuration updated!', 'success');
@@ -3419,20 +3617,42 @@ const DemoCreator = {
                 showUpdateToast('Demo configuration saved!', 'success');
             }
             
+            // Update loading status
+            this.updateLoadingStatus('Cleaning up map layers...');
+            
+            // Clear all disruption sets to prevent carrying over to next demo
+            this.disruptions.disruptionSets = {};
+            this.disruptions.customItems = [];
+            
             // Clear visual markers before handoff
             this.clearPreviewMarkers();
             this.clearAllRouteMarkers();
             this.clearAllDisruptionMarkers();
             
+            // Update loading status
+            this.updateLoadingStatus('Switching to Demo Runner...');
+            
+            // Small delay for visual feedback
+            await new Promise(resolve => setTimeout(resolve, 200));
+            
+            // Hide loading animation before panel transition
+            this.hideLoadingAnimation();
+            
             // Reset Demo Creator state
             this.resetForHandoff();
             
+            PanelManager.showPanel('demo-runner');
+
+            runBtn.disabled = false;
+            runBtn.innerHTML = originalContent;
+            
             // Delegate execution to Demo Runner (saved config, not temporary)
-            await DemoRunner.runExternalConfig(config, false);
+            await DemoRunner.runDemo(config);
             
         } catch (error) {
             console.error('Error saving/running demo:', error);
             showUpdateToast('Error: ' + error.message, 'error');
+            this.hideLoadingAnimation();
             // Restore button state on error
             if (runBtn) {
                 runBtn.disabled = false;
@@ -4182,6 +4402,9 @@ document.addEventListener('DOMContentLoaded', () => {
 // Global exports
 window.DemoCreator = DemoCreator;
 window.openDemoCreator = () => DemoCreator.openPanel();
-window.closeDemoCreator = () => DemoCreator.closePanel();
+window.closeDemoCreator = () =>  {
+    DemoCreator.closePanel();
+}
+
 
 console.log('✅ Demo Creator V2 module loaded');

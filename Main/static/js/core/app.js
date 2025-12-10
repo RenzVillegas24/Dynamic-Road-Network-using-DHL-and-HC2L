@@ -192,7 +192,7 @@ const App = (function() {
       const disruptionCount = typeof count === 'number' ? count : state.activeDisruptions;
       state.activeDisruptions = disruptionCount;
       badge.textContent = disruptionCount;
-      badge.classList.toggle('hidden', disruptionCount === 0);
+      badge.classList.toggle('collapse', disruptionCount === 0);
     }
   }
 

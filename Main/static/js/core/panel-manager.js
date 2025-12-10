@@ -117,6 +117,18 @@ const PanelManager = (function () {
           showDemoStopModal('demo-creator', 'sidebar');
           return false;
         }
+
+        // Reset system state when demo creator is shown
+        resetSystemState({
+            clearLocation: true,
+            clearDisruptions: true,
+            clearUpdateRegions: true,
+            clearGoogleMaps: true,
+            clearExportData: true,
+            resetUI: true,
+            verbose: false
+        });
+
         return true;
       }
     }
@@ -146,8 +158,7 @@ const PanelManager = (function () {
   }
 
   function isDemoRunning() {
-    return (typeof DemoRunner !== 'undefined' && DemoRunner.isRunning) ||
-      (typeof DemoCreator !== 'undefined' && DemoCreator.isRunning);
+    return (typeof DemoRunner !== 'undefined' && DemoRunner.isRunning);
   }
 
   /**
@@ -157,6 +168,15 @@ const PanelManager = (function () {
     // Handle all panel close buttons
     document.querySelectorAll('.panel__close').forEach(btn => {
       btn.addEventListener('click', (e) => {
+        // Check if this button has override close behavior
+        const overrideClose = btn.getAttribute('data-override-close') === 'true';
+        if (overrideClose) {
+          // Skip default close behavior - let the button's onclick handle it
+          return;
+        }
+
+
+
         e.preventDefault();
         e.stopPropagation();
 

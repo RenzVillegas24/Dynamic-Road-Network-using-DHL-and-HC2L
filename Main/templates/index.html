@@ -1493,10 +1493,18 @@
         });
       }
 
-      // Wire up Threshold Input and Quick Select Buttons
+      // Wire up Threshold Input and Quick Select Radio Buttons
       const thresholdInput = document.getElementById('threshold-input');
       const thresholdValue = document.getElementById('threshold-value');
-      const quickThresholdBtns = document.querySelectorAll('.quick-threshold-btn');
+      const thresholdPresetRadios = document.querySelectorAll('input[name="threshold-preset"]');
+
+      // Function to update threshold from preset selection
+      window.updateThresholdFromPreset = function(value) {
+        const numValue = parseFloat(value);
+        thresholdInput.value = numValue;
+        thresholdValue.textContent = numValue.toFixed(2);
+        showUpdateToast(`Threshold set to ${numValue}`, 'info');
+      };
 
       if (thresholdInput && thresholdValue) {
         // Update display when input changes
@@ -1508,34 +1516,11 @@
           e.target.value = value;
           thresholdValue.textContent = value.toFixed(2);
 
-          // Update button highlighting
-          quickThresholdBtns.forEach(btn => {
-            if (parseFloat(btn.dataset.value) === value) {
-              btn.classList.add('bg-blue-50', 'border-blue-500', 'shadow-md');
-              btn.classList.remove('bg-white', 'border-slate-300');
-            } else {
-              btn.classList.remove('bg-blue-50', 'border-blue-500', 'shadow-md');
-              btn.classList.add('bg-white', 'border-slate-300');
+          // Update radio button selection
+          thresholdPresetRadios.forEach(radio => {
+            if (parseFloat(radio.value) === value) {
+              radio.checked = true;
             }
-          });
-        });
-
-        // Wire up quick select buttons
-        quickThresholdBtns.forEach(btn => {
-          btn.addEventListener('click', () => {
-            const value = parseFloat(btn.dataset.value);
-            thresholdInput.value = value;
-            thresholdValue.textContent = value.toFixed(2);
-
-            // Update button highlighting
-            quickThresholdBtns.forEach(b => {
-              b.classList.remove('bg-blue-50', 'border-blue-500', 'shadow-md');
-              b.classList.add('bg-white', 'border-slate-300');
-            });
-            btn.classList.add('bg-blue-50', 'border-blue-500', 'shadow-md');
-            btn.classList.remove('bg-white', 'border-slate-300');
-
-            showUpdateToast(`Threshold set to ${value}`, 'info');
           });
         });
       }
@@ -2012,42 +1997,6 @@
       });
 
 
-      // Wire up Run Demo button - handled via onclick attribute with openDemoRunner()
-      // Legacy click handler removed - now using DemoRunner panel system
-
-      // Wire up Reset button
-      const resetBtn = document.getElementById('admin-reset-btn');
-      if (resetBtn) {
-        resetBtn.addEventListener('click', () => {
-          console.log('Reset button clicked');
-          // Clear all routes
-          if (typeof clearRoutes === 'function') {
-            clearRoutes();
-          }
-          // Clear disruption markers
-          if (typeof clearDisruptionMarkers === 'function') {
-            clearDisruptionMarkers();
-          }
-          // Clear Google Maps route
-          if (typeof clearGoogleMapsRoute === 'function') {
-            clearGoogleMapsRoute();
-          }
-          // Clear update regions
-          if (typeof clearUpdateRegions === 'function') {
-            clearUpdateRegions();
-          }
-          // Clear export data buffer
-          if (typeof clearExportData === 'function') {
-            clearExportData();
-          }
-          // Disable Google Compare button since route is reset
-          const googleCompareBtn = document.getElementById('admin-google-compare-btn');
-          if (googleCompareBtn) {
-            googleCompareBtn.disabled = true;
-          }
-          showUpdateToast('Map reset: all routes and disruptions cleared', 'success');
-        });
-      }
 
       // Wire up Export button (admin panel)
       const adminExportBtn = document.getElementById('admin-export-btn');

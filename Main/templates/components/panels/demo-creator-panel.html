@@ -15,7 +15,7 @@
       </h2>
       <p class="panel__subtitle">Build your custom demo scenario</p>
     </div>
-    <button onclick="closeDemoCreator()" class="panel__close">
+    <button onclick="closeDemoCreator()" class="panel__close" data-override-close="true">
       <i data-lucide="x" class="w-6 h-6"></i>
     </button>
   </div>
@@ -40,6 +40,17 @@
     <div id="demo-v2-step-item-4" class="wizard-steps__item wizard-steps__item--emerald">
       <div id="demo-v2-indicator-4" class="wizard-steps__indicator">4</div>
       <span class="wizard-steps__label">Review</span>
+    </div>
+  </div>
+
+  <!-- Loading Animation Overlay (shown while saving/running) - covers full panel_body -->
+  <div id="demo-creator-loading-overlay" class="hidden" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255, 255, 255, 0.5); display: none; align-items: center; justify-content: center; z-index: 50; backdrop-filter: blur(4px);">
+    <div style="background: white; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); padding: 32px; display: flex; flex-direction: column; align-items: center; gap: 16px;">
+      <div style="width: 64px; height: 64px; border: 4px solid #e5e7eb; border-top-color: #a855f7; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+      <div style="text-align: center;">
+        <h3 id="demo-creator-loading-title" style="font-size: 18px; font-weight: bold; color: #1f2937; margin-bottom: 8px;">Processing</h3>
+        <p id="demo-creator-loading-status" style="color: #4b5563; font-size: 14px;">Please wait...</p>
+      </div>
     </div>
   </div>
 
@@ -669,7 +680,7 @@
         <i data-lucide="save" class="w-4 h-4"></i> Save
       </button>
       <button id="demo-v2-save-run-btn" onclick="DemoCreator.saveAndRun()"
-        class="btn btn--success btn--lg w-full flex items-center justify-center gap-2" data-panel="demo-runner">
+        class="btn btn--success btn--lg w-full flex items-center justify-center gap-2">
         <i data-lucide="rocket" class="w-4 h-4"></i> Save & Run
       </button>
       <button id="demo-v2-prev-btn-step4" onclick="DemoCreator.prevStep()"
@@ -677,7 +688,7 @@
         <i data-lucide="arrow-left" class="w-4 h-4"></i> Previous
       </button>
       <button id="demo-v2-run-btn" onclick="DemoCreator.runOnly()"
-        class="btn btn--primary btn--lg w-full flex items-center justify-center gap-2" data-panel="demo-runner">
+        class="btn btn--primary btn--lg w-full flex items-center justify-center gap-2">
         <i data-lucide="play" class="w-4 h-4"></i> Run
       </button>
     </div>

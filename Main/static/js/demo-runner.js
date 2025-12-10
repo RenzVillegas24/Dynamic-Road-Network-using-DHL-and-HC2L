@@ -12,13 +12,13 @@ const DemoRunner = {
     isPaused: false,
     currentDemo: null,
     savedConfigs: [],
-    
+
     // Track if current results are saved to server
     currentResultsSavedPath: null,  // Path to saved file, null if not saved
-    
+
     // Track whether results are from a run (execution summary) or loaded from saved list
     resultsSource: 'new',  // 'new' (from execution) or 'saved' (from saved results list)
-    
+
     randomDemoSettings: {
         trials: 1,
         routeCount: 1,
@@ -32,18 +32,18 @@ const DemoRunner = {
         disruptionMode: 'both', // 'none', 'flow', 'incidents', 'both'
         stepDelay: 2000
     },
-    
+
     // Quezon City boundary data (loaded from GeoJSON)
     qcBoundary: null,
     qcBoundingBox: null,
-    
+
     // Demo-specific disruption data
     demoDisruptionDir: null,
     generatedDisruptions: {
         flowSegments: [],
         incidents: []
     },
-    
+
     // Detailed progress tracking
     currentProgress: {
         trial: 0,
@@ -58,10 +58,10 @@ const DemoRunner = {
         lastResult: null,
         results: []
     },
-    
+
     // Saved Route Finder state (to be restored after demo)
     savedRouteFinderState: null,
-    
+
     // Location presets for Quezon City
     presetLocations: [
         { name: 'Quezon Memorial Circle', lat: 14.6540, lng: 121.0490 },
@@ -81,7 +81,7 @@ const DemoRunner = {
     // ==========================================================================
     // INITIALIZATION
     // ==========================================================================
-    
+
     async init() {
         console.log('🎬 Initializing Demo Runner...');
         this.loadSavedConfigs();
@@ -89,7 +89,7 @@ const DemoRunner = {
         this.bindEvents();
         await this.loadQCBoundary();
     },
-    
+
     /**
      * Load Quezon City boundary from GeoJSON file
      */
@@ -107,7 +107,7 @@ const DemoRunner = {
                         // Use the first polygon for simplicity
                         this.qcBoundary = geometry.coordinates[0][0];
                     }
-                    
+
                     // Calculate bounding box for faster rejection
                     if (this.qcBoundary) {
                         const lngs = this.qcBoundary.map(c => c[0]);
@@ -133,7 +133,7 @@ const DemoRunner = {
             };
         }
     },
-    
+
     /**
      * Check if a point is inside Quezon City boundary using ray casting algorithm
      */
@@ -145,46 +145,46 @@ const DemoRunner = {
                 return false;
             }
         }
-        
+
         // If no polygon data, use bounding box only
         if (!this.qcBoundary) {
             return true; // Already passed bounding box check
         }
-        
+
         // Ray casting algorithm for point-in-polygon
         let inside = false;
         const polygon = this.qcBoundary;
-        
+
         for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
             const xi = polygon[i][0], yi = polygon[i][1];
             const xj = polygon[j][0], yj = polygon[j][1];
-            
+
             if (((yi > lat) !== (yj > lat)) &&
                 (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) {
                 inside = !inside;
             }
         }
-        
+
         return inside;
     },
-    
+
     /**
      * Generate a random location within Quezon City boundaries
      */
     getRandomLocationInQC() {
         const maxAttempts = 100;
-        
+
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
             // Generate random point within bounding box
             const lat = this.qcBoundingBox.minLat + Math.random() * (this.qcBoundingBox.maxLat - this.qcBoundingBox.minLat);
             const lng = this.qcBoundingBox.minLng + Math.random() * (this.qcBoundingBox.maxLng - this.qcBoundingBox.minLng);
-            
+
             // Check if point is inside QC boundary
             if (this.isPointInQC(lat, lng)) {
                 return { lat, lng, name: `Random (${lat.toFixed(4)}, ${lng.toFixed(4)})` };
             }
         }
-        
+
         // Fallback to preset if all attempts fail
         console.warn('⚠️ Could not generate random point in QC, using preset');
         return this.getRandomLocation();
@@ -195,26 +195,26 @@ const DemoRunner = {
         document.getElementById('random-route-count')?.addEventListener('input', (e) => {
             this.randomDemoSettings.routeCount = parseInt(e.target.value) || 1;
         });
-        
+
         document.getElementById('random-algorithm')?.addEventListener('change', (e) => {
             this.randomDemoSettings.algorithm = e.target.value;
         });
-        
+
         document.getElementById('random-tau-mode')?.addEventListener('change', (e) => {
             this.randomDemoSettings.tauMode = e.target.value;
             this.updateTauModeUI();
         });
-        
+
         document.getElementById('random-disruption-mode')?.addEventListener('change', (e) => {
             this.randomDemoSettings.disruptionMode = e.target.value;
         });
-        
+
         // Demo disruption toggles
         document.getElementById('demo-show-incidents')?.addEventListener('change', (e) => {
             const showFlow = document.getElementById('demo-show-flow')?.checked || false;
             this.showGeneratedDisruptions(e.target.checked, showFlow);
         });
-        
+
         document.getElementById('demo-show-flow')?.addEventListener('change', (e) => {
             const showIncidents = document.getElementById('demo-show-incidents')?.checked || false;
             this.showGeneratedDisruptions(showIncidents, e.target.checked);
@@ -268,7 +268,7 @@ const DemoRunner = {
             panel.classList.remove('translate-x-full');
             this.loadSavedConfigs();
             this.showTab('main');
-            
+
             // Turn off admin panel toggles when Demo Runner opens
             this.disableAdminToggles();
         }
@@ -280,13 +280,13 @@ const DemoRunner = {
             this.showStopConfirmation();
             return;
         }
-        
+
         const panel = document.getElementById('demo-runner-panel');
         if (panel) {
             panel.classList.add('translate-x-full');
         }
     },
-    
+
     forceClosePanel() {
         const panel = document.getElementById('demo-runner-panel');
         if (panel) {
@@ -321,19 +321,19 @@ const DemoRunner = {
             </div>
         `;
         document.body.appendChild(overlay);
-        
+
         // Handle cancel
         document.getElementById('demo-stop-cancel').addEventListener('click', () => {
             overlay.remove();
         });
-        
+
         // Handle confirm
         document.getElementById('demo-stop-confirm').addEventListener('click', () => {
             this.stopDemo();
             overlay.remove();
             this.forceClosePanel();
         });
-        
+
         // Close on overlay click
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) {
@@ -346,12 +346,12 @@ const DemoRunner = {
         // Store previous state
         const incidentToggle = document.getElementById('show-active-incidents');
         const flowToggle = document.getElementById('show-traffic-overlay');
-        
+
         this.previousToggleStates = {
             incidents: incidentToggle?.checked || false,
             flow: flowToggle?.checked || false
         };
-        
+
         // Turn off toggles
         if (incidentToggle && incidentToggle.checked) {
             incidentToggle.checked = false;
@@ -361,7 +361,7 @@ const DemoRunner = {
             flowToggle.checked = false;
             flowToggle.dispatchEvent(new Event('change'));
         }
-        
+
         console.log('🔇 Admin toggles disabled for demo');
     },
 
@@ -375,7 +375,7 @@ const DemoRunner = {
         const thresholdInput = document.getElementById('threshold-input');
         const incidentToggle = document.getElementById('show-active-incidents');
         const flowToggle = document.getElementById('show-traffic-overlay');
-        
+
         this.savedRouteFinderState = {
             algorithm: algorithmRadio?.value || 'hc2l',
             dataset: datasetRadio?.value || 'none',
@@ -383,7 +383,7 @@ const DemoRunner = {
             showIncidents: incidentToggle?.checked || false,
             showFlow: flowToggle?.checked || false
         };
-        
+
         console.log('💾 Saved Route Finder state:', this.savedRouteFinderState);
     },
 
@@ -397,21 +397,21 @@ const DemoRunner = {
         }
 
         const state = this.savedRouteFinderState;
-        
+
         // Restore Algorithm
         const algorithmRadio = document.querySelector(`input[name="algorithm"][value="${state.algorithm}"]`);
         if (algorithmRadio) {
             algorithmRadio.click();
             console.log(`✅ Restored algorithm: ${state.algorithm}`);
         }
-        
+
         // Restore Dataset
         const datasetRadio = document.querySelector(`input[name="dataset"][value="${state.dataset}"]`);
         if (datasetRadio) {
             datasetRadio.click();
             console.log(`✅ Restored dataset: ${state.dataset}`);
         }
-        
+
         // Restore Threshold
         const thresholdInput = document.getElementById('threshold-input');
         if (thresholdInput) {
@@ -419,7 +419,7 @@ const DemoRunner = {
             thresholdInput.dispatchEvent(new Event('input'));
             console.log(`✅ Restored threshold: ${state.threshold}`);
         }
-        
+
         // Restore Show Active Incidents
         const incidentToggle = document.getElementById('show-active-incidents');
         if (incidentToggle && incidentToggle.checked !== state.showIncidents) {
@@ -427,7 +427,7 @@ const DemoRunner = {
             incidentToggle.dispatchEvent(new Event('change'));
             console.log(`✅ Restored show incidents: ${state.showIncidents}`);
         }
-        
+
         // Restore Show Flow Overlay
         const flowToggle = document.getElementById('show-traffic-overlay');
         if (flowToggle && flowToggle.checked !== state.showFlow) {
@@ -435,7 +435,7 @@ const DemoRunner = {
             flowToggle.dispatchEvent(new Event('change'));
             console.log(`✅ Restored show flow: ${state.showFlow}`);
         }
-        
+
         console.log('🔄 Route Finder state restored');
     },
 
@@ -445,7 +445,7 @@ const DemoRunner = {
             const el = document.getElementById(`demo-runner-tab-${tab}`);
             if (el) el.classList.add('hidden');
         });
-        
+
         ['random-settings', 'running', 'results'].forEach(tab => {
             const el = document.getElementById(`demo-runner-footer-${tab}`);
             if (el) el.classList.add('hidden');
@@ -454,32 +454,32 @@ const DemoRunner = {
         // Show selected tab
         const selectedTab = document.getElementById(`demo-runner-tab-${tabName}`);
         if (selectedTab) selectedTab.classList.remove('hidden');
-        
+
         const selectedFooter = document.getElementById(`demo-runner-footer-${tabName}`);
         if (selectedFooter) selectedFooter.classList.remove('hidden');
-        
+
         // Update tab indicators
         document.querySelectorAll('[data-demo-tab]').forEach(btn => {
             btn.classList.remove('bg-purple-600', 'text-white');
             btn.classList.add('bg-gray-200', 'text-gray-700');
         });
-        
+
         const activeBtn = document.querySelector(`[data-demo-tab="${tabName}"]`);
         if (activeBtn) {
             activeBtn.classList.remove('bg-gray-200', 'text-gray-700');
             activeBtn.classList.add('bg-purple-600', 'text-white');
         }
-        
+
         // When switching to running tab, refresh the disruption display
         if (tabName === 'running') {
             console.log('🗺️ Switching to running tab, checking disruptions...');
             console.log('   generatedDisruptions:', this.generatedDisruptions);
             console.log('   disruptionSets:', Object.keys(this.disruptionSets || {}));
-            
+
             // Initialize checkboxes to be checked
             const showIncidentsCheckbox = document.getElementById('demo-show-incidents');
             const showFlowCheckbox = document.getElementById('demo-show-flow');
-            
+
             // Ensure checkboxes are checked by default
             if (showIncidentsCheckbox && !showIncidentsCheckbox.checked) {
                 showIncidentsCheckbox.checked = true;
@@ -487,16 +487,16 @@ const DemoRunner = {
             if (showFlowCheckbox && !showFlowCheckbox.checked) {
                 showFlowCheckbox.checked = true;
             }
-            
+
             const showIncidents = showIncidentsCheckbox?.checked ?? true;
             const showFlow = showFlowCheckbox?.checked ?? true;
-            
+
             // Check if we have disruptions to display
             const hasIncidents = this.generatedDisruptions?.incidents?.length > 0;
             const hasFlow = this.generatedDisruptions?.flowSegments?.length > 0;
-            
+
             console.log(`   Has incidents: ${hasIncidents}, Has flow: ${hasFlow}`);
-            
+
             if (hasIncidents || hasFlow) {
                 // Force refresh the disruption visualization
                 this.refreshDisruptionDisplay();
@@ -506,22 +506,22 @@ const DemoRunner = {
             }
         }
     },
-    
+
     /**
      * Force refresh the disruption display on the map
      */
     refreshDisruptionDisplay() {
         const showIncidents = document.getElementById('demo-show-incidents')?.checked ?? true;
         const showFlow = document.getElementById('demo-show-flow')?.checked ?? true;
-        
+
         console.log('🔄 Refreshing disruption display:', { showIncidents, showFlow });
-        
+
         // Show the disruptions on map
         this.showGeneratedDisruptions(showIncidents, showFlow);
-        
+
         // Update the preview list
         this.updateDisruptionPreview();
-        
+
         // Update disruption sets if available
         if (this.disruptionSets && Object.keys(this.disruptionSets).length > 0) {
             this.showDisruptionSetsPreview();
@@ -530,7 +530,7 @@ const DemoRunner = {
 
     updateTauModeUI() {
         const mode = this.randomDemoSettings.tauMode;
-        
+
         document.getElementById('tau-fixed-container')?.classList.toggle('hidden', mode !== 'fixed');
         document.getElementById('tau-random-container')?.classList.toggle('hidden', mode !== 'random');
         document.getElementById('tau-sequence-container')?.classList.toggle('hidden', mode !== 'sequence');
@@ -543,11 +543,11 @@ const DemoRunner = {
         // Update tab buttons
         const configsBtn = document.getElementById('tab-btn-configs');
         const resultsBtn = document.getElementById('tab-btn-saved-results');
-        
+
         // Update tab content visibility
         const configsContent = document.getElementById('data-tab-configs');
         const resultsContent = document.getElementById('data-tab-saved-results');
-        
+
         if (tabName === 'configs') {
             // Activate configs tab
             if (configsBtn) {
@@ -576,7 +576,7 @@ const DemoRunner = {
             }
             if (resultsContent) resultsContent.classList.remove('hidden');
             if (configsContent) configsContent.classList.add('hidden');
-            
+
             // Refresh saved results when switching to this tab
             this.loadSavedResults();
         }
@@ -590,7 +590,7 @@ const DemoRunner = {
         try {
             const response = await fetch('/api/demo/configs');
             const result = await response.json();
-            
+
             if (result.success) {
                 this.savedConfigs = result.configs || [];
             } else {
@@ -612,9 +612,9 @@ const DemoRunner = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(config)
             });
-            
+
             const result = await response.json();
-            
+
             if (result.success) {
                 this.savedConfigs.push(result.config);
                 this.renderConfigList();
@@ -635,9 +635,9 @@ const DemoRunner = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(config)
             });
-            
+
             const result = await response.json();
-            
+
             if (result.success) {
                 const index = this.savedConfigs.findIndex(c => c.id === config.id);
                 if (index !== -1) {
@@ -670,14 +670,14 @@ const DemoRunner = {
         if (!confirm('Delete this configuration? This will also remove associated disruption files and results.')) {
             return;
         }
-        
+
         try {
             const response = await fetch(`/api/demo/configs/${configId}`, {
                 method: 'DELETE'
             });
-            
+
             const result = await response.json();
-            
+
             if (result.success) {
                 this.savedConfigs = this.savedConfigs.filter(c => c.id !== configId);
                 this.renderConfigList();
@@ -709,8 +709,8 @@ const DemoRunner = {
             return;
         }
 
-    const isRunning = (typeof DemoCreator !== 'undefined' && DemoCreator.isRunning);
-    container.innerHTML = this.savedConfigs.map(config => `
+        const isRunning = (typeof DemoCreator !== 'undefined' && DemoCreator.isRunning);
+        container.innerHTML = this.savedConfigs.map(config => `
             <div class="card card--bordered p-4 hover:border-purple-300 hover:shadow-md transition-all">
                 <div class="flex items-start justify-between mb-2">
                     <div class="flex-1 min-w-0">
@@ -731,7 +731,7 @@ const DemoRunner = {
                 </div>
                 <div class="flex flex-wrap items-center gap-2 text-xs mb-3">
                     <span class="badge badge--info">${config.routes?.length || 0} routes</span>
-                    <span class="badge badge--purple">${config.trials || 1} trials</span>
+                    <span class="badge badge--purple">${config.routes?.[0]?.trials?.length || 1} trials</span>
                     <span class="badge badge--warning">${config.algorithm?.toUpperCase() || 'HC2L'}</span>
                 </div>
         <button onclick="DemoRunner.runSavedConfig('${config.id}')" 
@@ -763,7 +763,7 @@ const DemoRunner = {
         try {
             const response = await fetch('/api/demo/results');
             const result = await response.json();
-            
+
             if (result.success) {
                 this.savedResults = result.results || [];
             } else {
@@ -831,26 +831,26 @@ const DemoRunner = {
                     </div>
                     <div class="space-y-2 pl-2">
                         ${group.results.map((result, idx) => {
-                            const savedDate = result.savedAt ? new Date(result.savedAt) : null;
-                            const dateStr = savedDate ? savedDate.toLocaleDateString() : 'Unknown';
-                            const timeStr = savedDate ? savedDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
-                            const summary = result.summary || {};
-                            
-                            // Format duration
-                            const duration = summary.executionDurationSeconds;
-                            const durationStr = duration ? (duration >= 60 ? `${(duration/60).toFixed(1)}m` : `${duration.toFixed(1)}s`) : '--';
-                            
-                            // Format process time
-                            const processTime = summary.processTime?.avg;
-                            const processTimeStr = processTime ? `${processTime.toFixed(0)}ms` : '--';
-                            
-                            // Algorithm breakdown
-                            const algos = summary.algorithmBreakdown || {};
-                            const algoStr = [];
-                            if (algos.hc2l > 0) algoStr.push(`<span class="text-blue-600">${algos.hc2l}</span>`);
-                            if (algos.dhl > 0) algoStr.push(`<span class="text-green-600">${algos.dhl}</span>`);
-                            
-                            return `
+                const savedDate = result.savedAt ? new Date(result.savedAt) : null;
+                const dateStr = savedDate ? savedDate.toLocaleDateString() : 'Unknown';
+                const timeStr = savedDate ? savedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+                const summary = result.summary || {};
+
+                // Format duration
+                const duration = summary.executionDurationSeconds;
+                const durationStr = duration ? (duration >= 60 ? `${(duration / 60).toFixed(1)}m` : `${duration.toFixed(1)}s`) : '--';
+
+                // Format process time
+                const processTime = summary.processTime?.avg;
+                const processTimeStr = processTime ? `${processTime.toFixed(0)}ms` : '--';
+
+                // Algorithm breakdown
+                const algos = summary.algorithmBreakdown || {};
+                const algoStr = [];
+                if (algos.hc2l > 0) algoStr.push(`<span class="text-blue-600">${algos.hc2l}</span>`);
+                if (algos.dhl > 0) algoStr.push(`<span class="text-green-600">${algos.dhl}</span>`);
+
+                return `
                                 <div class="card card--flat p-3 hover:border-indigo-300 hover:bg-indigo-50/30 transition-all cursor-pointer"
                                      onclick="DemoRunner.viewSavedResult('${result.filePath.replace(/'/g, "\\'")}')">
                                     <div class="flex items-center justify-between mb-1">
@@ -865,7 +865,7 @@ const DemoRunner = {
                                     </div>
                                 </div>
                             `;
-                        }).join('')}
+            }).join('')}
                     </div>
                 </div>
             `;
@@ -885,9 +885,9 @@ const DemoRunner = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ filePath })
             });
-            
+
             const data = await response.json();
-            
+
             if (data.success && data.result) {
                 // Load the result into currentProgress and show the results tab
                 this.currentProgress.results = data.result.results || [];
@@ -939,9 +939,9 @@ const DemoRunner = {
             do {
                 end = this.getRandomLocationInQC();
                 attempts++;
-            } while (attempts < 10 && 
-                     Math.abs(end.lat - start.lat) < 0.01 && 
-                     Math.abs(end.lng - start.lng) < 0.01);
+            } while (attempts < 10 &&
+            Math.abs(end.lat - start.lat) < 0.01 &&
+                Math.abs(end.lng - start.lng) < 0.01);
             return { start, end };
         } else {
             // Use preset locations
@@ -1057,7 +1057,7 @@ const DemoRunner = {
 
         // Show running tab and start the demo
         this.showTab('running');
-        
+
         try {
             await this.runDemo(config);
             return true;
@@ -1078,14 +1078,14 @@ const DemoRunner = {
         this.isPaused = false;
         this.currentDemo = config;
         this.currentDemoId = null;  // Track demoId for cleanup
-        
+
         // Save the current Route Finder state before making any changes
         this.saveRouteFinderState();
-        
+
         // Turn off admin panel toggles to prevent interference during demo
         const incidentToggle = document.getElementById('show-active-incidents');
         const flowToggle = document.getElementById('show-traffic-overlay');
-        
+
         if (incidentToggle && incidentToggle.checked) {
             incidentToggle.checked = false;
             incidentToggle.dispatchEvent(new Event('change'));
@@ -1094,28 +1094,28 @@ const DemoRunner = {
             flowToggle.checked = false;
             flowToggle.dispatchEvent(new Event('change'));
         }
-        
+
         // Disable route finder UI when demo starts
         this.toggleRouteFinderUI(true);
-        
+
         // Reset saved state for new demo run
         this.currentResultsSavedPath = null;
-        
+
         // Read from settings block (new format) with fallbacks
         const trials = config.settings?.trials || config.trials || 1;
         const routes = config.routes || [];
         const algorithm = config.settings?.algorithm || config.algorithm || 'hc2l';
         const stepDelay = config.settings?.stepDelay || config.stepDelay || 2000;
-        
+
         // Store algorithm in config for processRouteWithProgress
         config.algorithm = algorithm;
         config.stepDelay = stepDelay;
-        
+
         // Check if this is a saved config with pre-generated disruptions
         // Flask saves as 'savedSets', but in-memory configs may use 'disruptionSets'
         const configDisruptionSets = config.disruptions?.savedSets || config.disruptions?.disruptionSets || {};
         const hasConfigDisruptions = Object.keys(configDisruptionSets).length > 0;
-        
+
         // Initialize detailed progress
         this.currentProgress = {
             trial: 0,
@@ -1131,13 +1131,13 @@ const DemoRunner = {
             results: [],
             configName: config.name
         };
-        
+
         console.log('🎬 Starting demo:', config.name);
         if (hasConfigDisruptions) {
             console.log(`📊 Using ${Object.keys(configDisruptionSets).length} saved disruption sets from config`);
         }
         showUpdateToast(`Starting: ${config.name}`, 'info');
-        
+
         this.showTab('running');
         this.showLoadingAnimation('Initializing demo setup...');
         this.updateDetailedProgressUI();
@@ -1145,17 +1145,26 @@ const DemoRunner = {
         try {
             // Reset map
             this.showLoadingAnimation('Resetting map...');
-            await this.resetMap();
-            
+            resetSystemState({
+                clearLocation: true,
+                clearDisruptions: true,
+                clearUpdateRegions: true,
+                clearGoogleMaps: true,
+                clearExportData: true,
+                resetUI: true,
+                verbose: false
+            });
+
+
             // Get disruption config - use new format paths with fallbacks
             const disruptions = config.disruptions || {};
             const generationScope = disruptions.scope || disruptions.generationScope || 'all';
             const disruptionKey = config.disruptionKey || null;  // For loading saved disruption CSVs
-            
+
             // Handle disruption setup
             this.disruptionSets = {};  // Store disruption sets by key
             this.currentDemoId = `demo_${Date.now()}`;
-            
+
             if (hasConfigDisruptions) {
                 // Use saved disruption sets from config - load from CSV files
                 this.showLoadingAnimation('Loading disruption sets...');
@@ -1177,60 +1186,60 @@ const DemoRunner = {
                 }
                 // For per-trial and per-trial-route, generate on-the-fly in the loop
             }
-            
+
             // Setup complete - hide loading animation
             this.hideLoadingAnimation();
-            
+
             // Run for each trial
             for (let trial = 0; trial < trials; trial++) {
                 if (!this.isRunning) break;
-                
+
                 this.currentProgress.trial = trial + 1;
-                
+
                 // Generate disruptions for this trial if per-trial scope (only if not using config-saved)
                 if (!hasConfigDisruptions && generationScope === 'per-trial') {
                     const trialKey = `set_trial_${trial}`;
                     await this.setupDemoDisruptions(config, `${this.currentDemoId}_${trialKey}`, trialKey);
                 }
-                
+
                 // Process each route
                 for (let i = 0; i < routes.length; i++) {
                     if (!this.isRunning) break;
                     while (this.isPaused) {
                         await this.delay(100);
                     }
-                    
+
                     const route = routes[i];
                     this.currentProgress.route = i + 1;
                     this.currentProgress.status = `Setting up route ${i + 1}...`;
                     this.updateDetailedProgressUI();
-                    
+
                     // Generate disruptions for this trial-route if per-trial-route scope (only if not using config-saved)
                     if (!hasConfigDisruptions && generationScope === 'per-trial-route') {
                         const comboKey = `set_trial_${trial}_route_${i}`;
                         await this.setupDemoDisruptions(config, `${this.currentDemoId}_${comboKey}`, comboKey);
                     }
-                    
+
                     // Set active disruptions based on scope
                     // NEW FORMAT: route.trials[trial].disruption is just the setKey string
                     const trialData = route.trials?.[trial];
                     let setKey = null;
-                    
+
                     if (trialData?.disruption) {
                         // Handle both formats:
                         // - New format: disruption is just the setKey string
                         // - Old format: disruption is an object with setKey property
-                        setKey = typeof trialData.disruption === 'string' 
-                            ? trialData.disruption 
+                        setKey = typeof trialData.disruption === 'string'
+                            ? trialData.disruption
                             : trialData.disruption.setKey;
                     }
-                    
+
                     if (setKey) {
                         await this.activateDisruptionSetByKey(setKey);
                     } else {
                         await this.activateDisruptionSet(generationScope, trial, i);
                     }
-                    
+
                     await this.processRouteWithProgress(route, config, trial);
                     await this.delay(config.stepDelay || config.settings?.stepDelay || 2000);
                 }
@@ -1240,22 +1249,22 @@ const DemoRunner = {
                 this.currentProgress.status = '✅ Demo completed!';
                 this.updateDetailedProgressUI();
                 showUpdateToast('Demo completed!', 'success');
-                
+
                 // Clear routes from map
                 if (typeof clearRoutes === 'function') {
                     clearRoutes();
                 }
-                
+
                 // Cleanup demo disruptions (only if we generated them at runtime)
                 if (this.currentDemoId) {
                     await this.cleanupDemoDisruptions(this.currentDemoId);
                 }
-                
+
                 // Mark this as a new execution result (not loaded from saved results)
                 this.resultsSource = 'new';
                 this.currentResultsSavedPath = null; // Reset saved path on new run
                 console.log('✅ Demo completed, resultsSource set to "new", currentResultsSavedPath=', this.currentResultsSavedPath);
-                
+
                 // Use the comprehensive system reset function from functions.js
                 resetSystemState({
                     clearLocation: true,
@@ -1283,15 +1292,15 @@ const DemoRunner = {
             this.currentDemo = null;
             this.currentDemoId = null;  // Reset demoId
             this.demoDisruptionDir = null;
-            
+
             // Re-enable route finder UI when demo stops
             this.toggleRouteFinderUI(false);
-            
+
             // Restore the saved Route Finder state
             this.restoreRouteFinderState();
         }
     },
-    
+
     /**
      * Setup demo-specific disruptions by generating files via API
      * @param {Object} config - Demo configuration
@@ -1301,34 +1310,34 @@ const DemoRunner = {
     async setupDemoDisruptions(config, demoId, setKey = 'all') {
         const disruptions = config.disruptions || {};
         const mode = disruptions.mode || config.disruptionMode || 'none';
-        
+
         if (mode === 'none') {
             this.demoDisruptionDir = null;
             window.demoDisruptionDir = null;
             console.log('📍 Demo running without disruptions');
             return;
         }
-        
+
         const scopeLabel = setKey === 'all' ? '' : ` (${setKey})`;
         this.currentProgress.status = `Generating demo disruptions${scopeLabel}...`;
         this.updateDetailedProgressUI();
-        
+
         try {
             // NEW: Use random matched edges from existing CSV files
             const severityMin = disruptions.severityMin || 0;
             const severityMax = disruptions.severityMax || 1;
-            
+
             // Determine counts based on mode
             let flowCount = 0;
             let incidentCount = 0;
-            
+
             if (mode === 'flow' || mode === 'both' || mode === 'random-both') {
                 flowCount = disruptions.randomFlowCount || 5;
             }
             if (mode === 'incidents' || mode === 'both' || mode === 'random-both') {
                 incidentCount = disruptions.randomIncidentCount || 3;
             }
-            
+
             // Build request for new API
             const requestBody = {
                 demo_id: demoId,
@@ -1338,14 +1347,14 @@ const DemoRunner = {
                 severity_min: severityMin,
                 severity_max: severityMax
             };
-            
+
             // Add custom disruption items if any (uses legacy snap-to-edge mode)
             if (disruptions.customItems && disruptions.customItems.length > 0) {
                 requestBody.use_random_edges = false;
-                
+
                 const flowData = [];
                 const incidentData = [];
-                
+
                 for (const item of disruptions.customItems) {
                     if (item.type === 'flow') {
                         flowData.push({
@@ -1362,20 +1371,20 @@ const DemoRunner = {
                         });
                     }
                 }
-                
+
                 requestBody.flow_data = flowData;
                 requestBody.incident_data = incidentData;
             }
-            
+
             // Call API to create disruption files
             const response = await fetch('/api/demo/disruptions', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(requestBody)
             });
-            
+
             const result = await response.json();
-            
+
             if (result.success) {
                 // Store this disruption set for later activation
                 this.disruptionSets = this.disruptionSets || {};
@@ -1386,10 +1395,10 @@ const DemoRunner = {
                     flowCount: result.flow_count,
                     incidentCount: result.incident_count
                 };
-                
+
                 console.log(`📍 Demo disruptions created for ${setKey}:`, result);
                 console.log(`   Flow: ${result.flow_count}, Incidents: ${result.incident_count}`);
-                
+
                 // If this is the 'all' scope or first set, activate it immediately
                 if (setKey === 'all') {
                     this.activateDisruptionSet('all', 0, 0);
@@ -1397,12 +1406,12 @@ const DemoRunner = {
             } else {
                 console.warn('⚠️ Failed to create demo disruptions:', result.error);
             }
-            
+
         } catch (error) {
             console.error('Error setting up demo disruptions:', error);
         }
     },
-    
+
     /**
      * Activate a disruption set from config - loads from saved CSV files or writes new temp files
      * @param {string} setKey - The disruption set key (e.g., 'set_all', 'set_trial_0', etc.)
@@ -1418,10 +1427,10 @@ const DemoRunner = {
             if (setData.disruption_dir && disruptionKey) {
                 // Load disruption data from saved CSV files via API
                 console.log(`📂 Loading saved disruption set: ${disruptionKey}/${setKey}`);
-                
+
                 const response = await fetch(`/api/demo/disruption-data/${disruptionKey}/${setKey}`);
                 const result = await response.json();
-                
+
                 if (result.success) {
                     // Store in our runtime disruption sets - using the existing saved CSV path
                     this.disruptionSets[setKey] = {
@@ -1451,9 +1460,9 @@ const DemoRunner = {
                         incident_data: setData.incidents || []
                     })
                 });
-                
+
                 const result = await response.json();
-                
+
                 if (result.success) {
                     // Store in our runtime disruption sets
                     this.disruptionSets[setKey] = {
@@ -1475,7 +1484,7 @@ const DemoRunner = {
             console.error(`❌ Error activating config disruption set ${setKey}:`, error);
         }
     },
-    
+
     /**
      * Activate a disruption set by its key directly
      * Used when route.trials[trial].disruption.setKey is available
@@ -1486,12 +1495,12 @@ const DemoRunner = {
             console.warn(`⚠️ No disruption sets loaded, cannot activate ${setKey}`);
             return;
         }
-        
+
         const disruptionSet = this.disruptionSets[setKey];
         if (disruptionSet) {
             this.demoDisruptionDir = disruptionSet.disruptionDir;
             window.demoDisruptionDir = disruptionSet.disruptionDir;
-            
+
             // Convert API format to display format
             const disruptions = disruptionSet.disruptions || {};
             this.generatedDisruptions = {
@@ -1512,10 +1521,10 @@ const DemoRunner = {
                     free_flow_speed: d.free_flow_kph
                 }))
             };
-            
+
             console.log(`🔄 Activated disruption set by key: ${setKey}`);
             console.log(`   Incidents: ${this.generatedDisruptions.incidents.length}, Flow: ${this.generatedDisruptions.flowSegments.length}`);
-            
+
             this.currentPreviewSet = setKey;
             await this.refreshDisruptionDisplay();  // Respect checkbox states
             this.showDisruptionSetsPreview();
@@ -1523,7 +1532,7 @@ const DemoRunner = {
             console.warn(`⚠️ Disruption set not found for key: ${setKey}`);
         }
     },
-    
+
     /**
      * Activate the appropriate disruption set based on scope
      * @param {string} scope - Generation scope ('all', 'per-trial', 'per-route', 'per-trial-route')
@@ -1549,15 +1558,15 @@ const DemoRunner = {
             default:
                 setKey = 'set_all';
         }
-        
+
         // Use runtime-generated disruption sets
         if (!this.disruptionSets) return;
-        
+
         const disruptionSet = this.disruptionSets[setKey];
         if (disruptionSet) {
             this.demoDisruptionDir = disruptionSet.disruptionDir;
             window.demoDisruptionDir = disruptionSet.disruptionDir;
-            
+
             // Convert API format (flow/incidents) to display format (flowSegments/incidents)
             const disruptions = disruptionSet.disruptions || {};
             this.generatedDisruptions = {
@@ -1578,23 +1587,23 @@ const DemoRunner = {
                     free_flow_speed: d.free_flow_kph
                 }))
             };
-            
+
             console.log(`🔄 Activated disruption set: ${setKey}`);
             console.log(`   Incidents: ${this.generatedDisruptions.incidents.length}, Flow: ${this.generatedDisruptions.flowSegments.length}`);
-            
+
             // Update current preview set and refresh UI
             this.currentPreviewSet = setKey;
-            
+
             // Update map visualization respecting checkbox states
             await this.refreshDisruptionDisplay();
-            
+
             // Update the disruption preview panel
             this.showDisruptionSetsPreview();
         } else {
             console.warn(`⚠️ Disruption set not found for key: ${setKey}`);
         }
     },
-    
+
     /**
      * Cleanup demo disruption files after demo completes
      */
@@ -1613,10 +1622,10 @@ const DemoRunner = {
                 }
                 this.disruptionSets = {};
             }
-            
+
             // Also try to cleanup the base demoId
             await fetch(`/api/demo/disruptions/${demoId}`, { method: 'DELETE' });
-            
+
             window.demoDisruptionDir = null;
             this.demoDisruptionDir = null;
             this.hideGeneratedDisruptions();
@@ -1630,7 +1639,7 @@ const DemoRunner = {
         // Set start location
         this.currentProgress.status = `Setting start: ${route.start.name}`;
         this.updateDetailedProgressUI();
-        
+
         if (typeof handleOSMStartLocationPin === 'function') {
             await handleOSMStartLocationPin(route.start.lat, route.start.lng);
         }
@@ -1640,7 +1649,7 @@ const DemoRunner = {
         // Set destination
         this.currentProgress.status = `Setting destination: ${route.end.name}`;
         this.updateDetailedProgressUI();
-        
+
         if (typeof handleOSMDestLocationPin === 'function') {
             await handleOSMDestLocationPin(route.end.lat, route.end.lng);
         }
@@ -1653,7 +1662,7 @@ const DemoRunner = {
 
         // Note: Disruptions are handled separately via activateDisruptionSet/activateDisruptionSetByKey
         // No need to set dataset radio here - disruptions are displayed via showGeneratedDisruptions
-        
+
         // Ensure disruptions are displayed on the map
         console.log('📍 About to refresh disruption display in processRouteWithProgress');
         console.log('   generatedDisruptions:', this.generatedDisruptions);
@@ -1664,7 +1673,7 @@ const DemoRunner = {
         // Determine TAU values to test based on scope
         const tauScope = config.tau?.scope || config.sequence?.tauGenerationScope || 'all';
         let tauValuesToTest;
-        
+
         // NEW FORMAT: Use route.trials[trialIndex].tau if available
         const trialData = route.trials?.[trialIndex];
         if (trialData && trialData.tau !== undefined) {
@@ -1675,7 +1684,7 @@ const DemoRunner = {
             // Legacy format: fallback - generate tau based on config template
             const tauMode = config.tau?.mode || config.sequence?.tauMode || 'fixed';
             let tau = 0.5;
-            
+
             if (tauMode === 'fixed') {
                 tau = config.tau?.fixed || config.sequence?.tauFixed || 0.5;
             } else if (tauMode === 'random') {
@@ -1687,19 +1696,19 @@ const DemoRunner = {
                 const idx = trialIndex % seq.length;
                 tau = seq[idx];
             }
-            
+
             tauValuesToTest = [tau];
             console.log(`📊 Generated tau (no saved value): ${tau}`);
         }
-        
+
         this.currentProgress.totalTaus = tauValuesToTest.length;
-        
+
         for (let tauIdx = 0; tauIdx < tauValuesToTest.length; tauIdx++) {
             if (!this.isRunning) break;
             while (this.isPaused) {
                 await this.delay(100);
             }
-            
+
             const tau = tauValuesToTest[tauIdx];
             this.currentProgress.tauIndex = tauIdx + 1;
             this.currentProgress.currentTau = tau;
@@ -1718,15 +1727,19 @@ const DemoRunner = {
 
                 // DHL uses default 0.5, HC2L uses the specified tau
                 const effectiveTau = algo === 'hc2l' ? tau : 0.5;
-                
+
                 this.currentProgress.algorithm = algo.toUpperCase();
                 this.currentProgress.currentTau = effectiveTau;
-                this.currentProgress.status = `Testing ${algo.toUpperCase()} with τ = ${effectiveTau.toFixed(2)}`;
+                if (algo === 'dhl') {
+                    this.currentProgress.status = `Testing DHL (τ not used)`;
+                } else {
+                    this.currentProgress.status = `Testing ${algo.toUpperCase()} with τ = ${effectiveTau.toFixed(2)}`;
+                }
                 this.updateDetailedProgressUI();
-                
+
                 // Set algorithm
                 document.querySelector(`input[name="algorithm"][value="${algo}"]`)?.click();
-                
+
                 // Set tau value
                 const thresholdInput = document.getElementById('threshold-input');
                 if (thresholdInput) {
@@ -1762,7 +1775,7 @@ const DemoRunner = {
                 } else {
                     console.warn(`⚠️ Failed to capture ${algo.toUpperCase()} result - routeData:`, routeData);
                 }
-                
+
                 this.updateDetailedProgressUI();
 
                 // Step delay for visualization purposes (user can observe the route)
@@ -1780,7 +1793,7 @@ const DemoRunner = {
     async waitForLocationSet(type, maxWaitMs = 5000) {
         const startTime = Date.now();
         const checkInterval = 50;
-        
+
         while (Date.now() - startTime < maxWaitMs) {
             const location = type === 'start' ? window.startLocation : window.destLocation;
             if (location && location.lat && location.lng) {
@@ -1790,7 +1803,7 @@ const DemoRunner = {
             }
             await this.delay(checkInterval);
         }
-        
+
         console.warn(`⚠️ Timeout waiting for ${type} location to be set`);
         return false;
     },
@@ -1836,11 +1849,11 @@ const DemoRunner = {
             // ============================================================
             // CORE METRICS FROM API (calculated_distance_meters, calculated_distance_km)
             // ============================================================
-            
+
             // Distance - use calculated values from C++ API (haversine calculation)
             result.metrics.calculatedDistanceMeters = metrics.calculated_distance_meters || null;
             result.metrics.calculatedDistanceKm = metrics.calculated_distance_km || null;
-            
+
             // Format display distance
             if (result.metrics.calculatedDistanceKm) {
                 result.metrics.displayDistance = `${result.metrics.calculatedDistanceKm.toFixed(2)} km`;
@@ -1849,7 +1862,7 @@ const DemoRunner = {
                 result.metrics.displayDistance = `${(result.metrics.calculatedDistanceMeters / 1000).toFixed(2)} km`;
                 result.metrics.distanceKm = result.metrics.calculatedDistanceMeters / 1000;
             }
-            
+
             // Fallback to other distance sources if calculated not available
             if (!result.metrics.displayDistance) {
                 if (metrics.total_distance_meters && metrics.total_distance_meters < 2147483647) {
@@ -1865,14 +1878,14 @@ const DemoRunner = {
             result.metrics.etaFormatted = metrics.eta_formatted || null;
             result.metrics.displayEta = metrics.eta_formatted || (metrics.eta_seconds ? this.formatSeconds(metrics.eta_seconds) : null);
             result.metrics.actualEta = result.metrics.displayEta;
-            
+
             // Baseline vs Actual ETA from disruptions summary
             const routeDisruptions = disruptionsSummary.route || {};
             result.metrics.baselineEtaSeconds = routeDisruptions.baseline_eta_seconds || null;
             result.metrics.actualEtaSeconds = routeDisruptions.actual_eta_seconds || null;
             result.metrics.timeImpactSeconds = routeDisruptions.total_time_impact_seconds || null;
             result.metrics.timeImpactPercent = routeDisruptions.percentage_increase || null;
-            
+
             if (result.metrics.baselineEtaSeconds) {
                 result.metrics.baselineEta = this.formatSeconds(result.metrics.baselineEtaSeconds);
             }
@@ -1908,7 +1921,7 @@ const DemoRunner = {
             result.metrics.dirtyNodes = result.metrics.dirtyNodesCount ? `${result.metrics.dirtyNodesCount} nodes` : null;
             result.metrics.impactScoreNum = updatePhase.impact_score || null;
             result.metrics.impactScore = result.metrics.impactScoreNum ? result.metrics.impactScoreNum.toFixed(3) : null;
-            
+
             // Label size metrics
             result.metrics.labelSizeBeforeMb = updatePhase.label_size_before_mb || null;
             result.metrics.labelSizeAfterMb = updatePhase.label_size_after_mb || null;
@@ -1987,11 +2000,11 @@ const DemoRunner = {
      */
     formatSeconds(seconds) {
         if (seconds == null || isNaN(seconds)) return null;
-        
+
         const hours = Math.floor(seconds / 3600);
         const minutes = Math.floor((seconds % 3600) / 60);
         const secs = Math.round(seconds % 60);
-        
+
         if (hours > 0) {
             return `${hours}h ${minutes}m ${secs}s`;
         } else if (minutes > 0) {
@@ -2046,13 +2059,13 @@ const DemoRunner = {
             result.metrics.actualEta = getMetricValue('metrics-actual-eta');
             result.metrics.timeImpact = getMetricValue('metrics-time-impact');
             result.metrics.disruptedEdges = getMetricValue('metrics-disrupted-edges');
-            
+
             // Distance - try multiple sources WITH CACHING PREVENTION
             // First try direct DOM elements that get updated dynamically
             const routeDistance = document.getElementById('route-distance')?.textContent?.trim();
             const calculatedDistEl = document.getElementById('metrics-calculated-distance')?.textContent?.trim();
             const metricsDistEl = getMetricValue('metrics-distance');
-            
+
             // Use the most recently updated distance value
             if (routeDistance && routeDistance !== '--') {
                 result.metrics.displayDistance = routeDistance;
@@ -2062,7 +2075,7 @@ const DemoRunner = {
                     result.metrics.distanceKm = parseFloat(kmMatch[1]);
                 }
             }
-            
+
             // Fallback to calculated distance if main route distance not available
             if (!result.metrics.displayDistance && calculatedDistEl && calculatedDistEl !== '--') {
                 result.metrics.calculatedDistance = calculatedDistEl;
@@ -2071,12 +2084,12 @@ const DemoRunner = {
                     result.metrics.distanceKm = parseFloat(kmMatch[1]);
                 }
             }
-            
+
             // Fallback to metrics distance panel
             if (!result.metrics.displayDistance && !result.metrics.calculatedDistance && metricsDistEl) {
                 result.metrics.distance = metricsDistEl;
             }
-            
+
             result.metrics.distanceNum = getNumericValue('metrics-distance');
             result.metrics.pathLength = getMetricValue('metrics-path-length');
             result.metrics.edgeCount = getMetricValue('metrics-edge-count');
@@ -2099,7 +2112,7 @@ const DemoRunner = {
             result.metrics.impactScoreNum = getNumericValue('metrics-impact-score');
             result.metrics.tauThreshold = getMetricValue('metrics-tau-threshold');
             result.metrics.tauThresholdNum = getNumericValue('metrics-tau-threshold');
-            
+
             // Hierarchy info (for completeness)
             result.metrics.hierarchyHeight = getMetricValue('metrics-hierarchy-height');
             result.metrics.avgCutSize = getMetricValue('metrics-avg-cut-size');
@@ -2303,28 +2316,28 @@ const DemoRunner = {
     calculateOverallProgress() {
         const p = this.currentProgress;
         if (p.totalTrials === 0 || p.totalRoutes === 0) return 0;
-        
+
         // Each route has multiple sub-steps:
         // 1. Setting start (5%)
         // 2. Setting destination (5%)
         // 3. Setting algorithm (5%)
         // 4. For each tau: setting tau (10%), computing (50%), capturing (30%) = 90% divided among taus
         // Total per route: 15% + (85% / numTaus per tau step)
-        
+
         const totalTaus = p.totalTaus || 1;
         const stepsPerRoute = 3 + (totalTaus * 3); // 3 setup steps + 3 steps per tau
         const totalSteps = p.totalTrials * p.totalRoutes * stepsPerRoute;
-        
+
         // Calculate completed steps
         const completedTrials = (p.trial - 1) * p.totalRoutes * stepsPerRoute;
         const completedRoutes = (p.route - 1) * stepsPerRoute;
         const completedTauSteps = (p.tauIndex - 1) * 3 + (p.subStep || 0);
-        
+
         // Add current progress within the route (3 setup steps + tau progress)
         const routeProgress = p.setupStep || 0; // 0-3 for setup steps
-        
+
         const completedSteps = completedTrials + completedRoutes + routeProgress + completedTauSteps;
-        
+
         return Math.min(100, (completedSteps / totalSteps) * 100);
     },
 
@@ -2362,7 +2375,7 @@ const DemoRunner = {
             adminToggle.checked = checked;
             adminToggle.dispatchEvent(new Event('change'));
         }
-        
+
         // Also call the handler directly
         if (typeof handleActiveIncidentsToggle === 'function') {
             await handleActiveIncidentsToggle(checked, { silent: true });
@@ -2376,7 +2389,7 @@ const DemoRunner = {
             adminToggle.checked = checked;
             adminToggle.dispatchEvent(new Event('change'));
         }
-        
+
         // Also call the handler directly
         if (typeof handleTrafficOverlayToggle === 'function') {
             await handleTrafficOverlayToggle(checked, { silent: true });
@@ -2386,7 +2399,7 @@ const DemoRunner = {
     // Apply disruption mode from config
     async applyDisruptionMode(mode) {
         console.log('🚦 Applying disruption mode:', mode);
-        
+
         // Set the radio button
         const disruptionRadio = document.querySelector(`input[name="dataset"][value="${mode}"]`);
         if (disruptionRadio) {
@@ -2439,24 +2452,24 @@ const DemoRunner = {
     // Generate random incidents within Quezon City bounds
     generateRandomIncidents(count = 5, severityMin = 0.3, severityMax = 0.9) {
         const incidentTypes = [
-            'Accident', 'Road Closure', 'Construction', 
+            'Accident', 'Road Closure', 'Construction',
             'Road Hazard', 'Disabled Vehicle', 'Lane Restriction'
         ];
-        
+
         const severityLevels = ['Heavy', 'Medium', 'Light'];
-        
+
         // Quezon City bounds
         const bounds = {
             minLat: 14.58, maxLat: 14.72,
             minLng: 121.00, maxLng: 121.12
         };
-        
+
         const incidents = [];
         for (let i = 0; i < count; i++) {
             const lat = bounds.minLat + Math.random() * (bounds.maxLat - bounds.minLat);
             const lng = bounds.minLng + Math.random() * (bounds.maxLng - bounds.minLng);
             const severity = severityMin + Math.random() * (severityMax - severityMin);
-            
+
             incidents.push({
                 id: `demo-incident-${i}`,
                 type: incidentTypes[Math.floor(Math.random() * incidentTypes.length)],
@@ -2472,7 +2485,7 @@ const DemoRunner = {
                 custom: true
             });
         }
-        
+
         return incidents;
     },
 
@@ -2483,14 +2496,14 @@ const DemoRunner = {
             minLat: 14.58, maxLat: 14.72,
             minLng: 121.00, maxLng: 121.12
         };
-        
+
         const segments = [];
         for (let i = 0; i < count; i++) {
             const lat = bounds.minLat + Math.random() * (bounds.maxLat - bounds.minLat);
             const lng = bounds.minLng + Math.random() * (bounds.maxLng - bounds.minLng);
             const severity = severityMin + Math.random() * (severityMax - severityMin);
             const currentSpeed = Math.floor(10 + Math.random() * 40); // 10-50 kph
-            
+
             segments.push({
                 id: `demo-flow-${i}`,
                 type: 'Congestion',
@@ -2507,7 +2520,7 @@ const DemoRunner = {
                 custom: true
             });
         }
-        
+
         return segments;
     },
 
@@ -2518,14 +2531,14 @@ const DemoRunner = {
         const flowCount = config.disruptions?.randomFlowCount || 5;
         const severityMin = config.disruptions?.severityMin || 0.3;
         const severityMax = config.disruptions?.severityMax || 0.9;
-        
+
         console.log('🎲 Generating demo disruptions:', { mode, incidentCount, flowCount });
-        
+
         this.generatedDisruptions = {
             incidents: [],
             flowSegments: []
         };
-        
+
         switch (mode) {
             case 'random-both':
             case 'both':
@@ -2563,12 +2576,12 @@ const DemoRunner = {
                 // No disruptions
                 break;
         }
-        
+
         console.log('✅ Generated disruptions:', {
             incidents: this.generatedDisruptions.incidents.length,
             flowSegments: this.generatedDisruptions.flowSegments.length
         });
-        
+
         return this.generatedDisruptions;
     },
 
@@ -2578,36 +2591,36 @@ const DemoRunner = {
     // Show generated disruptions on map - mirrors DemoCreator.displayDisruptionsOnMap approach
     async showGeneratedDisruptions(showIncidents = true, showFlow = true) {
         console.log('🗺️ showGeneratedDisruptions called:', { showIncidents, showFlow });
-        
+
         // Check if we have any disruptions to display
         if (!this.generatedDisruptions) {
             console.warn('⚠️ No generatedDisruptions data available');
             return;
         }
-        
+
         console.log('   Current disruption data:', {
             incidentCount: this.generatedDisruptions?.incidents?.length || 0,
             flowCount: this.generatedDisruptions?.flowSegments?.length || 0
         });
-        
+
         // If no disruptions to show, clear and return
         if (!showIncidents && !showFlow) {
             console.log('📍 Both disruption types disabled, clearing layers');
             this.clearDemoDisruptionLayers();
             return;
         }
-        
+
         // Clear existing demo disruption layers
         this.clearDemoDisruptionLayers();
-        
+
         // Get map reference - use global map object
         const mapRef = (typeof map !== 'undefined') ? map : window.map;
-        
+
         if (!mapRef) {
             console.warn('❌ Map not available for disruption display');
             return;
         }
-        
+
         console.log('✅ Map reference obtained, adding layers...');
 
         // Prepare flow segments with geometry handling
@@ -2626,7 +2639,7 @@ const DemoRunner = {
                     return null;
                 }).filter(c => c !== null);
             }
-            
+
             return {
                 ...f,
                 geometry: geometry,
@@ -2634,7 +2647,7 @@ const DemoRunner = {
                 target_lng: f.target_lng || f.target_lon
             };
         });
-        
+
         // Prepare incidents
         const incidents = (this.generatedDisruptions.incidents || []).map(inc => ({
             ...inc,
@@ -2643,7 +2656,7 @@ const DemoRunner = {
             type: inc.incident_type || inc.type || 'Incident',
             criticality: inc.incident_criticality || inc.criticality || 'minor'
         }));
-        
+
         // Use TrafficUtils unified display function
         // This ensures incidents are rendered ON TOP with icons inside markers
         console.log(`📍 Calling TrafficUtils.displayDisruptionsOnMap with:`);
@@ -2651,7 +2664,7 @@ const DemoRunner = {
         console.log(`   incidents: ${incidents.length} items`);
         console.log(`   mapRef: ${mapRef ? 'OK' : 'NULL'}`);
         console.log(`   layerStorage is array: ${Array.isArray(this.demoDisruptionLayers)}`);
-        
+
         TrafficUtils.displayDisruptionsOnMap({
             flowSegments: flowSegments,
             incidents: incidents,
@@ -2660,17 +2673,17 @@ const DemoRunner = {
             showFlow: showFlow,
             showIncidents: showIncidents
         });
-        
+
         console.log(`📊 After display - demoDisruptionLayers length: ${this.demoDisruptionLayers.length}`);
     },
-    
+
     // Clear demo disruption layers from map
     clearDemoDisruptionLayers() {
         const mapRef = window.map || (typeof map !== 'undefined' ? map : null);
         TrafficUtils.clearDisruptionLayers(this.demoDisruptionLayers, mapRef);
         console.log('🧹 Cleared demo disruption layers');
     },
-    
+
     /**
      * Hide generated disruptions from the map
      */
@@ -2681,7 +2694,7 @@ const DemoRunner = {
             clearDisruptionMarkers();
         }
     },
-    
+
     // Current disruption set key for display
     currentPreviewSet: null,
 
@@ -2692,22 +2705,22 @@ const DemoRunner = {
         const setsPanel = document.getElementById('demo-runner-disruption-sets');
         const buttonsContainer = document.getElementById('demo-runner-set-buttons');
         const previewContainer = document.getElementById('demo-runner-disruption-preview');
-        
+
         if (!setsPanel || !buttonsContainer || !previewContainer) return;
-        
+
         const sets = this.disruptionSets || {};
         const setKeys = Object.keys(sets);
-        
+
         // Always show the panel, even if there are no disruption sets
         setsPanel.classList.remove('hidden');
-        
+
         if (setKeys.length === 0) {
             // Show empty state with count badges
             buttonsContainer.innerHTML = '<div class="text-xs text-gray-400 text-center py-2">No disruption sets</div>';
             previewContainer.innerHTML = this.renderCurrentDisruptionList();
             return;
         }
-        
+
         // Show sets panel and render buttons
         buttonsContainer.innerHTML = setKeys.map(key => `
             <button onclick="DemoRunner.selectDisruptionSet('${key}')"
@@ -2720,7 +2733,7 @@ const DemoRunner = {
         if (this.currentPreviewSet) {
             setTimeout(() => this.scrollToActiveDisruptionSet(this.currentPreviewSet), 100);
         }
-        
+
         // Render current set details
         previewContainer.innerHTML = this.renderCurrentDisruptionList();
     },
@@ -2730,9 +2743,9 @@ const DemoRunner = {
      */
     getSetLabel(key) {
         if (!key) return 'Unknown';
-        
+
         if (key === 'set_all') return 'All Trials/Routes';
-        
+
         const match = key.match(/set_trial_(\d+)(?:_route_(\d+))?/);
         if (match) {
             const trial = parseInt(match[1]) + 1;
@@ -2742,12 +2755,12 @@ const DemoRunner = {
             }
             return `Trial ${trial}`;
         }
-        
+
         const routeMatch = key.match(/set_route_(\d+)/);
         if (routeMatch) {
             return `Route ${parseInt(routeMatch[1]) + 1}`;
         }
-        
+
         return key.replace('set_', '').replace(/_/g, ' ');
     },
 
@@ -2770,7 +2783,7 @@ const DemoRunner = {
                 target_lng: d.target_lon || d.target_lng,
                 incident_type: d.type || d.incident_type || 'Incident',
                 severity: d.criticality === 'critical' ? 'Heavy' :
-                          d.criticality === 'major' ? 'Medium' : 'Light'
+                    d.criticality === 'major' ? 'Medium' : 'Light'
             })),
             flowSegments: (disruptions.flow || []).map(d => ({
                 ...d,
@@ -2778,7 +2791,7 @@ const DemoRunner = {
                 target_lng: d.target_lon || d.target_lng,
                 incident_type: 'Congestion',
                 severity: d.jam_factor > 7 ? 'Heavy' :
-                          d.jam_factor > 4 ? 'Medium' : 'Light',
+                    d.jam_factor > 4 ? 'Medium' : 'Light',
                 current_speed: d.speed_kph,
                 free_flow_speed: d.free_flow_kph
             }))
@@ -2820,13 +2833,13 @@ const DemoRunner = {
     renderCurrentDisruptionList() {
         const flow = this.generatedDisruptions.flowSegments || [];
         const incidents = this.generatedDisruptions.incidents || [];
-        
+
         if (flow.length === 0 && incidents.length === 0) {
             return `<div class="text-xs text-gray-500 text-center py-2">No disruptions loaded</div>`;
         }
-        
+
         let html = '';
-        
+
         // Flow disruptions
         if (flow.length > 0) {
             html += `<div class="flex items-center gap-2 text-xs font-semibold text-orange-600 mb-2">
@@ -2880,7 +2893,7 @@ const DemoRunner = {
             }
             html += `</div>`;
         }
-        
+
         return html;
     },
 
@@ -2894,13 +2907,13 @@ const DemoRunner = {
         } else {
             item = this.generatedDisruptions.incidents?.[index];
         }
-        
+
         if (!item || !window.map) return;
-        
+
         // Calculate center of the disruption
         const lat = (parseFloat(item.source_lat) + parseFloat(item.target_lat)) / 2;
         const lng = (parseFloat(item.source_lng || item.source_lon) + parseFloat(item.target_lng || item.target_lon)) / 2;
-        
+
         if (!isNaN(lat) && !isNaN(lng)) {
             map.setView([lat, lng], 16);
             console.log(`🔍 Focused on ${type} disruption at [${lat.toFixed(4)}, ${lng.toFixed(4)}]`);
@@ -2948,7 +2961,7 @@ const DemoRunner = {
         // Get checkbox states, defaulting to true if not yet initialized
         const incidentsCheckbox = document.getElementById('demo-show-incidents');
         const flowCheckbox = document.getElementById('demo-show-flow');
-        
+
         // Ensure checkboxes are checked if they exist
         if (incidentsCheckbox && !incidentsCheckbox.checked) {
             incidentsCheckbox.checked = true;
@@ -2956,10 +2969,10 @@ const DemoRunner = {
         if (flowCheckbox && !flowCheckbox.checked) {
             flowCheckbox.checked = true;
         }
-        
+
         const showIncidents = incidentsCheckbox ? incidentsCheckbox.checked : true;
         const showFlow = flowCheckbox ? flowCheckbox.checked : true;
-        
+
         console.log(`📍 Refreshing disruption display: incidents=${showIncidents}, flow=${showFlow}`);
         await this.showGeneratedDisruptions(showIncidents, showFlow);
         this.updateDisruptionPreview();
@@ -2972,12 +2985,12 @@ const DemoRunner = {
         const showIncidents = document.getElementById('demo-show-incidents')?.checked ?? true;
         const showFlow = document.getElementById('demo-show-flow')?.checked ?? true;
         const previewContainer = document.getElementById('demo-runner-disruption-preview');
-        
+
         if (!previewContainer) return;
-        
+
         const flow = showFlow ? (this.generatedDisruptions.flowSegments || []) : [];
         const incidents = showIncidents ? (this.generatedDisruptions.incidents || []) : [];
-        
+
         if (flow.length === 0 && incidents.length === 0) {
             if (!showIncidents && !showFlow) {
                 previewContainer.innerHTML = '<div class="text-xs text-gray-500 text-center py-2">Disruption display disabled</div>';
@@ -2986,25 +2999,25 @@ const DemoRunner = {
             }
             return;
         }
-        
+
         previewContainer.innerHTML = this.renderCurrentDisruptionList();
     },
-    
+
     // Apply disruption mode from config - NOW uses generated disruptions instead of HERE API
     async applyDemoDisruptions(config) {
         const mode = config.disruptions?.mode || config.disruptionMode || 'none';
         console.log('🚦 Applying demo disruptions:', mode);
-        
+
         // Generate disruptions based on config
         this.generateDemoDisruptions(config);
-        
+
         // Update the UI checkboxes
         const incidentCheckbox = document.getElementById('demo-show-incidents');
         const flowCheckbox = document.getElementById('demo-show-flow');
-        
+
         let showIncidents = false;
         let showFlow = false;
-        
+
         switch (mode) {
             case 'random-both':
             case 'both':
@@ -3026,17 +3039,17 @@ const DemoRunner = {
             default:
                 break;
         }
-        
+
         // Update checkboxes
         if (incidentCheckbox) incidentCheckbox.checked = showIncidents;
         if (flowCheckbox) flowCheckbox.checked = showFlow;
-        
+
         // Show the generated disruptions on map
         await this.showGeneratedDisruptions(showIncidents, showFlow);
-        
+
         // Update the disruption preview panel
         this.showDisruptionSetsPreview();
-        
+
         // Also set the dataset radio for the routing algorithm
         let datasetValue = 'none';
         if (showIncidents && showFlow) {
@@ -3046,7 +3059,7 @@ const DemoRunner = {
         } else if (showFlow) {
             datasetValue = 'both'; // flow still needs 'both' for the algorithm
         }
-        
+
         const disruptionRadio = document.querySelector(`input[name="dataset"][value="${datasetValue}"]`);
         if (disruptionRadio) {
             disruptionRadio.click();
@@ -3058,13 +3071,13 @@ const DemoRunner = {
         this.currentProgress.setupStep = 0;
         this.currentProgress.status = `Setting start: ${route.start.name}`;
         this.updateDetailedProgressUI();
-        
+
         // Set start location
         if (typeof handleOSMStartLocationPin === 'function') {
             await handleOSMStartLocationPin(route.start.lat, route.start.lng);
         }
         await this.delay(500);
-        
+
         this.currentProgress.setupStep = 1;
         this.currentProgress.status = `Setting destination: ${route.end.name}`;
         this.updateDetailedProgressUI();
@@ -3074,7 +3087,7 @@ const DemoRunner = {
             await handleOSMDestLocationPin(route.end.lat, route.end.lng);
         }
         await this.delay(500);
-        
+
         this.currentProgress.setupStep = 2;
         this.currentProgress.status = `Configuring algorithm and disruptions...`;
         this.updateDetailedProgressUI();
@@ -3089,7 +3102,7 @@ const DemoRunner = {
 
         // Apply demo disruptions (generates custom disruptions instead of HERE API)
         await this.applyDemoDisruptions(config);
-        
+
         this.currentProgress.setupStep = 3;
         this.updateDetailedProgressUI();
 
@@ -3098,7 +3111,7 @@ const DemoRunner = {
         // Test each tau value
         const tauValues = route.tauValues || [0.5];
         this.currentProgress.totalTaus = tauValues.length;
-        
+
         for (let tauIdx = 0; tauIdx < tauValues.length; tauIdx++) {
             const tau = tauValues[tauIdx];
             if (!this.isRunning) break;
@@ -3112,7 +3125,7 @@ const DemoRunner = {
             this.currentProgress.subStep = 0;
             this.currentProgress.status = `Setting τ = ${tau.toFixed(2)}`;
             this.updateDetailedProgressUI();
-            
+
             const thresholdInput = document.getElementById('threshold-input');
             if (thresholdInput) {
                 thresholdInput.value = tau;
@@ -3125,7 +3138,7 @@ const DemoRunner = {
             this.currentProgress.subStep = 1;
             this.currentProgress.status = `Computing route (τ = ${tau.toFixed(2)})...`;
             this.updateDetailedProgressUI();
-            
+
             if (typeof computeRouteBasedOnSelection === 'function') {
                 await computeRouteBasedOnSelection();
             }
@@ -3134,38 +3147,30 @@ const DemoRunner = {
             this.currentProgress.subStep = 2;
             this.currentProgress.status = `Waiting for result...`;
             this.updateDetailedProgressUI();
-            
+
             await this.delay(config.stepDelay || 2000);
-            
+
             // Step 4: Result captured (will be done by outer loop)
             this.currentProgress.subStep = 3;
             this.updateDetailedProgressUI();
- 
+
         }
 
         // Compare algorithms if needed
         if (config.algorithm === 'both') {
             this.currentProgress.status = 'Comparing HC2L vs DHL...';
             this.updateDetailedProgressUI();
-            
+
             // Run with DHL
             document.querySelector('input[name="algorithm"][value="dhl"]')?.click();
             await this.delay(300);
-            
+
             if (typeof computeRouteBasedOnSelection === 'function') {
                 await computeRouteBasedOnSelection();
             }
-            
+
             await this.delay(config.stepDelay || 2000);
         }
-    },
-
-    async resetMap() {
-        if (typeof clearRoutes === 'function') clearRoutes();
-        if (typeof clearDisruptionMarkers === 'function') clearDisruptionMarkers();
-        if (typeof clearUpdateRegions === 'function') clearUpdateRegions();
-        if (typeof clearGoogleMapsRoute === 'function') clearGoogleMapsRoute();
-        await this.delay(500);
     },
 
     pauseDemo() {
@@ -3217,7 +3222,7 @@ const DemoRunner = {
         this.isRunning = false;
         this.isPaused = false;
         this.updatePlayPauseButton();  // Reset button to pause state
-        
+
         // Use the comprehensive system reset function from functions.js
         resetSystemState({
             clearLocation: true,
@@ -3228,13 +3233,13 @@ const DemoRunner = {
             resetUI: true,
             verbose: false
         });
-        
+
         // Re-enable route finder UI when demo stops
         this.toggleRouteFinderUI(false);
-        
+
         // Restore the saved Route Finder state
         this.restoreRouteFinderState();
-        
+
         showUpdateToast('Demo stopped', 'warning');
         this.showTab('main');
     },
@@ -3247,7 +3252,7 @@ const DemoRunner = {
         // Use currentProgress.results instead of resultsHistory
         const results = this.currentProgress.results || [];
         console.log('📊 Showing results summary with', results.length, 'results');
-        
+
         if (!results || results.length === 0) {
             showUpdateToast('No results to display', 'info');
             return;
@@ -3267,7 +3272,7 @@ const DemoRunner = {
 
         // Build modern statistics cards HTML
         let statsHTML = '';
-        
+
         // Row 1: Execution Overview
         statsHTML += `
             <div class="col-span-2 bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-4 text-white">
@@ -3441,7 +3446,7 @@ const DemoRunner = {
             const hc2l = stats.algorithmComparison.hc2l;
             const dhl = stats.algorithmComparison.dhl;
             const best = stats.bestPerformers || {};
-            
+
             // Helper to show winner indicator
             const showWinner = (metric, hc2lVal, dhlVal) => {
                 if (hc2lVal === null || dhlVal === null) return '';
@@ -3450,7 +3455,7 @@ const DemoRunner = {
                 if (winner === 'DHL') return '<i data-lucide="zap" class="w-4 h-4 ml-1 text-green-600"></i>';
                 return '';
             };
-            
+
             statsHTML += `
                 <div class="col-span-2 bg-white rounded-xl p-3 border border-gray-200 shadow-sm">
                     <h4 class="font-bold text-gray-700 mb-2 flex items-center gap-1 text-xs">
@@ -3551,7 +3556,7 @@ const DemoRunner = {
             const metrics = r.metrics || {};
             const algoColor = (r.algorithm || '').toUpperCase() === 'HC2L' ? 'blue' : 'green';
             const algoIcon = (r.algorithm || '').toUpperCase() === 'HC2L' ? '<i data-lucide="cpu" class="w-4 h-4 text-blue-600"></i>' : '<i data-lucide="zap" class="w-4 h-4 text-green-600"></i>';
-            
+
             // Helper to get best display value for a metric
             const getDisplayValue = (...keys) => {
                 for (const key of keys) {
@@ -3562,7 +3567,7 @@ const DemoRunner = {
                 }
                 return 'N/A';
             };
-            
+
             // Extract key metrics for display - match Results History approach
             // Results History works, so use same order: displayDistance first (it has proper formatting)
             const distance = metrics.displayDistance || metrics.calculatedDistance || metrics.distance || 'N/A';
@@ -3574,11 +3579,11 @@ const DemoRunner = {
             const labelingSize = getDisplayValue('labelingSize');
             const disruptedEdges = getDisplayValue('disruptedEdges');
             const timeImpact = getDisplayValue('timeImpact');
-            
+
             // Determine if we should show tau (hide for DHL)
             const isDHL = (r.algorithm || '').toUpperCase() === 'DHL';
             const tauBadge = !isDHL ? `<span class="text-xs bg-${algoColor}-100 text-${algoColor}-700 px-2 py-0.5 rounded">τ = ${r.tau?.toFixed(2) || 'N/A'}</span>` : '';
-            
+
             return `
                 <div class="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden result-item" data-result-index="${i}">
                     <!-- Header (clickable to expand) -->
@@ -3725,13 +3730,13 @@ const DemoRunner = {
 
         // Render performance charts
         this.renderResultsCharts(results, stats);
-        
+
         // Render best performer highlight
         this.renderBestPerformer(results);
 
         // Switch to results tab in the panel
         this.showTab('results');
-        
+
         // Update button visibility based on current source
         this.updateResultsActionButtons();
     },
@@ -3759,13 +3764,13 @@ const DemoRunner = {
 
         // Render Algorithm Comparison Bar Chart
         this.renderAlgorithmComparisonChart(results, stats);
-        
+
         // Render Process Time Chart
         this.renderProcessTimeChart(results);
-        
+
         // Render Query Time Trend Line Chart
         this.renderQueryTimeTrendChart(results);
-        
+
         // Render Performance Radar Chart
         this.renderPerformanceRadarChart(results, stats);
     },
@@ -3785,7 +3790,7 @@ const DemoRunner = {
         const getProcessTimes = (arr) => arr.map(r => r.processTimeMs).filter(v => v !== null && v !== undefined && v > 0);
         const hc2lTimes = getProcessTimes(hc2lResults);
         const dhlTimes = getProcessTimes(dhlResults);
-        
+
         const avg = arr => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
         const min = arr => arr.length > 0 ? Math.min(...arr) : 0;
         const max = arr => arr.length > 0 ? Math.max(...arr) : 0;
@@ -3927,7 +3932,7 @@ const DemoRunner = {
         const hc2lData = [];
         const dhlData = [];
         const labels = [];
-        
+
         results.forEach((r, i) => {
             labels.push(`#${i + 1}`);
             const queryTime = r.metrics?.queryTimeNum || parseFloat(String(r.metrics?.queryTime || '0').replace(/[^\d.-]/g, '')) || 0;
@@ -4113,11 +4118,11 @@ const DemoRunner = {
         // Find best performers
         let bestQueryTime = { result: null, value: Infinity };
         let bestLabelingTime = { result: null, value: Infinity };
-        
+
         results.forEach(r => {
             const queryTime = r.metrics?.queryTimeNum || Infinity;
             const labelingTime = parseFloat(String(r.metrics?.labelingTime || '999').replace(/[^\d.-]/g, '')) || Infinity;
-            
+
             if (queryTime < bestQueryTime.value) {
                 bestQueryTime = { result: r, value: queryTime };
             }
@@ -4129,7 +4134,7 @@ const DemoRunner = {
         // Count algorithm wins
         const hc2lWins = [bestQueryTime, bestLabelingTime].filter(b => (b.result?.algorithm || '').toUpperCase() === 'HC2L').length;
         const dhlWins = [bestQueryTime, bestLabelingTime].filter(b => (b.result?.algorithm || '').toUpperCase() === 'DHL').length;
-        
+
         const overallWinner = hc2lWins > dhlWins ? 'HC2L' : dhlWins > hc2lWins ? 'DHL' : 'Tie';
         const winnerColor = overallWinner === 'HC2L' ? 'blue' : overallWinner === 'DHL' ? 'green' : 'gray';
         const winnerIcon = overallWinner === 'HC2L' ? '<i data-lucide="cpu" class="w-4 h-4 text-blue-600"></i>' : overallWinner === 'DHL' ? '<i data-lucide="zap" class="w-4 h-4 text-green-600"></i>' : '<i data-lucide="minus" class="w-4 h-4 text-gray-600"></i>';
@@ -4175,11 +4180,11 @@ const DemoRunner = {
     toggleResultDetails(index) {
         const detailsEl = document.getElementById(`result-details-${index}`);
         const chevronEl = document.getElementById(`chevron-${index}`);
-        
+
         if (detailsEl) {
             const isHidden = detailsEl.classList.contains('hidden');
             detailsEl.classList.toggle('hidden');
-            
+
             if (chevronEl) {
                 chevronEl.classList.toggle('rotate-180', isHidden);
             }
@@ -4197,7 +4202,7 @@ const DemoRunner = {
         }
 
         const configId = this.currentDemo?.id || `demo_${Date.now()}`;
-        
+
         // Compute summary statistics for export
         const exportData = this.buildExportData(results);
 
@@ -4262,7 +4267,7 @@ const DemoRunner = {
             try {
                 const text = await file.text();
                 const data = JSON.parse(text);
-                
+
                 if (!data.results || !Array.isArray(data.results)) {
                     throw new Error('Invalid file format: missing results array');
                 }
@@ -4276,7 +4281,7 @@ const DemoRunner = {
                 this.currentResultsSavedPath = null; // Not saved to server yet
                 this.resultsSource = 'new'; // Treat as new results
                 console.log('📥 Results imported, resultsSource set to "new"');
-                
+
                 this.showResultsSummary();
                 this.updateResultsActionButtons();
                 showUpdateToast('Results imported successfully!', 'success');
@@ -4295,7 +4300,7 @@ const DemoRunner = {
         const saveBtn = document.getElementById('btn-save-to-server');
         const deleteBtn = document.getElementById('btn-delete-from-server');
         const downloadBtn = document.getElementById('btn-download-json');
-        
+
         console.log('🔘 updateResultsActionButtons:', {
             resultsSource: this.resultsSource,
             isSaved: !!this.currentResultsSavedPath,
@@ -4303,7 +4308,7 @@ const DemoRunner = {
             deleteBtnExists: !!deleteBtn,
             downloadBtnExists: !!downloadBtn
         });
-        
+
         // If viewing saved results from the saved results list
         if (this.resultsSource === 'saved') {
             console.log('  → Viewing SAVED results: Hide Save, Show Delete+Download');
@@ -4400,7 +4405,7 @@ const DemoRunner = {
      */
     buildExportData(results) {
         const stats = this.computeResultsStatistics(results);
-        
+
         return {
             exportedAt: new Date().toISOString(),
             demoName: this.currentDemo?.name || 'Demo Results',
@@ -4438,13 +4443,13 @@ const DemoRunner = {
         const disruptedEdges = results.map(r => getNumeric(r.metrics, 'disruptedEdges')).filter(v => v !== null && v >= 0);
         const labelingSizes = results.map(r => getNumeric(r.metrics, 'indexSizeMb', 'labelingSize')).filter(v => v !== null && v > 0);
         const labelingTimes = results.map(r => getNumeric(r.metrics, 'indexLoadTimeMs', 'labelingTimeNum', 'labelingTime')).filter(v => v !== null && v > 0);
-        
+
         // Distance metrics (new API format uses calculated_distance_km)
         const distances = results.map(r => getNumeric(r.metrics, 'calculatedDistanceKm', 'distanceKm', 'calculatedDistanceNum')).filter(v => v !== null && v > 0);
-        
+
         // ETA metrics
         const etaSeconds = results.map(r => getNumeric(r.metrics, 'etaSeconds', 'actualEtaSeconds')).filter(v => v !== null && v > 0);
-        
+
         // LazyHC2L / Update Phase metrics
         const lazyRepairTimes = results.map(r => getNumeric(r.metrics, 'lazyRepairTimeMs', 'lazyRepairTimeNum', 'lazyRepairTime')).filter(v => v !== null && v >= 0);
         const lazyUpdateTimes = results.map(r => getNumeric(r.metrics, 'lazyUpdateTimeMs')).filter(v => v !== null && v >= 0);
@@ -4453,7 +4458,7 @@ const DemoRunner = {
         const nodesRepaired = results.map(r => getNumeric(r.metrics, 'nodesRepaired', 'nodesRepairedNum')).filter(v => v !== null && v >= 0);
         const impactScores = results.map(r => getNumeric(r.metrics, 'impactScoreNum', 'impactScore')).filter(v => v !== null && v >= 0);
         const tauThresholds = results.map(r => getNumeric(r.metrics, 'tauThreshold', 'tauThresholdNum')).filter(v => v !== null && v >= 0);
-        
+
         // Process time (server request + response time)
         const processTimes = results.map(r => r.processTimeMs).filter(v => v !== null && v !== undefined && v > 0);
 

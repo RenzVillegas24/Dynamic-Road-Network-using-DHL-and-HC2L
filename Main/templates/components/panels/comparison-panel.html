@@ -22,27 +22,29 @@
         </div>
         <h3 class="section-card__title">Select Algorithms to Compare</h3>
       </div>
-      <div class="section-card__body space-y-3">
-        <label class="compare-option compare-option--warning">
-          <div class="compare-option__content">
-            <input type="checkbox" id="compare-google" class="compare-option__input">
-            <span class="compare-option__label">Google Maps</span>
+      <div class="nav-select">
+        <label class="nav-select__option" data-color="amber">
+          <input type="checkbox" id="compare-google" class="nav-select__input">
+          <div class="nav-select__icon"><i data-lucide="map" class="w-5 h-5"></i></div>
+          <div class="nav-select__content">
+            <span class="nav-select__title">Google Maps</span>
           </div>
-          <div class="compare-option__dot compare-option__dot--warning"></div>
         </label>
-        <label class="compare-option compare-option--primary">
-          <div class="compare-option__content">
-            <input type="checkbox" id="compare-dhl" class="compare-option__input" checked>
-            <span class="compare-option__label">DHL (Dual-Hierarchy Labeling)</span>
+        <label class="nav-select__option" data-color="emerald">
+          <input type="checkbox" id="compare-dhl" class="nav-select__input" checked>
+          <div class="nav-select__icon"><i data-lucide="layers" class="w-5 h-5"></i></div>
+          <div class="nav-select__content">
+            <span class="nav-select__title">DHL</span>
+            <span class="nav-select__description">Dual-Hierarchy Labeling</span>
           </div>
-          <div class="compare-option__dot compare-option__dot--primary"></div>
         </label>
-        <label class="compare-option compare-option--info">
-          <div class="compare-option__content">
-            <input type="checkbox" id="compare-hc2l" class="compare-option__input" checked>
-            <span class="compare-option__label">HC2L (Hierarchical Cut 2-Hop)</span>
+        <label class="nav-select__option" data-color="blue">
+          <input type="checkbox" id="compare-hc2l" class="nav-select__input" checked>
+          <div class="nav-select__icon"><i data-lucide="layers" class="w-5 h-5"></i></div>
+          <div class="nav-select__content">
+            <span class="nav-select__title">HC2L</span>
+            <span class="nav-select__description">Hierarchical Cut 2-Hop</span>
           </div>
-          <div class="compare-option__dot compare-option__dot--info"></div>
         </label>
       </div>
       <button onclick="runComparison()" class="btn btn--primary btn--lg btn--block mt-4">

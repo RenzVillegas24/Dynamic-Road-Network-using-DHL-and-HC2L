@@ -173,11 +173,35 @@
       </div>
       <div class="form-group mb-4">
         <label class="form-group__label">Quick Select</label>
-        <div class="grid grid-cols-4 gap-2">
-          <button class="quick-threshold-btn btn btn--outline btn--secondary btn--sm" data-value="0.25">0.25</button>
-          <button class="quick-threshold-btn btn btn--indigo btn--sm" data-value="0.5">0.5</button>
-          <button class="quick-threshold-btn btn btn--outline btn--secondary btn--sm" data-value="0.75">0.75</button>
-          <button class="quick-threshold-btn btn btn--outline btn--secondary btn--sm" data-value="1.0">1.0</button>
+        <div class="nav-select nav-select--grid nav-select--grid-row-4">
+          <label class="nav-select__option" data-color="slate">
+            <input type="radio" name="threshold-preset" value="0.25"
+              onchange="updateThresholdFromPreset(this.value)">
+            <div class="nav-select__content">
+              <span class="nav-select__title">0.25</span>
+            </div>
+          </label>
+          <label class="nav-select__option" data-color="blue">
+            <input type="radio" name="threshold-preset" value="0.5" checked
+              onchange="updateThresholdFromPreset(this.value)">
+            <div class="nav-select__content">
+              <span class="nav-select__title">0.5</span>
+            </div>
+          </label>
+          <label class="nav-select__option" data-color="purple">
+            <input type="radio" name="threshold-preset" value="0.75"
+              onchange="updateThresholdFromPreset(this.value)">
+            <div class="nav-select__content">
+              <span class="nav-select__title">0.75</span>
+            </div>
+          </label>
+          <label class="nav-select__option" data-color="emerald">
+            <input type="radio" name="threshold-preset" value="1.0"
+              onchange="updateThresholdFromPreset(this.value)">
+            <div class="nav-select__content">
+              <span class="nav-select__title">1.0</span>
+            </div>
+          </label>
         </div>
       </div>
       <div class="card card--flat p-4">
