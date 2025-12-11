@@ -126,7 +126,7 @@
             <div class="grid grid-cols-3 gap-3">
               <div class="form-group">
                 <label class="form-group__label">Count</label>
-                <input type="number" id="demo-random-count" value="3" min="1" max="10" class="form-input">
+                <input type="number" id="demo-random-count" value="3" min="1" max="1000" class="form-input">
               </div>
               <div class="form-group">
                 <label class="form-group__label">Min Distance (km)</label>
@@ -308,19 +308,28 @@
           <div id="disruption-generation-status" class="border-t border-amber-200 pt-3 mt-3">
             <div class="metric-row mb-2">
               <span class="metric-row__label">Disruption Sets</span>
-              <span id="disruption-status-text" class="text-muted">Not generated</span>
+              <span id="disruption-status-text" class="text-muted text-sm">Not generated</span>
             </div>
 
-            <!-- Generate Random Disruptions Button -->
-            <button onclick="DemoCreator.generateRandomDisruptions()" id="generate-disruptions-btn"
-              class="btn btn--warning btn--block flex items-center justify-center gap-2">
-              <i data-lucide="shuffle" class="w-4 h-4"></i> Generate Random Disruptions
-            </button>
-            <div class="text-center text-xs text-muted mt-1" id="disruption-sets-status">No sets generated</div>
+            <!-- Generate Random Disruptions Button (hidden during generation) -->
+            <div id="disruption-button-container">
+              <button onclick="DemoCreator.generateRandomDisruptions()" id="generate-disruptions-btn"
+                class="btn btn--warning btn--block flex items-center justify-center gap-2">
+                <i data-lucide="shuffle" class="w-4 h-4"></i> Generate Random Disruptions
+              </button>
+              <div class="text-center text-xs text-muted mt-1" id="disruption-sets-status">No sets generated</div>
+            </div>
 
-            <div id="disruption-loading-indicator" class="hidden mt-2 flex items-center justify-center gap-2 py-2">
-              <div class="animate-spin h-4 w-4 border-2 border-amber-500 border-t-transparent rounded-full"></div>
-              <span id="disruption-loading-text" class="text-sm text-amber-700">Generating...</span>
+            <!-- Progress Bar (hidden by default) -->
+            <div id="disruption-loading-indicator" class="hidden space-y-4">
+              <!-- Stop Generation Button -->
+              <button onclick="DemoCreator.generateRandomDisruptions()" 
+                class="btn btn--danger btn--block flex items-center justify-center gap-2">
+                <i data-lucide="square" class="w-4 h-4"></i> Stop Generation
+              </button>
+              <div class="progress-bar">
+                <div id="disruption-progress-bar" class="progress-bar__fill" style="width: 0%"></div>
+              </div>
             </div>
           </div>
         </div>

@@ -16,7 +16,7 @@
   <!-- Main Tab -->
   <div id="demo-runner-tab-main" class="space-y-4 panel__body">
     <!-- Quick Actions -->
-    <div class="grid grid-cols-2 gap-3">
+    <div class="grid grid-cols-3 gap-3">
       <button onclick="DemoRunner.openRandomSettings()" class="btn btn--warning btn--lg flex-col gap-2 py-4">
         <i data-lucide="shuffle" class="w-6 h-6"></i>
         <span class="text-sm font-semibold">Random Demo</span>
@@ -24,6 +24,10 @@
       <button data-panel="demo-creator" class="btn btn--primary btn--lg flex-col gap-2 py-4">
         <i data-lucide="sparkles" class="w-6 h-6"></i>
         <span class="text-sm font-semibold">Custom Demo</span>
+      </button>
+      <button onclick="DemoRunner.openExperimentSettings()" class="btn btn--danger btn--lg flex-col gap-2 py-4">
+        <i data-lucide="flask-conical" class="w-6 h-6"></i>
+        <span class="text-sm font-semibold">Experiment Mode</span>
       </button>
     </div>
 
@@ -73,6 +77,253 @@
   </div>
 
 
+
+  <!-- Experiment Settings Tab -->
+  <div id="demo-runner-tab-experiment-settings" class="hidden panel__body space-y-4">
+    <button onclick="DemoRunner.showTab('main')" class="btn btn--ghost btn--sm">
+      <i data-lucide="arrow-left" class="w-4 h-4"></i>
+      Back
+    </button>
+
+    <div class="section-card__header">
+      <div class="section-card__icon section-card__icon--danger">
+        <i data-lucide="flask-conical" class="w-5 h-5"></i>
+      </div>
+      <h3 class="section-card__title">Experiment Mode</h3>
+    </div>
+
+    <div class="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-800">
+      <p class="font-bold mb-1">⚠️ Fixed Experiment Parameters</p>
+      <ul class="list-disc list-inside space-y-1">
+        <li><strong>3 Trials</strong> - Each route tested 3 times</li>
+        <li><strong>1,000 Routes</strong> - Batch query size</li>
+        <li><strong>1,000 Disruptions</strong> - Flow + Incidents combined</li>
+        <li><strong>Both Algorithms</strong> - DHL & HC2L compared</li>
+      </ul>
+    </div>
+
+    <!-- Query Configuration -->
+    <div class="section-card section-card--info">
+      <div class="section-card__header">
+        <div class="section-card__icon section-card__icon--info">
+          <i data-lucide="map-pin" class="w-5 h-5"></i>
+        </div>
+        <h4 class="section-card__title">Query Configuration</h4>
+      </div>
+      <div class="section-card__body space-y-3">
+        <div class="form-group">
+          <label class="form-group__label">Route Generation Mode</label>
+          <div class="nav-select nav-select--grid">
+            <label class="nav-select__option" data-color="blue">
+              <input type="radio" name="experiment-route-mode" value="preset" checked>
+              <div class="nav-select__icon"><i data-lucide="save" class="w-4 h-4"></i></div>
+              <div class="nav-select__content">
+                <span class="nav-select__title">Preset</span>
+                <span class="nav-select__description">Use saved or generate once</span>
+              </div>
+            </label>
+            <label class="nav-select__option" data-color="amber">
+              <input type="radio" name="experiment-route-mode" value="random">
+              <div class="nav-select__icon"><i data-lucide="shuffle" class="w-4 h-4"></i></div>
+              <div class="nav-select__content">
+                <span class="nav-select__title">Random</span>
+                <span class="nav-select__description">New routes every run</span>
+              </div>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Disruption Configuration -->
+    <div class="section-card section-card--warning">
+      <div class="section-card__header">
+        <div class="section-card__icon section-card__icon--warning">
+          <i data-lucide="traffic-cone" class="w-5 h-5"></i>
+        </div>
+        <h4 class="section-card__title">Disruption Configuration</h4>
+      </div>
+      <div class="section-card__body space-y-4">
+        <div class="form-group">
+          <label class="form-group__label">Disruption Generation Mode</label>
+          <div class="nav-select nav-select--grid">
+            <label class="nav-select__option" data-color="amber">
+              <input type="radio" name="experiment-disruption-mode" value="preset" checked>
+              <div class="nav-select__icon"><i data-lucide="save" class="w-4 h-4"></i></div>
+              <div class="nav-select__content">
+                <span class="nav-select__title">Preset</span>
+                <span class="nav-select__description">Use saved or generate once</span>
+              </div>
+            </label>
+            <label class="nav-select__option" data-color="orange">
+              <input type="radio" name="experiment-disruption-mode" value="random">
+              <div class="nav-select__icon"><i data-lucide="shuffle" class="w-4 h-4"></i></div>
+              <div class="nav-select__content">
+                <span class="nav-select__title">Random</span>
+                <span class="nav-select__description">New disruptions every run</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Severity Range -->
+        <div class="border-t border-amber-200 pt-3">
+          <h5 class="form-group__label">Severity Range</h5>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="form-group">
+              <label class="form-group__label text-sm">Min Severity</label>
+              <div class="flex items-center gap-2">
+                <input type="range" id="experiment-severity-min" min="0" max="0.9" step="0.1" value="0.1"
+                  oninput="document.getElementById('experiment-severity-min-display').textContent = this.value"
+                  class="form-range flex-1">
+                <span id="experiment-severity-min-display" class="badge badge--warning w-8">0.1</span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-group__label text-sm">Max Severity</label>
+              <div class="flex items-center gap-2">
+                <input type="range" id="experiment-severity-max" min="0.1" max="1" step="0.1" value="0.9"
+                  oninput="document.getElementById('experiment-severity-max-display').textContent = this.value"
+                  class="form-range flex-1">
+                <span id="experiment-severity-max-display" class="badge badge--warning w-8">0.9</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Flow:Incident Ratio -->
+        <div class="border-t border-amber-200 pt-3">
+          <h5 class="form-group__label">Flow : Incident Ratio</h5>
+          <div class="flex items-center gap-3">
+            <div class="flex-1">
+              <label class="form-group__label text-xs text-amber-700">Flow %</label>
+              <input type="number" id="experiment-ratio-flow" value="95" min="0" max="100" 
+                onchange="document.getElementById('experiment-ratio-incident').value = 100 - this.value"
+                class="form-input text-center font-semibold">
+            </div>
+            <span class="text-gray-400 font-bold text-xl pt-4">:</span>
+            <div class="flex-1">
+              <label class="form-group__label text-xs text-orange-700">Incident %</label>
+              <input type="number" id="experiment-ratio-incident" value="5" min="0" max="100"
+                onchange="document.getElementById('experiment-ratio-flow').value = 100 - this.value"
+                class="form-input text-center font-semibold">
+            </div>
+          </div>
+          <p class="text-xs text-muted mt-1">Total: 1,000 disruptions (950 flow + 50 incidents at 95:5)</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAU (τ) Settings - Copied from Demo Creator -->
+    <div class="section-card section-card--purple">
+      <div class="section-card__header">
+        <div class="section-card__icon section-card__icon--purple">
+          <i data-lucide="sliders" class="w-5 h-5"></i>
+        </div>
+        <h4 class="section-card__title">Threshold (τ) Settings</h4>
+      </div>
+      <div class="section-card__body space-y-4">
+        <!-- TAU Scope -->
+        <div>
+          <label class="form-group__label mb-3">TAU (τ) Scope</label>
+          <div class="nav-select nav-select--purple">
+            <label class="nav-select__option tau-scope-option" data-color="purple">
+              <input type="radio" name="experiment-tau-scope" value="all" onchange="DemoRunner.updateExperimentTauUI()">
+              <div class="nav-select__icon"><i data-lucide="globe" class="w-4 h-4"></i></div>
+              <div class="nav-select__content">
+                <span class="nav-select__title">Same for All</span>
+                <span class="nav-select__description">All routes use the same TAU</span>
+              </div>
+            </label>
+            <label class="nav-select__option tau-scope-option" data-color="indigo">
+              <input type="radio" name="experiment-tau-scope" value="per-trial" onchange="DemoRunner.updateExperimentTauUI()">
+              <div class="nav-select__icon"><i data-lucide="repeat" class="w-4 h-4"></i></div>
+              <div class="nav-select__content">
+                <span class="nav-select__title">Per Trial</span>
+                <span class="nav-select__description">Each trial gets unique TAU</span>
+              </div>
+            </label>
+            <label class="nav-select__option tau-scope-option" data-color="teal">
+              <input type="radio" name="experiment-tau-scope" value="per-route" onchange="DemoRunner.updateExperimentTauUI()">
+              <div class="nav-select__icon"><i data-lucide="git-branch" class="w-4 h-4"></i></div>
+              <div class="nav-select__content">
+                <span class="nav-select__title">Per Route</span>
+                <span class="nav-select__description">Each route gets unique TAU</span>
+              </div>
+            </label>
+            <label class="nav-select__option tau-scope-option" data-color="slate">
+              <input type="radio" name="experiment-tau-scope" value="per-trial-route" checked onchange="DemoRunner.updateExperimentTauUI()">
+              <div class="nav-select__icon"><i data-lucide="shuffle" class="w-4 h-4"></i></div>
+              <div class="nav-select__content">
+                <span class="nav-select__title">Per Trial & Route</span>
+                <span class="nav-select__description">Unique TAU for each combination</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- TAU Value Input Mode -->
+        <div class="border-t border-purple-200 pt-3">
+          <label class="form-group__label mb-3">Value Input Mode</label>
+          <div class="nav-select nav-select--grid">
+            <label class="nav-select__option tau-mode-option" data-color="indigo">
+              <input type="radio" name="experiment-tau-mode" value="fixed" onchange="DemoRunner.updateExperimentTauUI()">
+              <div class="nav-select__icon"><i data-lucide="crosshair" class="w-4 h-4"></i></div>
+              <div class="nav-select__content">
+                <span class="nav-select__title">Fixed</span>
+              </div>
+            </label>
+            <label class="nav-select__option tau-mode-option" data-color="amber">
+              <input type="radio" name="experiment-tau-mode" value="random" checked onchange="DemoRunner.updateExperimentTauUI()">
+              <div class="nav-select__icon"><i data-lucide="dice-5" class="w-4 h-4"></i></div>
+              <div class="nav-select__content">
+                <span class="nav-select__title">Random</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Fixed TAU Input -->
+        <div id="experiment-tau-fixed-setting" class="hidden border-t border-purple-200 pt-3">
+          <label class="form-group__label">Fixed TAU Value (0.0 - 1.0)</label>
+          <input type="number" id="experiment-tau-fixed-value" value="0.5" min="0" max="1" step="0.1" class="form-input">
+        </div>
+
+        <!-- Random TAU Range -->
+        <div id="experiment-tau-random-setting" class="border-t border-purple-200 pt-3">
+          <label class="form-group__label">Random TAU Range</label>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="form-group">
+              <label class="form-group__label text-sm">Min</label>
+              <div class="flex items-center gap-2">
+                <input type="range" id="experiment-tau-random-min" min="0" max="0.9" step="0.1" value="0.1"
+                  oninput="document.getElementById('experiment-tau-min-display').textContent = this.value"
+                  class="form-range flex-1">
+                <span id="experiment-tau-min-display" class="badge badge--purple w-8">0.1</span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-group__label text-sm">Max</label>
+              <div class="flex items-center gap-2">
+                <input type="range" id="experiment-tau-random-max" min="0.1" max="1" step="0.1" value="0.9"
+                  oninput="document.getElementById('experiment-tau-max-display').textContent = this.value"
+                  class="form-range flex-1">
+                <span id="experiment-tau-max-display" class="badge badge--purple w-8">0.9</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Experiment Action Buttons -->
+  <div id="demo-runner-footer-experiment-settings" class="hidden panel__footer">
+    <button onclick="DemoRunner.startExperiment()" class="btn btn--danger btn--lg btn--block">
+      <i data-lucide="play" class="w-5 h-5"></i> Start Experiment
+    </button>
+  </div>
 
   <!-- Random Settings Tab -->
   <div id="demo-runner-tab-random-settings" class="hidden panel__body space-y-4">

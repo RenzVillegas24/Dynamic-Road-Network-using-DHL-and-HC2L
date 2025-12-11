@@ -333,13 +333,13 @@ const DemoRunner = {
     },
 
     showTab(tabName) {
-        // Hide all tabs (including results)
-        ['main', 'random-settings', 'running', 'results'].forEach(tab => {
+        // Hide all tabs (including results and experiment-settings)
+        ['main', 'random-settings', 'experiment-settings', 'running', 'results'].forEach(tab => {
             const el = document.getElementById(`demo-runner-tab-${tab}`);
             if (el) el.classList.add('hidden');
         });
 
-        ['random-settings', 'running', 'results'].forEach(tab => {
+        ['random-settings', 'experiment-settings', 'running', 'results'].forEach(tab => {
             const el = document.getElementById(`demo-runner-footer-${tab}`);
             if (el) el.classList.add('hidden');
         });
@@ -397,6 +397,11 @@ const DemoRunner = {
                 // Update preview to show "no disruptions"
                 this.updateDisruptionPreview();
             }
+        }
+
+        // Refresh lucide icons after tab switch
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
         }
     },
 
@@ -588,7 +593,10 @@ const DemoRunner = {
         const container = document.getElementById('saved-configs-list');
         if (!container) return;
 
-        if (this.savedConfigs.length === 0) {
+        // Filter out experiment configs (isExperiment: true) from the list
+        const displayConfigs = this.savedConfigs.filter(config => !config.isExperiment);
+
+        if (displayConfigs.length === 0) {
             container.innerHTML = `
                 <div class="empty-state text-center py-8">
                     <div class="empty-state__icon text-muted mb-2">
@@ -603,7 +611,7 @@ const DemoRunner = {
         }
 
         const isRunning = (typeof DemoCreator !== 'undefined' && DemoCreator.isRunning);
-        container.innerHTML = this.savedConfigs.map(config => `
+        container.innerHTML = displayConfigs.map(config => `
             <div class="card card--bordered p-4 hover:border-purple-300 hover:shadow-md transition-all">
                 <div class="flex items-start justify-between mb-2">
                     <div class="flex-1 min-w-0">
@@ -634,9 +642,9 @@ const DemoRunner = {
             </div>
         `).join('');
         lucide.createIcons();
-        // Update tab badge count
+        // Update tab badge count (excluding experiment configs)
         const badge = document.getElementById('tab-badge-configs');
-        if (badge) badge.textContent = `${this.savedConfigs.length}`;
+        if (badge) badge.textContent = `${displayConfigs.length}`;
     },
 
     runSavedConfig(configId) {
@@ -916,6 +924,508 @@ const DemoRunner = {
 
         this.showTab('main');
         this.runDemo(config);
+    },
+
+    // ==========================================================================
+    // EXPERIMENT MODE (Thesis)
+    // ==========================================================================
+
+    experimentSettings: {
+        trials: 3,                    // Fixed at 3 trials
+        batchSize: 1000,              // Fixed at 1000
+        disruptionMode: 'preset',     // 'preset' or 'random'
+        routeMode: 'preset',          // 'preset' or 'random'
+        severityMin: 0.1,
+        severityMax: 0.9,
+        ratioFlow: 95,
+        ratioIncident: 5,
+        tauMode: 'random',            // 'fixed' or 'random'
+        tauScope: 'per-trial-route',  // 'all', 'per-trial', 'per-route', 'per-trial-route'
+        tauFixed: 0.5,
+        tauRandomMin: 0.1,
+        tauRandomMax: 0.9
+    },
+
+    experimentConfigName: 'ExperimentMode',
+
+    openExperimentSettings() {
+        this.showTab('experiment-settings');
+        this.updateExperimentTauUI();
+        // Refresh lucide icons for experiment tab
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    },
+
+    updateExperimentTauUI() {
+        const mode = document.querySelector('input[name="experiment-tau-mode"]:checked')?.value || 'random';
+        
+        document.getElementById('experiment-tau-fixed-setting')?.classList.toggle('hidden', mode !== 'fixed');
+        document.getElementById('experiment-tau-random-setting')?.classList.toggle('hidden', mode !== 'random');
+
+        // Update visual styling for mode options
+        document.querySelectorAll('#demo-runner-tab-experiment-settings .tau-mode-option').forEach(label => {
+            const radio = label.querySelector('input[type="radio"]');
+            if (radio && radio.checked) {
+                label.classList.add('ring-2', 'ring-purple-500', 'border-purple-500');
+            } else {
+                label.classList.remove('ring-2', 'ring-purple-500', 'border-purple-500');
+            }
+        });
+
+        // Update visual styling for scope options
+        document.querySelectorAll('#demo-runner-tab-experiment-settings .tau-scope-option').forEach(label => {
+            const radio = label.querySelector('input[type="radio"]');
+            if (radio && radio.checked) {
+                label.classList.add('ring-2', 'ring-purple-500', 'border-purple-500');
+            } else {
+                label.classList.remove('ring-2', 'ring-purple-500', 'border-purple-500');
+            }
+        });
+    },
+
+    getExperimentTauSettings() {
+        const mode = document.querySelector('input[name="experiment-tau-mode"]:checked')?.value || 'random';
+        const scope = document.querySelector('input[name="experiment-tau-scope"]:checked')?.value || 'per-trial-route';
+        
+        return {
+            mode,
+            scope,
+            fixed: parseFloat(document.getElementById('experiment-tau-fixed-value')?.value) || 0.5,
+            randomMin: parseFloat(document.getElementById('experiment-tau-random-min')?.value) || 0.1,
+            randomMax: parseFloat(document.getElementById('experiment-tau-random-max')?.value) || 0.9
+        };
+    },
+
+    getExperimentDisruptionSettings() {
+        const modeRadio = document.querySelector('input[name="experiment-disruption-mode"]:checked');
+        return {
+            mode: modeRadio?.value || 'preset',
+            severityMin: parseFloat(document.getElementById('experiment-severity-min')?.value) || 0.1,
+            severityMax: parseFloat(document.getElementById('experiment-severity-max')?.value) || 0.9,
+            ratioFlow: parseInt(document.getElementById('experiment-ratio-flow')?.value) || 95,
+            ratioIncident: parseInt(document.getElementById('experiment-ratio-incident')?.value) || 5
+        };
+    },
+
+    getExperimentRouteSettings() {
+        const modeRadio = document.querySelector('input[name="experiment-route-mode"]:checked');
+        return {
+            mode: modeRadio?.value || 'preset'
+        };
+    },
+
+    /**
+     * Generate tau value based on experiment settings
+     */
+    generateExperimentTau(tauSettings, trialIndex, routeIndex, routeCount) {
+        const { mode, scope, fixed, randomMin, randomMax } = tauSettings;
+
+        if (mode === 'fixed') {
+            return fixed;
+        }
+
+        // For random mode, generate based on scope
+        // Use a seed based on indices for reproducibility within a run
+        const seed = scope === 'all' ? 0 :
+                     scope === 'per-trial' ? trialIndex :
+                     scope === 'per-route' ? routeIndex :
+                     trialIndex * routeCount + routeIndex;
+        
+        // Simple seeded random (for consistency within scope)
+        const random = () => {
+            const x = Math.sin(seed + 1) * 10000;
+            return x - Math.floor(x);
+        };
+
+        return randomMin + random() * (randomMax - randomMin);
+    },
+
+    /**
+     * Load or generate experiment preset data using demo configs structure
+     * Routes are stored in the config JSON, disruptions in /data/demos/configs/disruptions/ThesisExperiment/
+     */
+    async loadOrGenerateExperimentPreset(type, settings) {
+        const configName = this.experimentConfigName;
+        
+        try {
+            // Try to load existing ThesisExperiment config
+            const response = await fetch(`/api/demo/configs/${configName}`);
+            const result = await response.json();
+            
+            if (result.success && result.config) {
+                if (type === 'routes' && result.config.routes && result.config.routes.length > 0) {
+                    console.log(`📂 Loaded existing routes from ${configName} config`);
+                    return result.config.routes;
+                }
+                if (type === 'disruptions' && result.config.disruptions?.disruptionSets) {
+                    console.log(`📂 Loaded existing disruptions from ${configName} config`);
+                    // Return the first disruption set (experiment uses 'all' scope)
+                    const setKey = Object.keys(result.config.disruptions.disruptionSets)[0];
+                    if (setKey) {
+                        return result.config.disruptions.disruptionSets[setKey];
+                    }
+                }
+            }
+        } catch (e) {
+            console.log(`📝 No existing ${type} preset, will generate new`);
+        }
+
+        // Generate new preset
+        console.log(`🔄 Generating new ${type} preset for ${configName}`);
+        
+        if (type === 'routes') {
+            return await this.generateExperimentRoutes(settings);
+        } else if (type === 'disruptions') {
+            return await this.generateExperimentDisruptions(settings);
+        }
+
+        return null;
+    },
+
+    /**
+     * Generate 1000 random routes for experiment
+     */
+    async generateExperimentRoutes(settings) {
+        const batchSize = 1000;
+        const routes = [];
+
+        this.showLoadingAnimation('Generating Routes', `Creating ${batchSize} random routes...`);
+
+        for (let i = 0; i < batchSize; i++) {
+            const pair = this.getRandomLocationPair(true); // Use truly random QC locations
+            routes.push({
+                id: `exp-route-${i}`,
+                start: pair.start,
+                end: pair.end
+            });
+
+            if (i % 100 === 0) {
+                this.updateLoadingStatus(`Generated ${i + 1}/${batchSize} routes`);
+                await this.delay(1); // Allow UI to update
+            }
+        }
+
+        return routes;
+    },
+
+    /**
+     * Generate disruptions for experiment based on ratio
+     * Saves to /data/demos/configs/disruptions/ThesisExperiment/ using same structure as demo-creator
+     */
+    async generateExperimentDisruptions(settings) {
+        const batchSize = 1000;
+        const { ratioFlow, ratioIncident, severityMin, severityMax } = settings;
+        
+        // Calculate counts based on ratio
+        const total = ratioFlow + ratioIncident;
+        const flowCount = Math.round((ratioFlow / total) * batchSize);
+        const incidentCount = batchSize - flowCount;
+
+        this.showLoadingAnimation('Generating Disruptions', 
+            `Creating ${flowCount} flow + ${incidentCount} incidents...`);
+
+        try {
+            const response = await fetch('/api/demo/random_edges', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    flow_count: flowCount,
+                    incident_count: incidentCount,
+                    severity_min: severityMin,
+                    severity_max: severityMax
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                const disruptions = {
+                    flow: result.flow || [],
+                    incidents: result.incidents || [],
+                    flowCount: result.flow_count,
+                    incidentCount: result.incident_count,
+                    settings: { ratioFlow, ratioIncident, severityMin, severityMax }
+                };
+
+                return disruptions;
+            }
+        } catch (error) {
+            console.error('Error generating experiment disruptions:', error);
+        }
+
+        return null;
+    },
+
+    /**
+     * Save experiment config to server using demo configs structure
+     * Config saved to /data/demos/configs/ThesisExperiment.json
+     * Disruptions saved to /data/demos/configs/disruptions/ThesisExperiment/
+     */
+    async saveExperimentConfig(routes, disruptions, tauSettings, disruptionSettings) {
+        const configName = this.experimentConfigName;
+        
+        try {
+            // Build config structure matching demo-creator format
+            const config = {
+                id: configName,
+                name: configName,
+                savedAt: new Date().toISOString(),
+                isExperiment: true,
+                routes: routes.map((r, idx) => ({
+                    ...r,
+                    trials: [] // Will be populated during run
+                })),
+                settings: {
+                    algorithm: 'both',
+                    trials: 3,
+                    stepDelay: 100
+                },
+                tau: tauSettings,
+                disruptions: {
+                    mode: 'random-both',
+                    scope: 'all',
+                    severityMin: disruptionSettings.severityMin,
+                    severityMax: disruptionSettings.severityMax,
+                    randomFlowCount: disruptions.flowCount,
+                    randomIncidentCount: disruptions.incidentCount,
+                    disruptionSets: {
+                        'set_all': disruptions
+                    }
+                },
+                disruptionKey: configName
+            };
+
+            // Save config using same API as demo-creator
+            const response = await fetch('/api/demo/configs', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(config)
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                console.log(`✅ Saved experiment config: ${configName}`);
+                return true;
+            }
+        } catch (error) {
+            console.error('Error saving experiment config:', error);
+        }
+        return false;
+    },
+
+    /**
+     * Start the thesis experiment
+     * Uses the same save mechanism as Demo Creator:
+     * - Config saved to /data/demos/configs/ExperimentMode.json
+     * - Disruptions saved to /data/demos/configs/disruptions/ExperimentMode/set_route_N/
+     * 
+     * Structure:
+     * - 1000 routes, each with its own disruption set (set_route_0, set_route_1, ...)
+     * - 3 trials per route, all trials for a route use the same disruption set
+     * - Both DHL and HC2L algorithms tested
+     */
+    async startExperiment() {
+        if (this.isRunning) {
+            showUpdateToast('A demo is already running', 'warning');
+            return;
+        }
+
+        const tauSettings = this.getExperimentTauSettings();
+        const disruptionSettings = this.getExperimentDisruptionSettings();
+        const routeSettings = this.getExperimentRouteSettings();
+
+        console.log('🧪 Starting Experiment Mode');
+        console.log('   Tau Settings:', tauSettings);
+        console.log('   Disruption Settings:', disruptionSettings);
+        console.log('   Route Settings:', routeSettings);
+
+        this.showLoadingAnimation('Initializing Experiment', 'Loading configuration...');
+
+        try {
+            // Try to load existing preset or generate new
+            let routes = null;
+            let existingConfig = null;
+            const trials = 3; // Fixed 3 trials
+            const batchSize = 1000; // Fixed 1000 routes
+
+            // Check if we have an existing ExperimentMode config
+            try {
+                const response = await fetch(`/api/demo/configs/${this.experimentConfigName}`);
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.success) {
+                        existingConfig = result.config;
+                        console.log('📂 Found existing ExperimentMode config');
+                    }
+                }
+            } catch (e) {
+                console.log('No existing config found, will create new');
+            }
+
+            // Handle routes
+            if (routeSettings.mode === 'preset' && existingConfig?.routes?.length > 0) {
+                // Use saved routes from config - they already have the correct format
+                routes = existingConfig.routes;
+                console.log(`📂 Loaded ${routes.length} preset routes from config`);
+                this.updateLoadingStatus(`Loaded ${routes.length} preset routes`);
+            } else {
+                // Generate new routes
+                routes = await this.generateExperimentRoutes(routeSettings);
+                console.log(`🎲 Generated ${routes.length} new routes`);
+            }
+
+            if (!routes || routes.length === 0) {
+                throw new Error('Failed to load/generate routes');
+            }
+
+            // Determine if we need to generate new disruptions
+            let needNewDisruptions = disruptionSettings.mode === 'random';
+            let disruptionSets = {};
+
+            if (disruptionSettings.mode === 'preset' && existingConfig?.disruptions?.savedSets) {
+                // Check if we have the right number of disruption sets
+                const savedSetKeys = Object.keys(existingConfig.disruptions.savedSets);
+                if (savedSetKeys.length === routes.length) {
+                    console.log(`📂 Using ${savedSetKeys.length} preset disruption sets`);
+                    // We'll load these during runDemo via activateConfigDisruptionSet
+                    needNewDisruptions = false;
+                } else {
+                    console.log(`⚠️ Mismatch: ${savedSetKeys.length} saved sets but ${routes.length} routes, regenerating`);
+                    needNewDisruptions = true;
+                }
+            } else if (disruptionSettings.mode === 'preset') {
+                // Preset mode but no saved sets - generate new
+                needNewDisruptions = true;
+            }
+
+            // Generate disruptions if needed (one per route)
+            if (needNewDisruptions) {
+                this.updateLoadingStatus('Generating disruptions for each route...');
+                
+                const { ratioFlow, ratioIncident, severityMin, severityMax } = disruptionSettings;
+                const total = ratioFlow + ratioIncident;
+                // Each route gets 1000 disruptions (batchSize) with the specified ratio
+                const flowCount = Math.round((ratioFlow / total) * batchSize);
+                const incidentCount = batchSize - flowCount;
+                
+                console.log(`🎲 Generating disruptions: ${flowCount} flow + ${incidentCount} incidents per route (1000 total per route)`);
+                
+                // Generate one disruption set per route (each route gets the full 1000 disruptions)
+                for (let i = 0; i < routes.length; i++) {
+                    this.updateLoadingStatus(`Generating disruptions: ${i}/${routes.length} routes...`);
+
+                    try {
+                        const response = await fetch('/api/demo/random_edges', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                flow_count: flowCount,  // Full 1000 count based on ratio (e.g., 950)
+                                incident_count: incidentCount,  // Full 1000 count based on ratio (e.g., 50)
+                                severity_min: severityMin,
+                                severity_max: severityMax
+                            })
+                        });
+
+                        const result = await response.json();
+                        if (result.success) {
+                            disruptionSets[`set_route_${i}`] = {
+                                flow: result.flow || [],
+                                incidents: result.incidents || []
+                            };
+                        }
+                    } catch (e) {
+                        console.warn(`Failed to generate disruptions for route ${i}:`, e);
+                    }
+                }
+                console.log(`🎲 Generated ${Object.keys(disruptionSets).length} disruption sets (one per route)`);
+            }
+
+            // Build routes with trials - preserve start/end format
+            const routesWithTrials = routes.map((r, routeIdx) => {
+                // Preserve the route structure (start/end format)
+                const baseRoute = {
+                    id: r.id || `exp-route-${routeIdx}`,
+                    start: r.start || { lat: r.sourceCoords?.lat, lng: r.sourceCoords?.lng, name: r.sourceName || 'Unknown' },
+                    end: r.end || { lat: r.targetCoords?.lat, lng: r.targetCoords?.lng, name: r.targetName || 'Unknown' }
+                };
+
+                // Each route gets 3 trials, all using the same disruption set for that route
+                const trialsArray = [];
+                for (let t = 0; t < trials; t++) {
+                    const tau = this.generateExperimentTau(tauSettings, t, routeIdx, routes.length);
+                    trialsArray.push({
+                        tau: parseFloat(tau.toFixed(3)),
+                        disruption: `set_route_${routeIdx}`  // Per-route disruption set
+                    });
+                }
+
+                return {
+                    ...baseRoute,
+                    trials: trialsArray
+                };
+            });
+
+            // Build experiment config (same format as demo-creator)
+            const config = {
+                id: this.experimentConfigName,  // Fixed ID so it overwrites previous
+                name: this.experimentConfigName,
+                isExperiment: true,
+                routes: routesWithTrials,
+                settings: {
+                    algorithm: 'both',  // Always test both DHL and HC2L
+                    trials: trials,
+                    stepDelay: 100      // Default step delay
+                },
+                tau: tauSettings,
+                disruptions: {
+                    mode: 'random-both',
+                    scope: 'per-route',  // Each route has its own disruption set
+                    flowCount: disruptionSettings.ratioFlow,
+                    incidentCount: disruptionSettings.ratioIncident,
+                    severityMin: disruptionSettings.severityMin,
+                    severityMax: disruptionSettings.severityMax,
+                    // Include the disruption sets for saving (demo-creator format)
+                    disruptionSets: needNewDisruptions ? disruptionSets : undefined
+                },
+                disruptionKey: this.experimentConfigName  // Use config name as disruption key
+            };
+
+            // Only save if we generated new disruptions or routes
+            if (needNewDisruptions || routeSettings.mode === 'random') {
+                this.updateLoadingStatus('Saving experiment configuration...');
+                
+                const saveResponse = await fetch('/api/demo/configs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+
+                const saveResult = await saveResponse.json();
+                if (!saveResult.success) {
+                    throw new Error('Failed to save experiment config: ' + saveResult.error);
+                }
+
+                console.log('✅ Saved experiment config:', saveResult.config?.id);
+                console.log('   Disruption key:', saveResult.config?.disruptionKey);
+
+                // Use the saved config (has savedSets populated by Flask)
+                this.hideLoadingAnimation();
+                this.showTab('running');
+                await this.runDemo(saveResult.config);
+            } else {
+                // Use existing config directly
+                console.log('✅ Using existing experiment config');
+                this.hideLoadingAnimation();
+                this.showTab('running');
+                await this.runDemo(existingConfig);
+            }
+
+        } catch (error) {
+            console.error('Experiment error:', error);
+            this.hideLoadingAnimation();
+            showUpdateToast('Experiment failed: ' + error.message, 'error');
+        }
     },
 
     // ==========================================================================
@@ -2384,6 +2894,17 @@ const DemoRunner = {
         if (overlay) {
             overlay.classList.add('hidden');
             overlay.style.display = 'none';
+        }
+    },
+
+    /**
+     * Update loading animation status message
+     * @param {string} message - Status message to display
+     */
+    updateLoadingStatus(message) {
+        const statusEl = document.getElementById('demo-loading-status');
+        if (statusEl) {
+            statusEl.textContent = message;
         }
     },
 

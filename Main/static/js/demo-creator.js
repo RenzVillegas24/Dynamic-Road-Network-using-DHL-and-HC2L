@@ -2119,6 +2119,10 @@ const DemoCreator = {
     // Debounce timer for auto-generation
     disruptionGenerationTimer: null,
 
+    // Cancellation controller for disruption generation
+    disruptionAbortController: null,
+    isGeneratingDisruptions: false,
+
     /**
      * Called when disruption scope or settings change - triggers auto-generation
      */
@@ -2133,6 +2137,15 @@ const DemoCreator = {
      * Called when any disruption setting changes - auto-generates disruptions
      */
     onDisruptionSettingChange() {
+        // If generation is in progress, cancel it
+        if (this.isGeneratingDisruptions && this.disruptionAbortController) {
+            console.log('⏹️ Cancelling in-progress disruption generation due to settings change');
+            this.disruptionAbortController.abort();
+            this.isGeneratingDisruptions = false;
+            this.disruptionsNeedGeneration = true;
+            this.resetDisruptionGenerationUI();
+        }
+
         // Clear previous timer
         if (this.disruptionGenerationTimer) {
             clearTimeout(this.disruptionGenerationTimer);
@@ -2163,13 +2176,22 @@ const DemoCreator = {
         const trials = parseInt(document.getElementById('demo-trials-count')?.value) || 1;
         const routeCount = this.routes.length || 1;
 
-        // Show loading indicator
+        // Show loading indicator and hide button container
         const loadingIndicator = document.getElementById('disruption-loading-indicator');
-        const loadingText = document.getElementById('disruption-loading-text');
+        const buttonContainer = document.getElementById('disruption-button-container');
+        const progressBar = document.getElementById('disruption-progress-bar');
         const statusText = document.getElementById('disruption-status-text');
 
         if (loadingIndicator) loadingIndicator.classList.remove('hidden');
-        if (statusText) statusText.textContent = 'Generating...';
+        if (buttonContainer) buttonContainer.classList.add('hidden');
+        if (statusText) {
+            statusText.textContent = 'Generating...';
+            statusText.className = 'text-amber-700 text-sm';
+        }
+
+        // Create new abort controller for this generation
+        this.disruptionAbortController = new AbortController();
+        this.isGeneratingDisruptions = true;
 
         // Disable navigation buttons while generating
         this.setNavigationButtonsEnabled(false);
@@ -2177,7 +2199,6 @@ const DemoCreator = {
         try {
             // Calculate required sets
             const requiredSets = this.calculateRequiredSets();
-            if (loadingText) loadingText.textContent = `Generating ${requiredSets} sets...`;
 
             // Clear previous sets
             this.disruptions.disruptionSets = {};
@@ -2204,32 +2225,55 @@ const DemoCreator = {
 
             // Generate each set
             let generatedCount = 0;
-            for (const setKey of setKeys) {
-                const response = await fetch('/api/demo/random_edges', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        flow_count: flowCount,
-                        incident_count: incidentCount,
-                        severity_min: severityMin,
-                        severity_max: severityMax
-                    })
-                });
+            for (let i = 0; i < setKeys.length; i++) {
+                const setKey = setKeys[i];
 
-                const result = await response.json();
+                // Check if generation was cancelled
+                if (this.disruptionAbortController.signal.aborted) {
+                    console.log('⏹️ Disruption generation cancelled by user');
+                    throw new DOMException('Generation cancelled', 'AbortError');
+                }
 
-                if (result.success) {
-                    this.disruptions.disruptionSets[setKey] = {
-                        flow: result.flow || [],
-                        incidents: result.incidents || [],
-                        flowCount: result.flow_count,
-                        incidentCount: result.incident_count
-                    };
-                    generatedCount++;
+                try {
+                    const response = await fetch('/api/demo/random_edges', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            flow_count: flowCount,
+                            incident_count: incidentCount,
+                            severity_min: severityMin,
+                            severity_max: severityMax
+                        }),
+                        signal: this.disruptionAbortController.signal
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        this.disruptions.disruptionSets[setKey] = {
+                            flow: result.flow || [],
+                            incidents: result.incidents || [],
+                            flowCount: result.flow_count,
+                            incidentCount: result.incident_count
+                        };
+                        generatedCount++;
+                    }
+                } catch (error) {
+                    if (error.name === 'AbortError') {
+                        throw error;
+                    }
+                    console.warn(`Failed to generate set ${setKey}, continuing...`);
                 }
 
                 // Update progress
-                if (loadingText) loadingText.textContent = `Set ${generatedCount}/${setKeys.length}...`;
+                const progressPercent = Math.round(((i + 1) / setKeys.length) * 100);
+                if (statusText) {
+                    // show the current processed items and total
+                    statusText.textContent = `${generatedCount}/${setKeys.length} generated sets (${progressPercent}%)`;
+                }
+                if (progressBar) {
+                    progressBar.style.width = progressPercent + '%';
+                }
             }
 
             // Show the first set on map
@@ -2248,12 +2292,6 @@ const DemoCreator = {
                 statusText.className = 'text-green-600 font-medium';
             }
 
-            // Update status text below button
-            const setsStatusEl = document.getElementById('disruption-sets-status');
-            if (setsStatusEl) {
-                setsStatusEl.textContent = `${generatedCount} set(s) generated`;
-            }
-
             console.log(`📦 Auto-generated ${generatedCount} disruption sets for scope: ${scope}`);
 
             // Track what trials/routes we generated for
@@ -2262,14 +2300,27 @@ const DemoCreator = {
             this.disruptionsNeedGeneration = false;
 
         } catch (error) {
-            console.error('Error auto-generating disruptions:', error);
-            if (statusText) {
-                statusText.textContent = 'Generation failed';
-                statusText.className = 'text-red-600';
+            if (error.name === 'AbortError') {
+                console.log('Generation was cancelled');
+                if (statusText) {
+                    statusText.textContent = 'Generation cancelled';
+                    statusText.className = 'text-amber-600';
+                }
+            } else {
+                console.error('Error auto-generating disruptions:', error);
+                if (statusText) {
+                    statusText.textContent = 'Generation failed';
+                    statusText.className = 'text-red-600';
+                }
             }
         } finally {
-            // Hide loading indicator
+            // Mark generation as complete
+            this.isGeneratingDisruptions = false;
+            
+            // Hide loading indicator and show button container
             if (loadingIndicator) loadingIndicator.classList.add('hidden');
+            if (buttonContainer) buttonContainer.classList.remove('hidden');
+            
             // Re-enable navigation buttons
             this.setNavigationButtonsEnabled(true);
         }
@@ -2277,9 +2328,22 @@ const DemoCreator = {
 
     /**
      * Generate random disruptions - called by button click
-     * Similar to generateRandomTauValues()
+     * Supports stopping ongoing generation
      */
     async generateRandomDisruptions() {
+        const btn = document.getElementById('generate-disruptions-btn');
+        
+        // If generation is in progress, stop it
+        if (this.isGeneratingDisruptions) {
+            console.log('⏹️ User clicked to stop disruption generation');
+            if (this.disruptionAbortController) {
+                this.disruptionAbortController.abort();
+            }
+            this.isGeneratingDisruptions = false;
+            this.resetDisruptionGenerationUI();
+            return;
+        }
+
         // Check if disruption mode is not 'custom' or 'none'
         const mode = this.disruptions.mode || 'random-both';
         if (mode === 'none') {
@@ -2287,35 +2351,52 @@ const DemoCreator = {
             return;
         }
 
-        // Update button to show loading
-        const btn = document.getElementById('generate-disruptions-btn');
-        const originalContent = btn?.innerHTML;
-        if (btn) {
-            btn.disabled = true;
-            btn.innerHTML = '<span class="animate-spin inline-block">⏳</span> Generating...';
-        }
-
         try {
             await this.autoGenerateDisruptions();
-            showUpdateToast('Disruptions generated successfully!', 'success');
+            if (!this.disruptionAbortController.signal.aborted) {
+                showUpdateToast('Disruptions generated successfully!', 'success');
+            }
         } catch (error) {
-            console.error('Error generating disruptions:', error);
-            showUpdateToast('Failed to generate disruptions', 'error');
-        } finally {
-            if (btn) {
-                btn.disabled = false;
-                btn.innerHTML = originalContent;
+            if (error.name !== 'AbortError') {
+                console.error('Error generating disruptions:', error);
+                showUpdateToast('Failed to generate disruptions', 'error');
             }
         }
+    },
+
+    /**
+     * Reset disruption generation UI after cancellation
+     */
+    resetDisruptionGenerationUI() {
+        const loadingIndicator = document.getElementById('disruption-loading-indicator');
+        const buttonContainer = document.getElementById('disruption-button-container');
+        const progressBar = document.getElementById('disruption-progress-bar');
+        const statusText = document.getElementById('disruption-status-text');
+        const btn = document.getElementById('generate-disruptions-btn');
+
+        if (loadingIndicator) loadingIndicator.classList.add('hidden');
+        if (buttonContainer) buttonContainer.classList.remove('hidden');
+        if (progressBar) progressBar.style.width = '0%';
+        if (statusText) {
+            statusText.textContent = 'Not generated';
+            statusText.className = 'text-muted';
+        }
+        if (btn) {
+            btn.innerHTML = '<i data-lucide="shuffle" class="w-4 h-4"></i> Generate Random Disruptions';
+        }
+
+        // Refresh lucide icons for the button
+        lucide.createIcons();
     },
 
     /**
      * Enable/disable navigation buttons
      */
     setNavigationButtonsEnabled(enabled) {
-        const prevBtn = document.getElementById('demo-prev-btn');
-        const nextBtn = document.getElementById('demo-next-btn');
+        const prevBtn = document.getElementById('demo-v2-prev-btn');
+        const nextBtn = document.getElementById('demo-v2-next-btn');
         if (prevBtn) prevBtn.disabled = !enabled;
+        if (nextBtn) nextBtn.disabled = !enabled;
         if (nextBtn) nextBtn.disabled = !enabled;
     },
 

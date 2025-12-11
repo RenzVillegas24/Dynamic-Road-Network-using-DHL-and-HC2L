@@ -461,23 +461,58 @@
 .form-range {
   width: 100%;
   height: 0.5rem;
-  background-color: var(--color-gray-200);
+  background: transparent;
   border-radius: var(--radius-full);
   cursor: pointer;
   appearance: none;
   -webkit-appearance: none;
+  -moz-appearance: none;
+  outline: none;
+}
+
+/* Webkit browsers (Chrome, Safari, Edge) */
+.form-range::-webkit-slider-runnable-track {
+  width: 100%;
+  height: 0.5rem;
+  background-color: var(--color-gray-200);
+  border-radius: var(--radius-full);
+  border: none;
 }
 
 .form-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
   width: 1.25rem;
   height: 1.25rem;
+  margin-top: -0.375rem;
   background-color: var(--color-primary);
   border-radius: var(--radius-full);
   border: none;
   cursor: pointer;
-  appearance: none;
-  -webkit-appearance: none;
-  transition: transform var(--transition-fast);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.form-range::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+}
+
+.form-range::-webkit-slider-thumb:active {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Mozilla Firefox */
+.form-range::-moz-range-track {
+  background-color: var(--color-gray-200);
+  border-radius: var(--radius-full);
+  border: none;
+  height: 0.5rem;
+}
+
+.form-range::-moz-range-progress {
+  background-color: var(--color-primary);
+  border-radius: var(--radius-full);
+  height: 0.5rem;
 }
 
 .form-range::-moz-range-thumb {
@@ -487,18 +522,76 @@
   border-radius: var(--radius-full);
   border: none;
   cursor: pointer;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.form-range:hover::-webkit-slider-thumb {
+.form-range::-moz-range-thumb:hover {
   transform: scale(1.1);
 }
 
+.form-range::-moz-range-thumb:active {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Focus state */
 .form-range:focus {
   outline: none;
 }
 
 .form-range:focus::-webkit-slider-thumb {
-  box-shadow: var(--ring-primary);
+  box-shadow: var(--ring-primary), 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.form-range:focus::-moz-range-thumb {
+  box-shadow: var(--ring-primary), 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Disabled state */
+.form-range:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.form-range:disabled::-webkit-slider-thumb,
+.form-range:disabled::-moz-range-thumb {
+  cursor: not-allowed;
+}
+
+/* =====================
+   PROGRESS BAR
+   ===================== */
+
+.progress-bar {
+  width: 100%;
+  height: 0.5rem;
+  background-color: var(--color-gray-200);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.progress-bar__fill {
+  height: 100%;
+  background-color: var(--color-warning);
+  border-radius: var(--radius-full);
+  transition: width 300ms ease-in-out;
+  min-width: 0;
+}
+
+.progress-bar__fill--success {
+  background-color: var(--color-success);
+}
+
+.progress-bar__fill--primary {
+  background-color: var(--color-primary);
+}
+
+.progress-bar__fill--error {
+  background-color: var(--color-error);
+}
+
+.progress-bar__fill--info {
+  background-color: var(--color-info);
 }
 
 /* =====================

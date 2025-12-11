@@ -1912,6 +1912,103 @@ def delete_demo_disruptions(demo_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/demo/disruptions/<disruption_key>/<set_key>', methods=['GET'])
+def get_demo_disruptions(disruption_key, set_key):
+    """
+    Load disruption data from saved CSV files.
+    
+    Args:
+        disruption_key: The disruption folder key (e.g., 'ExperimentMode' or UUID)
+        set_key: The set key (e.g., 'set_all', 'trial_0', 'route_1')
+    
+    Returns:
+    {
+        "success": true,
+        "flow": [...],
+        "incidents": [...]
+    }
+    """
+    import csv
+    
+    try:
+        base_path = DEMO_DISRUPTIONS_DIR / disruption_key / set_key
+        
+        if not base_path.exists():
+            return jsonify({
+                'success': False, 
+                'error': f'Disruption set not found: {disruption_key}/{set_key}'
+            }), 404
+        
+        flow_data = []
+        incident_data = []
+        
+        # Load flow CSVs
+        flow_dir = base_path / 'flow'
+        if flow_dir.exists():
+            for csv_file in flow_dir.glob('*.csv'):
+                with open(csv_file, 'r') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        # Convert numeric fields
+                        flow_data.append({
+                            'id_hash': row.get('id_hash', ''),
+                            'source': int(row.get('source', 0)) if row.get('source') else None,
+                            'target': int(row.get('target', 0)) if row.get('target') else None,
+                            'source_lat': float(row.get('source_lat', 0)) if row.get('source_lat') else None,
+                            'source_lon': float(row.get('source_lon', 0)) if row.get('source_lon') else None,
+                            'target_lat': float(row.get('target_lat', 0)) if row.get('target_lat') else None,
+                            'target_lon': float(row.get('target_lon', 0)) if row.get('target_lon') else None,
+                            'flow_speed_kph': float(row.get('flow_speed_kph', 30)),
+                            'flow_free_flow_kph': float(row.get('flow_free_flow_kph', 60)),
+                            'flow_jam_factor': float(row.get('flow_jam_factor', 5)),
+                            'flow_confidence': float(row.get('flow_confidence', 0.95)),
+                            'flow_traversability': row.get('flow_traversability', 'open'),
+                            'highway_type': row.get('highway_type', 'primary'),
+                            'road_name': row.get('road_name', 'Unknown')
+                        })
+        
+        # Load incident CSVs
+        incidents_dir = base_path / 'incidents'
+        if incidents_dir.exists():
+            for csv_file in incidents_dir.glob('*.csv'):
+                with open(csv_file, 'r') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        incident_data.append({
+                            'source': int(row.get('source', 0)) if row.get('source') else None,
+                            'target': int(row.get('target', 0)) if row.get('target') else None,
+                            'source_lat': float(row.get('source_lat', 0)) if row.get('source_lat') else None,
+                            'source_lon': float(row.get('source_lon', 0)) if row.get('source_lon') else None,
+                            'target_lat': float(row.get('target_lat', 0)) if row.get('target_lat') else None,
+                            'target_lon': float(row.get('target_lon', 0)) if row.get('target_lon') else None,
+                            'incident_id': row.get('incident_id', ''),
+                            'incident_type': row.get('incident_type', 'construction'),
+                            'incident_criticality': row.get('incident_criticality', 'major'),
+                            'incident_description': row.get('incident_description', ''),
+                            'incident_road_closed': row.get('incident_road_closed', 'False').lower() == 'true',
+                            'incident_start_time': row.get('incident_start_time', ''),
+                            'incident_end_time': row.get('incident_end_time', ''),
+                            'highway_type': row.get('highway_type', 'primary'),
+                            'road_name': row.get('road_name', 'Unknown')
+                        })
+        
+        console_logger.info(f"Loaded disruptions: {disruption_key}/{set_key} ({len(flow_data)} flow, {len(incident_data)} incidents)")
+        
+        return jsonify({
+            'success': True,
+            'flow': flow_data,
+            'incidents': incident_data,
+            'flowCount': len(flow_data),
+            'incidentCount': len(incident_data)
+        })
+        
+    except Exception as e:
+        console_logger.error(f"Error loading disruptions: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/api/demo/snap_disruptions', methods=['POST'])
 def snap_demo_disruptions():
     """
@@ -3175,6 +3272,287 @@ def delete_demo_result_file():
         })
     except Exception as e:
         console_logger.error(f"Error deleting result file: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ===========================================================================
+# EXPERIMENT MODE API ENDPOINTS (Thesis)
+# Uses same structure as Demo Creator:
+# - Config: /data/demos/configs/ThesisExperiment.json
+# - Disruptions: /data/demos/configs/disruptions/ThesisExperiment/
+# - Routes stored within config file
+# ===========================================================================
+
+
+@app.route('/api/experiment/preset/<config_name>/<preset_type>', methods=['GET'])
+def get_experiment_preset(config_name, preset_type):
+    """
+    Get saved experiment preset data (routes or disruptions).
+    Uses demo configs structure for consistency with Demo Creator.
+    
+    Args:
+        config_name: The experiment config name (e.g., 'ThesisExperiment')
+        preset_type: 'routes' or 'disruptions'
+    
+    Returns:
+    {
+        "success": true,
+        "data": {...}  // The preset data
+    }
+    """
+    try:
+        if preset_type == 'routes':
+            # Routes are stored in the main config file
+            config_file = DEMO_CONFIGS_DIR / f"{config_name}.json"
+            if not config_file.exists():
+                return jsonify({
+                    'success': False,
+                    'error': f'Config not found: {config_name}'
+                }), 404
+            
+            with open(config_file, 'r') as f:
+                config = json.load(f)
+            
+            routes = config.get('routes', [])
+            console_logger.info(f"Loaded experiment routes from config: {config_name} ({len(routes)} routes)")
+            
+            return jsonify({
+                'success': True,
+                'data': routes
+            })
+            
+        elif preset_type == 'disruptions':
+            # Disruptions are stored in disruptions subdirectory
+            disruption_dir = DEMO_DISRUPTIONS_DIR / config_name
+            if not disruption_dir.exists():
+                return jsonify({
+                    'success': False,
+                    'error': f'Disruption preset not found: {config_name}'
+                }), 404
+            
+            # Load all disruption files from the directory
+            disruptions = {
+                'flow': [],
+                'incidents': []
+            }
+            
+            for file in disruption_dir.glob('*.json'):
+                with open(file, 'r') as f:
+                    data = json.load(f)
+                    if 'flow' in data:
+                        disruptions['flow'].extend(data['flow'])
+                    if 'incidents' in data:
+                        disruptions['incidents'].extend(data['incidents'])
+            
+            disruptions['flowCount'] = len(disruptions['flow'])
+            disruptions['incidentCount'] = len(disruptions['incidents'])
+            
+            console_logger.info(f"Loaded experiment disruptions: {config_name} ({disruptions['flowCount']} flow, {disruptions['incidentCount']} incidents)")
+            
+            return jsonify({
+                'success': True,
+                'data': disruptions
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': f'Invalid preset type: {preset_type}'
+            }), 400
+            
+    except Exception as e:
+        console_logger.error(f"Error loading experiment preset: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/experiment/preset/<config_name>/<preset_type>', methods=['POST'])
+def save_experiment_preset(config_name, preset_type):
+    """
+    Save experiment preset data (routes or disruptions).
+    Uses demo configs structure for consistency with Demo Creator.
+    
+    Args:
+        config_name: The experiment config name (e.g., 'ThesisExperiment')
+        preset_type: 'routes' or 'disruptions'
+    
+    Request body:
+    {
+        "data": {...}  // The preset data to save
+    }
+    
+    Returns:
+    {
+        "success": true,
+        "path": "..."  // Path to saved file
+    }
+    """
+    try:
+        data = request.json.get('data')
+        
+        if not data:
+            return jsonify({'success': False, 'error': 'No data provided'}), 400
+        
+        if preset_type == 'routes':
+            # Routes saved within config file
+            config_file = DEMO_CONFIGS_DIR / f"{config_name}.json"
+            
+            # Load existing config or create new
+            if config_file.exists():
+                with open(config_file, 'r') as f:
+                    config = json.load(f)
+            else:
+                config = {
+                    'id': config_name,
+                    'name': config_name,
+                    'savedAt': datetime.now().isoformat(),
+                    'isExperiment': True,
+                    'settings': {
+                        'algorithm': 'both',
+                        'trials': 3,
+                        'stepDelay': 100
+                    }
+                }
+            
+            config['routes'] = data
+            config['savedAt'] = datetime.now().isoformat()
+            
+            with open(config_file, 'w') as f:
+                json.dump(config, f, indent=2)
+            
+            console_logger.success(f"Saved experiment routes to config: {config_name} ({len(data)} routes)")
+            
+            return jsonify({
+                'success': True,
+                'path': str(config_file)
+            })
+            
+        elif preset_type == 'disruptions':
+            # Disruptions saved in disruptions subdirectory
+            disruption_dir = DEMO_DISRUPTIONS_DIR / config_name
+            disruption_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Save as single file set_all.json (same as demo-creator)
+            disruption_file = disruption_dir / 'set_all.json'
+            with open(disruption_file, 'w') as f:
+                json.dump(data, f, indent=2)
+            
+            console_logger.success(f"Saved experiment disruptions: {config_name}")
+            
+            return jsonify({
+                'success': True,
+                'path': str(disruption_file)
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': f'Invalid preset type: {preset_type}'
+            }), 400
+            
+    except Exception as e:
+        console_logger.error(f"Error saving experiment preset: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/experiment/preset/<config_name>/<preset_type>', methods=['DELETE'])
+def delete_experiment_preset(config_name, preset_type):
+    """
+    Delete experiment preset data.
+    
+    Args:
+        config_name: The experiment config name (e.g., 'ThesisExperiment')
+        preset_type: 'routes', 'disruptions', or 'all' to delete entire config
+    
+    Returns:
+    {
+        "success": true
+    }
+    """
+    try:
+        import shutil
+        
+        if preset_type == 'all':
+            # Delete config file
+            config_file = DEMO_CONFIGS_DIR / f"{config_name}.json"
+            if config_file.exists():
+                config_file.unlink()
+                console_logger.info(f"Deleted experiment config: {config_name}")
+            
+            # Delete disruptions directory
+            disruption_dir = DEMO_DISRUPTIONS_DIR / config_name
+            if disruption_dir.exists():
+                shutil.rmtree(disruption_dir)
+                console_logger.info(f"Deleted experiment disruptions: {config_name}")
+                
+        elif preset_type == 'routes':
+            # Clear routes from config
+            config_file = DEMO_CONFIGS_DIR / f"{config_name}.json"
+            if config_file.exists():
+                with open(config_file, 'r') as f:
+                    config = json.load(f)
+                config['routes'] = []
+                with open(config_file, 'w') as f:
+                    json.dump(config, f, indent=2)
+                console_logger.info(f"Cleared experiment routes: {config_name}")
+                
+        elif preset_type == 'disruptions':
+            # Delete disruptions directory
+            disruption_dir = DEMO_DISRUPTIONS_DIR / config_name
+            if disruption_dir.exists():
+                shutil.rmtree(disruption_dir)
+                console_logger.info(f"Deleted experiment disruptions: {config_name}")
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        console_logger.error(f"Error deleting experiment preset: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/experiment/presets', methods=['GET'])
+def list_experiment_presets():
+    """
+    List all experiment presets (configs with isExperiment: true).
+    
+    Returns:
+    {
+        "success": true,
+        "presets": [
+            {
+                "name": "ThesisExperiment",
+                "hasRoutes": true,
+                "hasDisruptions": true
+            },
+            ...
+        ]
+    }
+    """
+    try:
+        presets = []
+        
+        # Find experiment configs in demo configs directory
+        if DEMO_CONFIGS_DIR.exists():
+            for config_file in DEMO_CONFIGS_DIR.glob('*.json'):
+                try:
+                    with open(config_file, 'r') as f:
+                        config = json.load(f)
+                    
+                    # Only include experiment configs
+                    if config.get('isExperiment'):
+                        config_name = config_file.stem
+                        disruption_dir = DEMO_DISRUPTIONS_DIR / config_name
+                        
+                        presets.append({
+                            'name': config_name,
+                            'hasRoutes': len(config.get('routes', [])) > 0,
+                            'hasDisruptions': disruption_dir.exists() and any(disruption_dir.glob('*.json'))
+                        })
+                except:
+                    pass
+        
+        return jsonify({
+            'success': True,
+            'presets': presets
+        })
+    except Exception as e:
+        console_logger.error(f"Error listing experiment presets: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
