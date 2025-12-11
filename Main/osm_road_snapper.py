@@ -28,16 +28,18 @@ class OSMRoadSnapper:
     road geometries rather than just intersection nodes.
     """
     
-    def __init__(self, edges_csv: str, nodes_csv: str = None):
+    def __init__(self, edges_csv: str, nodes_csv: str = None, excluded_bbox: str = None):
         """
         Initialize the OSM Road Snapper.
         
         Args:
             edges_csv: Path to edges CSV file (source,target,length,name,highway,oneway,geometry_coords)
             nodes_csv: Optional path to nodes CSV for routing node mapping
+            excluded_bbox: Optional bounding box to exclude from snapping as "min_lon,min_lat,max_lon,max_lat"
         """
         self.edges_csv = Path(edges_csv)
         self.nodes_csv = Path(nodes_csv) if nodes_csv else None
+        self.excluded_bbox = self._parse_bbox(excluded_bbox) if excluded_bbox else None
         
         # Load edge geometries from CSV
         logger.processing(f"Loading road geometries from {edges_csv}...")
@@ -51,6 +53,53 @@ class OSMRoadSnapper:
         if self.nodes_csv and self.nodes_csv.exists():
             self.routing_nodes_df = pd.read_csv(self.nodes_csv)
             logger.success(f"Loaded {len(self.routing_nodes_df)} routing nodes")
+        
+        if self.excluded_bbox:
+            logger.info(f"Excluded bounding box: {self.excluded_bbox}")
+    
+    
+    def _parse_bbox(self, bbox_str: str) -> Optional[Dict]:
+        """
+        Parse bounding box string.
+        
+        Args:
+            bbox_str: Bounding box as "min_lon,min_lat,max_lon,max_lat"
+        
+        Returns:
+            dict or None: {'min_lon': float, 'min_lat': float, 'max_lon': float, 'max_lat': float}
+        """
+        try:
+            parts = [float(x.strip()) for x in bbox_str.split(',')]
+            if len(parts) != 4:
+                logger.warning(f"Invalid bbox format: expected 4 values, got {len(parts)}")
+                return None
+            return {
+                'min_lon': parts[0],
+                'min_lat': parts[1],
+                'max_lon': parts[2],
+                'max_lat': parts[3]
+            }
+        except (ValueError, AttributeError) as e:
+            logger.warning(f"Error parsing bbox: {e}")
+            return None
+    
+    def _is_in_excluded_bbox(self, lat: float, lng: float) -> bool:
+        """
+        Check if a point is within the excluded bounding box.
+        
+        Args:
+            lat: Latitude
+            lng: Longitude
+        
+        Returns:
+            bool: True if point is in excluded bbox, False otherwise
+        """
+        if self.excluded_bbox is None:
+            return False
+        
+        bbox = self.excluded_bbox
+        return (bbox['min_lon'] <= lng <= bbox['max_lon'] and
+                bbox['min_lat'] <= lat <= bbox['max_lat'])
     
     def _load_edges_from_csv(self):
         """Load edge geometries from CSV file."""
@@ -180,6 +229,11 @@ class OSMRoadSnapper:
                 'metadata': dict
             }
         """
+        # Check if point is in excluded bounding box
+        if self._is_in_excluded_bbox(lat, lng):
+            logger.warning(f"Point ({lat}, {lng}) is in excluded bounding box - skipping snap")
+            return None
+        
         # Create point geometry
         point = Point(lng, lat)
         

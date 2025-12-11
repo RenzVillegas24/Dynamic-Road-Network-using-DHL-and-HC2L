@@ -66,6 +66,9 @@ const DemoRunner = {
     // Saved Route Finder state (to be restored after demo)
     savedRouteFinderState: null,
 
+    // Temporary config name for experiment mode (used for cleanup)
+    currentTempConfigName: null,
+
     // Location presets for Quezon City
     presetLocations: [
         { name: 'Quezon Memorial Circle', lat: 14.6540, lng: 121.0490 },
@@ -192,6 +195,41 @@ const DemoRunner = {
         // Fallback to preset if all attempts fail
         console.warn('⚠️ Could not generate random point in QC, using preset');
         return this.getRandomLocation();
+    },
+
+    /**
+     * Get multiple random road points in one efficient API call
+     * Much faster than generating random QC points individually
+     * @param {number} count - Number of road points to get
+     * @returns {Promise<Array|null>} Array of {lat, lng, name} objects or null on error
+     */
+    async getRandomRoadPoints(count) {
+        try {
+            const response = await fetch('/api/demo/random_road_points', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    count: count,
+                    min_lat: this.qcBoundingBox?.minLat || 14.55,
+                    max_lat: this.qcBoundingBox?.maxLat || 14.78,
+                    min_lng: this.qcBoundingBox?.minLng || 120.98,
+                    max_lng: this.qcBoundingBox?.maxLng || 121.12
+                })
+            });
+            const result = await response.json();
+
+            if (result.success && result.points) {
+                return result.points.map(p => ({
+                    lat: p.lat,
+                    lng: p.lng,
+                    name: p.road_name || `Road (${p.lat.toFixed(4)}, ${p.lng.toFixed(4)})`
+                }));
+            }
+            return null;
+        } catch (error) {
+            console.error('Error getting random road points:', error);
+            return null;
+        }
     },
 
     bindEvents() {
@@ -420,10 +458,9 @@ const DemoRunner = {
         // Update the preview list
         this.updateDisruptionPreview();
 
-        // Update disruption sets if available
-        if (this.disruptionSets && Object.keys(this.disruptionSets).length > 0) {
-            this.showDisruptionSetsPreview();
-        }
+        // ALWAYS update disruption sets preview (even if no disruptions on map)
+        // This ensures the list is visible and usable regardless of map visualization
+        this.showDisruptionSetsPreview();
     },
 
     updateTauModeUI() {
@@ -845,12 +882,35 @@ const DemoRunner = {
 
     /**
      * Get a pair of random locations for route generation.
-     * If useRandomQC is true, uses truly random coords within QC boundary.
+     * If useRandomQC is true, uses road-validated locations via API.
      * Otherwise uses preset locations.
+     * @param {boolean} useRandomQC - Whether to use random QC road points
+     * @returns {Promise<{start: Object, end: Object}>} Pair of locations
      */
-    getRandomLocationPair(useRandomQC = false) {
-        if (useRandomQC && this.qcBoundary) {
-            // Generate truly random locations within QC
+    async getRandomLocationPair(useRandomQC = false) {
+        if (useRandomQC) {
+            // Use efficient API call to get road-validated points
+            const roadPoints = await this.getRandomRoadPoints(10); // Get extra for distance filtering
+            
+            if (roadPoints && roadPoints.length >= 2) {
+                // Find a pair with reasonable distance between them
+                for (let i = 0; i < roadPoints.length - 1; i++) {
+                    for (let j = i + 1; j < roadPoints.length; j++) {
+                        const start = roadPoints[i];
+                        const end = roadPoints[j];
+                        // Ensure minimum distance
+                        if (Math.abs(end.lat - start.lat) >= 0.01 ||
+                            Math.abs(end.lng - start.lng) >= 0.01) {
+                            return { start, end };
+                        }
+                    }
+                }
+                // If no suitable pair found, just use first two
+                return { start: roadPoints[0], end: roadPoints[1] };
+            }
+            
+            // Fallback to random QC boundary method
+            console.warn('⚠️ Road points API failed, falling back to random QC');
             const start = this.getRandomLocationInQC();
             let end;
             let attempts = 0;
@@ -858,7 +918,7 @@ const DemoRunner = {
                 end = this.getRandomLocationInQC();
                 attempts++;
             } while (attempts < 10 &&
-            Math.abs(end.lat - start.lat) < 0.01 &&
+                Math.abs(end.lat - start.lat) < 0.01 &&
                 Math.abs(end.lng - start.lng) < 0.01);
             return { start, end };
         } else {
@@ -903,7 +963,7 @@ const DemoRunner = {
         // Generate random routes
         const routes = [];
         for (let i = 0; i < settings.routeCount; i++) {
-            const pair = this.getRandomLocationPair(useRandomQC);
+            const pair = await this.getRandomLocationPair(useRandomQC);
             routes.push({
                 id: `route-${i}`,
                 start: pair.start,
@@ -1085,6 +1145,7 @@ const DemoRunner = {
 
     /**
      * Generate 1000 random routes for experiment
+     * Uses efficient batch API call to get road-validated points
      */
     async generateExperimentRoutes(settings) {
         const batchSize = 1000;
@@ -1092,17 +1153,56 @@ const DemoRunner = {
 
         this.showLoadingAnimation('Generating Routes', `Creating ${batchSize} random routes...`);
 
-        for (let i = 0; i < batchSize; i++) {
-            const pair = this.getRandomLocationPair(true); // Use truly random QC locations
-            routes.push({
-                id: `exp-route-${i}`,
-                start: pair.start,
-                end: pair.end
-            });
+        // Efficient batch approach: get all road points at once
+        // We need 2 points per route, but get extra for distance filtering
+        const neededPoints = batchSize * 3;  // 3x for variety
+        const roadPoints = await this.getRandomRoadPoints(neededPoints);
 
-            if (i % 100 === 0) {
-                this.updateLoadingStatus(`Generated ${i + 1}/${batchSize} routes`);
-                await this.delay(1); // Allow UI to update
+        if (roadPoints && roadPoints.length >= 2) {
+            this.updateLoadingStatus(`Got ${roadPoints.length} road points, creating route pairs...`);
+            
+            let pointIndex = 0;
+            for (let i = 0; i < batchSize; i++) {
+                // Pick two points with reasonable distance between them
+                let start = roadPoints[pointIndex % roadPoints.length];
+                let end = roadPoints[(pointIndex + 1) % roadPoints.length];
+                pointIndex += 2;
+                
+                // Try to find a pair with minimum distance
+                let attempts = 0;
+                while (attempts < 5 && 
+                       Math.abs(end.lat - start.lat) < 0.005 &&
+                       Math.abs(end.lng - start.lng) < 0.005) {
+                    end = roadPoints[(pointIndex + attempts) % roadPoints.length];
+                    attempts++;
+                }
+
+                routes.push({
+                    id: `exp-route-${i}`,
+                    start: start,
+                    end: end
+                });
+
+                if (i % 100 === 0) {
+                    this.updateLoadingStatus(`Generated ${i + 1}/${batchSize} routes`);
+                    await this.delay(1); // Allow UI to update
+                }
+            }
+        } else {
+            // Fallback to individual calls (slower but more reliable)
+            console.warn('⚠️ Batch road points failed, using individual calls');
+            for (let i = 0; i < batchSize; i++) {
+                const pair = await this.getRandomLocationPair(true);
+                routes.push({
+                    id: `exp-route-${i}`,
+                    start: pair.start,
+                    end: pair.end
+                });
+
+                if (i % 100 === 0) {
+                    this.updateLoadingStatus(`Generated ${i + 1}/${batchSize} routes`);
+                    await this.delay(1); // Allow UI to update
+                }
             }
         }
 
@@ -1215,6 +1315,33 @@ const DemoRunner = {
     },
 
     /**
+     * Delete a temporary experiment config and its disruptions folder
+     * @param {string} tempConfigName - The temporary config name to delete
+     */
+    async deleteTemporaryExperimentConfig(tempConfigName) {
+        if (!tempConfigName || !tempConfigName.startsWith('ExperimentMode_temp_')) {
+            return; // Safety check - only delete temp configs
+        }
+
+        try {
+            console.log(`🗑️ Deleting temporary experiment config: ${tempConfigName}`);
+            
+            const response = await fetch(`/api/demo/configs/${tempConfigName}`, {
+                method: 'DELETE'
+            });
+            
+            const result = await response.json();
+            if (result.success) {
+                console.log(`✅ Deleted temporary config: ${tempConfigName}`);
+            } else {
+                console.warn(`⚠️ Failed to delete temp config: ${result.error}`);
+            }
+        } catch (error) {
+            console.error('Error deleting temporary config:', error);
+        }
+    },
+
+    /**
      * Start the thesis experiment
      * Uses the same save mechanism as Demo Creator:
      * - Config saved to /data/demos/configs/ExperimentMode.json
@@ -1224,6 +1351,11 @@ const DemoRunner = {
      * - 1000 routes, each with its own disruption set (set_route_0, set_route_1, ...)
      * - 3 trials per route, all trials for a route use the same disruption set
      * - Both DHL and HC2L algorithms tested
+     * 
+     * Random Mode Behavior:
+     * - Random Routes: Creates temporary config with new routes, uses existing disruptions
+     * - Random Disruptions: Creates temporary config and folder with new disruptions, uses existing routes
+     * - The temporary files are deleted after the run completes
      */
     async startExperiment() {
         if (this.isRunning) {
@@ -1249,69 +1381,68 @@ const DemoRunner = {
             const trials = 3; // Fixed 3 trials
             const batchSize = 1000; // Fixed 1000 routes
 
-            // Check if we have an existing ExperimentMode config
+            // Determine if we're using random mode (temporary config needed)
+            const isRandomRoutes = routeSettings.mode === 'random';
+            const isRandomDisruptions = disruptionSettings.mode === 'random';
+            const needsTempConfig = isRandomRoutes || isRandomDisruptions;
+            
+            // Generate temp config name if needed
+            const tempTimestamp = Date.now();
+            const tempConfigName = needsTempConfig ? `ExperimentMode_temp_${tempTimestamp}` : null;
+            
+            // Store temp config name for cleanup after run
+            this.currentTempConfigName = tempConfigName;
+
+            // Check if we have an existing ExperimentMode config (the preset)
             try {
                 const response = await fetch(`/api/demo/configs/${this.experimentConfigName}`);
                 if (response.ok) {
                     const result = await response.json();
                     if (result.success) {
                         existingConfig = result.config;
-                        console.log('📂 Found existing ExperimentMode config');
+                        console.log('📂 Found existing ExperimentMode preset config');
                     }
                 }
             } catch (e) {
-                console.log('No existing config found, will create new');
+                console.log('No existing preset config found, will create new');
             }
 
             // Handle routes
-            if (routeSettings.mode === 'preset' && existingConfig?.routes?.length > 0) {
-                // Use saved routes from config - they already have the correct format
+            if (isRandomRoutes) {
+                // Generate new routes for temporary config
+                routes = await this.generateExperimentRoutes(routeSettings);
+                console.log(`🎲 Generated ${routes.length} new random routes (temporary)`);
+            } else if (existingConfig?.routes?.length > 0) {
+                // Use saved routes from preset config
                 routes = existingConfig.routes;
                 console.log(`📂 Loaded ${routes.length} preset routes from config`);
                 this.updateLoadingStatus(`Loaded ${routes.length} preset routes`);
             } else {
-                // Generate new routes
+                // No preset routes exist, generate new for preset
                 routes = await this.generateExperimentRoutes(routeSettings);
-                console.log(`🎲 Generated ${routes.length} new routes`);
+                console.log(`🎲 Generated ${routes.length} new routes (will save to preset)`);
             }
 
             if (!routes || routes.length === 0) {
                 throw new Error('Failed to load/generate routes');
             }
 
-            // Determine if we need to generate new disruptions
-            let needNewDisruptions = disruptionSettings.mode === 'random';
+            // Handle disruptions
+            let needNewDisruptions = isRandomDisruptions;
             let disruptionSets = {};
+            let disruptionKeyToUse = null;
 
-            if (disruptionSettings.mode === 'preset' && existingConfig?.disruptions?.savedSets) {
-                // Check if we have the right number of disruption sets
-                const savedSetKeys = Object.keys(existingConfig.disruptions.savedSets);
-                if (savedSetKeys.length === routes.length) {
-                    console.log(`📂 Using ${savedSetKeys.length} preset disruption sets`);
-                    // We'll load these during runDemo via activateConfigDisruptionSet
-                    needNewDisruptions = false;
-                } else {
-                    console.log(`⚠️ Mismatch: ${savedSetKeys.length} saved sets but ${routes.length} routes, regenerating`);
-                    needNewDisruptions = true;
-                }
-            } else if (disruptionSettings.mode === 'preset') {
-                // Preset mode but no saved sets - generate new
-                needNewDisruptions = true;
-            }
-
-            // Generate disruptions if needed (one per route)
-            if (needNewDisruptions) {
-                this.updateLoadingStatus('Generating disruptions for each route...');
+            if (isRandomDisruptions) {
+                // Generate new disruptions for temporary config
+                this.updateLoadingStatus('Generating random disruptions...');
                 
                 const { ratioFlow, ratioIncident, severityMin, severityMax } = disruptionSettings;
                 const total = ratioFlow + ratioIncident;
-                // Each route gets 1000 disruptions (batchSize) with the specified ratio
                 const flowCount = Math.round((ratioFlow / total) * batchSize);
                 const incidentCount = batchSize - flowCount;
                 
-                console.log(`🎲 Generating disruptions: ${flowCount} flow + ${incidentCount} incidents per route (1000 total per route)`);
+                console.log(`🎲 Generating disruptions: ${flowCount} flow + ${incidentCount} incidents per route (temporary)`);
                 
-                // Generate one disruption set per route (each route gets the full 1000 disruptions)
                 for (let i = 0; i < routes.length; i++) {
                     this.updateLoadingStatus(`Generating disruptions: ${i}/${routes.length} routes...`);
 
@@ -1320,8 +1451,8 @@ const DemoRunner = {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
-                                flow_count: flowCount,  // Full 1000 count based on ratio (e.g., 950)
-                                incident_count: incidentCount,  // Full 1000 count based on ratio (e.g., 50)
+                                flow_count: flowCount,
+                                incident_count: incidentCount,
                                 severity_min: severityMin,
                                 severity_max: severityMax
                             })
@@ -1338,62 +1469,118 @@ const DemoRunner = {
                         console.warn(`Failed to generate disruptions for route ${i}:`, e);
                     }
                 }
-                console.log(`🎲 Generated ${Object.keys(disruptionSets).length} disruption sets (one per route)`);
+                console.log(`🎲 Generated ${Object.keys(disruptionSets).length} disruption sets (temporary)`);
+                disruptionKeyToUse = tempConfigName;  // Use temp folder for disruptions
+                needNewDisruptions = true;
+            } else if (existingConfig?.disruptions?.savedSets) {
+                // Use existing preset disruptions
+                const savedSetKeys = Object.keys(existingConfig.disruptions.savedSets);
+                if (savedSetKeys.length >= routes.length) {
+                    console.log(`📂 Using ${savedSetKeys.length} preset disruption sets from ExperimentMode`);
+                    disruptionKeyToUse = this.experimentConfigName;  // Point to preset disruptions
+                    needNewDisruptions = false;
+                } else {
+                    console.log(`⚠️ Mismatch: ${savedSetKeys.length} saved sets but ${routes.length} routes`);
+                    throw new Error(`Preset has ${savedSetKeys.length} disruption sets but need ${routes.length}. Please regenerate preset.`);
+                }
+            } else {
+                // No preset disruptions exist, generate new for preset
+                this.updateLoadingStatus('Generating disruptions for preset...');
+                
+                const { ratioFlow, ratioIncident, severityMin, severityMax } = disruptionSettings;
+                const total = ratioFlow + ratioIncident;
+                const flowCount = Math.round((ratioFlow / total) * batchSize);
+                const incidentCount = batchSize - flowCount;
+                
+                for (let i = 0; i < routes.length; i++) {
+                    this.updateLoadingStatus(`Generating disruptions: ${i}/${routes.length} routes...`);
+
+                    try {
+                        const response = await fetch('/api/demo/random_edges', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                flow_count: flowCount,
+                                incident_count: incidentCount,
+                                severity_min: severityMin,
+                                severity_max: severityMax
+                            })
+                        });
+
+                        const result = await response.json();
+                        if (result.success) {
+                            disruptionSets[`set_route_${i}`] = {
+                                flow: result.flow || [],
+                                incidents: result.incidents || []
+                            };
+                        }
+                    } catch (e) {
+                        console.warn(`Failed to generate disruptions for route ${i}:`, e);
+                    }
+                }
+                console.log(`🎲 Generated ${Object.keys(disruptionSets).length} disruption sets (for preset)`);
+                disruptionKeyToUse = this.experimentConfigName;
+                needNewDisruptions = true;
             }
 
-            // Build routes with trials - preserve start/end format
+            // Build routes with trials
             const routesWithTrials = routes.map((r, routeIdx) => {
-                // Preserve the route structure (start/end format)
                 const baseRoute = {
                     id: r.id || `exp-route-${routeIdx}`,
                     start: r.start || { lat: r.sourceCoords?.lat, lng: r.sourceCoords?.lng, name: r.sourceName || 'Unknown' },
                     end: r.end || { lat: r.targetCoords?.lat, lng: r.targetCoords?.lng, name: r.targetName || 'Unknown' }
                 };
 
-                // Each route gets 3 trials, all using the same disruption set for that route
                 const trialsArray = [];
                 for (let t = 0; t < trials; t++) {
                     const tau = this.generateExperimentTau(tauSettings, t, routeIdx, routes.length);
                     trialsArray.push({
                         tau: parseFloat(tau.toFixed(3)),
-                        disruption: `set_route_${routeIdx}`  // Per-route disruption set
+                        disruption: `set_route_${routeIdx}`
                     });
                 }
 
-                return {
-                    ...baseRoute,
-                    trials: trialsArray
-                };
+                return { ...baseRoute, trials: trialsArray };
             });
 
-            // Build experiment config (same format as demo-creator)
+            // Determine which config ID to use
+            const configId = needsTempConfig ? tempConfigName : this.experimentConfigName;
+
+            // Build config
             const config = {
-                id: this.experimentConfigName,  // Fixed ID so it overwrites previous
-                name: this.experimentConfigName,
+                id: configId,
+                name: needsTempConfig ? `Experiment (Temporary ${tempTimestamp})` : this.experimentConfigName,
                 isExperiment: true,
+                isTemporary: needsTempConfig,  // Mark as temporary for cleanup
                 routes: routesWithTrials,
                 settings: {
-                    algorithm: 'both',  // Always test both DHL and HC2L
+                    algorithm: 'both',
                     trials: trials,
-                    stepDelay: 100      // Default step delay
+                    stepDelay: 100
                 },
                 tau: tauSettings,
                 disruptions: {
                     mode: 'random-both',
-                    scope: 'per-route',  // Each route has its own disruption set
+                    scope: 'per-route',
                     flowCount: disruptionSettings.ratioFlow,
                     incidentCount: disruptionSettings.ratioIncident,
                     severityMin: disruptionSettings.severityMin,
                     severityMax: disruptionSettings.severityMax,
-                    // Include the disruption sets for saving (demo-creator format)
-                    disruptionSets: needNewDisruptions ? disruptionSets : undefined
+                    // Only include disruption sets if we're generating new ones
+                    disruptionSets: needNewDisruptions ? disruptionSets : undefined,
+                    // If using preset disruptions, reference them via savedSets
+                    savedSets: !needNewDisruptions && existingConfig?.disruptions?.savedSets 
+                        ? existingConfig.disruptions.savedSets 
+                        : undefined
                 },
-                disruptionKey: this.experimentConfigName  // Use config name as disruption key
+                disruptionKey: disruptionKeyToUse
             };
 
-            // Only save if we generated new disruptions or routes
-            if (needNewDisruptions || routeSettings.mode === 'random') {
-                this.updateLoadingStatus('Saving experiment configuration...');
+            // Save config based on mode
+            if (needsTempConfig) {
+                // Save temporary config (will be deleted after run)
+                this.updateLoadingStatus(`Saving temporary config: ${tempConfigName}...`);
+                console.log(`📝 Saving temporary experiment config: ${tempConfigName}`);
                 
                 const saveResponse = await fetch('/api/demo/configs', {
                     method: 'POST',
@@ -1403,19 +1590,43 @@ const DemoRunner = {
 
                 const saveResult = await saveResponse.json();
                 if (!saveResult.success) {
-                    throw new Error('Failed to save experiment config: ' + saveResult.error);
+                    throw new Error('Failed to save temporary config: ' + saveResult.error);
                 }
 
-                console.log('✅ Saved experiment config:', saveResult.config?.id);
-                console.log('   Disruption key:', saveResult.config?.disruptionKey);
+                console.log(`✅ Saved temporary config: ${saveResult.config?.id}`);
+                
+                // Run demo with saved config
+                this.hideLoadingAnimation();
+                this.showTab('running');
+                try {
+                    await this.runDemo(saveResult.config);
+                } finally {
+                    // Cleanup temporary config after demo completes (success or error)
+                    await this.deleteTemporaryExperimentConfig(tempConfigName);
+                }
+            } else if (needNewDisruptions || !existingConfig) {
+                // Save to preset (first time setup or regenerating preset)
+                this.updateLoadingStatus('Saving experiment preset...');
+                
+                const saveResponse = await fetch('/api/demo/configs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
 
-                // Use the saved config (has savedSets populated by Flask)
+                const saveResult = await saveResponse.json();
+                if (!saveResult.success) {
+                    throw new Error('Failed to save preset config: ' + saveResult.error);
+                }
+
+                console.log('✅ Saved/Updated preset config:', saveResult.config?.id);
+                
                 this.hideLoadingAnimation();
                 this.showTab('running');
                 await this.runDemo(saveResult.config);
             } else {
-                // Use existing config directly
-                console.log('✅ Using existing experiment config');
+                // Use existing preset directly (no changes)
+                console.log('✅ Using existing preset config as-is');
                 this.hideLoadingAnimation();
                 this.showTab('running');
                 await this.runDemo(existingConfig);
@@ -1425,6 +1636,12 @@ const DemoRunner = {
             console.error('Experiment error:', error);
             this.hideLoadingAnimation();
             showUpdateToast('Experiment failed: ' + error.message, 'error');
+            
+            // Cleanup any temp config that might have been created
+            if (this.currentTempConfigName) {
+                await this.deleteTemporaryExperimentConfig(this.currentTempConfigName);
+                this.currentTempConfigName = null;
+            }
         }
     },
 
@@ -3249,7 +3466,7 @@ const DemoRunner = {
         if (!setsPanel || !buttonsContainer || !previewContainer) return;
 
         const sets = this.disruptionSets || {};
-        const setKeys = Object.keys(sets);
+        let setKeys = Object.keys(sets);
 
         // Always show the panel, even if there are no disruption sets
         setsPanel.classList.remove('hidden');
@@ -3260,6 +3477,39 @@ const DemoRunner = {
             previewContainer.innerHTML = this.renderCurrentDisruptionList();
             return;
         }
+
+        // Sort keys to maintain order (important for 100+ sets)
+        // Priority: set_all, set_trial_*, set_route_*, set_trial_*_route_*
+        setKeys = setKeys.sort((a, b) => {
+            // set_all comes first
+            if (a === 'set_all') return -1;
+            if (b === 'set_all') return 1;
+            
+            // Extract numeric parts for proper ordering
+            const aMatch = a.match(/(\d+)/g);
+            const bMatch = b.match(/(\d+)/g);
+            
+            // Compare by type first
+            const aType = a.split('_')[1];  // 'trial', 'route', etc.
+            const bType = b.split('_')[1];
+            
+            if (aType !== bType) {
+                // trial comes before route
+                if (aType === 'trial') return -1;
+                if (bType === 'trial') return 1;
+            }
+            
+            // Then compare numeric values
+            if (aMatch && bMatch) {
+                for (let i = 0; i < Math.min(aMatch.length, bMatch.length); i++) {
+                    const aNum = parseInt(aMatch[i]);
+                    const bNum = parseInt(bMatch[i]);
+                    if (aNum !== bNum) return aNum - bNum;
+                }
+            }
+            
+            return a.localeCompare(b);
+        });
 
         // Show sets panel and render buttons
         buttonsContainer.innerHTML = setKeys.map(key => `
@@ -3274,7 +3524,7 @@ const DemoRunner = {
             setTimeout(() => this.scrollToActiveDisruptionSet(this.currentPreviewSet), 100);
         }
 
-        // Render current set details
+        // Render current set details - ALWAYS render, even if no disruptions on map
         previewContainer.innerHTML = this.renderCurrentDisruptionList();
     },
 
@@ -3498,18 +3748,11 @@ const DemoRunner = {
      * Use this instead of showGeneratedDisruptions(true, true) to respect user preferences
      */
     async refreshDisruptionDisplay() {
-        // Get checkbox states, defaulting to true if not yet initialized
+        // Get checkbox states, defaulting to true if checkboxes don't exist
         const incidentsCheckbox = document.getElementById('demo-show-incidents');
         const flowCheckbox = document.getElementById('demo-show-flow');
 
-        // Ensure checkboxes are checked if they exist
-        if (incidentsCheckbox && !incidentsCheckbox.checked) {
-            incidentsCheckbox.checked = true;
-        }
-        if (flowCheckbox && !flowCheckbox.checked) {
-            flowCheckbox.checked = true;
-        }
-
+        // Respect user's checkbox state - do NOT force them to be checked
         const showIncidents = incidentsCheckbox ? incidentsCheckbox.checked : true;
         const showFlow = flowCheckbox ? flowCheckbox.checked : true;
 
@@ -3520,6 +3763,7 @@ const DemoRunner = {
 
     /**
      * Update the disruption preview panel based on current checkbox states
+     * Note: Even if display is disabled, the disruption sets list remains visible
      */
     updateDisruptionPreview() {
         const showIncidents = document.getElementById('demo-show-incidents')?.checked ?? true;
@@ -3530,15 +3774,6 @@ const DemoRunner = {
 
         const flow = showFlow ? (this.generatedDisruptions.flowSegments || []) : [];
         const incidents = showIncidents ? (this.generatedDisruptions.incidents || []) : [];
-
-        if (flow.length === 0 && incidents.length === 0) {
-            if (!showIncidents && !showFlow) {
-                previewContainer.innerHTML = '<div class="text-xs text-gray-500 text-center py-2">Disruption display disabled</div>';
-            } else {
-                previewContainer.innerHTML = '<div class="text-xs text-gray-500 text-center py-2">No disruptions to display</div>';
-            }
-            return;
-        }
 
         previewContainer.innerHTML = this.renderCurrentDisruptionList();
     },

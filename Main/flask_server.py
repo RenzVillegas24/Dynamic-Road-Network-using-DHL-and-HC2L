@@ -119,7 +119,31 @@ app.logger.info("Backend logging system initialized")
 # Initialize components using config paths
 console_logger.info("Initializing Core Components")
 
-mapper = NodeMapper(str(Config.NODES_CSV))
+# Initialize mapper with excluded bounding box for snapping feature
+# Format: "min_lon,min_lat,max_lon,max_lat"
+EXCLUDED_BBOX = "121.072083,14.728427,121.137571,14.780285"  # Disregarded map area for snapping
+
+# Parse excluded bbox for random route generation filtering
+def parse_excluded_bbox(bbox_str: str) -> dict:
+    """Parse bounding box string into dict with min/max lat/lon."""
+    parts = [float(x.strip()) for x in bbox_str.split(',')]
+    return {
+        'min_lon': parts[0],
+        'min_lat': parts[1],
+        'max_lon': parts[2],
+        'max_lat': parts[3]
+    }
+
+def is_in_excluded_bbox(lat: float, lng: float, bbox: dict = None) -> bool:
+    """Check if a point is within the excluded bounding box."""
+    if bbox is None:
+        bbox = EXCLUDED_BBOX_PARSED
+    return (bbox['min_lon'] <= lng <= bbox['max_lon'] and
+            bbox['min_lat'] <= lat <= bbox['max_lat'])
+
+EXCLUDED_BBOX_PARSED = parse_excluded_bbox(EXCLUDED_BBOX)
+
+mapper = NodeMapper(str(Config.NODES_CSV), excluded_bbox=EXCLUDED_BBOX)
 try:
     gps_router = HC2LRouter()
     console_logger.success("HC2L Router initialized")
@@ -222,6 +246,7 @@ def snap_location_to_edge(lat: float, lng: float) -> dict:
 def validate_location_near_road(lat: float, lng: float, max_distance: float = 100) -> dict:
     """
     Validate if a location is within max_distance meters of a road.
+    Also checks if the location is in the excluded bounding box.
     
     Args:
         lat: Latitude
@@ -232,6 +257,10 @@ def validate_location_near_road(lat: float, lng: float, max_distance: float = 10
         dict with success status and snapped coordinates if valid
     """
     try:
+        # Check if point is in excluded bbox first
+        if is_in_excluded_bbox(lat, lng):
+            return {'valid': False, 'error': 'Location is in excluded area'}
+        
         snap_result = mapper.snap_to_nearest_road(lat, lng, max_distance=max_distance)
         if snap_result:
             return {
@@ -360,12 +389,14 @@ def get_available_matched_edges() -> dict:
     Uses free_flow_speed directly from matched_edges.csv.
     Enriches edge data with additional properties from quezon_city_edges.csv (length, geometry, etc.)
     This is the master source of edges that can be used for random disruption generation.
+    Filters out edges that fall within the excluded bounding box.
     """
     import csv
     
     matched_edges_file = Path(Config.HERE_OSM_DIR) / 'matched_edges.csv'
     
     all_edges = []
+    excluded_count = 0
     
     if matched_edges_file.exists():
         try:
@@ -379,6 +410,28 @@ def get_available_matched_edges() -> dict:
                     target = row.get('target')
                     
                     if source and target:
+                        # Check if edge is in excluded bbox (check both source and target)
+                        source_lat = row.get('source_lat')
+                        source_lon = row.get('source_lon')
+                        target_lat = row.get('target_lat')
+                        target_lon = row.get('target_lon')
+                        
+                        try:
+                            s_lat = float(source_lat) if source_lat else None
+                            s_lon = float(source_lon) if source_lon else None
+                            t_lat = float(target_lat) if target_lat else None
+                            t_lon = float(target_lon) if target_lon else None
+                            
+                            # Skip edge if either endpoint is in excluded bbox
+                            if s_lat and s_lon and is_in_excluded_bbox(s_lat, s_lon):
+                                excluded_count += 1
+                                continue
+                            if t_lat and t_lon and is_in_excluded_bbox(t_lat, t_lon):
+                                excluded_count += 1
+                                continue
+                        except (ValueError, TypeError):
+                            pass  # If coordinates can't be parsed, include the edge
+                        
                         # Look up edge properties from graph for additional data
                         edge_props = get_edge_properties(source, target)
                         highway_type = edge_props.get('highway_type', 'primary')
@@ -403,10 +456,10 @@ def get_available_matched_edges() -> dict:
                             'id_hash': row.get('id_hash', ''),
                             'source': source,
                             'target': target,
-                            'source_lat': row.get('source_lat'),
-                            'source_lon': row.get('source_lon'),
-                            'target_lat': row.get('target_lat'),
-                            'target_lon': row.get('target_lon'),
+                            'source_lat': source_lat,
+                            'source_lon': source_lon,
+                            'target_lat': target_lat,
+                            'target_lon': target_lon,
                             # Use free_flow_speed from CSV
                             'flow_free_flow_kph': free_flow_kph,
                             'road_name': road_name,
@@ -416,7 +469,7 @@ def get_available_matched_edges() -> dict:
                             'geometry': edge_props.get('geometry', '')
                         }
                         all_edges.append(edge)
-            console_logger.data(f"Loaded {len(all_edges)} edges from matched_edges.csv (using free_flow_speed from CSV)")
+            console_logger.data(f"Loaded {len(all_edges)} edges from matched_edges.csv (using free_flow_speed from CSV), excluded {excluded_count} in bbox")
         except Exception as e:
             console_logger.warning(f"Error loading matched edges: {e}")
             import traceback
@@ -2168,23 +2221,27 @@ def get_random_road_points():
             try:
                 src_lat = float(edge.get('source_lat', 0))
                 src_lng = float(edge.get('source_lon', 0))
+                # Check if within bounds AND not in excluded bbox
                 if min_lat <= src_lat <= max_lat and min_lng <= src_lng <= max_lng:
-                    valid_edges.append({
-                        'lat': src_lat,
-                        'lng': src_lng,
-                        'road_name': edge.get('road_name', 'Unknown Road'),
-                        'highway_type': edge.get('highway_type', 'unknown')
-                    })
+                    if not is_in_excluded_bbox(src_lat, src_lng):
+                        valid_edges.append({
+                            'lat': src_lat,
+                            'lng': src_lng,
+                            'road_name': edge.get('road_name', 'Unknown Road'),
+                            'highway_type': edge.get('highway_type', 'unknown')
+                        })
                 
                 tgt_lat = float(edge.get('target_lat', 0))
                 tgt_lng = float(edge.get('target_lon', 0))
+                # Check if within bounds AND not in excluded bbox
                 if min_lat <= tgt_lat <= max_lat and min_lng <= tgt_lng <= max_lng:
-                    valid_edges.append({
-                        'lat': tgt_lat,
-                        'lng': tgt_lng,
-                        'road_name': edge.get('road_name', 'Unknown Road'),
-                        'highway_type': edge.get('highway_type', 'unknown')
-                    })
+                    if not is_in_excluded_bbox(tgt_lat, tgt_lng):
+                        valid_edges.append({
+                            'lat': tgt_lat,
+                            'lng': tgt_lng,
+                            'road_name': edge.get('road_name', 'Unknown Road'),
+                            'highway_type': edge.get('highway_type', 'unknown')
+                        })
             except (ValueError, TypeError):
                 continue
         
@@ -2198,12 +2255,16 @@ def get_random_road_points():
         # If we need more than available, duplicate with slight variation
         while len(selected) < count:
             base = random.choice(valid_edges)
-            selected.append({
-                'lat': base['lat'] + random.uniform(-0.001, 0.001),
-                'lng': base['lng'] + random.uniform(-0.001, 0.001),
-                'road_name': base['road_name'],
-                'highway_type': base['highway_type']
-            })
+            new_lat = base['lat'] + random.uniform(-0.001, 0.001)
+            new_lng = base['lng'] + random.uniform(-0.001, 0.001)
+            # Make sure the varied point is also not in excluded bbox
+            if not is_in_excluded_bbox(new_lat, new_lng):
+                selected.append({
+                    'lat': new_lat,
+                    'lng': new_lng,
+                    'road_name': base['road_name'],
+                    'highway_type': base['highway_type']
+                })
         
         return jsonify({
             'success': True,

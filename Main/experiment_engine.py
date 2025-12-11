@@ -38,6 +38,29 @@ from experiment_config import (
 # Configure logger
 logger = logging.getLogger(__name__)
 
+# Excluded bounding box for random route generation (same as snapping)
+# Format: "min_lon,min_lat,max_lon,max_lat"
+EXCLUDED_BBOX = "121.072083,14.728427,121.137571,14.780285"
+
+def _parse_excluded_bbox(bbox_str: str) -> dict:
+    """Parse bounding box string into dict with min/max lat/lon."""
+    parts = [float(x.strip()) for x in bbox_str.split(',')]
+    return {
+        'min_lon': parts[0],
+        'min_lat': parts[1],
+        'max_lon': parts[2],
+        'max_lat': parts[3]
+    }
+
+EXCLUDED_BBOX_PARSED = _parse_excluded_bbox(EXCLUDED_BBOX)
+
+def is_in_excluded_bbox(lat: float, lng: float, bbox: dict = None) -> bool:
+    """Check if a point is within the excluded bounding box."""
+    if bbox is None:
+        bbox = EXCLUDED_BBOX_PARSED
+    return (bbox['min_lon'] <= lng <= bbox['max_lon'] and
+            bbox['min_lat'] <= lat <= bbox['max_lat'])
+
 
 class ExperimentStatus(Enum):
     """Status of an experiment run."""
@@ -191,15 +214,49 @@ class DisruptionGenerator:
             edges_data: List of available edges for random disruptions
         """
         self.config = config
-        self.edges = edges_data or []
+        # Filter edges to exclude those in the excluded bbox
+        self.edges = self._filter_edges_by_bbox(edges_data or [])
         self.random_seed = config.random_seed
         if self.random_seed:
             random.seed(self.random_seed)
     
+    def _filter_edges_by_bbox(self, edges: List[Dict]) -> List[Dict]:
+        """Filter out edges that fall within the excluded bounding box."""
+        if not EXCLUDED_BBOX_PARSED:
+            return edges
+        
+        filtered = []
+        excluded_count = 0
+        for edge in edges:
+            try:
+                # Check source coordinates
+                source_lat = edge.get('source_lat')
+                source_lon = edge.get('source_lon')
+                target_lat = edge.get('target_lat')
+                target_lon = edge.get('target_lon')
+                
+                if source_lat and source_lon:
+                    if is_in_excluded_bbox(float(source_lat), float(source_lon)):
+                        excluded_count += 1
+                        continue
+                if target_lat and target_lon:
+                    if is_in_excluded_bbox(float(target_lat), float(target_lon)):
+                        excluded_count += 1
+                        continue
+                
+                filtered.append(edge)
+            except (ValueError, TypeError):
+                # If coordinates can't be parsed, include the edge
+                filtered.append(edge)
+        
+        if excluded_count > 0:
+            logger.info(f"DisruptionGenerator: Filtered out {excluded_count} edges in excluded bbox")
+        return filtered
+    
     def set_edges(self, edges: List[Dict]):
         """Set the available edges for random disruption generation."""
-        self.edges = edges
-        logger.info(f"DisruptionGenerator: Set {len(edges)} edges for random disruptions")
+        self.edges = self._filter_edges_by_bbox(edges)
+        logger.info(f"DisruptionGenerator: Set {len(self.edges)} edges for random disruptions")
     
     def generate_batch_disruptions(self, batch_id: int, count: int) -> List[DisruptionEvent]:
         """
@@ -463,17 +520,34 @@ class PointsGenerator:
         return pairs[:count]
     
     def _generate_random_pairs(self, count: int) -> List[Dict]:
-        """Generate random OD pairs within bounds."""
+        """Generate random OD pairs within bounds, excluding the disregarded bbox."""
         pairs = []
         bounds = self.config.random_bounds
         
-        for _ in range(count):
-            if self.nodes and len(self.nodes) >= 2:
-                # Use actual nodes
-                origin_node = random.choice(self.nodes)
-                dest_node = random.choice(self.nodes)
+        # Filter nodes to exclude those in the excluded bbox
+        if self.nodes and len(self.nodes) >= 2:
+            valid_nodes = [
+                node for node in self.nodes 
+                if not is_in_excluded_bbox(
+                    node.get("lat", node.get("latitude", 0)),
+                    node.get("lng", node.get("longitude", 0))
+                )
+            ]
+        else:
+            valid_nodes = []
+        
+        max_attempts = count * 10  # Prevent infinite loop
+        attempts = 0
+        
+        while len(pairs) < count and attempts < max_attempts:
+            attempts += 1
+            
+            if valid_nodes and len(valid_nodes) >= 2:
+                # Use actual nodes (already filtered)
+                origin_node = random.choice(valid_nodes)
+                dest_node = random.choice(valid_nodes)
                 while dest_node == origin_node:
-                    dest_node = random.choice(self.nodes)
+                    dest_node = random.choice(valid_nodes)
                 
                 pairs.append({
                     "origin": (origin_node.get("lat", origin_node.get("latitude")), 
@@ -484,16 +558,23 @@ class PointsGenerator:
                     "destination_node_id": dest_node.get("node_id")
                 })
             else:
-                # Generate within bounds
+                # Generate within bounds, avoiding excluded bbox
                 origin_lat = random.uniform(bounds["lat_min"], bounds["lat_max"])
                 origin_lon = random.uniform(bounds["lon_min"], bounds["lon_max"])
                 dest_lat = random.uniform(bounds["lat_min"], bounds["lat_max"])
                 dest_lon = random.uniform(bounds["lon_min"], bounds["lon_max"])
                 
+                # Skip if either point is in excluded bbox
+                if is_in_excluded_bbox(origin_lat, origin_lon) or is_in_excluded_bbox(dest_lat, dest_lon):
+                    continue
+                
                 pairs.append({
                     "origin": (origin_lat, origin_lon),
                     "destination": (dest_lat, dest_lon)
                 })
+        
+        if len(pairs) < count:
+            logger.warning(f"Could only generate {len(pairs)}/{count} pairs avoiding excluded bbox")
         
         return pairs
 
