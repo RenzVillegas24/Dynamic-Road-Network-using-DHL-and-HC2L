@@ -1469,6 +1469,9 @@ int main(int argc, char* argv[]) {
     }
     
     try {
+        // Find best route using HC2L labels
+        auto start_time = chrono::high_resolution_clock::now();
+        
         // Parse arguments (14 routing parameters)
         double start_pin_lat = stod(argv[1]);
         double start_pin_lng = stod(argv[2]);
@@ -1830,10 +1833,6 @@ int main(int argc, char* argv[]) {
             return 1;
         }
         
-        // Find best route using HC2L labels
-        // cerr << "🔍 Querying HC2L index..." << endl;
-        auto start_time = chrono::high_resolution_clock::now();
-        
         distance_t best_distance = numeric_limits<distance_t>::max();
         NodeID best_start = 0, best_dest = 0;
         
@@ -1849,10 +1848,6 @@ int main(int argc, char* argv[]) {
                 }
             }
         }
-        
-        auto end_time = chrono::high_resolution_clock::now();
-        double query_time_ms = chrono::duration<double, milli>(end_time - start_time).count();
-        
         // cerr << "✅ Best route found: " << best_start << " -> " << best_dest << " (distance: " << best_distance << ")" << endl;
         
         if (best_start == 0 || best_dest == 0) {
@@ -2155,6 +2150,9 @@ int main(int argc, char* argv[]) {
         
         // Auto-calibrate optimizer based on query performance
         optimizer.auto_calibrate();
+
+        auto end_time = chrono::high_resolution_clock::now();
+        double query_time_ms = chrono::duration<double, milli>(end_time - start_time).count();
         
         // Output result
         output_json_response(true, "", best_start, best_dest,

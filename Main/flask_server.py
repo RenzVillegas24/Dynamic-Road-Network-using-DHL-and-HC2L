@@ -34,6 +34,9 @@ from auto_disruption_service import init_auto_disruption_service, shutdown_auto_
 # Import Google Maps service
 from google_maps_service import GoogleMapsService
 
+# Import HERE Routing service
+from here_routing_service import HereRoutingService
+
 # Import Real-Time Data Services (V3 - Separated Flow and Incidents)
 from flow_service import FlowService
 from incident_service import IncidentService
@@ -139,6 +142,14 @@ try:
 except Exception as e:
     console_logger.error(f"Error initializing Google Maps Service: {e}")
     gmaps_service = None
+
+# Initialize HERE Routing Service
+try:
+    here_routing_service = HereRoutingService()
+    console_logger.success("HERE Routing Service initialized")
+except Exception as e:
+    console_logger.error(f"Error initializing HERE Routing Service: {e}")
+    here_routing_service = None
 
 # Initialize Real-Time Data Services (V3 - Separated Flow and Incidents)
 try:
@@ -5198,6 +5209,114 @@ def get_google_maps_route():
     except Exception as e:
         import traceback
         console_logger.error(f"Google Maps route fetch error: {str(e)}")
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': f"Route fetch failed: {str(e)}"
+        })
+
+
+@app.route('/get_here_route', methods=['POST'])
+def get_here_route():
+    """
+    Fetch a HERE Routing API route for comparison panel
+    
+    This endpoint is specifically for the algorithm comparison panel.
+    It fetches the HERE route with optional traffic consideration.
+    
+    Frontend sends:
+    - start_lat, start_lng: Origin coordinates
+    - dest_lat, dest_lng: Destination coordinates
+    - traffic_mode: 'enabled' (default), 'disabled', or 'long_distance'
+    
+    Returns:
+    - HERE route data with coordinates, distance, duration
+    """
+    data = request.json
+    
+    try:
+        # Validate required input parameters
+        start_lat = float(data['start_lat'])
+        start_lng = float(data['start_lng'])
+        dest_lat = float(data['dest_lat'])
+        dest_lng = float(data['dest_lng'])
+        traffic_mode = data.get('traffic_mode', 'enabled')
+        
+        console_logger.processing("Fetching HERE Routing route")
+        console_logger.data(f"Route: ({start_lat}, {start_lng}) → ({dest_lat}, {dest_lng})")
+        console_logger.data(f"Traffic mode: {traffic_mode}")
+        
+        # Validate HERE Routing service is initialized
+        if not here_routing_service:
+            console_logger.error("HERE Routing service not initialized")
+            return jsonify({
+                'success': False,
+                'error': 'HERE Routing service not initialized. Check HERE_API_KEY in .env'
+            })
+        
+        # Fetch HERE route
+        here_route = here_routing_service.get_directions(
+            start_lat, start_lng, dest_lat, dest_lng, traffic_mode
+        )
+        
+        if not here_route or not here_route.get('success'):
+            error_msg = here_route.get('error') if here_route else 'HERE Routing API call failed'
+            console_logger.error(f"Error: {error_msg}")
+            return jsonify({
+                'success': False,
+                'error': f"Failed to fetch HERE route: {error_msg}"
+            })
+        
+        here_coords = here_route.get('coordinates', [])
+        
+        if not here_coords:
+            console_logger.error("HERE Routing returned no coordinates")
+            return jsonify({
+                'success': False,
+                'error': 'HERE route has no coordinates'
+            })
+        
+        console_logger.success(f"HERE route fetched: {len(here_coords)} points")
+        console_logger.data(f"Distance: {here_route.get('distance_meters', 'N/A')} meters")
+        console_logger.data(f"Duration: {here_route.get('duration_seconds', 'N/A')} seconds")
+        
+        # Build response with route data
+        result = {
+            'success': True,
+            'route': {
+                'coordinates': here_coords,
+                'distance_meters': here_route.get('distance_meters', 0),
+                'duration_seconds': here_route.get('duration_seconds', 0),
+                'point_count': len(here_coords),
+                'sections': here_route.get('sections', 0),
+                'traffic_mode': traffic_mode
+            },
+            'metadata': {
+                'fetch_time': time.time(),
+                'origin': {'lat': start_lat, 'lng': start_lng},
+                'destination': {'lat': dest_lat, 'lng': dest_lng}
+            }
+        }
+        
+        return jsonify(result)
+        
+    except KeyError as e:
+        error_msg = f"Missing required parameter: {str(e)}"
+        console_logger.error(error_msg)
+        return jsonify({
+            'success': False,
+            'error': error_msg
+        })
+    except ValueError as e:
+        error_msg = f"Invalid parameter value: {str(e)}"
+        console_logger.error(error_msg)
+        return jsonify({
+            'success': False,
+            'error': error_msg
+        })
+    except Exception as e:
+        import traceback
+        console_logger.error(f"HERE route fetch error: {str(e)}")
         traceback.print_exc()
         return jsonify({
             'success': False,

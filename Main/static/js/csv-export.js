@@ -44,7 +44,7 @@ function addRouteToExport(routeData) {
     if (algorithm.includes('DHL')) {
         const dhlInfo = routeData.dhl_update_info || {};
         exportEntry.labeling_time_ms = metrics.labeling_time_ms || 0;
-        exportEntry.labeling_size_mb = metrics.labeling_size_mb || 0;
+        exportEntry.labeling_size_kb = metrics.labeling_size_kb || 0;
         exportEntry.query_time_microseconds = metrics.query_time_microseconds || 0;
         exportEntry.update_strategy = dhlInfo.update_strategy || 'none';
         exportEntry.nodes_updated = dhlInfo.nodes_updated || 0;
@@ -54,7 +54,8 @@ function addRouteToExport(routeData) {
         const labelingInfo = metrics.labeling_info || {};
         
         exportEntry.index_load_time_ms = labelingInfo.index_load_time_ms || 0;
-        exportEntry.index_size_mb = labelingInfo.index_size_mb || 0;
+        exportEntry.index_size_kb = labelingInfo.index_size_bytes ? labelingInfo.index_size_bytes / 1024 : 0;
+        exportEntry.labeling_size_kb = metrics.labeling_size_kb || 0;
         exportEntry.update_strategy = lazyInfo.update_strategy || 'none';
         exportEntry.dirty_nodes_marked = lazyInfo.dirty_nodes_marked || 0;
         exportEntry.nodes_repaired = lazyInfo.nodes_repaired || 0;

@@ -249,7 +249,7 @@ class HC2LRouter:
                     logger.info(f"Query time: {metrics.get('query_time_ms', 'N/A')} ms")
                     logger.info(f"Distance: {metrics.get('calculated_distance_km', 'N/A')} km")
                     logger.info(f"ETA: {metrics.get('eta_formatted', 'N/A')}")
-                    logger.info(f"Labeling size: {metrics.get('labeling_size_mb', 'N/A')} MB")
+                    logger.info(f"Labeling size: {metrics.get('labeling_size_kb', 'N/A')} KB")
                     logger.info(f"Labeling time: {metrics.get('labeling_time_ms', 'N/A')} s")
                     
                     # Log disruption analysis if present
@@ -450,12 +450,12 @@ class HC2LRouter:
         labeling_info = metrics.get('labeling_info', {})
         
         # Extract labeling size and time from C++ labeling_info
-        labeling_size_mb = labeling_info.get('index_size_mb', 0.0)
+        labeling_size_kb = labeling_info.get('index_size_bytes', 0.0) / 1024
         labeling_time_ms = labeling_info.get('index_load_time_ms', 0.0)
         
         # Fallback to direct metrics if labeling_info not available
-        if labeling_size_mb == 0.0:
-            labeling_size_mb = metrics.get('labeling_size_mb', 0.0)
+        if labeling_size_kb == 0.0:
+            labeling_size_kb = metrics.get('labeling_size_bytes', 0.0) / 1024
         if labeling_time_ms == 0.0:
             labeling_time_ms = metrics.get('labeling_time_ms', 0.0)
         
@@ -477,7 +477,7 @@ class HC2LRouter:
             'labels_status': metrics.get('labels_status', 'original'),
             
             # ENHANCED: Add labeling metrics from C++ labeling_info
-            'labeling_size_mb': labeling_size_mb,
+            'labeling_size_kb': labeling_size_kb,
             'labeling_time_ms': labeling_time_ms,
             'labeling_info': labeling_info  # Pass through complete labeling_info for debugging
         }

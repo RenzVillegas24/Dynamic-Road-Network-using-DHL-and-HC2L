@@ -31,7 +31,7 @@ function updateAdminPerformanceMetrics(routeData) {
         metrics.labeling_time_ms ? `${(metrics.labeling_time_ms / 1000).toFixed(1)}s` : 'N/A';
       
       document.getElementById('perf-labeling-size').textContent = 
-        metrics.labeling_size_mb ? `${metrics.labeling_size_mb.toFixed(1)} MB` : 'N/A';
+        metrics.labeling_size_kb ? `${metrics.labeling_size_kb.toFixed(1)} KB` : 'N/A';
       
       document.getElementById('perf-query-time').textContent = 
         metrics.query_time_microseconds ? `${(metrics.query_time_microseconds / 1000).toFixed(3)}μs` : 'N/A';
@@ -73,14 +73,14 @@ function updateAdminPerformanceMetrics(routeData) {
         labelingTimeMs > 0 ? `${labelingTimeMs.toFixed(1)} ms` : 'N/A';
       
       // Labeling size: try multiple possible locations
-      const labelingSizeMb = metrics.labeling_size_mb || 
-                            labelingInfo.index_size_mb ||
+      const labelingSizeKb = metrics.labeling_size_kb || 
+                            (labelingInfo.index_size_bytes ? labelingInfo.index_size_bytes / 1024 : 0) ||
                             0;
-      console.log('🔍 DEBUG - labelingSizeMb:', labelingSizeMb, 'from:', 
-                  metrics.labeling_size_mb ? 'metrics.labeling_size_mb' : 
-                  labelingInfo.index_size_mb ? 'labelingInfo.index_size_mb' : 'default 0');
+      console.log('🔍 DEBUG - labelingSizeKb:', labelingSizeKb, 'from:', 
+                  metrics.labeling_size_kb ? 'metrics.labeling_size_kb' : 
+                  labelingInfo.index_size_bytes ? 'labelingInfo.index_size_bytes / 1024' : 'default 0');
       document.getElementById('perf-labeling-size').textContent = 
-        labelingSizeMb > 0 ? `${labelingSizeMb.toFixed(1)} MB` : 'N/A';
+        labelingSizeKb > 0 ? `${labelingSizeKb.toFixed(1)} KB` : 'N/A';
       
       // Query time
       const queryTimeMs = metrics.query_time_ms || 0;
@@ -115,7 +115,7 @@ function updateAdminPerformanceMetrics(routeData) {
         console.log(`🔄 Updated mode badge: ${displayText} (${routingMode})`);
         console.log(`📊 Performance metrics updated:`, {
           labelingTimeMs,
-          labelingSizeMb,
+          labelingSizeKb,
           queryTimeMs
         });
       }
@@ -176,8 +176,8 @@ function updateDHLComparisonMetrics(dhlMetrics) {
     // Update DHL Labeling Size
     const dhlSizeElement = document.getElementById('dhl-labeling-size');
     if (dhlSizeElement) {
-        const labelingSize = dhlMetrics.labeling_size_mb || 0;
-        dhlSizeElement.textContent = labelingSize > 0 ? `${labelingSize.toFixed(1)} MB` : 'N/A';
+        const labelingSize = dhlMetrics.labeling_size_kb || 0;
+        dhlSizeElement.textContent = labelingSize > 0 ? `${labelingSize.toFixed(1)} KB` : 'N/A';
         console.log('DHL Labeling Size:', labelingSize);
     }
     
@@ -227,20 +227,20 @@ function updateDHC2LComparisonMetrics(dhc2lMetrics, dhlMetrics) {
     // Update D-HC2L Labeling Size with comparison
     const dhc2lSizeElement = document.getElementById('dhc2l-labeling-size');
     if (dhc2lSizeElement) {
-        const dhc2lLabelingSize = dhc2lMetrics.labeling_size_mb || 0;
-        const dhlLabelingSize = dhlMetrics.labeling_size_mb || 0;
+        const dhc2lLabelingSize = dhc2lMetrics.labeling_size_kb || 0;
+        const dhlLabelingSize = dhlMetrics.labeling_size_kb || 0;
         
         console.log('D-HC2L Labeling Size:', dhc2lLabelingSize, 'DHL Labeling Size:', dhlLabelingSize);
         
         if (dhc2lLabelingSize > 0) {
-            let displayText = `${dhc2lLabelingSize.toFixed(1)} MB`;
+            let displayText = `${dhc2lLabelingSize.toFixed(1)} KB`;
             
             // Calculate percentage difference if both values exist
             if (dhlLabelingSize > 0) {
                 const percentDiff = ((dhc2lLabelingSize - dhlLabelingSize) / dhlLabelingSize) * 100;
                 const arrow = percentDiff < 0 ? '↓' : '↑';
                 const color = percentDiff < 0 ? 'text-emerald-600' : 'text-red-600';
-                displayText = `${dhc2lLabelingSize.toFixed(1)} MB ${arrow} ${Math.abs(percentDiff).toFixed(0)}%`;
+                displayText = `${dhc2lLabelingSize.toFixed(1)} KB ${arrow} ${Math.abs(percentDiff).toFixed(0)}%`;
                 dhc2lSizeElement.className = `font-bold ${color}`;
             }
             
@@ -540,7 +540,7 @@ function updatePerformanceMetrics(metrics) {
         metrics.labeling_time_ms ? `${metrics.labeling_time_ms.toFixed(1)}s` : 'N/A';
       
       document.getElementById('perf-labeling-size').textContent = 
-        metrics.labeling_size_mb ? `${metrics.labeling_size_mb.toFixed(1)} MB` : 'N/A';
+        metrics.labeling_size_kb ? `${metrics.labeling_size_kb.toFixed(1)} KB` : 'N/A';
       
       document.getElementById('perf-query-time').textContent = 
         metrics.query_time_microseconds ? `${(metrics.query_time_microseconds / 1000).toFixed(3)}μs` : 'N/A';
@@ -565,7 +565,7 @@ function updatePerformanceMetrics(metrics) {
         metrics.labeling_time_ms ? `${metrics.labeling_time_ms.toFixed(1)}s` : 'N/A';
       
       document.getElementById('perf-labeling-size').textContent = 
-        metrics.labeling_size_mb ? `${metrics.labeling_size_mb.toFixed(1)} MB` : 'N/A';
+        metrics.labeling_size_kb ? `${metrics.labeling_size_kb.toFixed(1)} KB` : 'N/A';
       
       document.getElementById('perf-query-time').textContent = 
         metrics.query_time_ms ? `${metrics.query_time_ms.toFixed(3)}μs` : 'N/A';

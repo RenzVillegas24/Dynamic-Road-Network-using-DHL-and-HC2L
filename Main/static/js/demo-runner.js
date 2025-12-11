@@ -16,6 +16,10 @@ const DemoRunner = {
     // Track if current results are saved to server
     currentResultsSavedPath: null,  // Path to saved file, null if not saved
 
+    // Track the config ID for saving results (persists after demo ends)
+    lastRunConfigId: null,  // Config ID from the last run, used for saving results
+    lastRunConfigName: null,  // Config name from the last run
+
     // Track whether results are from a run (execution summary) or loaded from saved list
     resultsSource: 'new',  // 'new' (from execution) or 'saved' (from saved results list)
 
@@ -768,6 +772,11 @@ const DemoRunner = {
     },
 
     async viewSavedResult(filePath) {
+        // Show loading animation
+        this.showLoadingAnimation(
+            'Initializing Result',
+            'Loading saved result...');
+
         try {
             const response = await fetch('/api/demo/results/load', {
                 method: 'POST',
@@ -776,6 +785,8 @@ const DemoRunner = {
             });
 
             const data = await response.json();
+            
+            this.showTab('results');
 
             if (data.success && data.result) {
                 // Load the result into currentProgress and show the results tab
@@ -784,11 +795,20 @@ const DemoRunner = {
                     name: data.result.demoName,
                     id: data.result.demoId || data.result.configId
                 };
+
+                // Store persistent config ID/name for potential re-saving
+                this.lastRunConfigId = data.result.demoId || data.result.configId || null;
+                this.lastRunConfigName = data.result.demoName || null;
+
                 // Mark as already saved (since we loaded from server)
                 this.currentResultsSavedPath = filePath;
                 // Set source to 'saved' to indicate this is from the saved results list
                 this.resultsSource = 'saved';
                 console.log('📂 Viewing saved result, resultsSource set to "saved"');
+
+                // Hide loading animation before showing results
+                this.hideLoadingAnimation();
+
                 this.showResultsSummary();
                 this.updateResultsActionButtons();
                 showUpdateToast('Loaded saved result', 'success');
@@ -797,6 +817,7 @@ const DemoRunner = {
             }
         } catch (error) {
             console.error('Error loading saved result:', error);
+            this.hideLoadingAnimation();
             showUpdateToast('Failed to load result: ' + error.message, 'error');
         }
     },
@@ -968,6 +989,10 @@ const DemoRunner = {
         this.currentDemo = config;
         this.currentDemoId = null;  // Track demoId for cleanup
 
+        // Store config ID and name for results saving (persists after demo ends)
+        this.lastRunConfigId = config.id || null;
+        this.lastRunConfigName = config.name || 'Demo Results';
+
         // Save the current Route Finder state before making any changes
         saveRouteFinderState();
 
@@ -1027,13 +1052,16 @@ const DemoRunner = {
         }
         showUpdateToast(`Starting: ${config.name}`, 'info');
 
-        this.showTab('running');
-        this.showLoadingAnimation('Initializing demo setup...');
+        this.showLoadingAnimation(
+            'Initializing Demo',
+            'Initializing demo setup...');
         this.updateDetailedProgressUI();
 
         try {
             // Reset map
-            this.showLoadingAnimation('Resetting map...');
+            this.showLoadingAnimation(
+                'Initializing Demo',
+                'Resetting map...');
             resetSystemState();
 
 
@@ -1048,10 +1076,17 @@ const DemoRunner = {
 
             if (hasConfigDisruptions) {
                 // Use saved disruption sets from config - load from CSV files
-                this.showLoadingAnimation('Loading disruption sets...');
+                this.showLoadingAnimation(
+                    'Initializing Demo',
+                    'Loading disruption sets...');
                 console.log(`📂 Loading ${Object.keys(configDisruptionSets).length} saved disruption sets (key: ${disruptionKey})`);
+                let loadedCount = 0;
                 for (const [setKey, setData] of Object.entries(configDisruptionSets)) {
                     await this.activateConfigDisruptionSet(setKey, setData, this.currentDemoId, disruptionKey);
+                    loadedCount++;
+                    this.showLoadingAnimation(
+                        'Initializing Demo',
+                        `Loaded disruption set: ${loadedCount}/${Object.keys(configDisruptionSets).length}`);
                 }
             } else {
                 // Generate new disruptions based on scope
@@ -1070,6 +1105,7 @@ const DemoRunner = {
 
             // Setup complete - hide loading animation
             this.hideLoadingAnimation();
+            this.showTab('running');
 
             // Run for each trial
             for (let trial = 0; trial < trials; trial++) {
@@ -1783,40 +1819,56 @@ const DemoRunner = {
 
             // ============================================================
             // UPDATE PHASE METRICS
+            // The C++ API outputs lazy_hc2l section which contains update phase data
+            // We populate update phase metrics from lazyHc2l when updatePhase is empty
+            // Note: Use explicit null checks because 0 is a valid value
             // ============================================================
-            result.metrics.lazyUpdateTimeMs = updatePhase.lazy_update_time_ms || null;
-            result.metrics.lazyUpdateTime = result.metrics.lazyUpdateTimeMs ? `${result.metrics.lazyUpdateTimeMs.toFixed(3)} ms` : null;
-            result.metrics.thresholdRebuildTimeMs = updatePhase.threshold_rebuild_time_ms || null;
-            result.metrics.thresholdRebuildTime = result.metrics.thresholdRebuildTimeMs ? `${result.metrics.thresholdRebuildTimeMs.toFixed(3)} ms` : null;
-            result.metrics.thresholdRebuildTriggered = updatePhase.threshold_rebuild_triggered || false;
-            result.metrics.edgesUpdated = updatePhase.edges_updated || null;
-            result.metrics.dirtyNodesCount = updatePhase.dirty_nodes_count || null;
-            result.metrics.dirtyNodes = result.metrics.dirtyNodesCount ? `${result.metrics.dirtyNodesCount} nodes` : null;
-            result.metrics.impactScoreNum = updatePhase.impact_score || null;
-            result.metrics.impactScore = result.metrics.impactScoreNum ? result.metrics.impactScoreNum.toFixed(3) : null;
 
-            // Label size metrics
-            result.metrics.labelSizeBeforeMb = updatePhase.label_size_before_mb || null;
-            result.metrics.labelSizeAfterMb = updatePhase.label_size_after_mb || null;
+            // Lazy Update Time: from updatePhase or fallback to lazyHc2l.lazy_repair_time_ms
+            result.metrics.lazyUpdateTimeMs = updatePhase.lazy_update_time_ms ?? lazyHc2l.lazy_repair_time_ms ?? null;
+            result.metrics.lazyUpdateTime = result.metrics.lazyUpdateTimeMs !== null ? `${result.metrics.lazyUpdateTimeMs.toFixed(3)} ms` : null;
+
+            // Threshold Rebuild Time: from updatePhase (if API ever provides it)
+            result.metrics.thresholdRebuildTimeMs = updatePhase.threshold_rebuild_time_ms ?? null;
+            result.metrics.thresholdRebuildTime = result.metrics.thresholdRebuildTimeMs !== null ? `${result.metrics.thresholdRebuildTimeMs.toFixed(3)} ms` : null;
+            result.metrics.thresholdRebuildTriggered = updatePhase.threshold_rebuild_triggered ?? (lazyHc2l.update_strategy === 'immediate_update');
+
+            // Edges Updated
+            result.metrics.edgesUpdated = updatePhase.edges_updated ?? null;
+
+            // Dirty Nodes Count: from updatePhase or lazyHc2l.dirty_nodes_marked
+            result.metrics.dirtyNodesCount = updatePhase.dirty_nodes_count ?? lazyHc2l.dirty_nodes_marked ?? null;
+            result.metrics.dirtyNodes = result.metrics.dirtyNodesCount !== null ? `${result.metrics.dirtyNodesCount} nodes` : null;
+
+            // Impact Score: from updatePhase or lazyHc2l.disruption_impact_score
+            result.metrics.impactScoreNum = updatePhase.impact_score ?? lazyHc2l.disruption_impact_score ?? null;
+            result.metrics.impactScore = result.metrics.impactScoreNum !== null ? result.metrics.impactScoreNum.toFixed(3) : null;
+
+            // Label size metrics - from updatePhase or labelingInfo
+            const labelSizeMb = updatePhase.peak_label_size_mb || (labelingInfo.index_size_bytes ? labelingInfo.index_size_bytes / (1024 * 1024) : null);
+            result.metrics.labelSizeBeforeKb = updatePhase.label_size_before_mb ? updatePhase.label_size_before_mb * 1024 : null;
+            result.metrics.labelSizeAfterKb = updatePhase.label_size_after_mb ? updatePhase.label_size_after_mb * 1024 : null;
             result.metrics.labelSizeChangePct = updatePhase.label_size_change_pct || null;
-            result.metrics.peakLabelSizeMb = updatePhase.peak_label_size_mb || null;
-            result.metrics.peakLabelSize = result.metrics.peakLabelSizeMb ? `${result.metrics.peakLabelSizeMb.toFixed(2)} MB` : null;
+            result.metrics.peakLabelSizeKb = labelSizeMb ? labelSizeMb * 1024 : null;
+            result.metrics.peakLabelSize = result.metrics.peakLabelSizeKb ? `${result.metrics.peakLabelSizeKb.toFixed(2)} KB` : null;
             result.metrics.labelSizeChange = result.metrics.labelSizeChangePct !== null ? `${result.metrics.labelSizeChangePct.toFixed(2)}%` : null;
 
             // ============================================================
             // LAZY HC2L SPECIFIC METRICS
+            // Note: Use nullish coalescing (??) to preserve 0 values
             // ============================================================
             if (algorithm.toLowerCase() === 'hc2l' && Object.keys(lazyHc2l).length > 0) {
-                result.metrics.lazyEnabled = lazyHc2l.enabled || false;
-                result.metrics.updateStrategy = lazyHc2l.update_strategy || null;
-                result.metrics.updateReason = lazyHc2l.reason || null;
-                result.metrics.dirtyNodesMarked = lazyHc2l.dirty_nodes_marked || null;
-                result.metrics.dirtyNodesAffectedPath = lazyHc2l.dirty_nodes_affected_path || null;
-                result.metrics.lazyRepairTimeMs = lazyHc2l.lazy_repair_time_ms || null;
-                result.metrics.lazyRepairTime = result.metrics.lazyRepairTimeMs ? `${result.metrics.lazyRepairTimeMs.toFixed(3)} ms` : null;
-                result.metrics.nodesRepaired = lazyHc2l.nodes_repaired || null;
-                result.metrics.cacheHit = lazyHc2l.cache_hit || false;
-                result.metrics.tauThreshold = disruptionConfig.tau_threshold || tau;
+                result.metrics.lazyEnabled = lazyHc2l.enabled ?? false;
+                result.metrics.updateStrategy = lazyHc2l.update_strategy ?? null;
+                result.metrics.updateReason = lazyHc2l.reason ?? null;
+                result.metrics.dirtyNodesMarked = lazyHc2l.dirty_nodes_marked ?? null;
+                result.metrics.dirtyNodesAffectedPath = lazyHc2l.dirty_nodes_affected_path ?? null;
+                result.metrics.lazyRepairTimeMs = lazyHc2l.lazy_repair_time_ms ?? null;
+                result.metrics.lazyRepairTime = result.metrics.lazyRepairTimeMs !== null ? `${result.metrics.lazyRepairTimeMs.toFixed(3)} ms` : null;
+                result.metrics.nodesRepaired = lazyHc2l.nodes_repaired ?? null;
+                result.metrics.cacheHit = lazyHc2l.cache_hit ?? false;
+                result.metrics.tauThreshold = disruptionConfig.tau_threshold ?? tau;
+                result.metrics.totalUpdates = lazyHc2l.total_updates ?? 0;
             }
 
             // ============================================================
@@ -1833,8 +1885,8 @@ const DemoRunner = {
             // LABELING INFO
             // ============================================================
             result.metrics.totalLabels = labelingInfo.total_labels || null;
-            result.metrics.indexSizeMb = labelingInfo.index_size_mb || null;
-            result.metrics.labelingSize = result.metrics.indexSizeMb ? `${result.metrics.indexSizeMb.toFixed(2)} MB` : null;
+            result.metrics.indexSizeKb = labelingInfo.index_size_bytes ? labelingInfo.index_size_bytes / 1024 : null;
+            result.metrics.labelingSize = result.metrics.indexSizeKb ? `${result.metrics.indexSizeKb.toFixed(2)} KB` : null;
             result.metrics.indexLoadTimeMs = labelingInfo.index_load_time_ms || null;
             result.metrics.labelingTime = result.metrics.indexLoadTimeMs ? `${result.metrics.indexLoadTimeMs.toFixed(3)} ms` : null;
             result.metrics.maxLabelCountPerNode = labelingInfo.max_label_count_per_node || null;
@@ -1887,6 +1939,89 @@ const DemoRunner = {
         }
     },
 
+    /**
+     * Calculate query phase statistics from accumulated results
+     * @param {Array} results - Array of accumulated demo results
+     * @param {string} algorithm - Optional: filter by algorithm ('hc2l', 'dhl', or null for all)
+     * @returns {Object} Query phase statistics object
+     */
+    calculateQueryPhaseStats(results, algorithm = null) {
+        if (!results || results.length === 0) {
+            return {
+                avgQueryTime: null,
+                minQueryTime: null,
+                maxQueryTime: null,
+                queryTimeStdDev: null,
+                p95Latency: null,
+                queriesCount: 0
+            };
+        }
+
+        // Filter results by algorithm if specified
+        let filteredResults = results;
+        if (algorithm) {
+            filteredResults = results.filter(r =>
+                r.algorithm && r.algorithm.toUpperCase() === algorithm.toUpperCase()
+            );
+        }
+
+        // Extract query times (in ms) - use queryTimeMs or parse from queryTime string
+        const queryTimes = filteredResults
+            .map(r => {
+                if (r.metrics.queryTimeMs != null) return r.metrics.queryTimeMs;
+                if (r.metrics.queryTimeNum != null) return r.metrics.queryTimeNum;
+                if (r.metrics.queryTime) {
+                    const match = r.metrics.queryTime.match(/([\d.]+)/);
+                    return match ? parseFloat(match[1]) : null;
+                }
+                return null;
+            })
+            .filter(t => t != null && !isNaN(t));
+
+        if (queryTimes.length === 0) {
+            return {
+                avgQueryTime: null,
+                minQueryTime: null,
+                maxQueryTime: null,
+                queryTimeStdDev: null,
+                p95Latency: null,
+                queriesCount: 0
+            };
+        }
+
+        // Calculate statistics
+        const sum = queryTimes.reduce((a, b) => a + b, 0);
+        const avg = sum / queryTimes.length;
+        const min = Math.min(...queryTimes);
+        const max = Math.max(...queryTimes);
+
+        // Standard deviation
+        let stdDev = 0;
+        if (queryTimes.length > 1) {
+            const squaredDiffs = queryTimes.map(t => Math.pow(t - avg, 2));
+            stdDev = Math.sqrt(squaredDiffs.reduce((a, b) => a + b, 0) / (queryTimes.length - 1));
+        }
+
+        // P95 latency (95th percentile)
+        const sorted = [...queryTimes].sort((a, b) => a - b);
+        const p95Index = Math.floor(sorted.length * 0.95);
+        const p95 = sorted[Math.min(p95Index, sorted.length - 1)];
+
+        return {
+            avgQueryTime: `${avg.toFixed(3)} ms`,
+            avgQueryTimeMs: avg,
+            minQueryTime: `${min.toFixed(3)} ms`,
+            minQueryTimeMs: min,
+            maxQueryTime: `${max.toFixed(3)} ms`,
+            maxQueryTimeMs: max,
+            queryTimeStdDev: `${stdDev.toFixed(3)} ms`,
+            queryTimeStdDevMs: stdDev,
+            p95Latency: `${p95.toFixed(3)} ms`,
+            p95LatencyMs: p95,
+            queriesCount: queryTimes.length
+        };
+    },
+
     captureCurrentResult(algorithm, tau, route, trialIndex, processTimeMs = null) {
         try {
             const result = {
@@ -1909,7 +2044,7 @@ const DemoRunner = {
                     }
                     // Strip common unit suffixes if requested
                     if (stripUnits) {
-                        text = text.replace(/\s*(sec|ms|edges|km|m|MB|nodes|units)$/i, '').trim();
+                        text = text.replace(/\s*(sec|ms|edges|km|m|KB|nodes|units)$/i, '').trim();
                     }
                     return text;
                 }
@@ -2115,14 +2250,15 @@ const DemoRunner = {
                             <i data-lucide="refresh-cw" class="w-5 h-5"></i>
                         </div>
                         <h4 class="section-card__title">Update Phase</h4>
+                        ${p.lastResult.metrics.updateStrategy ? `<span class="badge badge--warning">${p.lastResult.metrics.updateStrategy}</span>` : ''}
                     </div>
                     <div class="section-card__body">
                         <div class="grid grid-cols-2 gap-2">
-                            ${renderMetric('Lazy Update Time', p.lastResult.metrics.lazyUpdateTime || 'N/A', 'text-amber-700')}
-                            ${renderMetric('Threshold Rebuild', p.lastResult.metrics.thresholdRebuildTime || 'N/A', 'text-orange-700')}
+                            ${renderMetric('Lazy Update Time', p.lastResult.metrics.lazyUpdateTime || p.lastResult.metrics.lazyRepairTime || '0.000 ms', 'text-amber-700')}
+                            ${renderMetric('Update Strategy', p.lastResult.metrics.updateStrategy ? p.lastResult.metrics.updateStrategy.replace('_', ' ') : 'N/A', 'text-orange-700')}
                             ${renderMetric('Peak Label Size', p.lastResult.metrics.peakLabelSize || p.lastResult.metrics.labelingSize || 'N/A', 'text-yellow-700')}
-                            ${renderMetric('Label Size Δ', p.lastResult.metrics.labelSizeChange || 'N/A', 'text-amber-600')}
-                            ${renderMetric('Dirty Nodes', p.lastResult.metrics.dirtyNodes || 'N/A', 'text-orange-600')}
+                            ${renderMetric('Nodes Repaired', p.lastResult.metrics.nodesRepaired !== null && p.lastResult.metrics.nodesRepaired !== undefined ? p.lastResult.metrics.nodesRepaired : 'N/A', 'text-amber-600')}
+                            ${renderMetric('Dirty Nodes', p.lastResult.metrics.dirtyNodes || (p.lastResult.metrics.dirtyNodesMarked !== null ? `${p.lastResult.metrics.dirtyNodesMarked} nodes` : 'N/A'), 'text-orange-600')}
                             ${renderMetric('Impact Score', p.lastResult.metrics.impactScore || 'N/A', 'text-red-600')}
                         </div>
                     </div>
@@ -2130,26 +2266,32 @@ const DemoRunner = {
                 ` : ''}
 
                 <!-- Query Phase Card -->
-                ${p.lastResult ? `
+                ${p.lastResult ? (() => {
+                // Calculate query phase statistics from accumulated results for the current algorithm
+                const currentAlgo = p.lastResult.algorithm;
+                const queryStats = this.calculateQueryPhaseStats(p.results, currentAlgo);
+                return `
                 <div class="section-card section-card--info">
                     <div class="section-card__header">
                         <div class="section-card__icon section-card__icon--info">
                             <i data-lucide="zap" class="w-5 h-5"></i>
                         </div>
                         <h4 class="section-card__title">Query Phase</h4>
+                        <span class="badge badge--info">${currentAlgo || 'All'}</span>
                     </div>
                     <div class="section-card__body">
                         <div class="grid grid-cols-2 gap-2">
-                            ${renderMetric('Avg Query Time', p.lastResult.metrics.queryTime || 'N/A', 'text-blue-700')}
-                            ${renderMetric('Std Dev', p.lastResult.metrics.queryTimeStdDev || 'N/A', 'text-violet-700')}
-                            ${renderMetric('Min Query Time', p.lastResult.metrics.minQueryTime || 'N/A', 'text-indigo-600')}
-                            ${renderMetric('Max Query Time', p.lastResult.metrics.maxQueryTime || 'N/A', 'text-purple-600')}
-                            ${renderMetric('P95 Latency', p.lastResult.metrics.p95Latency || 'N/A', 'text-fuchsia-600')}
-                            ${renderMetric('Queries Count', p.lastResult.metrics.queriesCount || p.lastResult.metrics.queriesProcessed || '1', 'text-pink-600')}
+                            ${renderMetric('Avg Query Time', queryStats.avgQueryTime || p.lastResult.metrics.queryTime || 'N/A', 'text-blue-700')}
+                            ${renderMetric('Std Dev', queryStats.queryTimeStdDev || 'N/A', 'text-violet-700')}
+                            ${renderMetric('Min Query Time', queryStats.minQueryTime || 'N/A', 'text-indigo-600')}
+                            ${renderMetric('Max Query Time', queryStats.maxQueryTime || 'N/A', 'text-purple-600')}
+                            ${renderMetric('P95 Latency', queryStats.p95Latency || 'N/A', 'text-fuchsia-600')}
+                            ${renderMetric('Queries Count', queryStats.queriesCount || 1, 'text-pink-600')}
                         </div>
                     </div>
                 </div>
-                ` : ''}
+                `;
+            })() : ''}
 
                 <!-- Results History Card -->
                 ${p.results && p.results.length > 0 ? `
@@ -2218,14 +2360,18 @@ const DemoRunner = {
      * Show loading animation overlay with status message
      * @param {string} message - Status message to display
      */
-    showLoadingAnimation(message = 'Setting up...') {
+    showLoadingAnimation(title = 'Processing', message = 'Setting up...') {
         const overlay = document.getElementById('demo-runner-loading-overlay');
         const statusEl = document.getElementById('demo-loading-status');
+        const titleEl = document.getElementById('demo-loading-title');
         if (overlay) {
             overlay.classList.remove('hidden');
             overlay.style.display = 'flex';
             if (statusEl) {
                 statusEl.textContent = message;
+            }
+            if (titleEl) {
+                titleEl.textContent = title;
             }
         }
     },
@@ -3306,18 +3452,47 @@ const DemoRunner = {
             `;
         }
 
-        // Algorithm Comparison Table
+
+
+        // Labeling Performance (if available)
+        if (stats.labelingSize.avg !== null) {
+            statsHTML += `
+                <div class="bg-green-50 rounded-xl p-3 border border-green-200">
+                    <h4 class="font-bold text-green-700 mb-2 flex items-center gap-1 text-xs">
+                        <i data-lucide="database" class="w-4 h-4"></i> Labeling Performance
+                    </h4>
+                    <div class="space-y-2 text-xs">
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Avg Label Size</span>
+                            <span class="font-semibold text-green-800">${stats.labelingSize.avg.toFixed(0)} KB</span>
+                        </div>
+                        ${stats.labelingTime.avg !== null ? `
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Avg Labeling Time</span>
+                            <span class="font-medium text-gray-700">${stats.labelingTime.avg.toFixed(2)} ms</span>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Algorithm Comparison Table (Expanded with more metrics)
         if (stats.algorithmComparison && (stats.algorithmComparison.hc2l.count > 0 || stats.algorithmComparison.dhl.count > 0)) {
             const hc2l = stats.algorithmComparison.hc2l;
             const dhl = stats.algorithmComparison.dhl;
             const best = stats.bestPerformers || {};
 
-            // Helper to show winner indicator
-            const showWinner = (metric, hc2lVal, dhlVal) => {
-                if (hc2lVal === null || dhlVal === null) return '';
-                const winner = best[metric];
-                if (winner === 'HC2L') return '<i data-lucide="cpu" class="w-4 h-4 ml-1 text-blue-600"></i>';
-                if (winner === 'DHL') return '<i data-lucide="zap" class="w-4 h-4 ml-1 text-green-600"></i>';
+            // Helper to format value
+            const fmtVal = (val, unit, decimals = 3) => {
+                if (val === null || val === undefined) return '-';
+                return val.toFixed(decimals) + ' ' + unit;
+            };
+
+            // Helper to get winner cell styling
+            const winnerClass = (metric) => {
+                if (best[metric] === 'HC2L') return 'text-blue-600 font-bold';
+                if (best[metric] === 'DHL') return 'text-green-600 font-bold';
                 return '';
             };
 
@@ -3341,57 +3516,159 @@ const DemoRunner = {
                                 </tr>
                             </thead>
                             <tbody>
+                                <!-- Basic Info -->
+                                <tr class="border-b border-gray-100 bg-gray-50">
+                                    <td class="py-1.5 px-2 text-gray-600 font-medium" colspan="4">📊 Basic Info</td>
+                                </tr>
                                 <tr class="border-b border-gray-100">
-                                    <td class="py-1.5 px-2 text-gray-600">Runs</td>
+                                    <td class="py-1.5 px-2 text-gray-600">Total Runs</td>
                                     <td class="py-1.5 px-2 text-center font-medium">${hc2l.count || 0}</td>
                                     <td class="py-1.5 px-2 text-center font-medium">${dhl.count || 0}</td>
                                     <td class="py-1.5 px-2 text-center">-</td>
                                 </tr>
+                                
+                                <!-- Query Performance -->
+                                <tr class="border-b border-gray-100 bg-purple-50">
+                                    <td class="py-1.5 px-2 text-purple-700 font-medium" colspan="4">⚡ Query Performance</td>
+                                </tr>
                                 <tr class="border-b border-gray-100">
                                     <td class="py-1.5 px-2 text-gray-600">Avg Query Time</td>
-                                    <td class="py-1.5 px-2 text-center font-medium">${hc2l.queryTime?.avg !== null ? hc2l.queryTime.avg.toFixed(3) + ' ms' : '-'}</td>
-                                    <td class="py-1.5 px-2 text-center font-medium">${dhl.queryTime?.avg !== null ? dhl.queryTime.avg.toFixed(3) + ' ms' : '-'}</td>
-                                    <td class="py-1.5 px-2 text-center font-bold ${best.queryTime === 'HC2L' ? 'text-blue-600' : best.queryTime === 'DHL' ? 'text-green-600' : ''}">${best.queryTime || '-'}</td>
+                                    <td class="py-1.5 px-2 text-center font-medium">${fmtVal(hc2l.queryTime?.avg, 'ms')}</td>
+                                    <td class="py-1.5 px-2 text-center font-medium">${fmtVal(dhl.queryTime?.avg, 'ms')}</td>
+                                    <td class="py-1.5 px-2 text-center ${winnerClass('queryTime')}">${best.queryTime || '-'}</td>
+                                </tr>
+                                <tr class="border-b border-gray-100">
+                                    <td class="py-1.5 px-2 text-gray-600">Min Query Time</td>
+                                    <td class="py-1.5 px-2 text-center">${fmtVal(hc2l.queryTime?.min, 'ms')}</td>
+                                    <td class="py-1.5 px-2 text-center">${fmtVal(dhl.queryTime?.min, 'ms')}</td>
+                                    <td class="py-1.5 px-2 text-center">-</td>
+                                </tr>
+                                <tr class="border-b border-gray-100">
+                                    <td class="py-1.5 px-2 text-gray-600">Max Query Time</td>
+                                    <td class="py-1.5 px-2 text-center">${fmtVal(hc2l.queryTime?.max, 'ms')}</td>
+                                    <td class="py-1.5 px-2 text-center">${fmtVal(dhl.queryTime?.max, 'ms')}</td>
+                                    <td class="py-1.5 px-2 text-center">-</td>
+                                </tr>
+                                
+                                <!-- Labeling Performance -->
+                                <tr class="border-b border-gray-100 bg-green-50">
+                                    <td class="py-1.5 px-2 text-green-700 font-medium" colspan="4">🏷️ Labeling Performance</td>
                                 </tr>
                                 <tr class="border-b border-gray-100">
                                     <td class="py-1.5 px-2 text-gray-600">Avg Labeling Time</td>
-                                    <td class="py-1.5 px-2 text-center font-medium">${hc2l.labelingTime?.avg !== null ? hc2l.labelingTime.avg.toFixed(3) + ' ms' : '-'}</td>
-                                    <td class="py-1.5 px-2 text-center font-medium">${dhl.labelingTime?.avg !== null ? dhl.labelingTime.avg.toFixed(3) + ' ms' : '-'}</td>
-                                    <td class="py-1.5 px-2 text-center font-bold ${best.labelingTime === 'HC2L' ? 'text-blue-600' : best.labelingTime === 'DHL' ? 'text-green-600' : ''}">${best.labelingTime || '-'}</td>
+                                    <td class="py-1.5 px-2 text-center font-medium">${fmtVal(hc2l.labelingTime?.avg, 'ms')}</td>
+                                    <td class="py-1.5 px-2 text-center font-medium">${fmtVal(dhl.labelingTime?.avg, 'ms')}</td>
+                                    <td class="py-1.5 px-2 text-center ${winnerClass('labelingTime')}">${best.labelingTime || '-'}</td>
+                                </tr>
+                                <tr class="border-b border-gray-100">
+                                    <td class="py-1.5 px-2 text-gray-600">Avg Label Size</td>
+                                    <td class="py-1.5 px-2 text-center font-medium">${fmtVal(hc2l.labelingSize?.avg, 'KB', 2)}</td>
+                                    <td class="py-1.5 px-2 text-center font-medium">${fmtVal(dhl.labelingSize?.avg, 'KB', 2)}</td>
+                                    <td class="py-1.5 px-2 text-center ${winnerClass('labelingSize')}">${best.labelingSize || '-'}</td>
+                                </tr>
+                                
+                                <!-- Process Time -->
+                                <tr class="border-b border-gray-100 bg-cyan-50">
+                                    <td class="py-1.5 px-2 text-cyan-700 font-medium" colspan="4">🚀 Process Time</td>
+                                </tr>
+                                <tr class="border-b border-gray-100">
+                                    <td class="py-1.5 px-2 text-gray-600">Avg Process Time</td>
+                                    <td class="py-1.5 px-2 text-center font-medium">${fmtVal(hc2l.processTime?.avg, 'ms', 0)}</td>
+                                    <td class="py-1.5 px-2 text-center font-medium">${fmtVal(dhl.processTime?.avg, 'ms', 0)}</td>
+                                    <td class="py-1.5 px-2 text-center ${winnerClass('processTime')}">${best.processTime || '-'}</td>
+                                </tr>
+                                <tr class="border-b border-gray-100">
+                                    <td class="py-1.5 px-2 text-gray-600">Min / Max Process</td>
+                                    <td class="py-1.5 px-2 text-center">${hc2l.processTime?.min !== null ? hc2l.processTime.min.toFixed(0) + ' / ' + hc2l.processTime.max.toFixed(0) + ' ms' : '-'}</td>
+                                    <td class="py-1.5 px-2 text-center">${dhl.processTime?.min !== null ? dhl.processTime.min.toFixed(0) + ' / ' + dhl.processTime.max.toFixed(0) + ' ms' : '-'}</td>
+                                    <td class="py-1.5 px-2 text-center">-</td>
+                                </tr>
+                                
+                                <!-- Graph Metrics -->
+                                <tr class="border-b border-gray-100 bg-amber-50">
+                                    <td class="py-1.5 px-2 text-amber-700 font-medium" colspan="4">📐 Graph Metrics</td>
+                                </tr>
+                                <tr class="border-b border-gray-100">
+                                    <td class="py-1.5 px-2 text-gray-600">Avg Path Length</td>
+                                    <td class="py-1.5 px-2 text-center font-medium">${hc2l.pathLength?.avg !== null ? hc2l.pathLength.avg.toFixed(0) + ' nodes' : '-'}</td>
+                                    <td class="py-1.5 px-2 text-center font-medium">${dhl.pathLength?.avg !== null ? dhl.pathLength.avg.toFixed(0) + ' nodes' : '-'}</td>
+                                    <td class="py-1.5 px-2 text-center ${winnerClass('pathLength')}">${best.pathLength || '-'}</td>
+                                </tr>
+                                <tr class="border-b border-gray-100">
+                                    <td class="py-1.5 px-2 text-gray-600">Avg Distance</td>
+                                    <td class="py-1.5 px-2 text-center">${fmtVal(hc2l.distance?.avg, 'km', 2)}</td>
+                                    <td class="py-1.5 px-2 text-center">${fmtVal(dhl.distance?.avg, 'km', 2)}</td>
+                                    <td class="py-1.5 px-2 text-center">-</td>
+                                </tr>
+                                
+                                <!-- Disruption Impact -->
+                                <tr class="border-b border-gray-100 bg-red-50">
+                                    <td class="py-1.5 px-2 text-red-700 font-medium" colspan="4">⚠️ Disruption Impact</td>
+                                </tr>
+                                <tr class="border-b border-gray-100">
+                                    <td class="py-1.5 px-2 text-gray-600">Avg ETA</td>
+                                    <td class="py-1.5 px-2 text-center font-medium">${hc2l.eta?.avg !== null ? (hc2l.eta.avg / 60).toFixed(1) + ' min' : '-'}</td>
+                                    <td class="py-1.5 px-2 text-center font-medium">${dhl.eta?.avg !== null ? (dhl.eta.avg / 60).toFixed(1) + ' min' : '-'}</td>
+                                    <td class="py-1.5 px-2 text-center ${winnerClass('eta')}">${best.eta || '-'}</td>
+                                </tr>
+                                <tr class="border-b border-gray-100">
+                                    <td class="py-1.5 px-2 text-gray-600">Avg Disrupted Edges</td>
+                                    <td class="py-1.5 px-2 text-center font-medium">${hc2l.disruptedEdges?.avg !== null ? hc2l.disruptedEdges.avg.toFixed(1) + ' edges' : '-'}</td>
+                                    <td class="py-1.5 px-2 text-center font-medium">${dhl.disruptedEdges?.avg !== null ? dhl.disruptedEdges.avg.toFixed(1) + ' edges' : '-'}</td>
+                                    <td class="py-1.5 px-2 text-center ${winnerClass('disruptedEdges')}">${best.disruptedEdges || '-'}</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
-                    ${best.winner ? `
-                    <div class="mt-2 pt-2 border-t border-gray-100 text-center">
-                        <span class="text-xs text-gray-500">Overall Winner: </span>
-                        <span class="font-bold text-sm ${best.winner === 'HC2L' ? 'text-blue-600' : best.winner === 'DHL' ? 'text-green-600' : 'text-gray-600'}">${best.winner === 'Tie' ? '<i data-lucide="minus" class="w-4 h-4 inline mr-1"></i>Tie' : best.winner === 'HC2L' ? '<i data-lucide="cpu" class="w-4 h-4 inline mr-1"></i>' + best.winner : '<i data-lucide="zap" class="w-4 h-4 inline mr-1"></i>' + best.winner}</span>
-                    </div>
-                    ` : ''}
                 </div>
             `;
         }
 
-        // Labeling Performance (if available)
-        if (stats.labelingSize.avg !== null) {
+
+        // Best Performer (Overall Winner) - shown in grid row
+        if (stats.bestPerformers?.winner) {
             statsHTML += `
-                <div class="col-span-2 bg-green-50 rounded-xl p-3 border border-green-200">
-                    <h4 class="font-bold text-green-700 mb-2 flex items-center gap-1 text-xs">
-                        <i data-lucide="database" class="w-4 h-4"></i> Labeling Performance
-                    </h4>
-                    <div class="grid grid-cols-2 gap-3 text-xs">
-                        <div class="flex justify-between">
-                            <span class="text-gray-600">Avg Label Size</span>
-                            <span class="font-semibold text-green-800">${stats.labelingSize.avg.toFixed(0)}</span>
-                        </div>
-                        ${stats.labelingTime.avg !== null ? `
-                        <div class="flex justify-between">
-                            <span class="text-gray-600">Avg Labeling Time</span>
-                            <span class="font-medium text-gray-700">${stats.labelingTime.avg.toFixed(2)} ms</span>
-                        </div>
-                        ` : ''}
+            <div class="col-span-2 section-card section-card--warning">
+            <div class="section-card__header">
+                <div class="section-card__icon section-card__icon--warning">
+                <i data-lucide="trophy" class="w-5 h-5"></i>
+                </div>
+                <h4 class="section-card__title">Best Performer</h4>
+            </div>
+            <div class="section-card__body">
+                <div class="flex flex-col items-center space-y-4">
+                <!-- Winner Announcement -->
+                <div class="rounded-xl p-4 w-full text-center border border-amber-200 ${stats.bestPerformers.winner === 'HC2L' ? 'bg-gradient-dhc2l' : stats.bestPerformers.winner === 'DHL' ? 'bg-gradient-dhl' : 'bg-gradient-dark'} text-white">
+                    <div class="text-sm text-amber-700 mb-2">Overall Winner</div>
+                    <div class="text-3xl font-bold ">
+                    ${stats.bestPerformers.winner === 'Tie' ? '🤝 Tie' : stats.bestPerformers.winner}
                     </div>
                 </div>
+                
+                <!-- Win Counts -->
+                <div class="grid grid-cols-2 gap-4 w-full">
+                    <div class="bg-blue-50 rounded-lg p-3 text-center border border-blue-200">
+                    <div class="text-2xl font-bold text-blue-700">${stats.bestPerformers.hc2lWins || 0}</div>
+                    <div class="text-xs text-blue-600 uppercase tracking-wide">HC2L Wins</div>
+                    </div>
+                    <div class="bg-purple-50 rounded-lg p-3 text-center border border-purple-200">
+                    <div class="text-2xl font-bold text-purple-700">${stats.bestPerformers.dhlWins || 0}</div>
+                    <div class="text-xs text-purple-600 uppercase tracking-wide">DHL Wins</div>
+                    </div>
+                </div>
+                
+                <!-- Categories Info -->
+                <div class="bg-gray-50 rounded-lg p-3 w-full text-center border border-gray-200">
+                    <div class="text-sm text-gray-700">
+                    Out of <span class="font-semibold text-gray-900">${stats.bestPerformers.totalCategories || 7}</span> performance categories
+                    </div>
+                    <div class="text-xs text-gray-600 mt-1">
+                    Query Time • Labeling Time • Label Size • Process Time • Path Length • Disrupted Edges • ETA
+                    </div>
+                </div>
+                </div>
+            </div>
+            </div>
             `;
         }
 
@@ -3596,9 +3873,6 @@ const DemoRunner = {
         // Render performance charts
         this.renderResultsCharts(results, stats);
 
-        // Render best performer highlight
-        this.renderBestPerformer(results);
-
         // Switch to results tab in the panel
         this.showTab('results');
 
@@ -3627,8 +3901,10 @@ const DemoRunner = {
             return;
         }
 
-        // Render Algorithm Comparison Bar Chart
-        this.renderAlgorithmComparisonChart(results, stats);
+        // Render separate comparison charts for each metric
+        this.renderQueryTimeComparisonChart(results, stats);
+        this.renderLabelingTimeComparisonChart(results, stats);
+        this.renderLabelSizeComparisonChart(results, stats);
 
         // Render Process Time Chart
         this.renderProcessTimeChart(results);
@@ -3638,6 +3914,251 @@ const DemoRunner = {
 
         // Render Performance Radar Chart
         this.renderPerformanceRadarChart(results, stats);
+    },
+
+    /**
+     * Render bar chart comparing query time by algorithm (Avg, Min, Max)
+     */
+    renderQueryTimeComparisonChart(results, stats) {
+        const ctx = document.getElementById('chart-query-time-comparison');
+        if (!ctx) return;
+
+        // Separate results by algorithm
+        const hc2lResults = results.filter(r => (r.algorithm || '').toUpperCase() === 'HC2L');
+        const dhlResults = results.filter(r => (r.algorithm || '').toUpperCase() === 'DHL');
+
+        // Helper to extract query times
+        const getQueryTimes = (arr) => arr.map(r => {
+            const val = r.metrics?.queryTimeMs || r.metrics?.queryTimeNum;
+            if (typeof val === 'number' && !isNaN(val) && val > 0) return val;
+            if (r.metrics?.queryTime) {
+                const num = parseFloat(String(r.metrics.queryTime).replace(/[^\d.-]/g, ''));
+                if (!isNaN(num) && num > 0) return num;
+            }
+            return null;
+        }).filter(v => v !== null);
+
+        const hc2lTimes = getQueryTimes(hc2lResults);
+        const dhlTimes = getQueryTimes(dhlResults);
+
+        const avg = arr => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+        const min = arr => arr.length > 0 ? Math.min(...arr) : 0;
+        const max = arr => arr.length > 0 ? Math.max(...arr) : 0;
+
+        this.chartInstances.queryTimeComparison = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Average', 'Min', 'Max'],
+                datasets: [
+                    {
+                        label: 'HC2L',
+                        data: [avg(hc2lTimes), min(hc2lTimes), max(hc2lTimes)],
+                        backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                        borderColor: 'rgba(59, 130, 246, 1)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'DHL',
+                        data: [avg(dhlTimes), min(dhlTimes), max(dhlTimes)],
+                        backgroundColor: 'rgba(34, 197, 94, 0.7)',
+                        borderColor: 'rgba(34, 197, 94, 1)',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: { font: { size: 10 } }
+                    },
+                    title: {
+                        display: true,
+                        text: 'Query Time (ms)',
+                        font: { size: 11 }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { font: { size: 9 } }
+                    },
+                    x: {
+                        ticks: { font: { size: 9 } }
+                    }
+                }
+            }
+        });
+    },
+
+    /**
+     * Render bar chart comparing labeling time by algorithm (Avg, Min, Max)
+     */
+    renderLabelingTimeComparisonChart(results, stats) {
+        const ctx = document.getElementById('chart-labeling-time-comparison');
+        if (!ctx) return;
+
+        // Separate results by algorithm
+        const hc2lResults = results.filter(r => (r.algorithm || '').toUpperCase() === 'HC2L');
+        const dhlResults = results.filter(r => (r.algorithm || '').toUpperCase() === 'DHL');
+
+        // Helper to extract labeling times
+        const getLabelingTimes = (arr) => arr.map(r => {
+            const val = r.metrics?.indexLoadTimeMs;
+            if (typeof val === 'number' && !isNaN(val) && val > 0) return val;
+            if (r.metrics?.labelingTime) {
+                const num = parseFloat(String(r.metrics.labelingTime).replace(/[^\d.-]/g, ''));
+                if (!isNaN(num) && num > 0) return num;
+            }
+            return null;
+        }).filter(v => v !== null);
+
+        const hc2lTimes = getLabelingTimes(hc2lResults);
+        const dhlTimes = getLabelingTimes(dhlResults);
+
+        const avg = arr => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+        const min = arr => arr.length > 0 ? Math.min(...arr) : 0;
+        const max = arr => arr.length > 0 ? Math.max(...arr) : 0;
+
+        this.chartInstances.labelingTimeComparison = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Average', 'Min', 'Max'],
+                datasets: [
+                    {
+                        label: 'HC2L',
+                        data: [avg(hc2lTimes), min(hc2lTimes), max(hc2lTimes)],
+                        backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                        borderColor: 'rgba(59, 130, 246, 1)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'DHL',
+                        data: [avg(dhlTimes), min(dhlTimes), max(dhlTimes)],
+                        backgroundColor: 'rgba(34, 197, 94, 0.7)',
+                        borderColor: 'rgba(34, 197, 94, 1)',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: { font: { size: 10 } }
+                    },
+                    title: {
+                        display: true,
+                        text: 'Labeling/Index Load Time (ms)',
+                        font: { size: 11 }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { font: { size: 9 } }
+                    },
+                    x: {
+                        ticks: { font: { size: 9 } }
+                    }
+                }
+            }
+        });
+    },
+
+    /**
+     * Render bar chart comparing label size by algorithm (Avg, Min, Max)
+     */
+    renderLabelSizeComparisonChart(results, stats) {
+        const ctx = document.getElementById('chart-label-size-comparison');
+        if (!ctx) return;
+
+        // Separate results by algorithm
+        const hc2lResults = results.filter(r => (r.algorithm || '').toUpperCase() === 'HC2L');
+        const dhlResults = results.filter(r => (r.algorithm || '').toUpperCase() === 'DHL');
+
+        // Helper to extract label sizes (in KB)
+        const getLabelSizes = (arr) => arr.map(r => {
+            // Try indexSizeKb first
+            const kb = r.metrics?.indexSizeKb;
+            if (typeof kb === 'number' && !isNaN(kb) && kb > 0) return kb;
+            // Try parsing from labelingSize string
+            if (r.metrics?.labelingSize) {
+                const str = String(r.metrics.labelingSize);
+                // Check if it's in MB
+                if (str.toLowerCase().includes('mb')) {
+                    const num = parseFloat(str.replace(/[^\d.-]/g, ''));
+                    if (!isNaN(num) && num > 0) return num * 1024; // Convert MB to KB
+                }
+                // Check if it's in KB
+                if (str.toLowerCase().includes('kb')) {
+                    const num = parseFloat(str.replace(/[^\d.-]/g, ''));
+                    if (!isNaN(num) && num > 0) return num;
+                }
+                // Assume KB if no unit
+                const num = parseFloat(str.replace(/[^\d.-]/g, ''));
+                if (!isNaN(num) && num > 0) return num;
+            }
+            return null;
+        }).filter(v => v !== null);
+
+        const hc2lSizes = getLabelSizes(hc2lResults);
+        const dhlSizes = getLabelSizes(dhlResults);
+
+        const avg = arr => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+        const min = arr => arr.length > 0 ? Math.min(...arr) : 0;
+        const max = arr => arr.length > 0 ? Math.max(...arr) : 0;
+
+        this.chartInstances.labelSizeComparison = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Average', 'Min', 'Max'],
+                datasets: [
+                    {
+                        label: 'HC2L',
+                        data: [avg(hc2lSizes), min(hc2lSizes), max(hc2lSizes)],
+                        backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                        borderColor: 'rgba(59, 130, 246, 1)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'DHL',
+                        data: [avg(dhlSizes), min(dhlSizes), max(dhlSizes)],
+                        backgroundColor: 'rgba(34, 197, 94, 0.7)',
+                        borderColor: 'rgba(34, 197, 94, 1)',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: { font: { size: 10 } }
+                    },
+                    title: {
+                        display: true,
+                        text: 'Label/Index Size (KB)',
+                        font: { size: 11 }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { font: { size: 9 } }
+                    },
+                    x: {
+                        ticks: { font: { size: 9 } }
+                    }
+                }
+            }
+        });
     },
 
     /**
@@ -3693,84 +4214,6 @@ const DemoRunner = {
                         display: true,
                         text: 'Process Time (ms) - Full Server Round-trip',
                         font: { size: 11 }
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: { font: { size: 9 } }
-                    },
-                    x: {
-                        ticks: { font: { size: 9 } }
-                    }
-                }
-            }
-        });
-    },
-
-    /**
-     * Render bar chart comparing HC2L vs DHL performance
-     */
-    renderAlgorithmComparisonChart(results, stats) {
-        const ctx = document.getElementById('chart-algorithm-comparison');
-        if (!ctx) return;
-
-        // Separate results by algorithm
-        const hc2lResults = results.filter(r => (r.algorithm || '').toUpperCase() === 'HC2L');
-        const dhlResults = results.filter(r => (r.algorithm || '').toUpperCase() === 'DHL');
-
-        // Helper to get average of a metric
-        const getAvg = (arr, ...keys) => {
-            const values = arr.map(r => {
-                for (const key of keys) {
-                    const val = r.metrics?.[key];
-                    if (typeof val === 'number' && !isNaN(val)) return val;
-                    if (typeof val === 'string') {
-                        const num = parseFloat(val.replace(/[^\d.-]/g, ''));
-                        if (!isNaN(num)) return num;
-                    }
-                }
-                return null;
-            }).filter(v => v !== null);
-            return values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0;
-        };
-
-        // Calculate metrics for each algorithm
-        const hc2lQueryTime = getAvg(hc2lResults, 'queryTimeNum', 'queryTime');
-        const dhlQueryTime = getAvg(dhlResults, 'queryTimeNum', 'queryTime');
-        const hc2lLabelingTime = getAvg(hc2lResults, 'labelingTimeNum', 'labelingTime');
-        const dhlLabelingTime = getAvg(dhlResults, 'labelingTimeNum', 'labelingTime');
-        const hc2lLabelSize = getAvg(hc2lResults, 'labelingSize');
-        const dhlLabelSize = getAvg(dhlResults, 'labelingSize');
-
-        this.chartInstances.algorithmComparison = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: ['Query Time (ms)', 'Labeling Time (ms)', 'Label Size (MB)'],
-                datasets: [
-                    {
-                        label: 'HC2L',
-                        data: [hc2lQueryTime, hc2lLabelingTime, hc2lLabelSize],
-                        backgroundColor: 'rgba(59, 130, 246, 0.7)',
-                        borderColor: 'rgba(59, 130, 246, 1)',
-                        borderWidth: 1
-                    },
-                    {
-                        label: 'DHL',
-                        data: [dhlQueryTime, dhlLabelingTime, dhlLabelSize],
-                        backgroundColor: 'rgba(34, 197, 94, 0.7)',
-                        borderColor: 'rgba(34, 197, 94, 1)',
-                        borderWidth: 1
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'top',
-                        labels: { font: { size: 10 } }
                     }
                 },
                 scales: {
@@ -3971,75 +4414,6 @@ const DemoRunner = {
     },
 
     /**
-     * Render the best performer highlight section
-     */
-    renderBestPerformer(results) {
-        const container = document.getElementById('demo-results-best-performer');
-        if (!container || results.length === 0) {
-            if (container) container.classList.add('hidden');
-            return;
-        }
-
-        // Find best performers
-        let bestQueryTime = { result: null, value: Infinity };
-        let bestLabelingTime = { result: null, value: Infinity };
-
-        results.forEach(r => {
-            const queryTime = r.metrics?.queryTimeNum || Infinity;
-            const labelingTime = parseFloat(String(r.metrics?.labelingTime || '999').replace(/[^\d.-]/g, '')) || Infinity;
-
-            if (queryTime < bestQueryTime.value) {
-                bestQueryTime = { result: r, value: queryTime };
-            }
-            if (labelingTime < bestLabelingTime.value) {
-                bestLabelingTime = { result: r, value: labelingTime };
-            }
-        });
-
-        // Count algorithm wins
-        const hc2lWins = [bestQueryTime, bestLabelingTime].filter(b => (b.result?.algorithm || '').toUpperCase() === 'HC2L').length;
-        const dhlWins = [bestQueryTime, bestLabelingTime].filter(b => (b.result?.algorithm || '').toUpperCase() === 'DHL').length;
-
-        const overallWinner = hc2lWins > dhlWins ? 'HC2L' : dhlWins > hc2lWins ? 'DHL' : 'Tie';
-        const winnerColor = overallWinner === 'HC2L' ? 'blue' : overallWinner === 'DHL' ? 'green' : 'gray';
-        const winnerIcon = overallWinner === 'HC2L' ? '<i data-lucide="cpu" class="w-4 h-4 text-blue-600"></i>' : overallWinner === 'DHL' ? '<i data-lucide="zap" class="w-4 h-4 text-green-600"></i>' : '<i data-lucide="minus" class="w-4 h-4 text-gray-600"></i>';
-
-        container.innerHTML = `
-            <div class="bg-gradient-to-r from-${winnerColor}-50 to-${winnerColor}-100 rounded-xl p-4 border border-${winnerColor}-200">
-                <div class="flex items-center justify-between mb-3">
-                    <h4 class="font-bold text-${winnerColor}-800 flex items-center gap-2">
-                        <span>🏆</span> Best Performer
-                    </h4>
-                    <span class="text-2xl">${winnerIcon}</span>
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div class="bg-white/60 rounded-lg p-2 text-center">
-                        <div class="text-xs text-gray-500 mb-1">Overall Winner</div>
-                        <div class="font-bold text-lg text-${winnerColor}-700">${overallWinner}</div>
-                    </div>
-                    <div class="bg-white/60 rounded-lg p-2 text-center">
-                        <div class="text-xs text-gray-500 mb-1">Fastest Query</div>
-                        <div class="font-bold text-sm text-gray-800">
-                            ${bestQueryTime.result?.algorithm || 'N/A'}
-                            <span class="text-xs text-gray-500">(${bestQueryTime.value.toFixed(3)}ms)</span>
-                        </div>
-                    </div>
-                </div>
-                ${hc2lWins !== dhlWins ? `
-                <div class="mt-2 text-xs text-${winnerColor}-600 text-center">
-                    ${overallWinner} won ${Math.max(hc2lWins, dhlWins)} of 2 performance categories
-                </div>
-                ` : `
-                <div class="mt-2 text-xs text-gray-600 text-center">
-                    Both algorithms performed equally well
-                </div>
-                `}
-            </div>
-        `;
-        container.classList.remove('hidden');
-    },
-
-    /**
      * Toggle result details visibility (collapsible)
      */
     toggleResultDetails(index) {
@@ -4060,13 +4434,22 @@ const DemoRunner = {
      * Export results locally to server (Main/data/demos/results)
      */
     async exportResultsLocally() {
+        // Show loading animation
+        this.showLoadingAnimation(
+            'Processing',
+            'Saving results to server...');
+
         const results = this.currentProgress.results || [];
         if (!results || results.length === 0) {
             showUpdateToast('No results to export', 'warning');
+
+            // Hide loading animation
+            this.hideLoadingAnimation();
             return;
         }
 
-        const configId = this.currentDemo?.id || `demo_${Date.now()}`;
+        // Use lastRunConfigId (persists after demo ends), fallback to currentDemo?.id, then generate new ID
+        const configId = this.lastRunConfigId || this.currentDemo?.id || `demo_${Date.now()}`;
 
         // Compute summary statistics for export
         const exportData = this.buildExportData(results);
@@ -4094,6 +4477,9 @@ const DemoRunner = {
             console.error('Error saving results:', error);
             showUpdateToast('Failed to save results: ' + error.message, 'error');
         }
+
+        // Hide loading animation
+        this.hideLoadingAnimation();
     },
 
     /**
@@ -4273,8 +4659,8 @@ const DemoRunner = {
 
         return {
             exportedAt: new Date().toISOString(),
-            demoName: this.currentDemo?.name || 'Demo Results',
-            demoId: this.currentDemo?.id || null,
+            demoName: this.lastRunConfigName || this.currentDemo?.name || 'Demo Results',
+            demoId: this.lastRunConfigId || this.currentDemo?.id || null,
             summary: stats,
             results: results
         };
@@ -4306,7 +4692,7 @@ const DemoRunner = {
         const pathLengths = results.map(r => getNumeric(r.metrics, 'pathLength')).filter(v => v !== null && v > 0);
         const edgeCounts = results.map(r => getNumeric(r.metrics, 'edgeCount')).filter(v => v !== null && v > 0);
         const disruptedEdges = results.map(r => getNumeric(r.metrics, 'disruptedEdges')).filter(v => v !== null && v >= 0);
-        const labelingSizes = results.map(r => getNumeric(r.metrics, 'indexSizeMb', 'labelingSize')).filter(v => v !== null && v > 0);
+        const labelingSizes = results.map(r => getNumeric(r.metrics, 'indexSizeKb', 'labelingSize')).filter(v => v !== null && v > 0);
         const labelingTimes = results.map(r => getNumeric(r.metrics, 'indexLoadTimeMs', 'labelingTimeNum', 'labelingTime')).filter(v => v !== null && v > 0);
 
         // Distance metrics (new API format uses calculated_distance_km)
@@ -4358,46 +4744,92 @@ const DemoRunner = {
             strategyCounts[s] = (strategyCounts[s] || 0) + 1;
         });
 
-        // Calculate algorithm-specific stats for comparison
+        // Calculate algorithm-specific stats for comparison (expanded with more metrics)
         const calcAlgoStats = (algoResults) => {
-            const qt = algoResults.map(r => getNumeric(r.metrics, 'queryTimeNum', 'queryTime')).filter(v => v !== null);
-            const lt = algoResults.map(r => getNumeric(r.metrics, 'labelingTimeNum', 'labelingTime')).filter(v => v !== null);
-            const ls = algoResults.map(r => getNumeric(r.metrics, 'labelingSize')).filter(v => v !== null);
+            const qt = algoResults.map(r => getNumeric(r.metrics, 'queryTimeMs', 'queryTimeNum', 'queryTime')).filter(v => v !== null && v > 0);
+            const lt = algoResults.map(r => getNumeric(r.metrics, 'indexLoadTimeMs', 'labelingTimeNum', 'labelingTime')).filter(v => v !== null && v > 0);
+            const ls = algoResults.map(r => getNumeric(r.metrics, 'indexSizeKb', 'labelingSize')).filter(v => v !== null && v > 0);
+            const pt = algoResults.map(r => r.processTimeMs).filter(v => v !== null && v !== undefined && v > 0);
+            const pl = algoResults.map(r => getNumeric(r.metrics, 'pathLength')).filter(v => v !== null && v > 0);
+            const de = algoResults.map(r => getNumeric(r.metrics, 'disruptedEdges')).filter(v => v !== null && v >= 0);
+            const dist = algoResults.map(r => getNumeric(r.metrics, 'calculatedDistanceKm', 'distanceKm')).filter(v => v !== null && v > 0);
+            const eta = algoResults.map(r => getNumeric(r.metrics, 'etaSeconds')).filter(v => v !== null && v > 0);
+
             return {
                 count: algoResults.length,
                 queryTime: calcStats(qt),
                 labelingTime: calcStats(lt),
-                labelingSize: calcStats(ls)
+                labelingSize: calcStats(ls),
+                processTime: calcStats(pt),
+                pathLength: calcStats(pl),
+                disruptedEdges: calcStats(de),
+                distance: calcStats(dist),
+                eta: calcStats(eta)
             };
         };
 
         const hc2lStats = calcAlgoStats(hc2lResults);
         const dhlStats = calcAlgoStats(dhlResults);
 
-        // Determine best performers
+        // Determine best performers (7 key metrics including ETA)
         const bestPerformers = {
-            queryTime: null,
-            labelingTime: null,
-            winner: null
+            queryTime: null,           // Lower query time is better
+            labelingTime: null,        // Lower labeling time is better
+            labelingSize: null,        // Lower label size is better
+            processTime: null,         // Lower process time is better
+            pathLength: null,          // Shorter path is better
+            disruptedEdges: null,      // Fewer disrupted edges is better
+            eta: null,                 // Lower ETA is better
+            winner: null,
+            hc2lWins: 0,
+            dhlWins: 0,
+            totalCategories: 0
         };
 
         if (hc2lStats.count > 0 && dhlStats.count > 0) {
-            // Compare query times
+            // Compare query times (lower is better)
             if (hc2lStats.queryTime.avg !== null && dhlStats.queryTime.avg !== null) {
                 bestPerformers.queryTime = hc2lStats.queryTime.avg <= dhlStats.queryTime.avg ? 'HC2L' : 'DHL';
             }
-            // Compare labeling times
+            // Compare labeling times (lower is better)
             if (hc2lStats.labelingTime.avg !== null && dhlStats.labelingTime.avg !== null) {
                 bestPerformers.labelingTime = hc2lStats.labelingTime.avg <= dhlStats.labelingTime.avg ? 'HC2L' : 'DHL';
             }
-            // Determine overall winner
-            const hc2lWins = Object.values(bestPerformers).filter(v => v === 'HC2L').length;
-            const dhlWins = Object.values(bestPerformers).filter(v => v === 'DHL').length;
-            bestPerformers.winner = hc2lWins > dhlWins ? 'HC2L' : dhlWins > hc2lWins ? 'DHL' : 'Tie';
+            // Compare labeling size (lower is better for memory)
+            if (hc2lStats.labelingSize.avg !== null && dhlStats.labelingSize.avg !== null) {
+                bestPerformers.labelingSize = hc2lStats.labelingSize.avg <= dhlStats.labelingSize.avg ? 'HC2L' : 'DHL';
+            }
+            // Compare process times (lower is better)
+            if (hc2lStats.processTime.avg !== null && dhlStats.processTime.avg !== null) {
+                bestPerformers.processTime = hc2lStats.processTime.avg <= dhlStats.processTime.avg ? 'HC2L' : 'DHL';
+            }
+            // Compare path lengths (shorter path is better for efficiency)
+            if (hc2lStats.pathLength.avg !== null && dhlStats.pathLength.avg !== null) {
+                bestPerformers.pathLength = hc2lStats.pathLength.avg <= dhlStats.pathLength.avg ? 'HC2L' : 'DHL';
+            }
+            // Compare disrupted edges (fewer is better)
+            if (hc2lStats.disruptedEdges.avg !== null && dhlStats.disruptedEdges.avg !== null) {
+                bestPerformers.disruptedEdges = hc2lStats.disruptedEdges.avg <= dhlStats.disruptedEdges.avg ? 'HC2L' : 'DHL';
+            }
+            // Compare ETA (lower is better for faster routes)
+            if (hc2lStats.eta.avg !== null && dhlStats.eta.avg !== null) {
+                bestPerformers.eta = hc2lStats.eta.avg <= dhlStats.eta.avg ? 'HC2L' : 'DHL';
+            }
+
+            // Determine overall winner based on all 7 categories
+            const validWinners = Object.entries(bestPerformers).filter(([k, v]) => v !== null && k !== 'winner' && k !== 'hc2lWins' && k !== 'dhlWins' && k !== 'totalCategories');
+            bestPerformers.hc2lWins = validWinners.filter(([k, v]) => v === 'HC2L').length;
+            bestPerformers.dhlWins = validWinners.filter(([k, v]) => v === 'DHL').length;
+            bestPerformers.totalCategories = validWinners.length;
+            bestPerformers.winner = bestPerformers.hc2lWins > bestPerformers.dhlWins ? 'HC2L' : bestPerformers.dhlWins > bestPerformers.hc2lWins ? 'DHL' : 'Tie';
         } else if (hc2lStats.count > 0) {
             bestPerformers.winner = 'HC2L';
+            bestPerformers.hc2lWins = 7;
+            bestPerformers.totalCategories = 7;
         } else if (dhlStats.count > 0) {
             bestPerformers.winner = 'DHL';
+            bestPerformers.dhlWins = 7;
+            bestPerformers.totalCategories = 7;
         }
 
         return {

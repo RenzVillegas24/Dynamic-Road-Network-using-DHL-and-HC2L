@@ -39,6 +39,44 @@
   background: var(--gradient-surface);
 }
 
+
+/* =====================
+   NEUTRAL GRADIENTS
+   ===================== */
+
+.bg-gradient-dark {
+  background: var(--gradient-dark);
+}
+
+.bg-gradient-slate {
+  background: var(--gradient-slate);
+}
+
+.bg-gradient-purple {
+  background: var(--gradient-purple);
+}
+
+.bg-gradient-amber {
+  background: var(--gradient-amber);
+}
+
+.bg-gradient-teal {
+  background: var(--gradient-teal);
+}
+
+.bg-gradient-blue {
+  background: var(--gradient-blue);
+}
+
+.bg-gradient-emerald {
+  background: var(--gradient-emerald);
+}
+
+.bg-gradient-rose {
+  background: var(--gradient-rose);
+}
+
+
 /* =====================
    ALGORITHM GRADIENTS
    ===================== */

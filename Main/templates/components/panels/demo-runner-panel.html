@@ -224,10 +224,10 @@
 
   <!-- Loading Animation Overlay (shown while initializing) - covers full panel_body -->
   <div id="demo-runner-loading-overlay" class="hidden" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255, 255, 255, 0.5); display: none; align-items: center; justify-content: center; z-index: 50;backdrop-filter: blur(4px);">
-    <div style="background: white; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); padding: 32px; display: flex; flex-direction: column; align-items: center; gap: 16px;">
+    <div style="background: white; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); padding: 32px; display: flex; flex-direction: column; align-items: center; gap: 16px; min-width: 300px;">
       <div style="width: 64px; height: 64px; border: 4px solid #e5e7eb; border-top-color: #3b82f6; border-radius: 50%; animation: spin 1s linear infinite;"></div>
       <div style="text-align: center;">
-        <h3 style="font-size: 18px; font-weight: bold; color: #1f2937; margin-bottom: 8px;">Initializing Demo</h3>
+        <h3 id="demo-loading-title" style="font-size: 18px; font-weight: bold; color: #1f2937; margin-bottom: 8px;">Initializing Demo</h3>
         <p id="demo-loading-status" style="color: #4b5563; font-size: 14px;">Setting up...</p>
       </div>
     </div>
@@ -262,16 +262,40 @@
 
     <!-- Performance Charts Section -->
     <div id="demo-results-charts" class="space-y-4">
+      <!-- Query Time Comparison Chart -->
+      <div class="section-card">
+        <div class="section-card__header">
+          <div class="section-card__icon section-card__icon--purple">
+            <i data-lucide="clock" class="w-5 h-5"></i>
+          </div>
+          <h4 class="section-card__title">Query Time Comparison</h4>
+        </div>
+        <div class="h-40"><canvas id="chart-query-time-comparison"></canvas></div>
+      </div>
+
+      <!-- Labeling Time Comparison Chart -->
+      <div class="section-card">
+        <div class="section-card__header">
+          <div class="section-card__icon section-card__icon--amber">
+            <i data-lucide="tag" class="w-5 h-5"></i>
+          </div>
+          <h4 class="section-card__title">Labeling Time Comparison</h4>
+        </div>
+        <div class="h-40"><canvas id="chart-labeling-time-comparison"></canvas></div>
+      </div>
+
+      <!-- Label Size Comparison Chart -->
       <div class="section-card">
         <div class="section-card__header">
           <div class="section-card__icon section-card__icon--success">
-            <i data-lucide="trending-up" class="w-5 h-5"></i>
+            <i data-lucide="database" class="w-5 h-5"></i>
           </div>
-          <h4 class="section-card__title">Algorithm Comparison</h4>
+          <h4 class="section-card__title">Label Size Comparison (KB)</h4>
         </div>
-        <div class="h-48"><canvas id="chart-algorithm-comparison"></canvas></div>
+        <div class="h-40"><canvas id="chart-label-size-comparison"></canvas></div>
       </div>
 
+      <!-- Process Time Comparison Chart -->
       <div class="section-card">
         <div class="section-card__header">
           <div class="section-card__icon section-card__icon--primary">
@@ -282,6 +306,7 @@
         <div class="h-40"><canvas id="chart-process-time"></canvas></div>
       </div>
 
+      <!-- Query Time Trend Chart -->
       <div class="section-card">
         <div class="section-card__header">
           <div class="section-card__icon section-card__icon--info">
@@ -292,6 +317,7 @@
         <div class="h-40"><canvas id="chart-query-time-trend"></canvas></div>
       </div>
 
+      <!-- Performance Radar Chart -->
       <div class="section-card">
         <div class="section-card__header">
           <div class="section-card__icon section-card__icon--warning">

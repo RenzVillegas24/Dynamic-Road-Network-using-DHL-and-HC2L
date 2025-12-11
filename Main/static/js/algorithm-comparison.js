@@ -1,5 +1,5 @@
 // Algorithm Comparison Panel Functions
-// Handles side-by-side comparison of Google Maps, DHL, and HC2L routing algorithms
+// Handles side-by-side comparison of Google Maps, HERE API, DHL, and HC2L routing algorithms
 
 // Color scheme for algorithms
 const ALGORITHM_COLORS = {
@@ -8,6 +8,12 @@ const ALGORITHM_COLORS = {
         bg: '#FFF4ED',
         border: '#FF6B00',
         name: 'Google Maps'
+    },
+    here: {
+        primary: '#14B8A6',
+        bg: '#F0FDFA',
+        border: '#14B8A6',
+        name: 'HERE API'
     },
     dhl: {
         primary: '#8B5CF6',
@@ -26,6 +32,7 @@ const ALGORITHM_COLORS = {
 // Store comparison results
 window.comparisonResults = {
     google: null,
+    here: null,
     dhl: null,
     hc2l: null
 };
@@ -41,6 +48,7 @@ async function openComparisonPanel() {
         if (window.startLocation && window.destLocation) {
             // Auto-run comparison with all algorithms by default
             document.getElementById('compare-google').checked = true;
+            document.getElementById('compare-here').checked = true;
             document.getElementById('compare-dhl').checked = true;
             document.getElementById('compare-hc2l').checked = true;
 
@@ -102,6 +110,7 @@ function compareEntered(event) {
     const input = label.querySelector('input[type="checkbox"]');
     if (input) {
         if (input.id === 'compare-google') hoveredAlgo = 'google';
+        else if (input.id === 'compare-here') hoveredAlgo = 'here';
         else if (input.id === 'compare-dhl') hoveredAlgo = 'dhl';
         else if (input.id === 'compare-hc2l') hoveredAlgo = 'hc2l';
     }
@@ -148,10 +157,11 @@ async function runComparison() {
 
     // Get selected algorithms
     const compareGoogle = document.getElementById('compare-google')?.checked;
+    const compareHere = document.getElementById('compare-here')?.checked;
     const compareDHL = document.getElementById('compare-dhl')?.checked;
     const compareHC2L = document.getElementById('compare-hc2l')?.checked;
 
-    if (!compareGoogle && !compareDHL && !compareHC2L) {
+    if (!compareGoogle && !compareHere && !compareDHL && !compareHC2L) {
         showUpdateToast('Please select at least one algorithm', 'warning');
         return;
     }
@@ -164,7 +174,7 @@ async function runComparison() {
     showUpdateToast('Computing routes for comparison...', 'info');
 
     // Clear previous comparison results
-    window.comparisonResults = { google: null, dhl: null, hc2l: null };
+    window.comparisonResults = { google: null, here: null, dhl: null, hc2l: null };
     clearComparisonRoutes();
 
     // Compute routes in parallel (with is_comparison_mode=true to skip alternatives)
@@ -180,6 +190,20 @@ async function runComparison() {
                 .catch(err => {
                     console.error('❌ Google Maps route failed:', err);
                     window.comparisonResults.google = { error: err.message };
+                })
+        );
+    }
+
+    if (compareHere) {
+        promises.push(
+            computeHereRoute()
+                .then(result => {
+                    window.comparisonResults.here = result;
+                    console.log('✅ HERE API route computed');
+                })
+                .catch(err => {
+                    console.error('❌ HERE API route failed:', err);
+                    window.comparisonResults.here = { error: err.message };
                 })
         );
     }
@@ -249,6 +273,7 @@ function calculateComparisonMetrics() {
     // Extract coordinates from all routes
     const routes = {
         google: extractCoordinates(window.comparisonResults.google),
+        here: extractCoordinates(window.comparisonResults.here),
         dhl: extractCoordinates(window.comparisonResults.dhl),
         hc2l: extractCoordinates(window.comparisonResults.hc2l)
     };
@@ -260,8 +285,11 @@ function calculateComparisonMetrics() {
 
     // Calculate Fréchet Distance and Overlap between all pairs
     const algorithmPairs = [
+        ['google', 'here'],
         ['google', 'dhl'],
         ['google', 'hc2l'],
+        ['here', 'dhl'],
+        ['here', 'hc2l'],
         ['dhl', 'hc2l']
     ];
 
@@ -381,6 +409,7 @@ function buildComparisonTable() {
 
     const algorithms = [];
     if (window.comparisonResults.google) algorithms.push('google');
+    if (window.comparisonResults.here) algorithms.push('here');
     if (window.comparisonResults.dhl) algorithms.push('dhl');
     if (window.comparisonResults.hc2l) algorithms.push('hc2l');
 
@@ -504,14 +533,26 @@ function displayComparisonRoutesOnMap() {
     clearComparisonRoutes();
 
     // Draw each algorithm's route with its color
-    const algorithms = ['google', 'dhl', 'hc2l'];
+    const algorithms = ['google', 'here', 'dhl', 'hc2l'];
 
     algorithms.forEach(algo => {
         const result = window.comparisonResults[algo];
-        if (!result || !result.success || !result.route) return;
+        console.log(`🔍 Processing ${algo} route:`, result);
+        
+        if (!result || !result.success || !result.route) {
+            console.warn(`⚠️ Skipping ${algo} - missing result, success, or route`);
+            return;
+        }
 
         const color = ALGORITHM_COLORS[algo];
         const route = result.route;
+        
+        console.log(`🔍 ${algo} route data:`, {
+            polylines: route.polylines?.length,
+            coordinates: route.coordinates?.length,
+            firstCoord: route.coordinates?.[0],
+            polylineFirstCoord: route.polylines?.[0]?.[0]
+        });
 
         // Extract coordinates
         let coordinates = [];
@@ -541,6 +582,11 @@ function displayComparisonRoutesOnMap() {
                 }
             }
         }
+        
+        console.log(`🔍 ${algo} extracted ${coordinates.length} coordinates:`, {
+            first: coordinates[0],
+            last: coordinates[coordinates.length - 1]
+        });
 
         if (coordinates.length === 0) {
             console.warn(`No coordinates for ${algo} route`);
@@ -606,6 +652,7 @@ function buildRouteDetails() {
 
     const algorithms = [];
     if (window.comparisonResults.google) algorithms.push('google');
+    if (window.comparisonResults.here) algorithms.push('here');
     if (window.comparisonResults.dhl) algorithms.push('dhl');
     if (window.comparisonResults.hc2l) algorithms.push('hc2l');
 
@@ -718,6 +765,24 @@ function buildRouteDetails() {
                     </div>
                 </div>
             `;
+        } else if (algo === 'here' && result.metrics) {
+            detailHTML += `
+                <div class="border-t border-slate-300 mt-3 pt-3 space-y-2">
+                    <div class="text-xs font-bold text-slate-600 mb-2">HERE API Details</div>
+                    <div class="flex justify-between py-1">
+                        <span class="text-slate-600">Query Time:</span>
+                        <span class="font-bold">${result.metrics.query_time_ms?.toFixed(1) || 'N/A'} ms</span>
+                    </div>
+                    <div class="flex justify-between py-1">
+                        <span class="text-slate-600">Traffic Mode:</span>
+                        <span class="font-bold">${result.route?.traffic_mode || 'enabled'}</span>
+                    </div>
+                    <div class="flex justify-between py-1">
+                        <span class="text-slate-600">Route Sections:</span>
+                        <span class="font-bold">${result.route?.sections || 'N/A'}</span>
+                    </div>
+                </div>
+            `;
         }
 
         detailHTML += `
@@ -793,6 +858,79 @@ async function computeGoogleMapsRoute() {
         };
     } catch (error) {
         console.error('Google Maps route error:', error);
+        throw error;
+    }
+}
+
+// Compute HERE API route (wrapper)
+async function computeHereRoute() {
+    // Fetch route from HERE Routing API
+    // Returns structured format for comparison
+
+    if (!window.startLocation || !window.destLocation) {
+        throw new Error('Start and destination required');
+    }
+
+    try {
+        const startTime = performance.now(); // Track query time
+
+        console.log('📍 HERE API Request:', {
+            start: window.startLocation,
+            dest: window.destLocation
+        });
+
+        const response = await fetch('/get_here_route', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                start_lat: window.startLocation.lat,
+                start_lng: window.startLocation.lng,
+                dest_lat: window.destLocation.lat,
+                dest_lng: window.destLocation.lng,
+                traffic_mode: 'enabled'  // Use real-time traffic
+            })
+        });
+
+        const queryTime = performance.now() - startTime; // Calculate query time
+
+        const data = await response.json();
+        
+        console.log('📍 HERE API Response:', data);
+
+        if (!data.success) {
+            throw new Error(data.error || 'HERE API route failed');
+        }
+
+        // Extract route data from endpoint format
+        const routeData = data.route || {};
+        const distanceKm = (routeData.distance_meters || 0) / 1000;
+        
+        console.log('📍 HERE Route Data:', {
+            coordCount: routeData.coordinates?.length,
+            firstCoord: routeData.coordinates?.[0],
+            lastCoord: routeData.coordinates?.[routeData.coordinates?.length - 1],
+            distance: distanceKm
+        });
+
+        return {
+            success: true,
+            route: {
+                distance: distanceKm,
+                duration: routeData.duration_seconds || 0,
+                polylines: routeData.coordinates ? [routeData.coordinates] : [],
+                coordinates: routeData.coordinates || [],
+                traffic_mode: routeData.traffic_mode || 'enabled',
+                sections: routeData.sections || 0
+            },
+            metrics: {
+                distance: distanceKm,
+                duration: routeData.duration_seconds || 0,
+                segments: routeData.point_count || 0,
+                query_time_ms: queryTime
+            }
+        };
+    } catch (error) {
+        console.error('HERE API route error:', error);
         throw error;
     }
 }

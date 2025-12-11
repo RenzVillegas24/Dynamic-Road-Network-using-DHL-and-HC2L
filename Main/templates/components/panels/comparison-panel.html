@@ -30,6 +30,14 @@
             <span class="nav-select__title">Google Maps</span>
           </div>
         </label>
+        <label class="nav-select__option" data-color="teal" onmouseenter="compareEntered(event)" onmouseleave="compareLeft()">
+          <input type="checkbox" id="compare-here" class="nav-select__input" onclick="compareChanged()">
+          <div class="nav-select__icon"><i data-lucide="navigation" class="w-5 h-5"></i></div>
+          <div class="nav-select__content">
+            <span class="nav-select__title">HERE API</span>
+            <span class="nav-select__description">HERE Routing with Traffic</span>
+          </div>
+        </label>
         <label class="nav-select__option" data-color="purple" onmouseenter="compareEntered(event)" onmouseleave="compareLeft()">
           <input type="checkbox" id="compare-dhl" class="nav-select__input" checked onclick="compareChanged()">
           <div class="nav-select__icon"><i data-lucide="layers" class="w-5 h-5"></i></div>
@@ -79,6 +87,10 @@
         <div class="legend-item">
           <div class="legend-item__dot legend-item__dot--warning"></div>
           <span class="legend-item__label">Google Maps</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-item__dot legend-item__dot--success"></div>
+          <span class="legend-item__label">HERE API</span>
         </div>
         <div class="legend-item">
           <div class="legend-item__dot legend-item__dot--primary"></div>

@@ -148,8 +148,8 @@ window.populateRouteMetricsPanel = function(routeData) {
   
   const labelingSizeEl = document.getElementById('metrics-labeling-size');
   if (labelingSizeEl) {
-    const labelingSize = metrics.labeling_size_mb;
-    labelingSizeEl.textContent = labelingSize !== undefined ? `${labelingSize.toFixed(2)} MB` : '--';
+    const labelingSize = metrics.labeling_size_kb;
+    labelingSizeEl.textContent = labelingSize !== undefined ? `${labelingSize.toFixed(2)} KB` : '--';
   }
   
   // ===== ADDITIONAL FIELDS FROM C++ OUTPUT =====

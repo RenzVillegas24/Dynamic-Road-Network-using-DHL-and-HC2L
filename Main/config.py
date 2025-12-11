@@ -216,6 +216,7 @@ class Config:
     # ========================================================================
     
     GOOGLE_MAPS_API_KEY = os.getenv('GOOGLE_MAPS_API_KEY', '')
+    HERE_API_KEY = os.getenv('HERE_API_KEY', '')
     
     # ========================================================================
     # FLASK CONFIGURATION
@@ -336,6 +337,7 @@ class Config:
         
         summary.append("API KEYS:")
         summary.append(f"  Google Maps:   {'Set ✓' if cls.GOOGLE_MAPS_API_KEY else 'Not set ✗'}")
+        summary.append(f"  HERE API:      {'Set ✓' if os.getenv('HERE_API_KEY') else 'Not set ✗'}")
         summary.append("")
         
         summary.append("FLASK:")
