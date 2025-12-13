@@ -130,7 +130,7 @@ const PanelManager = (function () {
       id: 'demo-runner-panel',
       title: 'Demo Runner',
       icon: 'play-circle',
-      size: 'lg',
+      size: 'xl',
       isPassable: () => true
     },
     'demo-creator': {

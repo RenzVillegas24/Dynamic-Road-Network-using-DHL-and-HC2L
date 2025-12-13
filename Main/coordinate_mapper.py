@@ -22,16 +22,14 @@ def haversine(lon1, lat1, lon2, lat2):
     return c * r * 1000  # Return in meters
 
 class NodeMapper:
-    def __init__(self, nodes_csv_path, excluded_bbox: str = None):
+    def __init__(self, nodes_csv_path):
         """Load node coordinates from CSV
         
         Args:
             nodes_csv_path: Path to nodes CSV file
-            excluded_bbox: Optional bounding box to exclude from snapping as "min_lon,min_lat,max_lon,max_lat"
         """
         self.nodes_df = pd.read_csv(nodes_csv_path)
         self.nodes_csv_path = nodes_csv_path
-        self.excluded_bbox = excluded_bbox
         
         # Initialize snap cache to reduce repeated geometry calculations
         # Cache format: {rounded_coords: (result, timestamp)}
@@ -46,7 +44,7 @@ class NodeMapper:
             from osm_road_snapper import OSMRoadSnapper
             edges_csv_path = nodes_csv_path.replace('nodes.csv', 'edges.csv')
             if os.path.exists(edges_csv_path):
-                self.osm_snapper = OSMRoadSnapper(edges_csv_path, nodes_csv_path, excluded_bbox=excluded_bbox)
+                self.osm_snapper = OSMRoadSnapper(edges_csv_path, nodes_csv_path)
                 logger.success("OSM road-aware snapping enabled (CSV-based)")
             else:
                 logger.warning(f"Edges CSV file not found at {edges_csv_path}")

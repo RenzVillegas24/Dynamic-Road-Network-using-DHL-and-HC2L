@@ -388,3 +388,170 @@
  #api-console-output::-webkit-scrollbar-corner {
    background: #1e1e1e;
  }
+
+ /* ============================================================================
+    Appendix Tables Styles
+    ============================================================================ */
+
+ .appendix-tab-content {
+   min-height: 300px;
+ }
+
+ .appendix-table {
+   width: 100%;
+   border-collapse: collapse;
+   font-size: 0.875rem;
+   background: white;
+   border-radius: 0.5rem;
+   overflow: hidden;
+ }
+
+ .appendix-table thead {
+   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+   color: white;
+ }
+
+ .appendix-table thead th {
+   padding: 0.75rem 1rem;
+   text-align: center;
+   font-weight: 600;
+   font-size: 0.875rem;
+   border-right: 1px solid rgba(255, 255, 255, 0.2);
+ }
+
+ .appendix-table thead th:last-child {
+   border-right: none;
+ }
+
+ .appendix-table tbody tr {
+   border-bottom: 1px solid #e5e7eb;
+ }
+
+ .appendix-table tbody tr:last-child {
+   border-bottom: none;
+ }
+
+ .appendix-table tbody tr:hover {
+   background-color: #f9fafb;
+ }
+
+ .appendix-table tbody td {
+   padding: 0.75rem 1rem;
+   text-align: center;
+   color: #374151;
+ }
+
+ .appendix-table tbody td.text-left {
+   text-align: left;
+ }
+
+ .appendix-table tbody td.font-semibold {
+   font-weight: 600;
+   color: #1f2937;
+ }
+
+ .appendix-table .metric-label {
+   font-weight: 500;
+   color: #4b5563;
+ }
+
+ .appendix-table .metric-value {
+   font-weight: 600;
+ }
+
+ .appendix-table .improvement-positive {
+   color: #059669;
+   font-weight: 600;
+ }
+
+ .appendix-table .improvement-negative {
+   color: #dc2626;
+   font-weight: 600;
+ }
+
+ .appendix-table .rating-excellent {
+   background: #d1fae5;
+   color: #065f46;
+   padding: 0.25rem 0.5rem;
+   border-radius: 0.375rem;
+   font-weight: 600;
+   display: inline-block;
+ }
+
+ .appendix-table .rating-good {
+   background: #dbeafe;
+   color: #1e40af;
+   padding: 0.25rem 0.5rem;
+   border-radius: 0.375rem;
+   font-weight: 600;
+   display: inline-block;
+ }
+
+ .appendix-table .rating-fair {
+   background: #fef3c7;
+   color: #92400e;
+   padding: 0.25rem 0.5rem;
+   border-radius: 0.375rem;
+   font-weight: 600;
+   display: inline-block;
+ }
+
+ .appendix-table .rating-fail {
+   background: #fee2e2;
+   color: #991b1b;
+   padding: 0.25rem 0.5rem;
+   border-radius: 0.375rem;
+   font-weight: 600;
+   display: inline-block;
+ }
+
+ .appendix-table .batch-header {
+   background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+   font-weight: 600;
+   color: #1f2937;
+ }
+
+ .appendix-table .trial-header {
+   background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+   font-weight: 600;
+   color: #1e40af;
+ }
+
+ .appendix-table .averages-row {
+   background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+   font-weight: 600;
+   color: #92400e;
+ }
+
+ .appendix-table .std-dev-row {
+   background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%);
+   font-weight: 500;
+   color: #6b21a8;
+   font-size: 0.8125rem;
+ }
+
+ .appendix-summary-card {
+   background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+   border: 1px solid #bfdbfe;
+   border-radius: 0.75rem;
+   padding: 1rem;
+   margin-bottom: 1rem;
+ }
+
+ .appendix-summary-card h5 {
+   font-size: 0.875rem;
+   font-weight: 600;
+   color: #1e40af;
+   margin-bottom: 0.5rem;
+ }
+
+ .appendix-summary-card ul {
+   list-style: disc;
+   padding-left: 1.5rem;
+   font-size: 0.8125rem;
+   color: #1e3a8a;
+ }
+
+ .appendix-summary-card ul li {
+   margin-bottom: 0.25rem;
+ }

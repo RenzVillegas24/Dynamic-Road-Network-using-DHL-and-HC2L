@@ -48,6 +48,15 @@ const DemoRunner = {
         incidents: []
     },
 
+    // Lazy disruption loading system
+    disruptionCache: new Map(),  // Cache for loaded disruptions
+    disruptionBuffer: [],        // Buffer of pre-loaded disruptions
+    disruptionGenerationQueue: [], // Queue of disruptions to generate
+    isGeneratingDisruptions: false,
+    disruptionBufferSize: 10,    // Number of disruptions to keep ready
+    currentDisruptionIndex: -1,
+    totalDisruptionsNeeded: 0,
+
     // Detailed progress tracking
     currentProgress: {
         trial: 0,
@@ -300,51 +309,33 @@ const DemoRunner = {
     },
 
     showStopConfirmation() {
-        // Create modal overlay
-        const overlay = document.createElement('div');
-        overlay.id = 'demo-stop-modal';
-        overlay.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-[100]';
-        overlay.innerHTML = `
-            <div class="bg-white rounded-2xl p-6 max-w-md mx-4 shadow-2xl">
-                <div class="flex items-center gap-3 mb-4">
-                    <div class="bg-amber-100 p-3 rounded-full">
-                        <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                        </svg>
-                    </div>
-                    <h3 class="text-lg font-bold text-gray-800">Demo Running</h3>
-                </div>
-                <p class="text-gray-600 mb-6">A demo is currently running. Do you want to stop it and close?</p>
-                <div class="flex gap-3">
-                    <button id="demo-stop-cancel" class="flex-1 py-2 px-4 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-xl transition-colors">
-                        Continue Demo
-                    </button>
-                    <button id="demo-stop-confirm" class="flex-1 py-2 px-4 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl transition-colors">
-                        Stop & Close
-                    </button>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(overlay);
+        // Get the modal element
+        const modal = document.getElementById('demo-stop-modal');
+        if (!modal) return;
+
+        // Show the modal
+        modal.classList.remove('hidden');
+
+        // Setup event listeners (using once:true to auto-cleanup)
+        const cancelBtn = document.getElementById('demo-stop-cancel');
+        const confirmBtn = document.getElementById('demo-stop-confirm');
+
+        const hideModal = () => modal.classList.add('hidden');
 
         // Handle cancel
-        document.getElementById('demo-stop-cancel').addEventListener('click', () => {
-            overlay.remove();
-        });
+        cancelBtn.addEventListener('click', hideModal, { once: true });
 
         // Handle confirm
-        document.getElementById('demo-stop-confirm').addEventListener('click', () => {
+        confirmBtn.addEventListener('click', () => {
             this.stopDemo();
-            overlay.remove();
+            hideModal();
             this.forceClosePanel();
-        });
+        }, { once: true });
 
         // Close on overlay click
-        overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) {
-                overlay.remove();
-            }
-        });
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) hideModal();
+        }, { once: true });
     },
 
     disableAdminToggles() {
@@ -630,56 +621,66 @@ const DemoRunner = {
         const container = document.getElementById('saved-configs-list');
         if (!container) return;
 
-        // Filter out experiment configs (isExperiment: true) from the list
+        // Filter out experiment configs
         const displayConfigs = this.savedConfigs.filter(config => !config.isExperiment);
 
+        // Clear container
+        container.innerHTML = '';
+
+        // Show empty state if no configs
         if (displayConfigs.length === 0) {
-            container.innerHTML = `
-                <div class="empty-state text-center py-8">
-                    <div class="empty-state__icon text-muted mb-2">
-                        <i data-lucide="folder-open" class="w-12 h-12 mx-auto opacity-50"></i>
-                    </div>
-                    <p class="text-sm text-muted">No saved configurations</p>
-                    <p class="text-xs text-muted mt-1">Create a custom demo to save it here</p>
-                </div>
-            `;
-            lucide.createIcons();
+            const emptyTemplate = document.getElementById('template-empty-configs');
+            if (emptyTemplate) {
+                const emptyState = emptyTemplate.content.cloneNode(true);
+                container.appendChild(emptyState);
+                lucide.createIcons();
+            }
             return;
         }
 
+        // Get config card template
+        const template = document.getElementById('template-config-card');
+        if (!template) return;
+
         const isRunning = (typeof DemoCreator !== 'undefined' && DemoCreator.isRunning);
-        container.innerHTML = displayConfigs.map(config => `
-            <div class="card card--bordered p-4 hover:border-purple-300 hover:shadow-md transition-all">
-                <div class="flex items-start justify-between mb-2">
-                    <div class="flex-1 min-w-0">
-                        <h4 class="font-bold text-gray-800 truncate">${config.name || 'Unnamed Demo'}</h4>
-                        <p class="text-xs text-muted">${new Date(config.savedAt).toLocaleDateString()}</p>
-                    </div>
-                    <div class="flex gap-1">
-                        <button onclick="DemoRunner.editConfig('${config.id}')" 
-                                data-panel="demo-creator"
-                                class="btn btn--ghost btn--sm p-1.5 ${isRunning ? 'opacity-50 cursor-not-allowed' : ''}" ${isRunning ? 'disabled' : ''} title="Edit">
-                            <i data-lucide="pencil" class="w-4 h-4 text-blue-500"></i>
-                        </button>
-            <button onclick="DemoRunner.deleteConfig('${config.id}')" 
-                class="btn btn--ghost btn--sm p-1.5 ${isRunning ? 'opacity-50 cursor-not-allowed' : ''}" ${isRunning ? 'disabled' : ''} title="Delete">
-                            <i data-lucide="x" class="w-4 h-4 text-red-500"></i>
-                        </button>
-                    </div>
-                </div>
-                <div class="flex flex-wrap items-center gap-2 text-xs mb-3">
-                    <span class="badge badge--info">${config.routes?.length || 0} routes</span>
-                    <span class="badge badge--purple">${config.routes?.[0]?.trials?.length || 1} trials</span>
-                    <span class="badge badge--warning">${config.algorithm?.toUpperCase() || 'HC2L'}</span>
-                </div>
-        <button onclick="DemoRunner.runSavedConfig('${config.id}')" 
-            class="btn btn--primary btn--block ${isRunning ? 'opacity-50 cursor-not-allowed' : ''}" ${isRunning ? 'disabled' : ''}>
-                    <i data-lucide="play" class="w-4 h-4"></i> Run Demo
-                </button>
-            </div>
-        `).join('');
+
+        // Render each config using template
+        displayConfigs.forEach(config => {
+            const card = template.content.cloneNode(true);
+            
+            // Populate card data
+            card.querySelector('[data-config-name]').textContent = config.name || 'Unnamed Demo';
+            card.querySelector('[data-config-date]').textContent = new Date(config.savedAt).toLocaleDateString();
+            card.querySelector('[data-config-routes]').textContent = `${config.routes?.length || 0} routes`;
+            card.querySelector('[data-config-trials]').textContent = `${config.routes?.[0]?.trials?.length || 1} trials`;
+            card.querySelector('[data-config-algorithm]').textContent = config.algorithm?.toUpperCase() || 'HC2L';
+            
+            // Setup button handlers
+            const editBtn = card.querySelector('[data-config-edit]');
+            const deleteBtn = card.querySelector('[data-config-delete]');
+            const runBtn = card.querySelector('[data-config-run]');
+            
+            // Disable buttons if demo is running
+            if (isRunning) {
+                [editBtn, deleteBtn, runBtn].forEach(btn => {
+                    btn.classList.add('opacity-50', 'cursor-not-allowed');
+                    btn.disabled = true;
+                });
+            } else {
+                editBtn.addEventListener('click', () => {
+                    this.editConfig(config.id);
+                    document.querySelector('[data-panel="demo-creator"]')?.click();
+                });
+                deleteBtn.addEventListener('click', () => this.deleteConfig(config.id));
+                runBtn.addEventListener('click', () => this.runSavedConfig(config.id));
+            }
+            
+            container.appendChild(card);
+        });
+
         lucide.createIcons();
-        // Update tab badge count (excluding experiment configs)
+        
+        // Update tab badge count
         const badge = document.getElementById('tab-badge-configs');
         if (badge) badge.textContent = `${displayConfigs.length}`;
     },
@@ -729,17 +730,15 @@ const DemoRunner = {
         const container = document.getElementById('saved-results-list');
         if (!container) return;
 
+        // Clear previous content
+        container.innerHTML = '';
+
         if (this.savedResults.length === 0) {
-            container.innerHTML = `
-                <div class="empty-state text-center py-6">
-                    <div class="empty-state__icon text-muted mb-2">
-                        <i data-lucide="bar-chart-2" class="w-10 h-10 mx-auto opacity-50"></i>
-                    </div>
-                    <p class="text-sm text-muted">No saved results yet</p>
-                    <p class="text-xs text-muted mt-1">Run a demo and save results to see them here</p>
-                </div>
-            `;
-            lucide.createIcons();
+            const emptyTemplate = document.getElementById('template-empty-saved-results');
+            if (emptyTemplate) {
+                container.appendChild(emptyTemplate.content.cloneNode(true));
+                lucide.createIcons();
+            }
             return;
         }
 
@@ -757,18 +756,22 @@ const DemoRunner = {
             grouped[groupKey].results.push(result);
         });
 
-        // Render grouped results
-        let html = '';
+        // Create groups using template
+        const groupTemplate = document.getElementById('template-result-group');
+        const cardTemplate = document.getElementById('template-saved-result-card');
+
+        if (!groupTemplate || !cardTemplate) return;
+
         Object.entries(grouped).forEach(([key, group]) => {
-            html += `
-                <div class="mb-4">
-                    <div class="flex items-center gap-2 mb-2 pb-1 border-b border-gray-200">
-                        <i data-lucide="folder" class="w-4 h-4 text-muted"></i>
-                        <span class="text-sm font-semibold">${group.name}</span>
-                        <span class="badge badge--secondary badge--sm">${group.results.length} run${group.results.length !== 1 ? 's' : ''}</span>
-                    </div>
-                    <div class="space-y-2 pl-2">
-                        ${group.results.map((result, idx) => {
+            // Clone and populate group
+            const groupNode = groupTemplate.content.cloneNode(true);
+            groupNode.querySelector('[data-group-name]').textContent = group.name;
+            groupNode.querySelector('[data-result-count]').textContent = `${group.results.length} run${group.results.length !== 1 ? 's' : ''}`;
+
+            const resultsContainer = groupNode.querySelector('[data-results-container]');
+
+            // Add result cards to this group
+            group.results.forEach(result => {
                 const savedDate = result.savedAt ? new Date(result.savedAt) : null;
                 const dateStr = savedDate ? savedDate.toLocaleDateString() : 'Unknown';
                 const timeStr = savedDate ? savedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
@@ -788,29 +791,47 @@ const DemoRunner = {
                 if (algos.hc2l > 0) algoStr.push(`<span class="text-blue-600">${algos.hc2l}</span>`);
                 if (algos.dhl > 0) algoStr.push(`<span class="text-green-600">${algos.dhl}</span>`);
 
-                return `
-                                <div class="card card--flat p-3 hover:border-indigo-300 hover:bg-indigo-50/30 transition-all cursor-pointer"
-                                     onclick="DemoRunner.viewSavedResult('${result.filePath.replace(/'/g, "\\'")}')">
-                                    <div class="flex items-center justify-between mb-1">
-                                        <span class="text-xs text-muted">${dateStr} ${timeStr}</span>
-                                        <span class="badge badge--info badge--sm">${result.totalRoutes || 0} routes</span>
-                                    </div>
-                                    <div class="flex flex-wrap gap-2 text-xs">
-                                        ${summary.trialsCompleted ? `<span class="badge badge--primary badge--sm"><i data-lucide="repeat" class="w-3 h-3 inline"></i> ${summary.trialsCompleted}</span>` : ''}
-                                        <span class="badge badge--purple badge--sm"><i data-lucide="clock" class="w-3 h-3 inline"></i> ${durationStr}</span>
-                                        <span class="badge badge--warning badge--sm"><i data-lucide="zap" class="w-3 h-3 inline"></i> ${processTimeStr}</span>
-                                        ${algoStr.length > 0 ? `<span class="badge badge--secondary badge--sm">${algoStr.join(' / ')}</span>` : ''}
-                                    </div>
-                                </div>
-                            `;
-            }).join('')}
-                    </div>
-                </div>
-            `;
+                // Clone result card
+                const cardNode = cardTemplate.content.cloneNode(true);
+                
+                // Populate card fields
+                cardNode.querySelector('[data-save-date]').textContent = `${dateStr} ${timeStr}`;
+                cardNode.querySelector('[data-route-count]').textContent = `${result.totalRoutes || 0} routes`;
+                cardNode.querySelector('[data-duration]').textContent = durationStr;
+                cardNode.querySelector('[data-process-time]').textContent = processTimeStr;
+
+                // Show/hide trials badge
+                if (summary.trialsCompleted) {
+                    const trialsBadge = cardNode.querySelector('[data-trials-badge]');
+                    trialsBadge.style.display = 'inline-block';
+                    cardNode.querySelector('[data-trials-count]').textContent = summary.trialsCompleted;
+                } else {
+                    cardNode.querySelector('[data-trials-badge]').style.display = 'none';
+                }
+
+                // Show/hide algorithm breakdown
+                if (algoStr.length > 0) {
+                    const algoBadge = cardNode.querySelector('[data-algo-badge]');
+                    algoBadge.style.display = 'inline-block';
+                    cardNode.querySelector('[data-algo-breakdown]').innerHTML = algoStr.join(' / ');
+                } else {
+                    cardNode.querySelector('[data-algo-badge]').style.display = 'none';
+                }
+
+                // Add click handler
+                const cardElement = cardNode.querySelector('.card');
+                cardElement.addEventListener('click', () => {
+                    this.viewSavedResult(result.filePath);
+                });
+
+                resultsContainer.appendChild(cardNode);
+            });
+
+            container.appendChild(groupNode);
         });
 
-        container.innerHTML = html;
         lucide.createIcons();
+
         // Update tab badge count for results
         const badge = document.getElementById('tab-badge-results');
         if (badge) badge.textContent = `${this.savedResults.length}`;
@@ -1341,6 +1362,247 @@ const DemoRunner = {
         }
     },
 
+    // ==========================================================================
+    // LAZY DISRUPTION LOADING SYSTEM
+    // ==========================================================================
+
+    /**
+     * Initialize lazy disruption system
+     */
+    initLazyDisruptionSystem(configId, totalDisruptions, disruptionSettings) {
+        this.disruptionCache.clear();
+        this.disruptionBuffer = [];
+        this.disruptionGenerationQueue = [];
+        this.isGeneratingDisruptions = false;
+        this.currentDisruptionIndex = -1;
+        this.totalDisruptionsNeeded = totalDisruptions;
+        this.disruptionConfigId = configId;
+        this.disruptionSettings = disruptionSettings;
+        
+        console.log(`🔧 Initialized lazy disruption system: ${totalDisruptions} disruptions needed`);
+    },
+
+    /**
+     * Check if a disruption file exists on the server
+     */
+    async checkDisruptionFileExists(configId, setKey) {
+        try {
+            const response = await fetch(`/api/demo/disruptions/${configId}/${setKey}/exists`);
+            const result = await response.json();
+            return result.exists || false;
+        } catch (e) {
+            return false;
+        }
+    },
+
+    /**
+     * Load a single disruption set from file or generate if not exists
+     */
+    async loadOrGenerateDisruption(queryIndex) {
+        const setKey = `set_query_${queryIndex}`;
+        const configId = this.disruptionConfigId;
+
+        // Check cache first
+        if (this.disruptionCache.has(setKey)) {
+            console.log(`✅ Using cached disruption: ${setKey}`);
+            return this.disruptionCache.get(setKey);
+        }
+
+        // Try to load from file
+        const exists = await this.checkDisruptionFileExists(configId, setKey);
+        
+        if (exists) {
+            console.log(`📂 Loading disruption from file: ${setKey}`);
+            try {
+                const response = await fetch(`/api/demo/disruptions/${configId}/${setKey}`);
+                const result = await response.json();
+                
+                if (result.success && result.disruptions) {
+                    const disruptionData = this.normalizeDisruptionData({
+                        flow: result.disruptions.flow || [],
+                        incidents: result.disruptions.incidents || []
+                    });
+                    
+                    // Cache it
+                    this.disruptionCache.set(setKey, disruptionData);
+                    console.log(`✅ Loaded and cached disruption: ${setKey}`);
+                    return disruptionData;
+                }
+            } catch (e) {
+                console.warn(`Failed to load disruption ${setKey}, will generate:`, e);
+            }
+        }
+
+        // Generate new disruption
+        console.log(`🎲 Generating disruption: ${setKey}`);
+        const { ratioFlow, ratioIncident, severityMin, severityMax, disruptionsPerBatch } = this.disruptionSettings;
+        const total = ratioFlow + ratioIncident;
+        const flowCount = Math.round((ratioFlow / total) * disruptionsPerBatch);
+        const incidentCount = disruptionsPerBatch - flowCount;
+
+        try {
+            const response = await fetch('/api/demo/random_edges', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    flow_count: flowCount,
+                    incident_count: incidentCount,
+                    severity_min: severityMin,
+                    severity_max: severityMax
+                })
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                const disruptionData = this.normalizeDisruptionData({
+                    flow: result.flow || [],
+                    incidents: result.incidents || []
+                });
+
+                // Save to file for future use
+                await this.saveDisruptionToFile(configId, setKey, disruptionData);
+
+                // Cache it
+                this.disruptionCache.set(setKey, disruptionData);
+                console.log(`🎲 Generated and cached disruption: ${setKey}`);
+                return disruptionData;
+            }
+        } catch (e) {
+            console.error(`Failed to generate disruption ${setKey}:`, e);
+        }
+
+        return { flow: [], incidents: [] };
+    },
+
+    /**
+     * Normalize disruption data to standard format
+     * Handles both CSV format (from loading) and API format (from generation)
+     */
+    normalizeDisruptionData(disruptionData) {
+        return {
+            flow: (disruptionData.flow || []).map(item => ({
+                id_hash: item.id_hash || '',
+                source: parseInt(item.source || 0),
+                target: parseInt(item.target || 0),
+                source_lat: parseFloat(item.source_lat || 0),
+                source_lon: parseFloat(item.source_lon || 0),
+                target_lat: parseFloat(item.target_lat || 0),
+                target_lon: parseFloat(item.target_lon || 0),
+                speed_kph: parseFloat(item.flow_speed_kph || item.speed_kph || 30),
+                free_flow_kph: parseFloat(item.flow_free_flow_kph || item.free_flow_kph || 60),
+                jam_factor: parseFloat(item.flow_jam_factor || item.jam_factor || 5),
+                flow_confidence: parseFloat(item.flow_confidence || 0.95),
+                flow_traversability: item.flow_traversability || 'open',
+                highway_type: item.highway_type || 'primary',
+                road_name: item.road_name || 'Unknown Road',
+                type: 'flow'
+            })),
+            incidents: (disruptionData.incidents || []).map(item => ({
+                incident_id: item.incident_id || '',
+                source: parseInt(item.source || 0),
+                target: parseInt(item.target || 0),
+                source_lat: parseFloat(item.source_lat || 0),
+                source_lon: parseFloat(item.source_lon || 0),
+                target_lat: parseFloat(item.target_lat || 0),
+                target_lon: parseFloat(item.target_lon || 0),
+                type: item.incident_type || item.type || 'accident',
+                criticality: item.incident_criticality || item.criticality || 'minor',
+                incident_description: item.incident_description || '',
+                road_closed: this.parseBoolean(item.incident_road_closed || item.road_closed || false),
+                incident_start_time: item.incident_start_time || '',
+                incident_end_time: item.incident_end_time || '',
+                highway_type: item.highway_type || 'primary',
+                road_name: item.road_name || 'Unknown Road',
+                is_incident: true
+            }))
+        };
+    },
+
+    /**
+     * Parse boolean values from various formats
+     */
+    parseBoolean(value) {
+        if (typeof value === 'boolean') return value;
+        if (typeof value === 'string') return value.toLowerCase() === 'true';
+        return !!value;
+    },
+
+    /**
+     * Save a disruption set to file
+     */
+    async saveDisruptionToFile(configId, setKey, disruptionData) {
+        try {
+            const response = await fetch(`/api/demo/disruptions/${configId}/${setKey}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    disruptions: disruptionData
+                })
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                console.log(`💾 Saved disruption to file: ${setKey}`);
+                return true;
+            }
+        } catch (e) {
+            console.warn(`Failed to save disruption ${setKey}:`, e);
+        }
+        return false;
+    },
+
+    /**
+     * Prefetch disruptions ahead of current position (background task)
+     */
+    async prefetchDisruptions(startIndex, count) {
+        if (this.isGeneratingDisruptions) return;
+        
+        this.isGeneratingDisruptions = true;
+        const endIndex = Math.min(startIndex + count, this.totalDisruptionsNeeded);
+        
+        console.log(`🔄 Prefetching disruptions ${startIndex} to ${endIndex - 1}`);
+        
+        for (let i = startIndex; i < endIndex; i++) {
+            if (!this.isRunning) break;
+            
+            const setKey = `set_query_${i}`;
+            if (!this.disruptionCache.has(setKey)) {
+                await this.loadOrGenerateDisruption(i);
+            }
+        }
+        
+        this.isGeneratingDisruptions = false;
+    },
+
+    /**
+     * Get disruption for a specific query index (with automatic prefetching)
+     */
+    async getDisruptionForQuery(queryIndex) {
+        const setKey = `set_query_${queryIndex}`;
+        
+        // Start prefetching next batch in background
+        const nextPrefetchStart = queryIndex + 1;
+        if (nextPrefetchStart < this.totalDisruptionsNeeded && !this.isGeneratingDisruptions) {
+            // Don't await - let it run in background
+            this.prefetchDisruptions(nextPrefetchStart, this.disruptionBufferSize);
+        }
+
+        // Get current disruption (this will wait if needed)
+        return await this.loadOrGenerateDisruption(queryIndex);
+    },
+
+    /**
+     * Clear disruption cache and reset system
+     */
+    clearDisruptionCache() {
+        this.disruptionCache.clear();
+        this.disruptionBuffer = [];
+        this.disruptionGenerationQueue = [];
+        this.isGeneratingDisruptions = false;
+        this.currentDisruptionIndex = -1;
+        console.log('🧹 Cleared disruption cache');
+    },
+
     /**
      * Start the thesis experiment
      * Uses the same save mechanism as Demo Creator:
@@ -1379,7 +1641,9 @@ const DemoRunner = {
             let routes = null;
             let existingConfig = null;
             const trials = 3; // Fixed 3 trials
-            const batchSize = 1000; // Fixed 1000 routes
+            const batchesPerTrial = 3; // Fixed 3 batches per trial
+            const disruptionsPerBatch = 1000; // Fixed 1000 disruptions per batch
+            const queriesPerBatch = 1000; // Fixed 1000 queries per batch
 
             // Determine if we're using random mode (temporary config needed)
             const isRandomRoutes = routeSettings.mode === 'random';
@@ -1427,121 +1691,63 @@ const DemoRunner = {
                 throw new Error('Failed to load/generate routes');
             }
 
-            // Handle disruptions
-            let needNewDisruptions = isRandomDisruptions;
-            let disruptionSets = {};
+            // Handle disruptions - Initialize Lazy Loading System
             let disruptionKeyToUse = null;
 
             if (isRandomDisruptions) {
-                // Generate new disruptions for temporary config
-                this.updateLoadingStatus('Generating random disruptions...');
-                
-                const { ratioFlow, ratioIncident, severityMin, severityMax } = disruptionSettings;
-                const total = ratioFlow + ratioIncident;
-                const flowCount = Math.round((ratioFlow / total) * batchSize);
-                const incidentCount = batchSize - flowCount;
-                
-                console.log(`🎲 Generating disruptions: ${flowCount} flow + ${incidentCount} incidents per route (temporary)`);
-                
-                for (let i = 0; i < routes.length; i++) {
-                    this.updateLoadingStatus(`Generating disruptions: ${i}/${routes.length} routes...`);
-
-                    try {
-                        const response = await fetch('/api/demo/random_edges', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                flow_count: flowCount,
-                                incident_count: incidentCount,
-                                severity_min: severityMin,
-                                severity_max: severityMax
-                            })
-                        });
-
-                        const result = await response.json();
-                        if (result.success) {
-                            disruptionSets[`set_route_${i}`] = {
-                                flow: result.flow || [],
-                                incidents: result.incidents || []
-                            };
-                        }
-                    } catch (e) {
-                        console.warn(`Failed to generate disruptions for route ${i}:`, e);
-                    }
-                }
-                console.log(`🎲 Generated ${Object.keys(disruptionSets).length} disruption sets (temporary)`);
-                disruptionKeyToUse = tempConfigName;  // Use temp folder for disruptions
-                needNewDisruptions = true;
-            } else if (existingConfig?.disruptions?.savedSets) {
-                // Use existing preset disruptions
-                const savedSetKeys = Object.keys(existingConfig.disruptions.savedSets);
-                if (savedSetKeys.length >= routes.length) {
-                    console.log(`📂 Using ${savedSetKeys.length} preset disruption sets from ExperimentMode`);
-                    disruptionKeyToUse = this.experimentConfigName;  // Point to preset disruptions
-                    needNewDisruptions = false;
-                } else {
-                    console.log(`⚠️ Mismatch: ${savedSetKeys.length} saved sets but ${routes.length} routes`);
-                    throw new Error(`Preset has ${savedSetKeys.length} disruption sets but need ${routes.length}. Please regenerate preset.`);
-                }
+                // Random mode: use temporary config for disruptions
+                disruptionKeyToUse = tempConfigName;
+                console.log(`🎲 Random mode: disruptions will be generated lazily (temporary config)`);
             } else {
-                // No preset disruptions exist, generate new for preset
-                this.updateLoadingStatus('Generating disruptions for preset...');
-                
-                const { ratioFlow, ratioIncident, severityMin, severityMax } = disruptionSettings;
-                const total = ratioFlow + ratioIncident;
-                const flowCount = Math.round((ratioFlow / total) * batchSize);
-                const incidentCount = batchSize - flowCount;
-                
-                for (let i = 0; i < routes.length; i++) {
-                    this.updateLoadingStatus(`Generating disruptions: ${i}/${routes.length} routes...`);
-
-                    try {
-                        const response = await fetch('/api/demo/random_edges', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                flow_count: flowCount,
-                                incident_count: incidentCount,
-                                severity_min: severityMin,
-                                severity_max: severityMax
-                            })
-                        });
-
-                        const result = await response.json();
-                        if (result.success) {
-                            disruptionSets[`set_route_${i}`] = {
-                                flow: result.flow || [],
-                                incidents: result.incidents || []
-                            };
-                        }
-                    } catch (e) {
-                        console.warn(`Failed to generate disruptions for route ${i}:`, e);
-                    }
-                }
-                console.log(`🎲 Generated ${Object.keys(disruptionSets).length} disruption sets (for preset)`);
+                // Preset mode: use main experiment config for disruptions
                 disruptionKeyToUse = this.experimentConfigName;
-                needNewDisruptions = true;
+                console.log(`📂 Preset mode: disruptions will be loaded lazily from ExperimentMode`);
             }
 
-            // Build routes with trials
-            const routesWithTrials = routes.map((r, routeIdx) => {
+            // Calculate total queries for all batches
+            const totalQueries = queriesPerBatch * batchesPerTrial;
+
+            // Initialize lazy disruption loading system
+            const { ratioFlow, ratioIncident, severityMin, severityMax } = disruptionSettings;
+            this.initLazyDisruptionSystem(disruptionKeyToUse, totalQueries, {
+                ratioFlow,
+                ratioIncident,
+                severityMin,
+                severityMax,
+                disruptionsPerBatch
+            });
+            
+            this.updateLoadingStatus('Disruption system initialized (lazy loading enabled)');
+
+            // Build routes with trials and batches
+            // For experiment mode: generate routes for each batch
+            const routesWithTrials = [];
+            
+            for (let queryIdx = 0; queryIdx < totalQueries; queryIdx++) {
+                // Cycle through available routes
+                const r = routes[queryIdx % routes.length];
+                const batchNum = Math.floor(queryIdx / queriesPerBatch) + 1;
+                
                 const baseRoute = {
-                    id: r.id || `exp-route-${routeIdx}`,
+                    id: `exp-query-${queryIdx}`,
+                    batchId: batchNum,
+                    queryId: queryIdx,
                     start: r.start || { lat: r.sourceCoords?.lat, lng: r.sourceCoords?.lng, name: r.sourceName || 'Unknown' },
                     end: r.end || { lat: r.targetCoords?.lat, lng: r.targetCoords?.lng, name: r.targetName || 'Unknown' }
                 };
 
                 const trialsArray = [];
                 for (let t = 0; t < trials; t++) {
-                    const tau = this.generateExperimentTau(tauSettings, t, routeIdx, routes.length);
+                    const tau = this.generateExperimentTau(tauSettings, t, queryIdx, totalQueries);
                     trialsArray.push({
                         tau: parseFloat(tau.toFixed(3)),
-                        disruption: `set_route_${routeIdx}`
+                        batchId: batchNum,
+                        disruption: `set_query_${queryIdx}`
                     });
                 }
 
-                return { ...baseRoute, trials: trialsArray };
-            });
+                routesWithTrials.push({ ...baseRoute, trials: trialsArray });
+            }
 
             // Determine which config ID to use
             const configId = needsTempConfig ? tempConfigName : this.experimentConfigName;
@@ -1552,26 +1758,26 @@ const DemoRunner = {
                 name: needsTempConfig ? `Experiment (Temporary ${tempTimestamp})` : this.experimentConfigName,
                 isExperiment: true,
                 isTemporary: needsTempConfig,  // Mark as temporary for cleanup
+                batchesPerTrial: batchesPerTrial,
+                disruptionsPerBatch: disruptionsPerBatch,
+                queriesPerBatch: queriesPerBatch,
                 routes: routesWithTrials,
                 settings: {
                     algorithm: 'both',
                     trials: trials,
+                    batchesPerTrial: batchesPerTrial,
                     stepDelay: 100
                 },
                 tau: tauSettings,
                 disruptions: {
                     mode: 'random-both',
-                    scope: 'per-route',
+                    scope: 'per-query',
                     flowCount: disruptionSettings.ratioFlow,
                     incidentCount: disruptionSettings.ratioIncident,
                     severityMin: disruptionSettings.severityMin,
-                    severityMax: disruptionSettings.severityMax,
-                    // Only include disruption sets if we're generating new ones
-                    disruptionSets: needNewDisruptions ? disruptionSets : undefined,
-                    // If using preset disruptions, reference them via savedSets
-                    savedSets: !needNewDisruptions && existingConfig?.disruptions?.savedSets 
-                        ? existingConfig.disruptions.savedSets 
-                        : undefined
+                    severityMax: disruptionSettings.severityMax
+                    // Lazy loading: disruptions are loaded/generated on demand
+                    // No need to store disruption sets in config
                 },
                 disruptionKey: disruptionKeyToUse
             };
@@ -1604,8 +1810,8 @@ const DemoRunner = {
                     // Cleanup temporary config after demo completes (success or error)
                     await this.deleteTemporaryExperimentConfig(tempConfigName);
                 }
-            } else if (needNewDisruptions || !existingConfig) {
-                // Save to preset (first time setup or regenerating preset)
+            } else if (!existingConfig) {
+                // Save to preset (first time setup)
                 this.updateLoadingStatus('Saving experiment preset...');
                 
                 const saveResponse = await fetch('/api/demo/configs', {
@@ -1619,14 +1825,14 @@ const DemoRunner = {
                     throw new Error('Failed to save preset config: ' + saveResult.error);
                 }
 
-                console.log('✅ Saved/Updated preset config:', saveResult.config?.id);
+                console.log('✅ Saved preset config:', saveResult.config?.id);
                 
                 this.hideLoadingAnimation();
                 this.showTab('running');
                 await this.runDemo(saveResult.config);
             } else {
-                // Use existing preset directly (no changes)
-                console.log('✅ Using existing preset config as-is');
+                // Use existing preset directly (no changes needed)
+                console.log('✅ Using existing preset config');
                 this.hideLoadingAnimation();
                 this.showTab('running');
                 await this.runDemo(existingConfig);
@@ -1747,6 +1953,8 @@ const DemoRunner = {
         const routes = config.routes || [];
         const algorithm = config.settings?.algorithm || config.algorithm || 'hc2l';
         const stepDelay = config.settings?.stepDelay || config.stepDelay || 2000;
+        const batchesPerTrial = config.batchesPerTrial || config.settings?.batchesPerTrial || 1;
+        const queriesPerBatch = config.queriesPerBatch || 1000;
 
         // Store algorithm in config for processRouteWithProgress
         config.algorithm = algorithm;
@@ -1761,8 +1969,11 @@ const DemoRunner = {
         this.currentProgress = {
             trial: 0,
             totalTrials: trials,
+            batch: 0,
+            totalBatches: batchesPerTrial,
             route: 0,
             totalRoutes: routes.length,
+            queriesPerBatch: queriesPerBatch,
             tauIndex: 0,
             totalTaus: 0,
             algorithm: '',
@@ -1846,7 +2057,7 @@ const DemoRunner = {
                     await this.setupDemoDisruptions(config, `${this.currentDemoId}_${trialKey}`, trialKey);
                 }
 
-                // Process each route
+                // Process each route (which includes batch information)
                 for (let i = 0; i < routes.length; i++) {
                     if (!this.isRunning) break;
                     while (this.isPaused) {
@@ -1855,7 +2066,12 @@ const DemoRunner = {
 
                     const route = routes[i];
                     this.currentProgress.route = i + 1;
-                    this.currentProgress.status = `Setting up route ${i + 1}...`;
+                    
+                    // Update batch tracking for display
+                    const currentBatch = route.batchId || Math.floor(i / queriesPerBatch) + 1;
+                    this.currentProgress.batch = currentBatch;
+                    
+                    this.currentProgress.status = `Trial ${trial + 1}, Batch ${currentBatch}, Query ${i + 1}/${routes.length}`;
                     this.updateDetailedProgressUI();
 
                     // Generate disruptions for this trial-route if per-trial-route scope (only if not using config-saved)
@@ -2124,17 +2340,15 @@ const DemoRunner = {
     /**
      * Activate a disruption set by its key directly
      * Used when route.trials[trial].disruption.setKey is available
-     * @param {string} setKey - The disruption set key (e.g., 'set_trial_0_route_1')
+     * Now uses lazy loading - will fetch/generate disruption on demand
+     * @param {string} setKey - The disruption set key (e.g., 'set_query_0')
      */
     async activateDisruptionSetByKey(setKey) {
-        if (!this.disruptionSets) {
-            console.warn(`⚠️ No disruption sets loaded, cannot activate ${setKey}`);
-            return;
-        }
-
-        const disruptionSet = this.disruptionSets[setKey];
-        if (disruptionSet) {
-            this.demoDisruptionDir = disruptionSet.disruptionDir;
+        // Check if this disruption set was already loaded (has absolute path)
+        if (this.disruptionSets && this.disruptionSets[setKey]) {
+            // Use the pre-loaded disruption set with absolute path
+            const disruptionSet = this.disruptionSets[setKey];
+            this.demoDisruptionDir = disruptionSet.disruptionDir;  // Absolute path
             window.demoDisruptionDir = disruptionSet.disruptionDir;
 
             // Convert API format to display format
@@ -2145,28 +2359,122 @@ const DemoRunner = {
                     source_lng: d.source_lon || d.source_lng,
                     target_lng: d.target_lon || d.target_lng,
                     incident_type: d.type || d.incident_type || 'Incident',
-                    severity: TrafficUtils.getSeverityFromCriticality(d.criticality, d.road_closed)
+                    type: d.type || d.incident_type || 'Incident',
+                    severity: TrafficUtils.getSeverityFromCriticality(d.criticality || d.incident_criticality, d.road_closed || d.incident_road_closed)
                 })),
                 flowSegments: (disruptions.flow || []).map(d => ({
                     ...d,
                     source_lng: d.source_lon || d.source_lng,
                     target_lng: d.target_lon || d.target_lng,
                     incident_type: 'Congestion',
-                    severity: TrafficUtils.getSeverityFromJamFactor(d.jam_factor, d.road_closed),
-                    current_speed: d.speed_kph,
-                    free_flow_speed: d.free_flow_kph
+                    type: 'Congestion',
+                    severity: TrafficUtils.getSeverityFromJamFactor(d.jam_factor || d.flow_jam_factor, d.road_closed),
+                    current_speed: d.speed_kph || d.flow_speed_kph,
+                    free_flow_speed: d.free_flow_kph || d.flow_free_flow_kph,
+                    jam_factor: d.jam_factor || d.flow_jam_factor
                 }))
             };
 
-            console.log(`🔄 Activated disruption set by key: ${setKey}`);
+            console.log(`🔄 Activated pre-loaded disruption set: ${setKey}`);
+            console.log(`   Disruption dir: ${this.demoDisruptionDir}`);
             console.log(`   Incidents: ${this.generatedDisruptions.incidents.length}, Flow: ${this.generatedDisruptions.flowSegments.length}`);
 
             this.currentPreviewSet = setKey;
-            await this.refreshDisruptionDisplay();  // Respect checkbox states
+            await this.refreshDisruptionDisplay();
             this.showDisruptionSetsPreview();
-        } else {
-            console.warn(`⚠️ Disruption set not found for key: ${setKey}`);
+            return;
         }
+
+        // Fall back to lazy loading for experiment mode (set_query_N format)
+        const match = setKey.match(/set_query_(\d+)/);
+        if (!match) {
+            console.warn(`⚠️ Invalid setKey format: ${setKey}, expected 'set_query_N' or pre-loaded set`);
+            return;
+        }
+
+        const queryIndex = parseInt(match[1]);
+        
+        // Use lazy loading to get disruption
+        const disruptionData = await this.getDisruptionForQuery(queryIndex);
+        
+        if (!disruptionData || (!disruptionData.flow || disruptionData.flow.length === 0 && !disruptionData.incidents || disruptionData.incidents.length === 0)) {
+            console.warn(`⚠️ No disruption data for ${setKey}`);
+            return;
+        }
+
+        // For experiment mode: request absolute path from backend
+        // Build absolute path from base directory and config ID
+        try {
+            const response = await fetch(`/api/demo/disruption-path/${this.disruptionConfigId}/${setKey}`);
+            const result = await response.json();
+            if (result.success && result.disruption_dir) {
+                this.demoDisruptionDir = result.disruption_dir;  // Absolute path from backend
+                window.demoDisruptionDir = result.disruption_dir;
+                console.log(`📍 Using absolute disruption path: ${result.disruption_dir}`);
+            } else {
+                // Fallback to relative path (will fail on C++ API but maintains backward compatibility)
+                console.warn(`⚠️ Could not get absolute path, using relative: disruptions/${this.disruptionConfigId}`);
+                this.demoDisruptionDir = `disruptions/${this.disruptionConfigId}`;
+                window.demoDisruptionDir = this.demoDisruptionDir;
+            }
+        } catch (error) {
+            // Fallback to relative path if API call fails
+            console.warn(`⚠️ Error getting absolute path:`, error);
+            this.demoDisruptionDir = `disruptions/${this.disruptionConfigId}`;
+            window.demoDisruptionDir = this.demoDisruptionDir;
+        }
+
+        // Convert to display format for the map renderer
+        this.generatedDisruptions = {
+            incidents: (disruptionData.incidents || []).map(d => ({
+                incident_id: d.incident_id || d.incident_id || '',
+                source: d.source,
+                target: d.target,
+                source_lat: d.source_lat,
+                source_lon: d.source_lon,
+                target_lat: d.target_lat,
+                target_lon: d.target_lon,
+                source_lng: d.source_lon,
+                target_lng: d.target_lon,
+                incident_type: d.type || d.incident_type || 'Incident',
+                type: d.type || d.incident_type || 'Incident',
+                criticality: d.criticality || d.incident_criticality || 'minor',
+                incident_criticality: d.criticality || d.incident_criticality || 'minor',
+                road_closed: d.road_closed || false,
+                incident_road_closed: d.road_closed || false,
+                severity: TrafficUtils.getSeverityFromCriticality(d.criticality || d.incident_criticality, d.road_closed || false),
+                highway_type: d.highway_type || 'primary',
+                road_name: d.road_name || 'Unknown Road'
+            })),
+            flowSegments: (disruptionData.flow || []).map(d => ({
+                id_hash: d.id_hash || '',
+                source: d.source,
+                target: d.target,
+                source_lat: d.source_lat,
+                source_lon: d.source_lon,
+                target_lat: d.target_lat,
+                target_lon: d.target_lon,
+                source_lng: d.source_lon,
+                target_lng: d.target_lon,
+                incident_type: 'Congestion',
+                type: 'Congestion',
+                jam_factor: d.jam_factor || d.flow_jam_factor || 5,
+                severity: TrafficUtils.getSeverityFromJamFactor(d.jam_factor || d.flow_jam_factor, d.road_closed || false),
+                current_speed: d.speed_kph || d.flow_speed_kph || 30,
+                speed_kph: d.speed_kph || d.flow_speed_kph || 30,
+                free_flow_speed: d.free_flow_kph || d.flow_free_flow_kph || 60,
+                free_flow_kph: d.free_flow_kph || d.flow_free_flow_kph || 60,
+                highway_type: d.highway_type || 'primary',
+                road_name: d.road_name || 'Unknown Road'
+            }))
+        };
+
+        console.log(`🔄 Activated disruption set (lazy loaded): ${setKey}`);
+        console.log(`   Incidents: ${this.generatedDisruptions.incidents.length}, Flow: ${this.generatedDisruptions.flowSegments.length}`);
+
+        this.currentPreviewSet = setKey;
+        await this.refreshDisruptionDisplay();  // Respect checkbox states
+        this.showDisruptionSetsPreview();
     },
 
     /**
@@ -2393,7 +2701,8 @@ const DemoRunner = {
                 const processTimeMs = calcEndTime - calcStartTime;
 
                 // Capture result directly from API response - no need to wait for DOM
-                const result = this.captureResultFromAPIResponse(algo, effectiveTau, route, trialIndex, processTimeMs, routeData);
+                const batchId = route.batchId || null;
+                const result = this.captureResultFromAPIResponse(algo, effectiveTau, route, trialIndex, processTimeMs, routeData, batchId);
                 if (result) {
                     console.log(`✅ Captured ${algo.toUpperCase()} result from API:`, {
                         distance: result.metrics.displayDistance,
@@ -2453,9 +2762,10 @@ const DemoRunner = {
      * @param {number} trialIndex - Current trial index
      * @param {number} processTimeMs - Time taken for the API call
      * @param {Object} routeData - Direct API response from computeRouteBasedOnSelection
+     * @param {number} batchId - Batch ID (1, 2, or 3 for experiment mode)
      * @returns {Object|null} Captured result object
      */
-    captureResultFromAPIResponse(algorithm, tau, route, trialIndex, processTimeMs, routeData) {
+    captureResultFromAPIResponse(algorithm, tau, route, trialIndex, processTimeMs, routeData, batchId = null) {
         try {
             if (!routeData || !routeData.success) {
                 console.warn('⚠️ Route computation failed or returned no data');
@@ -2474,6 +2784,7 @@ const DemoRunner = {
 
             const result = {
                 trial: trialIndex + 1,
+                batchId: batchId,
                 route: `${route.start.name} → ${route.end.name}`,
                 algorithm: algorithm.toUpperCase(),
                 tau: tau,
@@ -2881,179 +3192,128 @@ const DemoRunner = {
         const p = this.currentProgress;
         const overallProgress = this.calculateOverallProgress();
 
-        // Helper function to render metric if exists
-        const renderMetric = (label, value, colorClass = 'text-gray-800') => {
-            if (!value) return '';
-            return `<div class="flex justify-between py-1 px-2 bg-gray-50 rounded border border-gray-100">
-                <span class="text-gray-600 text-xs font-medium">${label}:</span>
-                <span class="font-semibold text-xs ${colorClass}">${value}</span>
-            </div>`;
-        };
+        // Initialize skeleton if needed
+        if (!container.querySelector('#progress-config-name')) {
+            const skeleton = document.getElementById('template-progress-skeleton');
+            if (skeleton) {
+                container.innerHTML = '';
+                container.appendChild(skeleton.content.cloneNode(true));
+                lucide.createIcons();
+            }
+        }
 
-        container.innerHTML = `
-            <div class="space-y-3">
-                <!-- Demo Name & Status Card -->
-                <div class="section-card section-card--primary">
-                    <div class="section-card__header">
-                        <div class="section-card__icon section-card__icon--primary">
-                            <i data-lucide="activity" class="w-5 h-5"></i>
-                        </div>
-                        <div>
-                            <h3 class="section-card__title">${p.configName || 'Demo'}</h3>
-                            <p class="text-xs text-gray-600 mt-1">${p.status || 'Initializing...'}</p>
-                        </div>
-                    </div>
-                    <div class="section-card__body">
-                        <!-- Overall Progress -->
-                        <div class="flex justify-between mb-3">
-                            <span class="text-xs font-semibold text-gray-700">Overall Progress</span>
-                            <span class="text-xs font-bold text-primary">${overallProgress.toFixed(1)}%</span>
-                        </div>
-                        <div class="h-3 bg-gray-200 rounded-full overflow-hidden mb-4">
-                            <div class="h-full bg-gradient-to-r from-blue-400 to-blue-600 transition-all duration-500 ease-out rounded-full"
-                                 style="width: ${Math.max(overallProgress, 2)}%"></div>
-                        </div>
+        // Update basic progress information
+        const nameEl = document.getElementById('progress-config-name');
+        const statusEl = document.getElementById('progress-status');
+        const percentEl = document.getElementById('progress-percentage');
+        const barEl = document.getElementById('progress-bar');
+        
+        if (nameEl) nameEl.textContent = p.configName || 'Demo';
+        if (statusEl) statusEl.textContent = p.status || 'Initializing...';
+        if (percentEl) percentEl.textContent = `${overallProgress.toFixed(1)}%`;
+        if (barEl) barEl.style.width = `${Math.max(overallProgress, 2)}%`;
 
-                        <!-- Trial/Route/Algorithm Progress -->
-                        <div class="flex gap-2">
-                            <div class="flex flex-col items-center p-2 rounded-lg bg-blue-50 border border-blue-200 flex-1">
-                                <i data-lucide="repeat" class="w-4 h-4 text-blue-600 mb-1"></i>
-                                <div class="text-sm text-blue-600 font-semibold uppercase">Trial</div>
-                                <div class="text-lg font-bold text-blue-800">${p.trial}/${p.totalTrials}</div>
-                            </div>
-                            <div class="flex flex-col items-center p-2 rounded-lg bg-emerald-50 border border-emerald-200 flex-1">
-                                <i data-lucide="navigation" class="w-4 h-4 text-emerald-600 mb-1"></i>
-                                <div class="text-sm text-emerald-600 font-semibold uppercase">Route</div>
-                                <div class="text-lg font-bold text-emerald-800">${p.route}/${p.totalRoutes}</div>
-                            </div>
-                            <div class="flex flex-col items-center p-2 rounded-lg bg-violet-50 border border-violet-200 flex-1">
-                                <i data-lucide="cpu" class="w-4 h-4 text-violet-600 mb-1"></i>
-                                <div class="text-sm text-violet-600 font-semibold uppercase">Algorithm</div>
-                                <div class="text-lg font-bold text-violet-800">${p.algorithm || '-'}</div>
-                            </div>
-                            ${(p.algorithm || '').toUpperCase() !== 'DHL' ? `
-                            <div class="flex flex-col items-center p-2 rounded-lg bg-rose-50 border border-rose-200 flex-1">
-                                <i data-lucide="sliders" class="w-4 h-4 text-rose-600 mb-1"></i>
-                                <div class="text-sm text-rose-600 font-semibold uppercase">Threshold</div>
-                                <div class="text-lg font-bold text-rose-800">${p.currentTau ? p.currentTau.toFixed(2) : '-'}</div>
-                            </div>
-                            ` : ''}
-                        </div>
-                    </div>
-                </div>
+        // Update progress counters
+        const trialEl = document.getElementById('progress-trial');
+        const routeEl = document.getElementById('progress-route');
+        const algoEl = document.getElementById('progress-algorithm');
+        const tauEl = document.getElementById('progress-tau');
+        const tauContainer = document.getElementById('progress-tau-container');
+        
+        if (trialEl) trialEl.textContent = `${p.trial}/${p.totalTrials}`;
+        if (routeEl) routeEl.textContent = `${p.route}/${p.totalRoutes}`;
+        if (algoEl) algoEl.textContent = p.algorithm || '-';
+        
+        // Show/hide tau based on algorithm
+        const isDHL = (p.algorithm || '').toUpperCase() === 'DHL';
+        if (tauContainer) {
+            tauContainer.classList.toggle('hidden', isDHL);
+        }
+        if (tauEl && !isDHL) {
+            tauEl.textContent = p.currentTau ? p.currentTau.toFixed(2) : '-';
+        }
 
-                <!-- Last Result Card -->
-                ${p.lastResult ? `
-                <div class="section-card section-card--slate">
-                    <div class="section-card__header">
-                        <div class="section-card__icon section-card__icon--success">
-                            <i data-lucide="check-circle-2" class="w-5 h-5"></i>
-                        </div>
-                        <div>
-                            <h4 class="section-card__title">Last Result</h4>
-                            <p class="text-xs text-gray-600 mt-1">${p.lastResult.route}</p>
-                        </div>
-                    </div>
-                    <div class="section-card__body">
-                        <div class="grid grid-cols-2 gap-2">
-                            ${renderMetric('Algorithm', p.lastResult.algorithm, 'text-blue-700')}
-                            ${(p.lastResult.algorithm || '').toUpperCase() !== 'DHL' ? renderMetric('τ Value', p.lastResult.tau.toFixed(2), 'text-rose-700') : ''}
-                            ${renderMetric('Query Time', p.lastResult.metrics.queryTime, 'text-purple-700')}
-                            ${renderMetric('Distance', p.lastResult.metrics.displayDistance || p.lastResult.metrics.calculatedDistance || p.lastResult.metrics.distance, 'text-green-700')}
-                            ${renderMetric('Baseline ETA', p.lastResult.metrics.baselineEta, 'text-emerald-700')}
-                            ${renderMetric('Actual ETA', p.lastResult.metrics.displayEta || p.lastResult.metrics.actualEta, 'text-orange-700')}
-                            ${renderMetric('Time Impact', p.lastResult.metrics.timeImpact, 'text-red-700')}
-                            ${renderMetric('Disrupted Edges', p.lastResult.metrics.disruptedEdges, 'text-indigo-700')}
-                        </div>
-                    </div>
-                </div>
-                ` : ''}
+        // Update last result section
+        const lastResultCard = document.getElementById('progress-last-result');
+        if (p.lastResult && lastResultCard) {
+            lastResultCard.classList.remove('hidden');
+            
+            const routeEl = document.getElementById('last-result-route');
+            if (routeEl) routeEl.textContent = p.lastResult.route;
+            
+            // Build metrics HTML
+            const metricsContainer = document.getElementById('last-result-metrics');
+            if (metricsContainer) {
+                metricsContainer.innerHTML = '';
+                
+                const metrics = [
+                    { label: 'Algorithm', value: p.lastResult.algorithm, color: 'text-blue-700' },
+                    { label: 'τ Value', value: !isDHL ? p.lastResult.tau.toFixed(2) : null, color: 'text-rose-700' },
+                    { label: 'Query Time', value: p.lastResult.metrics.queryTime, color: 'text-purple-700' },
+                    { label: 'Distance', value: p.lastResult.metrics.displayDistance || p.lastResult.metrics.calculatedDistance || p.lastResult.metrics.distance, color: 'text-green-700' },
+                    { label: 'Baseline ETA', value: p.lastResult.metrics.baselineEta, color: 'text-emerald-700' },
+                    { label: 'Actual ETA', value: p.lastResult.metrics.displayEta || p.lastResult.metrics.actualEta, color: 'text-orange-700' },
+                    { label: 'Time Impact', value: p.lastResult.metrics.timeImpact, color: 'text-red-700' },
+                    { label: 'Disrupted Edges', value: p.lastResult.metrics.disruptedEdges, color: 'text-indigo-700' }
+                ];
+                
+                metrics.forEach(m => {
+                    if (m.value) {
+                        const metricEl = document.createElement('div');
+                        metricEl.className = 'flex justify-between py-1 px-2 bg-gray-50 rounded border border-gray-100';
+                        metricEl.innerHTML = `
+                            <span class="text-gray-600 text-xs font-medium">${m.label}:</span>
+                            <span class="font-semibold text-xs ${m.color}">${m.value}</span>
+                        `;
+                        metricsContainer.appendChild(metricEl);
+                    }
+                });
+            }
+        } else if (lastResultCard) {
+            lastResultCard.classList.add('hidden');
+        }
 
-                <!-- Update Phase Card -->
-                ${p.lastResult ? `
-                <div class="section-card section-card--warning">
-                    <div class="section-card__header">
-                        <div class="section-card__icon section-card__icon--warning">
-                            <i data-lucide="refresh-cw" class="w-5 h-5"></i>
+        // Update results history
+        const historyCard = document.getElementById('progress-results-history');
+        if (p.results && p.results.length > 0 && historyCard) {
+            historyCard.classList.remove('hidden');
+            
+            const countEl = document.getElementById('progress-history-count');
+            if (countEl) countEl.textContent = `${p.results.length} total`;
+            
+            const listEl = document.getElementById('progress-history-list');
+            if (listEl) {
+                listEl.innerHTML = '';
+                p.results.slice().reverse().forEach((r, i) => {
+                    const itemEl = document.createElement('div');
+                    itemEl.className = `text-xs p-2 ${i === 0 ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-100'} rounded border`;
+                    
+                    const distance = r.metrics.displayDistance || r.metrics.calculatedDistance || r.metrics.distance || 'N/A';
+                    const eta = r.metrics.displayEta || r.metrics.actualEta || 'N/A';
+                    const queryTime = r.metrics.queryTime || 'N/A';
+                    
+                    itemEl.innerHTML = `
+                        <div class="flex justify-between items-center">
+                            <span class="font-semibold text-gray-800">${r.algorithm}${(r.algorithm || '').toUpperCase() !== 'DHL' ? ` τ=${r.tau.toFixed(2)}` : ''}</span>
+                            <span class="text-gray-500 text-[10px]">T${r.trial}</span>
                         </div>
-                        <h4 class="section-card__title">Update Phase</h4>
-                        ${p.lastResult.metrics.updateStrategy ? `<span class="badge badge--warning">${p.lastResult.metrics.updateStrategy}</span>` : ''}
-                    </div>
-                    <div class="section-card__body">
-                        <div class="grid grid-cols-2 gap-2">
-                            ${renderMetric('Lazy Update Time', p.lastResult.metrics.lazyUpdateTime || p.lastResult.metrics.lazyRepairTime || '0.000 ms', 'text-amber-700')}
-                            ${renderMetric('Update Strategy', p.lastResult.metrics.updateStrategy ? p.lastResult.metrics.updateStrategy.replace('_', ' ') : 'N/A', 'text-orange-700')}
-                            ${renderMetric('Peak Label Size', p.lastResult.metrics.peakLabelSize || p.lastResult.metrics.labelingSize || 'N/A', 'text-yellow-700')}
-                            ${renderMetric('Nodes Repaired', p.lastResult.metrics.nodesRepaired !== null && p.lastResult.metrics.nodesRepaired !== undefined ? p.lastResult.metrics.nodesRepaired : 'N/A', 'text-amber-600')}
-                            ${renderMetric('Dirty Nodes', p.lastResult.metrics.dirtyNodes || (p.lastResult.metrics.dirtyNodesMarked !== null ? `${p.lastResult.metrics.dirtyNodesMarked} nodes` : 'N/A'), 'text-orange-600')}
-                            ${renderMetric('Impact Score', p.lastResult.metrics.impactScore || 'N/A', 'text-red-600')}
+                        <div class="text-gray-600 truncate text-[10px]">${r.route}</div>
+                        <div class="flex gap-2 mt-1 text-[10px] flex-wrap">
+                            ${distance !== 'N/A' ? `<span class="flex items-center gap-1 text-green-600"><i data-lucide="map-pin" class="w-3 h-3"></i> ${distance}</span>` : ''}
+                            ${eta !== 'N/A' ? `<span class="flex items-center gap-1 text-orange-600"><i data-lucide="clock" class="w-3 h-3"></i> ${eta}</span>` : ''}
+                            ${queryTime !== 'N/A' ? `<span class="flex items-center gap-1 text-purple-600"><i data-lucide="zap" class="w-3 h-3"></i> ${queryTime}</span>` : ''}
                         </div>
-                    </div>
-                </div>
-                ` : ''}
+                    `;
+                    listEl.appendChild(itemEl);
+                });
+            }
+        } else if (historyCard) {
+            historyCard.classList.add('hidden');
+        }
 
-                <!-- Query Phase Card -->
-                ${p.lastResult ? (() => {
-                // Calculate query phase statistics from accumulated results for the current algorithm
-                const currentAlgo = p.lastResult.algorithm;
-                const queryStats = this.calculateQueryPhaseStats(p.results, currentAlgo);
-                return `
-                <div class="section-card section-card--info">
-                    <div class="section-card__header">
-                        <div class="section-card__icon section-card__icon--info">
-                            <i data-lucide="zap" class="w-5 h-5"></i>
-                        </div>
-                        <h4 class="section-card__title">Query Phase</h4>
-                        <span class="badge badge--info">${currentAlgo || 'All'}</span>
-                    </div>
-                    <div class="section-card__body">
-                        <div class="grid grid-cols-2 gap-2">
-                            ${renderMetric('Avg Query Time', queryStats.avgQueryTime || p.lastResult.metrics.queryTime || 'N/A', 'text-blue-700')}
-                            ${renderMetric('Std Dev', queryStats.queryTimeStdDev || 'N/A', 'text-violet-700')}
-                            ${renderMetric('Min Query Time', queryStats.minQueryTime || 'N/A', 'text-indigo-600')}
-                            ${renderMetric('Max Query Time', queryStats.maxQueryTime || 'N/A', 'text-purple-600')}
-                            ${renderMetric('P95 Latency', queryStats.p95Latency || 'N/A', 'text-fuchsia-600')}
-                            ${renderMetric('Queries Count', queryStats.queriesCount || 1, 'text-pink-600')}
-                        </div>
-                    </div>
-                </div>
-                `;
-            })() : ''}
-
-                <!-- Results History Card -->
-                ${p.results && p.results.length > 0 ? `
-                <div class="section-card section-card--primary">
-                    <div class="section-card__header">
-                        <div class="section-card__icon section-card__icon--primary">
-                            <i data-lucide="history" class="w-5 h-5"></i>
-                        </div>
-                        <h4 class="section-card__title">Results History</h4>
-                        <span class="badge badge--primary">${p.results.length} total</span>
-                    </div>
-                    <div class="section-card__body">
-                        <div class="space-y-2">
-                            ${p.results.slice().reverse().map((r, i) => `
-                                <div class="text-xs p-2 ${i === 0 ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-100'} rounded border">
-                                    <div class="flex justify-between items-center">
-                                        <span class="font-semibold text-gray-800">${r.algorithm}${(r.algorithm || '').toUpperCase() !== 'DHL' ? ` τ=${r.tau.toFixed(2)}` : ''}</span>
-                                        <span class="text-gray-500 text-[10px]">T${r.trial}</span>
-                                    </div>
-                                    <div class="text-gray-600 truncate text-[10px]">${r.route}</div>
-                                    <div class="flex gap-2 mt-1 text-[10px] flex-wrap">
-                                        ${r.metrics.displayDistance || r.metrics.calculatedDistance || r.metrics.distance ? `<span class="flex items-center gap-1 text-green-600"><i data-lucide="map-pin" class="w-3 h-3"></i> ${r.metrics.displayDistance || r.metrics.calculatedDistance || r.metrics.distance}</span>` : ''}
-                                        ${r.metrics.displayEta || r.metrics.actualEta ? `<span class="flex items-center gap-1 text-orange-600"><i data-lucide="clock" class="w-3 h-3"></i> ${r.metrics.displayEta || r.metrics.actualEta}</span>` : ''}
-                                        ${r.metrics.queryTime ? `<span class="flex items-center gap-1 text-purple-600"><i data-lucide="zap" class="w-3 h-3"></i> ${r.metrics.queryTime}</span>` : ''}
-                                        ${r.metrics.pathLength ? `<span class="flex items-center gap-1 text-cyan-600"><i data-lucide="route" class="w-3 h-3"></i> ${r.metrics.pathLength}</span>` : ''}
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                </div>
-                ` : ''}
-            </div>
-        `;
+        lucide.createIcons();
     },
+
 
     calculateOverallProgress() {
         const p = this.currentProgress;
@@ -3625,66 +3885,95 @@ const DemoRunner = {
         const incidents = this.generatedDisruptions.incidents || [];
 
         if (flow.length === 0 && incidents.length === 0) {
-            return `<div class="text-xs text-gray-500 text-center py-2">No disruptions loaded</div>`;
+            const emptyTemplate = document.getElementById('template-no-disruptions');
+            if (emptyTemplate) {
+                return emptyTemplate.content.cloneNode(true).firstElementChild.outerHTML;
+            }
+            return '<div class="text-xs text-gray-500 text-center py-2">No disruptions loaded</div>';
         }
 
-        let html = '';
+        // Create a container for building the HTML
+        const container = document.createElement('div');
 
-        // Flow disruptions
+        const flowTemplate = document.getElementById('template-flow-disruption');
+        const incidentTemplate = document.getElementById('template-incident-disruption');
+
+        // Add flow disruptions
         if (flow.length > 0) {
-            html += `<div class="flex items-center gap-2 text-xs font-semibold text-orange-600 mb-2">
-                <i data-lucide="traffic-cone" class="w-4 h-4"></i>
-                <span>Traffic Flow (${flow.length})</span>
-            </div>`;
-            html += `<div class="space-y-1 mb-3">`;
+            const flowHeader = document.createElement('div');
+            flowHeader.className = 'flex items-center gap-2 text-xs font-semibold text-orange-600 mb-2';
+            flowHeader.innerHTML = '<i data-lucide="traffic-cone" class="w-4 h-4"></i><span>Traffic Flow (' + flow.length + ')</span>';
+            container.appendChild(flowHeader);
+
+            const flowContainer = document.createElement('div');
+            flowContainer.className = 'space-y-1 mb-3';
+
             flow.slice(0, 10).forEach((f, i) => {
+                if (!flowTemplate) return;
                 const jamFactor = parseFloat(f.jam_factor) || 0;
                 const severityColor = TrafficUtils.getSeverityTextClass(jamFactor);
-                html += `
-                    <div class="flex items-center justify-between bg-orange-50 rounded-lg px-3 py-2 text-xs cursor-pointer hover:bg-orange-100 border border-orange-200 transition-colors"
-                         onclick="DemoRunner.focusDisruption('flow', ${i})">
-                        <div class="flex items-center gap-2 flex-1 min-w-0">
-                            <i data-lucide="car" class="w-3 h-3 text-orange-600 flex-shrink-0"></i>
-                            <span class="truncate text-gray-700">${f.road_name || 'Unknown Road'}</span>
-                        </div>
-                        <span class="${severityColor} font-semibold ml-2 flex-shrink-0">JF: ${jamFactor.toFixed(1)}</span>
-                    </div>
-                `;
+
+                const node = flowTemplate.content.cloneNode(true);
+                const item = node.querySelector('div[class*="flex items-center"]');
+                
+                item.querySelector('[data-road-name]').textContent = f.road_name || 'Unknown Road';
+                const jamEl = item.querySelector('[data-jam-factor]');
+                jamEl.textContent = 'JF: ' + jamFactor.toFixed(1);
+                jamEl.className = severityColor + ' font-semibold ml-2 flex-shrink-0';
+                
+                item.addEventListener('click', () => this.focusDisruption('flow', i));
+                flowContainer.appendChild(item);
             });
+
             if (flow.length > 10) {
-                html += `<div class="text-xs text-gray-400 text-center py-1">+${flow.length - 10} more...</div>`;
+                const moreText = document.createElement('div');
+                moreText.className = 'text-xs text-gray-400 text-center py-1';
+                moreText.textContent = '+' + (flow.length - 10) + ' more...';
+                flowContainer.appendChild(moreText);
             }
-            html += `</div>`;
+
+            container.appendChild(flowContainer);
         }
 
-        // Incidents
+        // Add incidents
         if (incidents.length > 0) {
-            html += `<div class="flex items-center gap-2 text-xs font-semibold text-red-600 mb-2">
-                <i data-lucide="alert-triangle" class="w-4 h-4"></i>
-                <span>Incidents (${incidents.length})</span>
-            </div>`;
-            html += `<div class="space-y-1 mb-3">`;
+            const incidentHeader = document.createElement('div');
+            incidentHeader.className = 'flex items-center gap-2 text-xs font-semibold text-red-600 mb-2';
+            incidentHeader.innerHTML = '<i data-lucide="alert-triangle" class="w-4 h-4"></i><span>Incidents (' + incidents.length + ')</span>';
+            container.appendChild(incidentHeader);
+
+            const incidentContainer = document.createElement('div');
+            incidentContainer.className = 'space-y-1 mb-3';
+
             incidents.slice(0, 10).forEach((inc, i) => {
+                if (!incidentTemplate) return;
                 const criticality = (inc.criticality || inc.incident_criticality || 'minor').toLowerCase();
                 const critColor = criticality === 'critical' ? 'text-red-700' : criticality === 'major' ? 'text-red-500' : 'text-amber-600';
-                html += `
-                    <div class="flex items-center justify-between bg-red-50 rounded-lg px-3 py-2 text-xs cursor-pointer hover:bg-red-100 border border-red-200 transition-colors"
-                         onclick="DemoRunner.focusDisruption('incident', ${i})">
-                        <div class="flex items-center gap-2 flex-1 min-w-0">
-                            <i data-lucide="zap" class="w-3 h-3 text-red-600 flex-shrink-0"></i>
-                            <span class="truncate text-gray-700">${inc.road_name || 'Unknown Road'}</span>
-                        </div>
-                        <span class="${critColor} font-semibold ml-2 flex-shrink-0">${inc.incident_type || inc.type || 'Incident'}</span>
-                    </div>
-                `;
+
+                const node = incidentTemplate.content.cloneNode(true);
+                const item = node.querySelector('div[class*="flex items-center"]');
+                
+                item.querySelector('[data-road-name]').textContent = inc.road_name || 'Unknown Road';
+                const typeEl = item.querySelector('[data-incident-type]');
+                typeEl.textContent = inc.incident_type || inc.type || 'Incident';
+                typeEl.className = critColor + ' font-semibold ml-2 flex-shrink-0';
+                
+                item.addEventListener('click', () => this.focusDisruption('incident', i));
+                incidentContainer.appendChild(item);
             });
+
             if (incidents.length > 10) {
-                html += `<div class="text-xs text-gray-400 text-center py-1">+${incidents.length - 10} more...</div>`;
+                const moreText = document.createElement('div');
+                moreText.className = 'text-xs text-gray-400 text-center py-1';
+                moreText.textContent = '+' + (incidents.length - 10) + ' more...';
+                incidentContainer.appendChild(moreText);
             }
-            html += `</div>`;
+
+            container.appendChild(incidentContainer);
         }
 
-        return html;
+        lucide.createIcons();
+        return container.innerHTML;
     },
 
     /**
@@ -4015,6 +4304,60 @@ const DemoRunner = {
     // RESULTS SUMMARY
     // ==========================================================================
 
+    /**
+     * Build algorithm comparison table HTML (helper for showResultsSummary)
+     */
+    buildAlgorithmComparisonTable(stats) {
+        if (!stats.algorithmComparison || (stats.algorithmComparison.hc2l.count === 0 && stats.algorithmComparison.dhl.count === 0)) {
+            return null;
+        }
+
+        const hc2l = stats.algorithmComparison.hc2l;
+        const dhl = stats.algorithmComparison.dhl;
+        const best = stats.bestPerformers || {};
+
+        const fmtVal = (val, unit, decimals = 3) => val === null || val === undefined ? '-' : val.toFixed(decimals) + ' ' + unit;
+        const winnerClass = (metric) => best[metric] === 'HC2L' ? 'text-blue-600 font-bold' : best[metric] === 'DHL' ? 'text-green-600 font-bold' : '';
+
+        return `
+            <h4 class="font-bold text-gray-700 mb-2 flex items-center gap-1 text-xs">
+                <i data-lucide="bar-chart-3" class="w-4 h-4"></i> Algorithm Comparison
+            </h4>
+            <div class="overflow-x-auto">
+                <table class="w-full text-xs">
+                    <thead>
+                        <tr class="border-b border-gray-200">
+                            <th class="text-left py-1 px-2 text-gray-500 font-medium">Metric</th>
+                            <th class="text-center py-1 px-2 text-blue-600 font-medium"><i data-lucide="cpu" class="w-4 h-4 inline mr-1"></i> HC2L</th>
+                            <th class="text-center py-1 px-2 text-green-600 font-medium"><i data-lucide="zap" class="w-4 h-4 inline mr-1"></i> DHL</th>
+                            <th class="text-center py-1 px-2 text-gray-500 font-medium">Winner</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="border-b border-gray-100 bg-gray-50"><td class="py-1.5 px-2 text-gray-600 font-medium" colspan="4">📊 Basic Info</td></tr>
+                        <tr class="border-b border-gray-100"><td class="py-1.5 px-2 text-gray-600">Total Runs</td><td class="py-1.5 px-2 text-center font-medium">${hc2l.count || 0}</td><td class="py-1.5 px-2 text-center font-medium">${dhl.count || 0}</td><td class="py-1.5 px-2 text-center">-</td></tr>
+                        <tr class="border-b border-gray-100 bg-purple-50"><td class="py-1.5 px-2 text-purple-700 font-medium" colspan="4">⚡ Query Performance</td></tr>
+                        <tr class="border-b border-gray-100"><td class="py-1.5 px-2 text-gray-600">Avg Query Time</td><td class="py-1.5 px-2 text-center font-medium">${fmtVal(hc2l.queryTime?.avg, 'ms')}</td><td class="py-1.5 px-2 text-center font-medium">${fmtVal(dhl.queryTime?.avg, 'ms')}</td><td class="py-1.5 px-2 text-center ${winnerClass('queryTime')}">${best.queryTime || '-'}</td></tr>
+                        <tr class="border-b border-gray-100"><td class="py-1.5 px-2 text-gray-600">Min Query Time</td><td class="py-1.5 px-2 text-center">${fmtVal(hc2l.queryTime?.min, 'ms')}</td><td class="py-1.5 px-2 text-center">${fmtVal(dhl.queryTime?.min, 'ms')}</td><td class="py-1.5 px-2 text-center">-</td></tr>
+                        <tr class="border-b border-gray-100"><td class="py-1.5 px-2 text-gray-600">Max Query Time</td><td class="py-1.5 px-2 text-center">${fmtVal(hc2l.queryTime?.max, 'ms')}</td><td class="py-1.5 px-2 text-center">${fmtVal(dhl.queryTime?.max, 'ms')}</td><td class="py-1.5 px-2 text-center">-</td></tr>
+                        <tr class="border-b border-gray-100 bg-green-50"><td class="py-1.5 px-2 text-green-700 font-medium" colspan="4">🏷️ Labeling Performance</td></tr>
+                        <tr class="border-b border-gray-100"><td class="py-1.5 px-2 text-gray-600">Avg Labeling Time</td><td class="py-1.5 px-2 text-center font-medium">${fmtVal(hc2l.labelingTime?.avg, 'ms')}</td><td class="py-1.5 px-2 text-center font-medium">${fmtVal(dhl.labelingTime?.avg, 'ms')}</td><td class="py-1.5 px-2 text-center ${winnerClass('labelingTime')}">${best.labelingTime || '-'}</td></tr>
+                        <tr class="border-b border-gray-100"><td class="py-1.5 px-2 text-gray-600">Avg Label Size</td><td class="py-1.5 px-2 text-center font-medium">${fmtVal(hc2l.labelingSize?.avg, 'KB', 2)}</td><td class="py-1.5 px-2 text-center font-medium">${fmtVal(dhl.labelingSize?.avg, 'KB', 2)}</td><td class="py-1.5 px-2 text-center ${winnerClass('labelingSize')}">${best.labelingSize || '-'}</td></tr>
+                        <tr class="border-b border-gray-100 bg-cyan-50"><td class="py-1.5 px-2 text-cyan-700 font-medium" colspan="4">🚀 Process Time</td></tr>
+                        <tr class="border-b border-gray-100"><td class="py-1.5 px-2 text-gray-600">Avg Process Time</td><td class="py-1.5 px-2 text-center font-medium">${fmtVal(hc2l.processTime?.avg, 'ms', 0)}</td><td class="py-1.5 px-2 text-center font-medium">${fmtVal(dhl.processTime?.avg, 'ms', 0)}</td><td class="py-1.5 px-2 text-center ${winnerClass('processTime')}">${best.processTime || '-'}</td></tr>
+                        <tr class="border-b border-gray-100"><td class="py-1.5 px-2 text-gray-600">Min / Max Process</td><td class="py-1.5 px-2 text-center">${hc2l.processTime?.min !== null ? hc2l.processTime.min.toFixed(0) + ' / ' + hc2l.processTime.max.toFixed(0) + ' ms' : '-'}</td><td class="py-1.5 px-2 text-center">${dhl.processTime?.min !== null ? dhl.processTime.min.toFixed(0) + ' / ' + dhl.processTime.max.toFixed(0) + ' ms' : '-'}</td><td class="py-1.5 px-2 text-center">-</td></tr>
+                        <tr class="border-b border-gray-100 bg-amber-50"><td class="py-1.5 px-2 text-amber-700 font-medium" colspan="4">📐 Graph Metrics</td></tr>
+                        <tr class="border-b border-gray-100"><td class="py-1.5 px-2 text-gray-600">Avg Path Length</td><td class="py-1.5 px-2 text-center font-medium">${hc2l.pathLength?.avg !== null ? hc2l.pathLength.avg.toFixed(0) + ' nodes' : '-'}</td><td class="py-1.5 px-2 text-center font-medium">${dhl.pathLength?.avg !== null ? dhl.pathLength.avg.toFixed(0) + ' nodes' : '-'}</td><td class="py-1.5 px-2 text-center ${winnerClass('pathLength')}">${best.pathLength || '-'}</td></tr>
+                        <tr class="border-b border-gray-100"><td class="py-1.5 px-2 text-gray-600">Avg Distance</td><td class="py-1.5 px-2 text-center">${fmtVal(hc2l.distance?.avg, 'km', 2)}</td><td class="py-1.5 px-2 text-center">${fmtVal(dhl.distance?.avg, 'km', 2)}</td><td class="py-1.5 px-2 text-center">-</td></tr>
+                        <tr class="border-b border-gray-100 bg-red-50"><td class="py-1.5 px-2 text-red-700 font-medium" colspan="4">⚠️ Disruption Impact</td></tr>
+                        <tr class="border-b border-gray-100"><td class="py-1.5 px-2 text-gray-600">Avg ETA</td><td class="py-1.5 px-2 text-center font-medium">${hc2l.eta?.avg !== null ? (hc2l.eta.avg / 60).toFixed(1) + ' min' : '-'}</td><td class="py-1.5 px-2 text-center font-medium">${dhl.eta?.avg !== null ? (dhl.eta.avg / 60).toFixed(1) + ' min' : '-'}</td><td class="py-1.5 px-2 text-center ${winnerClass('eta')}">${best.eta || '-'}</td></tr>
+                        <tr class="border-b border-gray-100"><td class="py-1.5 px-2 text-gray-600">Avg Disrupted Edges</td><td class="py-1.5 px-2 text-center font-medium">${hc2l.disruptedEdges?.avg !== null ? hc2l.disruptedEdges.avg.toFixed(1) + ' edges' : '-'}</td><td class="py-1.5 px-2 text-center font-medium">${dhl.disruptedEdges?.avg !== null ? dhl.disruptedEdges.avg.toFixed(1) + ' edges' : '-'}</td><td class="py-1.5 px-2 text-center ${winnerClass('disruptedEdges')}">${best.disruptedEdges || '-'}</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        `;
+    },
+
     showResultsSummary() {
         // Use currentProgress.results instead of resultsHistory
         const results = this.currentProgress.results || [];
@@ -4037,411 +4380,180 @@ const DemoRunner = {
             demoNameEl.textContent = `${demoName} • ${timestamp}`;
         }
 
-        // Build modern statistics cards HTML
-        let statsHTML = '';
-
-        // Row 1: Execution Overview
-        statsHTML += `
-            <div class="col-span-2 bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-4 text-white">
-                <h4 class="font-bold mb-3 flex items-center gap-2 text-sm">
-                    <i data-lucide="zap" class="w-5 h-5 text-blue-600"></i> Execution Summary
-                </h4>
-                <div class="grid grid-cols-4 gap-2 text-center">
-                    <div class="bg-white/10 rounded-lg p-2">
-                        <div class="text-2xl font-bold">${stats.totalRoutes}</div>
-                        <div class="text-xs text-slate-300">Routes</div>
-                    </div>
-                    <div class="bg-white/10 rounded-lg p-2">
-                        <div class="text-2xl font-bold">${stats.trialsCompleted}</div>
-                        <div class="text-xs text-slate-300">Trials</div>
-                    </div>
-                    <div class="bg-white/10 rounded-lg p-2">
-                        <div class="text-2xl font-bold">${stats.algorithmBreakdown.hc2l}</div>
-                        <div class="text-xs text-blue-300">HC2L</div>
-                    </div>
-                    <div class="bg-white/10 rounded-lg p-2">
-                        <div class="text-2xl font-bold">${stats.algorithmBreakdown.dhl}</div>
-                        <div class="text-xs text-green-300">DHL</div>
-                    </div>
-                </div>
-                ${stats.executionDurationSeconds ? `
-                <div class="mt-2 text-center text-xs text-slate-400">
-                    Total execution time: <span class="text-white font-medium">${stats.executionDurationSeconds.toFixed(1)}s</span>
-                </div>
-                ` : ''}
-            </div>
-        `;
-
-        // Row 2: Query Performance
-        if (stats.queryTime.avg !== null) {
-            statsHTML += `
-                <div class="bg-purple-50 rounded-xl p-3 border border-purple-200">
-                    <h4 class="font-bold text-purple-700 mb-2 flex items-center gap-1 text-xs">
-                        <i data-lucide="clock" class="w-4 h-4"></i> Query Latency
-                    </h4>
-                    <div class="space-y-1 text-xs">
-                        <div class="flex justify-between">
-                            <span class="text-gray-600">Average</span>
-                            <span class="font-semibold text-purple-800">${stats.queryTime.avg.toFixed(2)} ms</span>
-                        </div>
-                        <div class="flex justify-between">
-                            <span class="text-gray-600">Min / Max</span>
-                            <span class="font-medium text-gray-700">${stats.queryTime.min.toFixed(2)} / ${stats.queryTime.max.toFixed(2)}</span>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-
-        // Process Time (full server round-trip)
-        if (stats.processTime?.avg !== null && stats.processTime?.count > 0) {
-            statsHTML += `
-                <div class="bg-cyan-50 rounded-xl p-3 border border-cyan-200">
-                    <h4 class="font-bold text-cyan-700 mb-2 flex items-center gap-1 text-xs">
-                        <i data-lucide="rocket" class="w-4 h-4"></i> Process Time
-                    </h4>
-                    <div class="space-y-1 text-xs">
-                        <div class="flex justify-between">
-                            <span class="text-gray-600">Average</span>
-                            <span class="font-semibold text-cyan-800">${stats.processTime.avg.toFixed(0)} ms</span>
-                        </div>
-                        <div class="flex justify-between">
-                            <span class="text-gray-600">Min / Max</span>
-                            <span class="font-medium text-gray-700">${stats.processTime.min.toFixed(0)} / ${stats.processTime.max.toFixed(0)}</span>
-                        </div>
-                        <div class="flex justify-between">
-                            <span class="text-gray-600">Total</span>
-                            <span class="font-medium text-gray-700">${(stats.processTime.total / 1000).toFixed(1)}s</span>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-
-        // Row 3: Graph Metrics
-        if (stats.pathLength.avg !== null || stats.edgeCount.avg !== null) {
-            statsHTML += `
-                <div class="bg-amber-50 rounded-xl p-3 border border-amber-200">
-                    <h4 class="font-bold text-amber-700 mb-2 flex items-center gap-1 text-xs">
-                        <i data-lucide="network" class="w-4 h-4"></i> Graph Metrics
-                    </h4>
-                    <div class="space-y-1 text-xs">
-                        ${stats.pathLength.avg !== null ? `
-                        <div class="flex justify-between">
-                            <span class="text-gray-600">Avg Path Length</span>
-                            <span class="font-semibold text-amber-800">${stats.pathLength.avg.toFixed(0)}</span>
-                        </div>
-                        ` : ''}
-                        ${stats.edgeCount.avg !== null ? `
-                        <div class="flex justify-between">
-                            <span class="text-gray-600">Avg Edge Count</span>
-                            <span class="font-medium text-gray-700">${stats.edgeCount.avg.toFixed(0)}</span>
-                        </div>
-                        ` : ''}
-                    </div>
-                </div>
-            `;
-        }
-
-        // Disruption Impact
-        if (stats.disruptedEdges.avg !== null && stats.disruptedEdges.total > 0) {
-            statsHTML += `
-                <div class="bg-red-50 rounded-xl p-3 border border-red-200">
-                    <h4 class="font-bold text-red-700 mb-2 flex items-center gap-1 text-xs">
-                        <i data-lucide="alert-triangle" class="w-4 h-4"></i> Disruption Impact
-                    </h4>
-                    <div class="space-y-1 text-xs">
-                        <div class="flex justify-between">
-                            <span class="text-gray-600">Avg Disrupted</span>
-                            <span class="font-semibold text-red-800">${stats.disruptedEdges.avg.toFixed(1)} edges</span>
-                        </div>
-                        <div class="flex justify-between">
-                            <span class="text-gray-600">Total Disrupted</span>
-                            <span class="font-medium text-gray-700">${stats.disruptedEdges.total} edges</span>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-
-        // Update Phase (LazyHC2L metrics) - Only shown if data is available
-        if (stats.lazyRepairTime?.count > 0 || stats.dirtyNodes?.count > 0 || stats.impactScore?.count > 0) {
-            statsHTML += `
-                <div class="bg-indigo-50 rounded-xl p-3 border border-indigo-200">
-                    <h4 class="font-bold text-indigo-700 mb-2 flex items-center gap-1 text-xs">
-                        <i data-lucide="refresh-cw" class="w-4 h-4"></i> Update Phase (LazyHC2L)
-                    </h4>
-                    <div class="space-y-1 text-xs">
-                        ${stats.lazyRepairTime?.avg !== null ? `
-                        <div class="flex justify-between">
-                            <span class="text-gray-600">Avg Repair Time</span>
-                            <span class="font-semibold text-indigo-800">${stats.lazyRepairTime.avg.toFixed(3)} ms</span>
-                        </div>
-                        ` : ''}
-                        ${stats.dirtyNodes?.avg !== null ? `
-                        <div class="flex justify-between">
-                            <span class="text-gray-600">Avg Dirty Nodes</span>
-                            <span class="font-medium text-gray-700">${stats.dirtyNodes.avg.toFixed(1)}</span>
-                        </div>
-                        ` : ''}
-                        ${stats.impactScore?.avg !== null ? `
-                        <div class="flex justify-between">
-                            <span class="text-gray-600">Avg Impact Score</span>
-                            <span class="font-medium text-gray-700">${stats.impactScore.avg.toFixed(3)}</span>
-                        </div>
-                        ` : ''}
-                    </div>
-                </div>
-            `;
-        } else {
-            // Show placeholder when LazyHC2L metrics not available
-            statsHTML += `
-                <div class="bg-indigo-50 rounded-xl p-3 border border-indigo-200 col-span-2">
-                    <h4 class="font-bold text-indigo-700 mb-2 flex items-center gap-1 text-xs">
-                        <i data-lucide="refresh-cw" class="w-4 h-4"></i> Update Phase (LazyHC2L)
-                    </h4>
-                    <p class="text-xs text-indigo-600 text-center py-2">
-                        <span class="text-indigo-500">ℹ️</span> LazyHC2L update metrics not available in current system
-                    </p>
-                    <p class="text-xs text-gray-500 text-center">These metrics track lazy repair time, dirty nodes, and impact scores during graph updates.</p>
-                </div>
-            `;
-        }
-
-
-
-        // Labeling Performance (if available)
-        if (stats.labelingSize.avg !== null) {
-            statsHTML += `
-                <div class="bg-green-50 rounded-xl p-3 border border-green-200">
-                    <h4 class="font-bold text-green-700 mb-2 flex items-center gap-1 text-xs">
-                        <i data-lucide="database" class="w-4 h-4"></i> Labeling Performance
-                    </h4>
-                    <div class="space-y-2 text-xs">
-                        <div class="flex justify-between">
-                            <span class="text-gray-600">Avg Label Size</span>
-                            <span class="font-semibold text-green-800">${stats.labelingSize.avg.toFixed(0)} KB</span>
-                        </div>
-                        ${stats.labelingTime.avg !== null ? `
-                        <div class="flex justify-between">
-                            <span class="text-gray-600">Avg Labeling Time</span>
-                            <span class="font-medium text-gray-700">${stats.labelingTime.avg.toFixed(2)} ms</span>
-                        </div>
-                        ` : ''}
-                    </div>
-                </div>
-            `;
-        }
-
-        // Algorithm Comparison Table (Expanded with more metrics)
-        if (stats.algorithmComparison && (stats.algorithmComparison.hc2l.count > 0 || stats.algorithmComparison.dhl.count > 0)) {
-            const hc2l = stats.algorithmComparison.hc2l;
-            const dhl = stats.algorithmComparison.dhl;
-            const best = stats.bestPerformers || {};
-
-            // Helper to format value
-            const fmtVal = (val, unit, decimals = 3) => {
-                if (val === null || val === undefined) return '-';
-                return val.toFixed(decimals) + ' ' + unit;
-            };
-
-            // Helper to get winner cell styling
-            const winnerClass = (metric) => {
-                if (best[metric] === 'HC2L') return 'text-blue-600 font-bold';
-                if (best[metric] === 'DHL') return 'text-green-600 font-bold';
-                return '';
-            };
-
-            statsHTML += `
-                <div class="col-span-2 bg-white rounded-xl p-3 border border-gray-200 shadow-sm">
-                    <h4 class="font-bold text-gray-700 mb-2 flex items-center gap-1 text-xs">
-                        <i data-lucide="bar-chart-3" class="w-4 h-4"></i> Algorithm Comparison
-                    </h4>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-xs">
-                            <thead>
-                                <tr class="border-b border-gray-200">
-                                    <th class="text-left py-1 px-2 text-gray-500 font-medium">Metric</th>
-                                    <th class="text-center py-1 px-2 text-blue-600 font-medium">
-                                        <i data-lucide="cpu" class="w-4 h-4 inline mr-1"></i> HC2L
-                                    </th>
-                                    <th class="text-center py-1 px-2 text-green-600 font-medium">
-                                        <i data-lucide="zap" class="w-4 h-4 inline mr-1"></i> DHL
-                                    </th>
-                                    <th class="text-center py-1 px-2 text-gray-500 font-medium">Winner</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <!-- Basic Info -->
-                                <tr class="border-b border-gray-100 bg-gray-50">
-                                    <td class="py-1.5 px-2 text-gray-600 font-medium" colspan="4">📊 Basic Info</td>
-                                </tr>
-                                <tr class="border-b border-gray-100">
-                                    <td class="py-1.5 px-2 text-gray-600">Total Runs</td>
-                                    <td class="py-1.5 px-2 text-center font-medium">${hc2l.count || 0}</td>
-                                    <td class="py-1.5 px-2 text-center font-medium">${dhl.count || 0}</td>
-                                    <td class="py-1.5 px-2 text-center">-</td>
-                                </tr>
-                                
-                                <!-- Query Performance -->
-                                <tr class="border-b border-gray-100 bg-purple-50">
-                                    <td class="py-1.5 px-2 text-purple-700 font-medium" colspan="4">⚡ Query Performance</td>
-                                </tr>
-                                <tr class="border-b border-gray-100">
-                                    <td class="py-1.5 px-2 text-gray-600">Avg Query Time</td>
-                                    <td class="py-1.5 px-2 text-center font-medium">${fmtVal(hc2l.queryTime?.avg, 'ms')}</td>
-                                    <td class="py-1.5 px-2 text-center font-medium">${fmtVal(dhl.queryTime?.avg, 'ms')}</td>
-                                    <td class="py-1.5 px-2 text-center ${winnerClass('queryTime')}">${best.queryTime || '-'}</td>
-                                </tr>
-                                <tr class="border-b border-gray-100">
-                                    <td class="py-1.5 px-2 text-gray-600">Min Query Time</td>
-                                    <td class="py-1.5 px-2 text-center">${fmtVal(hc2l.queryTime?.min, 'ms')}</td>
-                                    <td class="py-1.5 px-2 text-center">${fmtVal(dhl.queryTime?.min, 'ms')}</td>
-                                    <td class="py-1.5 px-2 text-center">-</td>
-                                </tr>
-                                <tr class="border-b border-gray-100">
-                                    <td class="py-1.5 px-2 text-gray-600">Max Query Time</td>
-                                    <td class="py-1.5 px-2 text-center">${fmtVal(hc2l.queryTime?.max, 'ms')}</td>
-                                    <td class="py-1.5 px-2 text-center">${fmtVal(dhl.queryTime?.max, 'ms')}</td>
-                                    <td class="py-1.5 px-2 text-center">-</td>
-                                </tr>
-                                
-                                <!-- Labeling Performance -->
-                                <tr class="border-b border-gray-100 bg-green-50">
-                                    <td class="py-1.5 px-2 text-green-700 font-medium" colspan="4">🏷️ Labeling Performance</td>
-                                </tr>
-                                <tr class="border-b border-gray-100">
-                                    <td class="py-1.5 px-2 text-gray-600">Avg Labeling Time</td>
-                                    <td class="py-1.5 px-2 text-center font-medium">${fmtVal(hc2l.labelingTime?.avg, 'ms')}</td>
-                                    <td class="py-1.5 px-2 text-center font-medium">${fmtVal(dhl.labelingTime?.avg, 'ms')}</td>
-                                    <td class="py-1.5 px-2 text-center ${winnerClass('labelingTime')}">${best.labelingTime || '-'}</td>
-                                </tr>
-                                <tr class="border-b border-gray-100">
-                                    <td class="py-1.5 px-2 text-gray-600">Avg Label Size</td>
-                                    <td class="py-1.5 px-2 text-center font-medium">${fmtVal(hc2l.labelingSize?.avg, 'KB', 2)}</td>
-                                    <td class="py-1.5 px-2 text-center font-medium">${fmtVal(dhl.labelingSize?.avg, 'KB', 2)}</td>
-                                    <td class="py-1.5 px-2 text-center ${winnerClass('labelingSize')}">${best.labelingSize || '-'}</td>
-                                </tr>
-                                
-                                <!-- Process Time -->
-                                <tr class="border-b border-gray-100 bg-cyan-50">
-                                    <td class="py-1.5 px-2 text-cyan-700 font-medium" colspan="4">🚀 Process Time</td>
-                                </tr>
-                                <tr class="border-b border-gray-100">
-                                    <td class="py-1.5 px-2 text-gray-600">Avg Process Time</td>
-                                    <td class="py-1.5 px-2 text-center font-medium">${fmtVal(hc2l.processTime?.avg, 'ms', 0)}</td>
-                                    <td class="py-1.5 px-2 text-center font-medium">${fmtVal(dhl.processTime?.avg, 'ms', 0)}</td>
-                                    <td class="py-1.5 px-2 text-center ${winnerClass('processTime')}">${best.processTime || '-'}</td>
-                                </tr>
-                                <tr class="border-b border-gray-100">
-                                    <td class="py-1.5 px-2 text-gray-600">Min / Max Process</td>
-                                    <td class="py-1.5 px-2 text-center">${hc2l.processTime?.min !== null ? hc2l.processTime.min.toFixed(0) + ' / ' + hc2l.processTime.max.toFixed(0) + ' ms' : '-'}</td>
-                                    <td class="py-1.5 px-2 text-center">${dhl.processTime?.min !== null ? dhl.processTime.min.toFixed(0) + ' / ' + dhl.processTime.max.toFixed(0) + ' ms' : '-'}</td>
-                                    <td class="py-1.5 px-2 text-center">-</td>
-                                </tr>
-                                
-                                <!-- Graph Metrics -->
-                                <tr class="border-b border-gray-100 bg-amber-50">
-                                    <td class="py-1.5 px-2 text-amber-700 font-medium" colspan="4">📐 Graph Metrics</td>
-                                </tr>
-                                <tr class="border-b border-gray-100">
-                                    <td class="py-1.5 px-2 text-gray-600">Avg Path Length</td>
-                                    <td class="py-1.5 px-2 text-center font-medium">${hc2l.pathLength?.avg !== null ? hc2l.pathLength.avg.toFixed(0) + ' nodes' : '-'}</td>
-                                    <td class="py-1.5 px-2 text-center font-medium">${dhl.pathLength?.avg !== null ? dhl.pathLength.avg.toFixed(0) + ' nodes' : '-'}</td>
-                                    <td class="py-1.5 px-2 text-center ${winnerClass('pathLength')}">${best.pathLength || '-'}</td>
-                                </tr>
-                                <tr class="border-b border-gray-100">
-                                    <td class="py-1.5 px-2 text-gray-600">Avg Distance</td>
-                                    <td class="py-1.5 px-2 text-center">${fmtVal(hc2l.distance?.avg, 'km', 2)}</td>
-                                    <td class="py-1.5 px-2 text-center">${fmtVal(dhl.distance?.avg, 'km', 2)}</td>
-                                    <td class="py-1.5 px-2 text-center">-</td>
-                                </tr>
-                                
-                                <!-- Disruption Impact -->
-                                <tr class="border-b border-gray-100 bg-red-50">
-                                    <td class="py-1.5 px-2 text-red-700 font-medium" colspan="4">⚠️ Disruption Impact</td>
-                                </tr>
-                                <tr class="border-b border-gray-100">
-                                    <td class="py-1.5 px-2 text-gray-600">Avg ETA</td>
-                                    <td class="py-1.5 px-2 text-center font-medium">${hc2l.eta?.avg !== null ? (hc2l.eta.avg / 60).toFixed(1) + ' min' : '-'}</td>
-                                    <td class="py-1.5 px-2 text-center font-medium">${dhl.eta?.avg !== null ? (dhl.eta.avg / 60).toFixed(1) + ' min' : '-'}</td>
-                                    <td class="py-1.5 px-2 text-center ${winnerClass('eta')}">${best.eta || '-'}</td>
-                                </tr>
-                                <tr class="border-b border-gray-100">
-                                    <td class="py-1.5 px-2 text-gray-600">Avg Disrupted Edges</td>
-                                    <td class="py-1.5 px-2 text-center font-medium">${hc2l.disruptedEdges?.avg !== null ? hc2l.disruptedEdges.avg.toFixed(1) + ' edges' : '-'}</td>
-                                    <td class="py-1.5 px-2 text-center font-medium">${dhl.disruptedEdges?.avg !== null ? dhl.disruptedEdges.avg.toFixed(1) + ' edges' : '-'}</td>
-                                    <td class="py-1.5 px-2 text-center ${winnerClass('disruptedEdges')}">${best.disruptedEdges || '-'}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            `;
-        }
-
-
-        // Best Performer (Overall Winner) - shown in grid row
-        if (stats.bestPerformers?.winner) {
-            statsHTML += `
-            <div class="col-span-2 section-card section-card--warning">
-            <div class="section-card__header">
-                <div class="section-card__icon section-card__icon--warning">
-                <i data-lucide="trophy" class="w-5 h-5"></i>
-                </div>
-                <h4 class="section-card__title">Best Performer</h4>
-            </div>
-            <div class="section-card__body">
-                <div class="flex flex-col items-center space-y-4">
-                <!-- Winner Announcement -->
-                <div class="rounded-xl p-4 w-full text-center border border-amber-200 ${stats.bestPerformers.winner === 'HC2L' ? 'bg-gradient-dhc2l' : stats.bestPerformers.winner === 'DHL' ? 'bg-gradient-dhl' : 'bg-gradient-dark'} text-white">
-                    <div class="text-sm text-amber-700 mb-2">Overall Winner</div>
-                    <div class="text-3xl font-bold ">
-                    ${stats.bestPerformers.winner === 'Tie' ? '🤝 Tie' : stats.bestPerformers.winner}
-                    </div>
-                </div>
-                
-                <!-- Win Counts -->
-                <div class="grid grid-cols-2 gap-4 w-full">
-                    <div class="bg-blue-50 rounded-lg p-3 text-center border border-blue-200">
-                    <div class="text-2xl font-bold text-blue-700">${stats.bestPerformers.hc2lWins || 0}</div>
-                    <div class="text-xs text-blue-600 uppercase tracking-wide">HC2L Wins</div>
-                    </div>
-                    <div class="bg-purple-50 rounded-lg p-3 text-center border border-purple-200">
-                    <div class="text-2xl font-bold text-purple-700">${stats.bestPerformers.dhlWins || 0}</div>
-                    <div class="text-xs text-purple-600 uppercase tracking-wide">DHL Wins</div>
-                    </div>
-                </div>
-                
-                <!-- Categories Info -->
-                <div class="bg-gray-50 rounded-lg p-3 w-full text-center border border-gray-200">
-                    <div class="text-sm text-gray-700">
-                    Out of <span class="font-semibold text-gray-900">${stats.bestPerformers.totalCategories || 7}</span> performance categories
-                    </div>
-                    <div class="text-xs text-gray-600 mt-1">
-                    Query Time • Labeling Time • Label Size • Process Time • Path Length • Disrupted Edges • ETA
-                    </div>
-                </div>
-                </div>
-            </div>
-            </div>
-            `;
-        }
-
-        // If no specific stats, show a fallback
-        if (!statsHTML) {
-            statsHTML = `
-                <div class="col-span-2 bg-gray-50 rounded-xl p-4 border border-gray-200 text-center">
-                    <p class="text-gray-600">Run complete with ${results.length} results</p>
-                </div>
-            `;
-        }
-
-        // Update statistics cards
+        // Build statistics cards using DOM construction
         const statsContainer = document.getElementById('demo-results-stats');
         if (statsContainer) {
-            statsContainer.innerHTML = statsHTML;
+            statsContainer.innerHTML = '';
+            const grid = document.createElement('div');
+            grid.className = 'grid gap-3';
+
+            // Helper to create a stat card
+            const createStatCard = (config) => {
+                const div = document.createElement('div');
+                div.className = config.className || 'bg-gray-50 rounded-xl p-3 border border-gray-200';
+                div.innerHTML = config.html;
+                return div;
+            };
+
+            // 1. Execution Summary
+            grid.appendChild(createStatCard({
+                className: 'col-span-2 bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-4 text-white',
+                html: `
+                    <h4 class="font-bold mb-3 flex items-center gap-2 text-sm">
+                        <i data-lucide="zap" class="w-5 h-5 text-blue-600"></i> Execution Summary
+                    </h4>
+                    <div class="grid grid-cols-4 gap-2 text-center">
+                        <div class="bg-white/10 rounded-lg p-2"><div class="text-2xl font-bold">${stats.totalRoutes}</div><div class="text-xs text-slate-300">Routes</div></div>
+                        <div class="bg-white/10 rounded-lg p-2"><div class="text-2xl font-bold">${stats.trialsCompleted}</div><div class="text-xs text-slate-300">Trials</div></div>
+                        <div class="bg-white/10 rounded-lg p-2"><div class="text-2xl font-bold">${stats.algorithmBreakdown.hc2l}</div><div class="text-xs text-blue-300">HC2L</div></div>
+                        <div class="bg-white/10 rounded-lg p-2"><div class="text-2xl font-bold">${stats.algorithmBreakdown.dhl}</div><div class="text-xs text-green-300">DHL</div></div>
+                    </div>
+                    ${stats.executionDurationSeconds ? `<div class="mt-2 text-center text-xs text-slate-400">Total execution time: <span class="text-white font-medium">${stats.executionDurationSeconds.toFixed(1)}s</span></div>` : ''}
+                `
+            }));
+
+            // 2. Query Performance
+            if (stats.queryTime.avg !== null) {
+                grid.appendChild(createStatCard({
+                    className: 'bg-purple-50 rounded-xl p-3 border border-purple-200',
+                    html: `
+                        <h4 class="font-bold text-purple-700 mb-2 flex items-center gap-1 text-xs"><i data-lucide="clock" class="w-4 h-4"></i> Query Latency</h4>
+                        <div class="space-y-1 text-xs">
+                            <div class="flex justify-between"><span class="text-gray-600">Average</span><span class="font-semibold text-purple-800">${stats.queryTime.avg.toFixed(2)} ms</span></div>
+                            <div class="flex justify-between"><span class="text-gray-600">Min / Max</span><span class="font-medium text-gray-700">${stats.queryTime.min.toFixed(2)} / ${stats.queryTime.max.toFixed(2)}</span></div>
+                        </div>
+                    `
+                }));
+            }
+
+            // 3. Process Time
+            if (stats.processTime?.avg !== null && stats.processTime?.count > 0) {
+                grid.appendChild(createStatCard({
+                    className: 'bg-cyan-50 rounded-xl p-3 border border-cyan-200',
+                    html: `
+                        <h4 class="font-bold text-cyan-700 mb-2 flex items-center gap-1 text-xs"><i data-lucide="rocket" class="w-4 h-4"></i> Process Time</h4>
+                        <div class="space-y-1 text-xs">
+                            <div class="flex justify-between"><span class="text-gray-600">Average</span><span class="font-semibold text-cyan-800">${stats.processTime.avg.toFixed(0)} ms</span></div>
+                            <div class="flex justify-between"><span class="text-gray-600">Min / Max</span><span class="font-medium text-gray-700">${stats.processTime.min.toFixed(0)} / ${stats.processTime.max.toFixed(0)}</span></div>
+                            <div class="flex justify-between"><span class="text-gray-600">Total</span><span class="font-medium text-gray-700">${(stats.processTime.total / 1000).toFixed(1)}s</span></div>
+                        </div>
+                    `
+                }));
+            }
+
+            // 4. Graph Metrics
+            if (stats.pathLength.avg !== null || stats.edgeCount.avg !== null) {
+                grid.appendChild(createStatCard({
+                    className: 'bg-amber-50 rounded-xl p-3 border border-amber-200',
+                    html: `
+                        <h4 class="font-bold text-amber-700 mb-2 flex items-center gap-1 text-xs"><i data-lucide="network" class="w-4 h-4"></i> Graph Metrics</h4>
+                        <div class="space-y-1 text-xs">
+                            ${stats.pathLength.avg !== null ? `<div class="flex justify-between"><span class="text-gray-600">Avg Path Length</span><span class="font-semibold text-amber-800">${stats.pathLength.avg.toFixed(0)}</span></div>` : ''}
+                            ${stats.edgeCount.avg !== null ? `<div class="flex justify-between"><span class="text-gray-600">Avg Edge Count</span><span class="font-medium text-gray-700">${stats.edgeCount.avg.toFixed(0)}</span></div>` : ''}
+                        </div>
+                    `
+                }));
+            }
+
+            // 5. Disruption Impact
+            if (stats.disruptedEdges.avg !== null && stats.disruptedEdges.total > 0) {
+                grid.appendChild(createStatCard({
+                    className: 'bg-red-50 rounded-xl p-3 border border-red-200',
+                    html: `
+                        <h4 class="font-bold text-red-700 mb-2 flex items-center gap-1 text-xs"><i data-lucide="alert-triangle" class="w-4 h-4"></i> Disruption Impact</h4>
+                        <div class="space-y-1 text-xs">
+                            <div class="flex justify-between"><span class="text-gray-600">Avg Disrupted</span><span class="font-semibold text-red-800">${stats.disruptedEdges.avg.toFixed(1)} edges</span></div>
+                            <div class="flex justify-between"><span class="text-gray-600">Total Disrupted</span><span class="font-medium text-gray-700">${stats.disruptedEdges.total} edges</span></div>
+                        </div>
+                    `
+                }));
+            }
+
+            // 6. Update Phase (LazyHC2L)
+            if (stats.lazyRepairTime?.count > 0 || stats.dirtyNodes?.count > 0 || stats.impactScore?.count > 0) {
+                grid.appendChild(createStatCard({
+                    className: 'bg-indigo-50 rounded-xl p-3 border border-indigo-200',
+                    html: `
+                        <h4 class="font-bold text-indigo-700 mb-2 flex items-center gap-1 text-xs"><i data-lucide="refresh-cw" class="w-4 h-4"></i> Update Phase (LazyHC2L)</h4>
+                        <div class="space-y-1 text-xs">
+                            ${stats.lazyRepairTime?.avg !== null ? `<div class="flex justify-between"><span class="text-gray-600">Avg Repair Time</span><span class="font-semibold text-indigo-800">${stats.lazyRepairTime.avg.toFixed(3)} ms</span></div>` : ''}
+                            ${stats.dirtyNodes?.avg !== null ? `<div class="flex justify-between"><span class="text-gray-600">Avg Dirty Nodes</span><span class="font-medium text-gray-700">${stats.dirtyNodes.avg.toFixed(1)}</span></div>` : ''}
+                            ${stats.impactScore?.avg !== null ? `<div class="flex justify-between"><span class="text-gray-600">Avg Impact Score</span><span class="font-medium text-gray-700">${stats.impactScore.avg.toFixed(3)}</span></div>` : ''}
+                        </div>
+                    `
+                }));
+            } else {
+                grid.appendChild(createStatCard({
+                    className: 'col-span-2 bg-indigo-50 rounded-xl p-3 border border-indigo-200',
+                    html: `
+                        <h4 class="font-bold text-indigo-700 mb-2 flex items-center gap-1 text-xs"><i data-lucide="refresh-cw" class="w-4 h-4"></i> Update Phase (LazyHC2L)</h4>
+                        <p class="text-xs text-indigo-600 text-center py-2"><span class="text-indigo-500">ℹ️</span> LazyHC2L update metrics not available in current system</p>
+                        <p class="text-xs text-gray-500 text-center">These metrics track lazy repair time, dirty nodes, and impact scores during graph updates.</p>
+                    `
+                }));
+            }
+
+            // 7. Labeling Performance
+            if (stats.labelingSize.avg !== null) {
+                grid.appendChild(createStatCard({
+                    className: 'bg-green-50 rounded-xl p-3 border border-green-200',
+                    html: `
+                        <h4 class="font-bold text-green-700 mb-2 flex items-center gap-1 text-xs"><i data-lucide="database" class="w-4 h-4"></i> Labeling Performance</h4>
+                        <div class="space-y-1 text-xs">
+                            <div class="flex justify-between"><span class="text-gray-600">Avg Label Size</span><span class="font-semibold text-green-800">${stats.labelingSize.avg.toFixed(0)} KB</span></div>
+                            ${stats.labelingTime.avg !== null ? `<div class="flex justify-between"><span class="text-gray-600">Avg Labeling Time</span><span class="font-medium text-gray-700">${stats.labelingTime.avg.toFixed(2)} ms</span></div>` : ''}
+                        </div>
+                    `
+                }));
+            }
+
+            statsContainer.appendChild(grid);
+            lucide.createIcons();
         }
+
+        // Algorithm Comparison Table (kept as string due to complexity)
+        const comparisonTableHTML = this.buildAlgorithmComparisonTable(stats);
+        if (comparisonTableHTML) {
+            const tableContainer = document.createElement('div');
+            tableContainer.className = 'col-span-2 bg-white rounded-xl p-3 border border-gray-200 shadow-sm';
+            tableContainer.innerHTML = comparisonTableHTML;
+            if (statsContainer && statsContainer.firstChild) {
+                statsContainer.appendChild(tableContainer);
+            }
+        }
+
+        // Best Performer Card
+        if (stats.bestPerformers?.winner) {
+            const bestContainer = document.createElement('div');
+            bestContainer.className = 'section-card section-card--warning';
+            bestContainer.innerHTML = `
+                <div class="section-card__header">
+                    <div class="section-card__icon section-card__icon--warning"><i data-lucide="trophy" class="w-5 h-5"></i></div>
+                    <h4 class="section-card__title">Best Performer</h4>
+                </div>
+                <div class="section-card__body">
+                    <div class="flex flex-col items-center space-y-4">
+                        <div class="rounded-xl p-4 w-full text-center border border-amber-200 ${stats.bestPerformers.winner === 'HC2L' ? 'bg-gradient-dhc2l' : stats.bestPerformers.winner === 'DHL' ? 'bg-gradient-dhl' : 'bg-gradient-dark'} text-white">
+                            <div class="text-sm text-amber-700 mb-2">Overall Winner</div>
+                            <div class="text-3xl font-bold">${stats.bestPerformers.winner === 'Tie' ? '🤝 Tie' : stats.bestPerformers.winner}</div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4 w-full">
+                            <div class="bg-blue-50 rounded-lg p-3 text-center border border-blue-200"><div class="text-2xl font-bold text-blue-700">${stats.bestPerformers.hc2lWins || 0}</div><div class="text-xs text-blue-600 uppercase tracking-wide">HC2L Wins</div></div>
+                            <div class="bg-purple-50 rounded-lg p-3 text-center border border-purple-200"><div class="text-2xl font-bold text-purple-700">${stats.bestPerformers.dhlWins || 0}</div><div class="text-xs text-purple-600 uppercase tracking-wide">DHL Wins</div></div>
+                        </div>
+                        <div class="bg-gray-50 rounded-lg p-3 w-full text-center border border-gray-200">
+                            <div class="text-sm text-gray-700">Out of <span class="font-semibold text-gray-900">${stats.bestPerformers.totalCategories || 7}</span> performance categories</div>
+                            <div class="text-xs text-gray-600 mt-1">Query Time • Labeling Time • Label Size • Process Time • Path Length • Disrupted Edges • ETA</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            if (statsContainer) {
+                statsContainer.appendChild(bestContainer);
+            }
+        }
+
+        lucide.createIcons();
 
         // Update results count
         const countEl = document.getElementById('demo-results-count');
@@ -4449,185 +4561,118 @@ const DemoRunner = {
             countEl.textContent = `(${results.length} total)`;
         }
 
-        // Build collapsible results list HTML
-        const resultsListHTML = results.map((r, i) => {
-            const metrics = r.metrics || {};
-            const algoColor = (r.algorithm || '').toUpperCase() === 'HC2L' ? 'blue' : 'green';
-            const algoIcon = (r.algorithm || '').toUpperCase() === 'HC2L' ? '<i data-lucide="cpu" class="w-4 h-4 text-blue-600"></i>' : '<i data-lucide="zap" class="w-4 h-4 text-green-600"></i>';
-
-            // Helper to get best display value for a metric
-            const getDisplayValue = (...keys) => {
-                for (const key of keys) {
-                    const val = metrics[key];
-                    if (val !== null && val !== undefined && val !== '--' && val !== 'N/A') {
-                        return val;
-                    }
-                }
-                return 'N/A';
-            };
-
-            // Extract key metrics for display - match Results History approach
-            // Results History works, so use same order: displayDistance first (it has proper formatting)
-            const distance = metrics.displayDistance || metrics.calculatedDistance || metrics.distance || 'N/A';
-            const eta = getDisplayValue('actualEta', 'displayEta');
-            const queryTime = getDisplayValue('queryTime');
-            const pathLength = getDisplayValue('pathLength');
-            const edgeCount = getDisplayValue('edgeCount');
-            const labelingTime = getDisplayValue('labelingTime');
-            const labelingSize = getDisplayValue('labelingSize');
-            const disruptedEdges = getDisplayValue('disruptedEdges');
-            const timeImpact = getDisplayValue('timeImpact');
-
-            // Determine if we should show tau (hide for DHL)
-            const isDHL = (r.algorithm || '').toUpperCase() === 'DHL';
-            const tauBadge = !isDHL ? `<span class="text-xs bg-${algoColor}-100 text-${algoColor}-700 px-2 py-0.5 rounded">τ = ${r.tau?.toFixed(2) || 'N/A'}</span>` : '';
-
-            return `
-                <div class="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden result-item" data-result-index="${i}">
-                    <!-- Header (clickable to expand) -->
-                    <div class="p-3 cursor-pointer hover:bg-gray-100 transition-colors flex justify-between items-center"
-                         onclick="DemoRunner.toggleResultDetails(${i})">
-                        <div class="flex items-center gap-2">
-                            <span class="text-lg">${algoIcon}</span>
-                            <span class="font-medium text-gray-800">#${i + 1} ${r.algorithm || 'Unknown'}</span>
-                            ${tauBadge}
-                        </div>
-                        <div class="flex items-center gap-3">
-                            <span class="text-sm text-gray-600 font-medium">📏 ${distance}</span>
-                            <svg class="w-5 h-5 text-gray-400 transform transition-transform result-chevron" id="chevron-${i}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                            </svg>
-                        </div>
-                    </div>
-                    
-                    <!-- Collapsible Details -->
-                    <div id="result-details-${i}" class="hidden border-t border-gray-200 bg-white p-3">
-                        <div class="text-xs text-gray-500 mb-2">
-                            <strong>Route:</strong> ${r.route || 'N/A'}
-                        </div>
-                        <div class="text-xs text-gray-500 mb-2">
-                            <strong>Trial:</strong> ${r.trial || 'N/A'} | <strong>Timestamp:</strong> ${r.timestamp ? new Date(r.timestamp).toLocaleTimeString() : 'N/A'}
-                        </div>
-                        
-                        <div class="grid grid-cols-2 gap-2 text-xs">
-                            <div class="bg-gray-50 rounded p-2">
-                                <div class="text-gray-500">Distance</div>
-                                <div class="font-semibold text-gray-800">${distance}</div>
-                            </div>
-                            <div class="bg-gray-50 rounded p-2">
-                                <div class="text-gray-500">ETA</div>
-                                <div class="font-semibold text-gray-800">${eta}</div>
-                            </div>
-                            <div class="bg-gray-50 rounded p-2">
-                                <div class="text-gray-500">Query Time</div>
-                                <div class="font-semibold text-gray-800">${queryTime}</div>
-                            </div>
-                            <div class="bg-gray-50 rounded p-2">
-                                <div class="text-gray-500">Path Length</div>
-                                <div class="font-semibold text-gray-800">${pathLength}</div>
-                            </div>
-                            <div class="bg-gray-50 rounded p-2">
-                                <div class="text-gray-500">Edge Count</div>
-                                <div class="font-semibold text-gray-800">${edgeCount}</div>
-                            </div>
-                            <div class="bg-gray-50 rounded p-2">
-                                <div class="text-gray-500">Labeling Time</div>
-                                <div class="font-semibold text-gray-800">${labelingTime}</div>
-                            </div>
-                            <div class="bg-gray-50 rounded p-2">
-                                <div class="text-gray-500">Labeling Size</div>
-                                <div class="font-semibold text-gray-800">${labelingSize}</div>
-                            </div>
-                            <div class="bg-gray-50 rounded p-2">
-                                <div class="text-gray-500">Disrupted Edges</div>
-                                <div class="font-semibold text-gray-800">${disruptedEdges}</div>
-                            </div>
-                            ${timeImpact !== 'N/A' ? `
-                            <div class="col-span-2 bg-amber-50 rounded p-2">
-                                <div class="text-amber-700">Time Impact</div>
-                                <div class="font-semibold text-amber-800">${timeImpact}</div>
-                            </div>
-                            ` : ''}
-                        </div>
-                        
-                        <!-- Update Phase Metrics -->
-                        <div class="mt-3 bg-amber-50 rounded-lg p-2 border border-amber-200">
-                            <div class="text-xs font-bold text-amber-700 mb-1 flex items-center gap-1">
-                                <i data-lucide="refresh-cw" class="w-3 h-3"></i> Update Phase
-                            </div>
-                            <div class="grid grid-cols-3 gap-1 text-xs">
-                                <div class="bg-white/50 rounded p-1">
-                                    <div class="text-amber-600 text-[10px]">Strategy</div>
-                                    <div class="font-semibold text-amber-800">${metrics.updateStrategy || 'N/A'}</div>
-                                </div>
-                                <div class="bg-white/50 rounded p-1">
-                                    <div class="text-amber-600 text-[10px]">Repair Time</div>
-                                    <div class="font-semibold text-amber-800">${metrics.lazyRepairTime || 'N/A'}</div>
-                                </div>
-                                <div class="bg-white/50 rounded p-1">
-                                    <div class="text-amber-600 text-[10px]">Nodes Repaired</div>
-                                    <div class="font-semibold text-amber-800">${metrics.nodesRepaired || 'N/A'}</div>
-                                </div>
-                                <div class="bg-white/50 rounded p-1">
-                                    <div class="text-amber-600 text-[10px]">Dirty Nodes</div>
-                                    <div class="font-semibold text-amber-800">${metrics.dirtyNodes || 'N/A'}</div>
-                                </div>
-                                <div class="bg-white/50 rounded p-1">
-                                    <div class="text-amber-600 text-[10px]">Impact Score</div>
-                                    <div class="font-semibold text-amber-800">${metrics.impactScore || 'N/A'}</div>
-                                </div>
-                                <div class="bg-white/50 rounded p-1">
-                                    <div class="text-amber-600 text-[10px]">Cache Hit</div>
-                                    <div class="font-semibold text-amber-800">${metrics.cacheHit || 'N/A'}</div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Query Phase Metrics -->
-                        <div class="mt-2 bg-purple-50 rounded-lg p-2 border border-purple-200">
-                            <div class="text-xs font-bold text-purple-700 mb-1 flex items-center gap-1">
-                                <i data-lucide="zap" class="w-3 h-3"></i> Query Phase
-                            </div>
-                            <div class="grid grid-cols-3 gap-1 text-xs">
-                                <div class="bg-white/50 rounded p-1">
-                                    <div class="text-purple-600 text-[10px]">Query Time</div>
-                                    <div class="font-semibold text-purple-800">${queryTime}</div>
-                                </div>
-                                <div class="bg-white/50 rounded p-1">
-                                    <div class="text-purple-600 text-[10px]">Labeling Time</div>
-                                    <div class="font-semibold text-purple-800">${labelingTime}</div>
-                                </div>
-                                <div class="bg-white/50 rounded p-1">
-                                    <div class="text-purple-600 text-[10px]">Label Size</div>
-                                    <div class="font-semibold text-purple-800">${labelingSize}</div>
-                                </div>
-                                <div class="bg-white/50 rounded p-1">
-                                    <div class="text-purple-600 text-[10px]">Tau Threshold</div>
-                                    <div class="font-semibold text-purple-800">${metrics.tauThreshold || 'N/A'}</div>
-                                </div>
-                                <div class="bg-white/50 rounded p-1">
-                                    <div class="text-purple-600 text-[10px]">Hierarchy Height</div>
-                                    <div class="font-semibold text-purple-800">${metrics.hierarchyHeight || 'N/A'}</div>
-                                </div>
-                                <div class="bg-white/50 rounded p-1">
-                                    <div class="text-purple-600 text-[10px]">Queries</div>
-                                    <div class="font-semibold text-purple-800">${metrics.queriesProcessed || '1'}</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }).join('');
-
-        // Update results list
+        // Build collapsible results list using template cloning
         const resultsListContainer = document.getElementById('demo-results-list');
         if (resultsListContainer) {
-            resultsListContainer.innerHTML = resultsListHTML || '<p class="text-gray-500 text-center py-4">No results available</p>';
+            resultsListContainer.innerHTML = '';
+            const resultTemplate = document.getElementById('template-result-item');
+
+            if (resultTemplate && results.length > 0) {
+                results.forEach((r, i) => {
+                    const metrics = r.metrics || {};
+                    const algoColor = (r.algorithm || '').toUpperCase() === 'HC2L' ? 'blue' : 'green';
+                    const algoIcon = (r.algorithm || '').toUpperCase() === 'HC2L' ? '<i data-lucide="cpu" class="w-4 h-4 text-blue-600"></i>' : '<i data-lucide="zap" class="w-4 h-4 text-green-600"></i>';
+
+                    // Helper to get best display value
+                    const getDisplayValue = (...keys) => {
+                        for (const key of keys) {
+                            const val = metrics[key];
+                            if (val !== null && val !== undefined && val !== '--' && val !== 'N/A') {
+                                return val;
+                            }
+                        }
+                        return 'N/A';
+                    };
+
+                    const distance = metrics.displayDistance || metrics.calculatedDistance || metrics.distance || 'N/A';
+                    const eta = getDisplayValue('actualEta', 'displayEta');
+                    const queryTime = getDisplayValue('queryTime');
+                    const pathLength = getDisplayValue('pathLength');
+                    const edgeCount = getDisplayValue('edgeCount');
+                    const labelingTime = getDisplayValue('labelingTime');
+                    const labelingSize = getDisplayValue('labelingSize');
+                    const disruptedEdges = getDisplayValue('disruptedEdges');
+                    const timeImpact = getDisplayValue('timeImpact');
+                    const isDHL = (r.algorithm || '').toUpperCase() === 'DHL';
+
+                    // Clone and populate template
+                    const node = resultTemplate.content.cloneNode(true);
+                    const card = node.querySelector('.result-item');
+                    card.setAttribute('data-result-index', i);
+
+                    // Populate header
+                    node.querySelector('.result-algo-icon').innerHTML = algoIcon;
+                    node.querySelector('[data-result-title]').textContent = `#${i + 1} ${r.algorithm || 'Unknown'}`;
+
+                    // Populate tau badge
+                    if (!isDHL && r.tau) {
+                        const tauBadge = node.querySelector('.result-tau-badge');
+                        tauBadge.style.display = 'inline-block';
+                        tauBadge.textContent = `τ = ${r.tau.toFixed(2)}`;
+                    }
+
+                    node.querySelector('.result-distance').textContent = `📏 ${distance}`;
+
+                    // Populate details
+                    node.querySelector('[data-route]').textContent = r.route || 'N/A';
+                    node.querySelector('[data-trial]').textContent = r.trial || 'N/A';
+                    node.querySelector('[data-timestamp]').textContent = r.timestamp ? new Date(r.timestamp).toLocaleTimeString() : 'N/A';
+
+                    // Populate metrics
+                    node.querySelector('[data-metric-distance]').textContent = distance;
+                    node.querySelector('[data-metric-eta]').textContent = eta;
+                    node.querySelector('[data-metric-query]').textContent = queryTime;
+                    node.querySelector('[data-metric-path]').textContent = pathLength;
+                    node.querySelector('[data-metric-edges]').textContent = edgeCount;
+                    node.querySelector('[data-metric-labeling-time]').textContent = labelingTime;
+                    node.querySelector('[data-metric-labeling-size]').textContent = labelingSize;
+                    node.querySelector('[data-metric-disrupted]').textContent = disruptedEdges;
+
+                    // Show time impact if present
+                    if (timeImpact !== 'N/A') {
+                        node.querySelector('.result-time-impact').style.display = 'block';
+                        node.querySelector('[data-metric-impact]').textContent = timeImpact;
+                    }
+
+                    // Populate update phase
+                    node.querySelector('[data-update-strategy]').textContent = metrics.updateStrategy || 'N/A';
+                    node.querySelector('[data-update-repair]').textContent = metrics.lazyRepairTime || 'N/A';
+                    node.querySelector('[data-update-nodes]').textContent = metrics.nodesRepaired || 'N/A';
+                    node.querySelector('[data-update-dirty]').textContent = metrics.dirtyNodes || 'N/A';
+                    node.querySelector('[data-update-score]').textContent = metrics.impactScore || 'N/A';
+                    node.querySelector('[data-update-cache]').textContent = metrics.cacheHit || 'N/A';
+
+                    // Populate query phase
+                    node.querySelector('[data-query-time]').textContent = queryTime;
+                    node.querySelector('[data-query-labeling]').textContent = labelingTime;
+                    node.querySelector('[data-query-size]').textContent = labelingSize;
+                    node.querySelector('[data-query-tau]').textContent = metrics.tauThreshold || 'N/A';
+                    node.querySelector('[data-query-height]').textContent = metrics.hierarchyHeight || 'N/A';
+                    node.querySelector('[data-query-count]').textContent = metrics.queriesProcessed || '1';
+
+                    // Add click handler
+                    const header = node.querySelector('.result-header');
+                    header.addEventListener('click', () => {
+                        const details = card.querySelector('.result-details');
+                        const chevron = card.querySelector('.result-chevron');
+                        details.classList.toggle('hidden');
+                        chevron.classList.toggle('rotate-180');
+                    });
+
+                    resultsListContainer.appendChild(node);
+                });
+
+                lucide.createIcons();
+            } else {
+                resultsListContainer.innerHTML = '<p class="text-gray-500 text-center py-4">No results available</p>';
+            }
         }
 
         // Render performance charts
         this.renderResultsCharts(results, stats);
+
+        // Display appendices (only for experiment mode)
+        this.displayAppendices(results, stats);
 
         // Switch to results tab in the panel
         this.showTab('results');
@@ -5632,6 +5677,654 @@ const DemoRunner = {
 
     delay(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
+    },
+
+    // ==========================================================================
+    // APPENDIX TABS FUNCTIONS
+    // ==========================================================================
+
+    /**
+     * Switch between appendix tabs
+     */
+    switchAppendixTab(tabName) {
+        // Update tab buttons
+        const tabs = document.querySelectorAll('[data-appendix-tab]');
+        tabs.forEach(tab => {
+            if (tab.dataset.appendixTab === tabName) {
+                tab.setAttribute('aria-selected', 'true');
+            } else {
+                tab.setAttribute('aria-selected', 'false');
+            }
+        });
+
+        // Update tab content
+        const contents = document.querySelectorAll('.appendix-tab-content');
+        contents.forEach(content => {
+            if (content.id === `appendix-tab-${tabName}`) {
+                content.classList.remove('hidden');
+            } else {
+                content.classList.add('hidden');
+            }
+        });
+
+        // Re-initialize Lucide icons
+        if (window.lucide) {
+            lucide.createIcons();
+        }
+    },
+
+    /**
+     * Calculate and display appendix data
+     */
+    displayAppendices(results, stats) {
+        const isExperimentMode = this.lastRunConfigName && 
+            (this.lastRunConfigName.startsWith('experiment-') || this.lastRunConfigName.includes('experiment'));
+        
+        const appendixSection = document.getElementById('demo-appendix-section');
+        
+        // if (!isExperimentMode || !appendixSection) {
+        //     if (appendixSection) appendixSection.classList.add('hidden');
+        //     return;
+        // }
+
+        // Show the appendix section
+        appendixSection.classList.remove('hidden');
+
+        // Group results by trial and algorithm
+        const trialGroups = this.groupResultsByTrial(results);
+
+        // Generate appendix data
+        const appendixData = {
+            construction: this.calculateConstructionAppendix(trialGroups),
+            dynamic: this.calculateDynamicAppendix(trialGroups),
+            query: this.calculateQueryAppendix(trialGroups, stats),
+            similarity: this.calculateSimilarityAppendix(trialGroups)
+        };
+
+        // Render each appendix
+        this.renderConstructionAppendix(appendixData.construction);
+        this.renderDynamicAppendix(appendixData.dynamic);
+        this.renderQueryAppendix(appendixData.query);
+        this.renderSimilarityAppendix(appendixData.similarity);
+
+        // Initialize first tab
+        this.switchAppendixTab('construction');
+    },
+
+    /**
+     * Group results by trial number
+     */
+    groupResultsByTrial(results) {
+        const groups = {};
+        
+        results.forEach(result => {
+            const trial = result.trial || 1;
+            if (!groups[trial]) {
+                groups[trial] = { hc2l: [], dhl: [] };
+            }
+            
+            const algo = result.algorithm?.toLowerCase() === 'dhl' ? 'dhl' : 'hc2l';
+            groups[trial][algo].push(result);
+        });
+        
+        return groups;
+    },
+
+    /**
+     * Calculate Appendix 1.1: Initial Construction Performance
+     */
+    calculateConstructionAppendix(trialGroups) {
+        const data = [];
+        
+        Object.keys(trialGroups).sort((a, b) => parseInt(a) - parseInt(b)).forEach(trial => {
+            const trialNum = parseInt(trial);
+            const { hc2l, dhl } = trialGroups[trial];
+            
+            // Get construction metrics from first result of each algorithm
+            const hc2lFirst = hc2l[0];
+            const dhlFirst = dhl[0];
+            
+            if (hc2lFirst) {
+                data.push({
+                    trial: trialNum,
+                    algorithm: 'HC2L',
+                    constructionTime: hc2lFirst.metrics?.indexLoadTimeMs || hc2lFirst.metrics?.labelingTimeNum || 0,
+                    labelSize: hc2lFirst.metrics?.indexSizeKb || hc2lFirst.metrics?.labelingSize || 0
+                });
+            }
+            
+            if (dhlFirst) {
+                data.push({
+                    trial: trialNum,
+                    algorithm: 'DHL',
+                    constructionTime: dhlFirst.metrics?.indexLoadTimeMs || dhlFirst.metrics?.labelingTimeNum || 0,
+                    labelSize: dhlFirst.metrics?.indexSizeKb || dhlFirst.metrics?.labelingSize || 0
+                });
+            }
+        });
+        
+        return data;
+    },
+
+    /**
+     * Calculate Appendix 1.2: Dynamic Performance Log
+     */
+    calculateDynamicAppendix(trialGroups) {
+        const data = [];
+        
+        Object.keys(trialGroups).sort((a, b) => parseInt(a) - parseInt(b)).forEach(trial => {
+            const trialNum = parseInt(trial);
+            const { hc2l, dhl } = trialGroups[trial];
+            
+            // Group by batch using batchId from results
+            const batches = {};
+            
+            [...hc2l, ...dhl].forEach((result) => {
+                const batchNum = result.batchId || 1;
+                if (!batches[batchNum]) {
+                    batches[batchNum] = { hc2l: [], dhl: [] };
+                }
+                
+                const algo = result.algorithm?.toLowerCase() === 'dhl' ? 'dhl' : 'hc2l';
+                batches[batchNum][algo].push(result);
+            });
+            
+            // Calculate batch statistics
+            Object.keys(batches).sort((a, b) => parseInt(a) - parseInt(b)).forEach(batchNum => {
+                const batch = batches[batchNum];
+                
+                ['hc2l', 'dhl'].forEach(algo => {
+                    const results = batch[algo];
+                    if (results.length === 0) return;
+                    
+                    const lazyUpdateTimes = results.map(r => r.metrics?.lazyUpdateTimeMs || 0).filter(v => v > 0);
+                    const thresholdRebuildTimes = results.map(r => r.metrics?.thresholdRebuildTimeMs || 0).filter(v => v > 0);
+                    const peakLabelSizes = results.map(r => r.metrics?.peakLabelSizeKb || r.metrics?.indexSizeKb || 0);
+                    const labelSizeChanges = results.map((r, i) => {
+                        if (i === 0) return 0;
+                        const prev = results[i - 1].metrics?.indexSizeKb || 0;
+                        const curr = r.metrics?.indexSizeKb || 0;
+                        return prev > 0 ? ((curr - prev) / prev) * 100 : 0;
+                    });
+                    const queryTimes = results.map(r => r.metrics?.queryTimeMs || r.metrics?.queryTimeNum || 0);
+                    
+                    data.push({
+                        trial: trialNum,
+                        batch: parseInt(batchNum),
+                        algorithm: algo.toUpperCase(),
+                        disruptionLevel: 1000,
+                        queriesInBatch: results.length,
+                        lazyUpdateTime: lazyUpdateTimes.length > 0 ? lazyUpdateTimes.reduce((a, b) => a + b, 0) / lazyUpdateTimes.length : 0,
+                        thresholdRebuildTime: thresholdRebuildTimes.length > 0 ? thresholdRebuildTimes.reduce((a, b) => a + b, 0) / thresholdRebuildTimes.length : 0,
+                        peakLabelSize: peakLabelSizes.length > 0 ? Math.max(...peakLabelSizes) : 0,
+                        labelSizeChange: labelSizeChanges.length > 0 ? labelSizeChanges.reduce((a, b) => a + b, 0) / labelSizeChanges.length : 0,
+                        avgQueryTime: queryTimes.length > 0 ? queryTimes.reduce((a, b) => a + b, 0) / queryTimes.length : 0
+                    });
+                });
+            });
+        });
+        
+        return data;
+    },
+
+    /**
+     * Calculate Appendix 1.3: Combined Performance Summary
+     */
+    calculateQueryAppendix(trialGroups, stats) {
+        const data = {
+            metrics: [],
+            trials: []
+        };
+        
+        // Overall metrics comparison
+        if (stats.algorithmComparison) {
+            const hc2l = stats.algorithmComparison.hc2l;
+            const dhl = stats.algorithmComparison.dhl;
+            
+            const metrics = [
+                {
+                    name: 'Initial Labeling Time (ms)',
+                    hc2l: hc2l.labelingTime?.avg || 0,
+                    dhl: dhl.labelingTime?.avg || 0,
+                    improvement: this.calculateImprovement(hc2l.labelingTime?.avg, dhl.labelingTime?.avg)
+                },
+                {
+                    name: 'Avg Query Time (ms)',
+                    hc2l: hc2l.queryTime?.avg || 0,
+                    dhl: dhl.queryTime?.avg || 0,
+                    improvement: this.calculateImprovement(hc2l.queryTime?.avg, dhl.queryTime?.avg)
+                },
+                {
+                    name: 'Label Size (MB)',
+                    hc2l: (hc2l.labelingSize?.avg || 0) / 1024,
+                    dhl: (dhl.labelingSize?.avg || 0) / 1024,
+                    improvement: this.calculateImprovement(hc2l.labelingSize?.avg, dhl.labelingSize?.avg)
+                },
+                {
+                    name: 'Peak Label Size (MB)',
+                    hc2l: (hc2l.labelingSize?.max || 0) / 1024,
+                    dhl: (dhl.labelingSize?.max || 0) / 1024,
+                    improvement: this.calculateImprovement(hc2l.labelingSize?.max, dhl.labelingSize?.max)
+                },
+                {
+                    name: 'Lazy Update Time (ms)',
+                    hc2l: stats.lazyUpdateTime?.avg || 0,
+                    dhl: 0, // DHL doesn't have lazy updates
+                    improvement: 0
+                },
+                {
+                    name: 'Threshold Rebuild Time (ms)',
+                    hc2l: stats.thresholdRebuildTime?.avg || 0,
+                    dhl: 0,
+                    improvement: 0
+                },
+                {
+                    name: 'Total Rebuilds',
+                    hc2l: stats.thresholdRebuildTime?.count || 0,
+                    dhl: stats.lazyUpdateTime?.count || 0,
+                    improvement: this.calculateImprovement(stats.thresholdRebuildTime?.count, stats.lazyUpdateTime?.count)
+                }
+            ];
+            
+            data.metrics = metrics;
+        }
+        
+        // Per-trial breakdown
+        Object.keys(trialGroups).sort((a, b) => parseInt(a) - parseInt(b)).forEach(trial => {
+            const trialNum = parseInt(trial);
+            const { hc2l, dhl } = trialGroups[trial];
+            
+            const calcTrialStats = (results) => {
+                if (results.length === 0) return null;
+                
+                const queryTimes = results.map(r => r.metrics?.queryTimeMs || r.metrics?.queryTimeNum || 0).filter(v => v > 0);
+                const labelingTimes = results.map(r => r.metrics?.indexLoadTimeMs || r.metrics?.labelingTimeNum || 0).filter(v => v > 0);
+                const labelSizes = results.map(r => r.metrics?.indexSizeKb || r.metrics?.labelingSize || 0);
+                
+                return {
+                    avgQueryTime: queryTimes.length > 0 ? queryTimes.reduce((a, b) => a + b) / queryTimes.length : 0,
+                    labelingTime: labelingTimes.length > 0 ? labelingTimes[0] : 0,
+                    avgLabelSize: labelSizes.length > 0 ? labelSizes.reduce((a, b) => a + b) / labelSizes.length : 0,
+                    peakLabelSize: labelSizes.length > 0 ? Math.max(...labelSizes) : 0
+                };
+            };
+            
+            const hc2lStats = calcTrialStats(hc2l);
+            const dhlStats = calcTrialStats(dhl);
+            
+            if (hc2lStats && dhlStats) {
+                data.trials.push({
+                    trial: trialNum,
+                    hc2l: hc2lStats,
+                    dhl: dhlStats
+                });
+            }
+        });
+        
+        return data;
+    },
+
+    /**
+     * Calculate Appendix 1.4: Route Similarity Evaluation
+     */
+    calculateSimilarityAppendix(trialGroups) {
+        const data = [];
+        
+        // Group results by source-destination pairs
+        const pairMap = {};
+        
+        Object.keys(trialGroups).forEach(trial => {
+            const { hc2l, dhl } = trialGroups[trial];
+            
+            // Match HC2L and DHL routes by index (assuming they query the same routes)
+            const minLength = Math.min(hc2l.length, dhl.length);
+            
+            for (let i = 0; i < minLength; i++) {
+                const hc2lResult = hc2l[i];
+                const dhlResult = dhl[i];
+                
+                const source = hc2lResult.source || hc2lResult.start;
+                const dest = hc2lResult.destination || hc2lResult.end;
+                const pairKey = `${source?.lat || source}_${source?.lng || source}_${dest?.lat || dest}_${dest?.lng || dest}`;
+                
+                if (!pairMap[pairKey]) {
+                    pairMap[pairKey] = {
+                        source: source,
+                        destination: dest,
+                        hc2l: [],
+                        dhl: []
+                    };
+                }
+                
+                pairMap[pairKey].hc2l.push(hc2lResult);
+                pairMap[pairKey].dhl.push(dhlResult);
+            }
+        });
+        
+        // Calculate similarity metrics for each pair
+        Object.values(pairMap).forEach((pair, idx) => {
+            if (pair.hc2l.length === 0 || pair.dhl.length === 0) return;
+            
+            const hc2l = pair.hc2l[0];
+            const dhl = pair.dhl[0];
+            
+            const hc2lDist = hc2l.metrics?.calculatedDistanceKm || hc2l.metrics?.distanceKm || 0;
+            const dhlDist = dhl.metrics?.calculatedDistanceKm || dhl.metrics?.distanceKm || 0;
+            const hc2lTime = hc2l.metrics?.etaSeconds || 0;
+            const dhlTime = dhl.metrics?.etaSeconds || 0;
+            
+            const frechetDist = Math.abs(hc2lDist - dhlDist);
+            const fdRating = frechetDist < 0.2 ? 'Excellent' : frechetDist < 0.4 ? 'Good' : frechetDist < 0.6 ? 'Fair' : 'Fail';
+            
+            const timeDev = Math.abs(hc2lTime - dhlTime) / Math.max(hc2lTime, dhlTime, 1) * 100;
+            const ttdRating = timeDev < 5 ? 'Excellent' : timeDev < 10 ? 'Good' : timeDev < 20 ? 'Fair' : 'Fail';
+            
+            data.push({
+                pairId: `S ⇔ D`,
+                index: idx + 1,
+                distance: hc2lDist.toFixed(2),
+                travelTime: (hc2lTime / 60).toFixed(2),
+                frechetDistance: frechetDist.toFixed(2),
+                fdRating: fdRating,
+                timeDev: timeDev.toFixed(2),
+                ttdRating: ttdRating
+            });
+        });
+        
+        // Limit to first few entries for display
+        return data.slice(0, 10);
+    },
+
+    /**
+     * Calculate improvement percentage
+     */
+    calculateImprovement(baseline, comparison) {
+        if (!baseline || baseline === 0) return 0;
+        return ((baseline - comparison) / baseline) * 100;
+    },
+
+    /**
+     * Render Appendix 1.1: Construction Phase
+     */
+    renderConstructionAppendix(data) {
+        const container = document.getElementById('appendix-construction-content');
+        if (!container || data.length === 0) {
+            if (container) container.innerHTML = '<p class="text-muted text-center py-4">No construction data available</p>';
+            return;
+        }
+        
+        // Create table structure
+        const table = document.createElement('table');
+        table.className = 'appendix-table';
+        
+        // Create header
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+        ['Trial', 'Algorithm', 'Initial Construction Time (ms)', 'Initial Label Size (MB)'].forEach(text => {
+            const th = document.createElement('th');
+            th.textContent = text;
+            headerRow.appendChild(th);
+        });
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+        
+        // Create body
+        const tbody = document.createElement('tbody');
+        data.forEach(row => {
+            const tr = document.createElement('tr');
+            const cells = [
+                { text: row.trial, className: 'font-semibold' },
+                { text: row.algorithm, className: 'font-semibold' },
+                { text: row.constructionTime.toFixed(2) },
+                { text: ((row.labelSize || 0) / 1024).toFixed(2) }
+            ];
+            cells.forEach(cell => {
+                const td = document.createElement('td');
+                td.textContent = cell.text;
+                if (cell.className) td.className = cell.className;
+                tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        
+        container.innerHTML = '';
+        container.appendChild(table);
+    },
+
+    renderDynamicAppendix(data) {
+        const container = document.getElementById('appendix-dynamic-content');
+        if (!container || data.length === 0) {
+            if (container) container.innerHTML = '<p class="text-muted text-center py-4">No dynamic update data available</p>';
+            return;
+        }
+        
+        // Create summary card
+        const summary = document.createElement('div');
+        summary.className = 'appendix-summary-card';
+        summary.innerHTML = `
+            <h5>⚡ Experiment Structure</h5>
+            <ul>
+                <li><strong>Total Trials:</strong> ${new Set(data.map(r => r.trial)).size}</li>
+                <li><strong>Batches per Trial:</strong> 3</li>
+                <li><strong>Queries per Batch:</strong> 1,000</li>
+                <li><strong>Disruptions per Batch:</strong> 1,000</li>
+            </ul>
+        `;
+        
+        // Group by trial and batch
+        const trials = {};
+        data.forEach(row => {
+            if (!trials[row.trial]) trials[row.trial] = {};
+            if (!trials[row.trial][row.batch]) trials[row.trial][row.batch] = { HC2L: null, DHL: null };
+            trials[row.trial][row.batch][row.algorithm] = row;
+        });
+        
+        // Create table
+        const table = document.createElement('table');
+        table.className = 'appendix-table';
+        table.innerHTML = `
+            <thead>
+                <tr>
+                    <th colspan="2">Batch (Updates)</th>
+                    <th colspan="2">Lazy Update Time (ms)</th>
+                    <th colspan="2">Threshold Rebuild Time (ms)</th>
+                    <th colspan="2">Peak Label Size (MB)</th>
+                    <th colspan="2">% Label Size Change</th>
+                    <th colspan="2">Avg Query Time (ms)</th>
+                </tr>
+                <tr>
+                    <th>Trial</th>
+                    <th>Disruption Level</th>
+                    <th>HC2L</th>
+                    <th>DHL</th>
+                    <th>HC2L</th>
+                    <th>DHL</th>
+                    <th>HC2L</th>
+                    <th>DHL</th>
+                    <th>HC2L</th>
+                    <th>DHL</th>
+                    <th>HC2L</th>
+                    <th>DHL</th>
+                </tr>
+            </thead>
+        `;
+        
+        const tbody = document.createElement('tbody');
+        Object.keys(trials).sort((a, b) => parseInt(a) - parseInt(b)).forEach(trialNum => {
+            const batches = trials[trialNum];
+            const rows = [];
+            
+            Object.keys(batches).sort((a, b) => parseInt(a) - parseInt(b)).forEach(batchNum => {
+                const batch = batches[batchNum];
+                const hc2l = batch.HC2L || {};
+                const dhl = batch.DHL || {};
+                
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${trialNum}</td>
+                    <td>${hc2l.disruptionLevel || dhl.disruptionLevel || 1000}</td>
+                    <td>${(hc2l.lazyUpdateTime || 0).toFixed(2)}</td>
+                    <td>${(dhl.lazyUpdateTime || 0).toFixed(2)}</td>
+                    <td>${(hc2l.thresholdRebuildTime || 0).toFixed(2)}</td>
+                    <td>${(dhl.thresholdRebuildTime || 0).toFixed(2)}</td>
+                    <td>${((hc2l.peakLabelSize || 0) / 1024).toFixed(2)}</td>
+                    <td>${((dhl.peakLabelSize || 0) / 1024).toFixed(2)}</td>
+                    <td>${(hc2l.labelSizeChange || 0).toFixed(2)}%</td>
+                    <td>${(dhl.labelSizeChange || 0).toFixed(2)}%</td>
+                    <td>${(hc2l.avgQueryTime || 0).toFixed(3)}</td>
+                    <td>${(dhl.avgQueryTime || 0).toFixed(3)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        });
+        table.appendChild(tbody);
+        
+        container.innerHTML = '';
+        container.appendChild(summary);
+        container.appendChild(table);
+    },
+
+    renderQueryAppendix(data) {
+        const container = document.getElementById('appendix-query-content');
+        if (!container || !data.metrics || data.metrics.length === 0) {
+            if (container) container.innerHTML = '<p class="text-muted text-center py-4">No query performance data available</p>';
+            return;
+        }
+        
+        // Create summary
+        const summary = document.createElement('div');
+        summary.className = 'appendix-summary-card';
+        summary.innerHTML = `
+            <h5>📊 Performance Comparison Summary</h5>
+            <ul>
+                <li>Comparing <strong>DHL</strong> vs <strong>DHC2L</strong> across ${(data.trials || []).length} trials</li>
+                <li>Average of 3,000 queries per trial</li>
+            </ul>
+        `;
+        
+        // Create table
+        const table = document.createElement('table');
+        table.className = 'appendix-table';
+        table.innerHTML = `
+            <thead>
+                <tr>
+                    <th>Metric</th>
+                    <th>DHL (Avg)</th>
+                    <th>DHC2L (Avg)</th>
+                    <th>% Improvement</th>
+                </tr>
+            </thead>
+        `;
+        
+        const tbody = document.createElement('tbody');
+        data.metrics.forEach(metric => {
+            const tr = document.createElement('tr');
+            const improvClass = metric.improvement > 0 ? 'improvement-positive' : metric.improvement < 0 ? 'improvement-negative' : '';
+            const improvSign = metric.improvement > 0 ? '+' : '';
+            tr.innerHTML = `
+                <td class="text-left metric-label">${metric.name}</td>
+                <td class="metric-value">${metric.dhl.toFixed(2)}</td>
+                <td class="metric-value">${metric.hc2l.toFixed(2)}</td>
+                <td class="${improvClass}">${improvSign}${metric.improvement.toFixed(2)}%</td>
+            `;
+            tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        
+        container.innerHTML = '';
+        container.appendChild(summary);
+        container.appendChild(table);
+    },
+
+    renderSimilarityAppendix(data) {
+        const container = document.getElementById('appendix-similarity-content');
+        if (!container || data.length === 0) {
+            if (container) container.innerHTML = '<p class="text-muted text-center py-4">No route similarity data available</p>';
+            return;
+        }
+        
+        const avgFrechet = data.reduce((s, r) => s + parseFloat(r.frechetDistance), 0) / data.length;
+        const avgTimeDev = data.reduce((s, r) => s + parseFloat(r.timeDev), 0) / data.length;
+        
+        // Create summary
+        const summary = document.createElement('div');
+        summary.className = 'appendix-summary-card';
+        summary.innerHTML = `
+            <h5>🎯 Route Similarity Evaluation</h5>
+            <ul>
+                <li><strong>Fréchet Distance:</strong> Measures route path similarity</li>
+                <li><strong>Excellent:</strong> &lt; 200m | <strong>Good:</strong> 200-400m | <strong>Fair:</strong> &gt; 400m</li>
+                <li><strong>Travel Time Deviation:</strong> Measures ETA accuracy</li>
+                <li><strong>Excellent:</strong> &lt; 5% | <strong>Good:</strong> 5-10% | <strong>Fair:</strong> &gt; 10%</li>
+            </ul>
+        `;
+        
+        // Create table
+        const table = document.createElement('table');
+        table.className = 'appendix-table';
+        table.innerHTML = `
+            <thead>
+                <tr>
+                    <th>OD Pair</th>
+                    <th>Distance (km)</th>
+                    <th>Travel Time (min)</th>
+                    <th>Fréchet Distance (m)</th>
+                    <th>FD Rating</th>
+                    <th>Travel Time Deviation (%)</th>
+                    <th>TTD Rating</th>
+                </tr>
+            </thead>
+        `;
+        
+        const tbody = document.createElement('tbody');
+        data.forEach(row => {
+            const fdClass = row.fdRating === 'Excellent' ? 'rating-excellent' : 
+                          row.fdRating === 'Good' ? 'rating-good' : 
+                          row.fdRating === 'Fair' ? 'rating-fair' : 'rating-fail';
+            
+            const ttdClass = row.ttdRating === 'Excellent' ? 'rating-excellent' : 
+                           row.ttdRating === 'Good' ? 'rating-good' : 
+                           row.ttdRating === 'Fair' ? 'rating-fair' : 'rating-fail';
+            
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="font-semibold">${row.pairId}</td>
+                <td>${row.distance}</td>
+                <td>${row.travelTime}</td>
+                <td>${row.frechetDistance}</td>
+                <td><span class="${fdClass}">${row.fdRating}</span></td>
+                <td>${row.timeDev}</td>
+                <td><span class="${ttdClass}">${row.ttdRating}</span></td>
+            `;
+            tbody.appendChild(tr);
+        });
+        
+        // Add averages row
+        const avgRow = document.createElement('tr');
+        avgRow.className = 'averages-row';
+        avgRow.innerHTML = `
+            <td colspan="3">Average</td>
+            <td>${avgFrechet.toFixed(2)}</td>
+            <td>-</td>
+            <td>${avgTimeDev.toFixed(2)}%</td>
+            <td>-</td>
+        `;
+        tbody.appendChild(avgRow);
+        table.appendChild(tbody);
+        
+        container.innerHTML = '';
+        container.appendChild(summary);
+        container.appendChild(table);
+    },
+
+    /**
+     * Export appendix data as CSV
+     */
+    exportAppendixCSV(appendixType) {
+        console.log(`Exporting ${appendixType} appendix as CSV...`);
+        // TODO: Implement CSV export functionality
+        alert(`CSV export for ${appendixType} appendix will be implemented soon.`);
     }
 };
 

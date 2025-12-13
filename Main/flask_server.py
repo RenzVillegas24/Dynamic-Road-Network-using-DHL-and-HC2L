@@ -52,9 +52,6 @@ from user_disruptions import (
 # Import route recalculation endpoint
 import route_recalculation_endpoint
 
-# Import experiment automation API
-from experiment_api import experiment_bp
-
 # Get logger instance
 console_logger = get_logger("FlaskServer")
 
@@ -63,9 +60,6 @@ app = Flask(__name__)
 # Configure Flask from config file
 app.config['DEBUG'] = Config.FLASK_DEBUG
 app.config['ENV'] = Config.FLASK_ENV
-
-# Register experiment automation API blueprint
-app.register_blueprint(experiment_bp)
 
 # Initialize settings manager (persistent storage)
 settings_manager = init_settings_manager()
@@ -103,6 +97,8 @@ backend_handler = BackendLogHandler()
 backend_handler.setLevel(logging.DEBUG)
 backend_formatter = logging.Formatter('%(levelname)s - %(module)s:%(lineno)d - %(message)s')
 backend_handler.setFormatter(backend_formatter)
+# Import boundary filter for filtering points near boundaries
+from boundary_filter import is_in_excluded_area, is_point_in_valid_area
 
 # Add handler to Flask logger and root logger
 app.logger.addHandler(backend_handler)
@@ -119,31 +115,22 @@ app.logger.info("Backend logging system initialized")
 # Initialize components using config paths
 console_logger.info("Initializing Core Components")
 
-# Initialize mapper with excluded bounding box for snapping feature
-# Format: "min_lon,min_lat,max_lon,max_lat"
-EXCLUDED_BBOX = "121.072083,14.728427,121.137571,14.780285"  # Disregarded map area for snapping
+# Initialize boundary filter (replaces old excluded_bbox logic)
+# The boundary filter automatically loads the Quezon City boundary
+# and filters points that are too close to the boundary
+try:
+    from boundary_filter import get_boundary_filter
+    boundary_filter = get_boundary_filter()
+    console_logger.success("Boundary filter initialized")
+    info = boundary_filter.get_boundary_info()
+    console_logger.data(f"  Place: {info['place_name']}")
+    console_logger.data(f"  Buffer: {info['buffer_meters']}m inward")
+    console_logger.data(f"  Cached: {info['cached']}")
+except Exception as e:
+    console_logger.warning(f"Could not initialize boundary filter: {e}")
+    boundary_filter = None
 
-# Parse excluded bbox for random route generation filtering
-def parse_excluded_bbox(bbox_str: str) -> dict:
-    """Parse bounding box string into dict with min/max lat/lon."""
-    parts = [float(x.strip()) for x in bbox_str.split(',')]
-    return {
-        'min_lon': parts[0],
-        'min_lat': parts[1],
-        'max_lon': parts[2],
-        'max_lat': parts[3]
-    }
-
-def is_in_excluded_bbox(lat: float, lng: float, bbox: dict = None) -> bool:
-    """Check if a point is within the excluded bounding box."""
-    if bbox is None:
-        bbox = EXCLUDED_BBOX_PARSED
-    return (bbox['min_lon'] <= lng <= bbox['max_lon'] and
-            bbox['min_lat'] <= lat <= bbox['max_lat'])
-
-EXCLUDED_BBOX_PARSED = parse_excluded_bbox(EXCLUDED_BBOX)
-
-mapper = NodeMapper(str(Config.NODES_CSV), excluded_bbox=EXCLUDED_BBOX)
+mapper = NodeMapper(str(Config.NODES_CSV))
 try:
     gps_router = HC2LRouter()
     console_logger.success("HC2L Router initialized")
@@ -257,9 +244,9 @@ def validate_location_near_road(lat: float, lng: float, max_distance: float = 10
         dict with success status and snapped coordinates if valid
     """
     try:
-        # Check if point is in excluded bbox first
-        if is_in_excluded_bbox(lat, lng):
-            return {'valid': False, 'error': 'Location is in excluded area'}
+        # Check if point is in excluded area (near boundary) first
+        if is_in_excluded_area(lat, lng):
+            return {'valid': False, 'error': 'Location is near boundary'}
         
         snap_result = mapper.snap_to_nearest_road(lat, lng, max_distance=max_distance)
         if snap_result:
@@ -422,11 +409,11 @@ def get_available_matched_edges() -> dict:
                             t_lat = float(target_lat) if target_lat else None
                             t_lon = float(target_lon) if target_lon else None
                             
-                            # Skip edge if either endpoint is in excluded bbox
-                            if s_lat and s_lon and is_in_excluded_bbox(s_lat, s_lon):
+                            # Skip edge if either endpoint is in excluded area (near boundary)
+                            if s_lat and s_lon and is_in_excluded_area(s_lat, s_lon):
                                 excluded_count += 1
                                 continue
-                            if t_lat and t_lon and is_in_excluded_bbox(t_lat, t_lon):
+                            if t_lat and t_lon and is_in_excluded_area(t_lat, t_lon):
                                 excluded_count += 1
                                 continue
                         except (ValueError, TypeError):
@@ -2049,14 +2036,182 @@ def get_demo_disruptions(disruption_key, set_key):
         
         return jsonify({
             'success': True,
-            'flow': flow_data,
-            'incidents': incident_data,
+            'disruptions': {
+                'flow': flow_data,
+                'incidents': incident_data
+            },
             'flowCount': len(flow_data),
             'incidentCount': len(incident_data)
         })
         
     except Exception as e:
         console_logger.error(f"Error loading disruptions: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/demo/disruptions/<disruption_key>/<set_key>/exists', methods=['GET'])
+def check_disruption_exists(disruption_key, set_key):
+    """
+    Check if a disruption set exists on disk.
+    
+    Args:
+        disruption_key: The disruption folder key (e.g., 'ExperimentMode')
+        set_key: The set key (e.g., 'set_query_0')
+    
+    Returns:
+        {"success": true, "exists": true/false}
+    """
+    try:
+        base_path = DEMO_DISRUPTIONS_DIR / disruption_key / set_key
+        exists = base_path.exists() and (base_path / 'flow').exists() or (base_path / 'incidents').exists()
+        
+        return jsonify({
+            'success': True,
+            'exists': exists
+        })
+    except Exception as e:
+        console_logger.error(f"Error checking disruption existence: {e}")
+        return jsonify({'success': False, 'error': str(e), 'exists': False}), 500
+
+
+@app.route('/api/demo/disruptions/<disruption_key>/<set_key>', methods=['POST'])
+def save_disruption_set(disruption_key, set_key):
+    """
+    Save a disruption set to disk in CSV format.
+    Handles both formats:
+    - Format from /api/demo/random_edges (simplified field names)
+    - Format from internal generation (full prefixed field names)
+    
+    Args:
+        disruption_key: The disruption folder key (e.g., 'ExperimentMode')
+        set_key: The set key (e.g., 'set_query_0')
+    
+    Request body:
+    {
+        "disruptions": {
+            "flow": [...],
+            "incidents": [...]
+        }
+    }
+    
+    Returns:
+        {"success": true}
+    """
+    import csv
+    
+    try:
+        data = request.get_json()
+        disruptions = data.get('disruptions', {})
+        flow_data = disruptions.get('flow', [])
+        incident_data = disruptions.get('incidents', [])
+        
+        # Create directory structure
+        base_path = DEMO_DISRUPTIONS_DIR / disruption_key / set_key
+        base_path.mkdir(parents=True, exist_ok=True)
+        
+        # Helper function to normalize flow data to standard CSV format
+        def normalize_flow(flow_item):
+            """Convert flow item from any format to standard CSV format"""
+            return {
+                'id_hash': flow_item.get('id_hash', ''),
+                'source': str(int(flow_item.get('source', 0))),
+                'target': str(int(flow_item.get('target', 0))),
+                'source_lat': str(float(flow_item.get('source_lat', 0))),
+                'source_lon': str(float(flow_item.get('source_lon', 0))),
+                'target_lat': str(float(flow_item.get('target_lat', 0))),
+                'target_lon': str(float(flow_item.get('target_lon', 0))),
+                'flow_speed_kph': str(float(flow_item.get('speed_kph', flow_item.get('flow_speed_kph', 30)))),
+                'flow_free_flow_kph': str(float(flow_item.get('free_flow_kph', flow_item.get('flow_free_flow_kph', 60)))),
+                'flow_jam_factor': str(float(flow_item.get('jam_factor', flow_item.get('flow_jam_factor', 5)))),
+                'flow_confidence': str(float(flow_item.get('flow_confidence', 0.95))),
+                'flow_traversability': flow_item.get('flow_traversability', 'open'),
+                'highway_type': flow_item.get('highway_type', 'primary'),
+                'road_name': flow_item.get('road_name', 'Unknown Road')
+            }
+        
+        # Helper function to normalize incident data to standard CSV format
+        def normalize_incident(incident_item):
+            """Convert incident item from any format to standard CSV format"""
+            # Handle road_closed field - could be string 'True'/'False' or boolean
+            road_closed = incident_item.get('road_closed', incident_item.get('incident_road_closed', False))
+            if isinstance(road_closed, str):
+                road_closed = road_closed.lower() == 'true'
+            
+            return {
+                'source': str(int(incident_item.get('source', 0))),
+                'target': str(int(incident_item.get('target', 0))),
+                'source_lat': str(float(incident_item.get('source_lat', 0))),
+                'source_lon': str(float(incident_item.get('source_lon', 0))),
+                'target_lat': str(float(incident_item.get('target_lat', 0))),
+                'target_lon': str(float(incident_item.get('target_lon', 0))),
+                'incident_id': incident_item.get('incident_id', ''),
+                'incident_type': incident_item.get('type', incident_item.get('incident_type', 'accident')),
+                'incident_criticality': incident_item.get('criticality', incident_item.get('incident_criticality', 'minor')),
+                'incident_description': incident_item.get('incident_description', ''),
+                'incident_road_closed': str(road_closed),
+                'incident_start_time': incident_item.get('incident_start_time', ''),
+                'incident_end_time': incident_item.get('incident_end_time', ''),
+                'highway_type': incident_item.get('highway_type', 'primary'),
+                'road_name': incident_item.get('road_name', 'Unknown Road')
+            }
+        
+        # Save flow data
+        if flow_data:
+            flow_dir = base_path / 'flow'
+            flow_dir.mkdir(exist_ok=True)
+            
+            flow_file = flow_dir / 'flow_disruptions.csv'
+            normalized_flow = [normalize_flow(item) for item in flow_data]
+            
+            with open(flow_file, 'w', newline='') as f:
+                if len(normalized_flow) > 0:
+                    fieldnames = [
+                        'id_hash', 'source', 'target', 'source_lat', 'source_lon', 
+                        'target_lat', 'target_lon', 'flow_speed_kph', 'flow_free_flow_kph',
+                        'flow_jam_factor', 'flow_confidence', 'flow_traversability',
+                        'highway_type', 'road_name'
+                    ]
+                    writer = csv.DictWriter(f, fieldnames=fieldnames)
+                    writer.writeheader()
+                    writer.writerows(normalized_flow)
+            
+            console_logger.info(f"Saved {len(normalized_flow)} flow disruptions to {flow_file}")
+        
+        # Save incident data
+        if incident_data:
+            incidents_dir = base_path / 'incidents'
+            incidents_dir.mkdir(exist_ok=True)
+            
+            incidents_file = incidents_dir / 'incident_disruptions.csv'
+            normalized_incidents = [normalize_incident(item) for item in incident_data]
+            
+            with open(incidents_file, 'w', newline='') as f:
+                if len(normalized_incidents) > 0:
+                    fieldnames = [
+                        'source', 'target', 'source_lat', 'source_lon', 'target_lat', 'target_lon',
+                        'incident_id', 'incident_type', 'incident_criticality', 'incident_description',
+                        'incident_road_closed', 'incident_start_time', 'incident_end_time',
+                        'highway_type', 'road_name'
+                    ]
+                    writer = csv.DictWriter(f, fieldnames=fieldnames)
+                    writer.writeheader()
+                    writer.writerows(normalized_incidents)
+            
+            console_logger.info(f"Saved {len(normalized_incidents)} incident disruptions to {incidents_file}")
+        
+        console_logger.info(f"Saved disruption set: {disruption_key}/{set_key} ({len(flow_data)} flow, {len(incident_data)} incidents)")
+        
+        return jsonify({
+            'success': True,
+            'path': str(base_path),
+            'flowCount': len(flow_data),
+            'incidentCount': len(incident_data)
+        })
+        
+    except Exception as e:
+        console_logger.error(f"Error saving disruption set: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -2221,9 +2376,9 @@ def get_random_road_points():
             try:
                 src_lat = float(edge.get('source_lat', 0))
                 src_lng = float(edge.get('source_lon', 0))
-                # Check if within bounds AND not in excluded bbox
+                # Check if within bounds AND not in excluded area (near boundary)
                 if min_lat <= src_lat <= max_lat and min_lng <= src_lng <= max_lng:
-                    if not is_in_excluded_bbox(src_lat, src_lng):
+                    if is_point_in_valid_area(src_lat, src_lng):
                         valid_edges.append({
                             'lat': src_lat,
                             'lng': src_lng,
@@ -2233,9 +2388,9 @@ def get_random_road_points():
                 
                 tgt_lat = float(edge.get('target_lat', 0))
                 tgt_lng = float(edge.get('target_lon', 0))
-                # Check if within bounds AND not in excluded bbox
+                # Check if within bounds AND not in excluded area (near boundary)
                 if min_lat <= tgt_lat <= max_lat and min_lng <= tgt_lng <= max_lng:
-                    if not is_in_excluded_bbox(tgt_lat, tgt_lng):
+                    if is_point_in_valid_area(tgt_lat, tgt_lng):
                         valid_edges.append({
                             'lat': tgt_lat,
                             'lng': tgt_lng,
@@ -2257,8 +2412,8 @@ def get_random_road_points():
             base = random.choice(valid_edges)
             new_lat = base['lat'] + random.uniform(-0.001, 0.001)
             new_lng = base['lng'] + random.uniform(-0.001, 0.001)
-            # Make sure the varied point is also not in excluded bbox
-            if not is_in_excluded_bbox(new_lat, new_lng):
+            # Make sure the varied point is also not in excluded area (near boundary)
+            if is_point_in_valid_area(new_lat, new_lng):
                 selected.append({
                     'lat': new_lat,
                     'lng': new_lng,
