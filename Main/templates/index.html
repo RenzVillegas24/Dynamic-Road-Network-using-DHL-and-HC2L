@@ -24,6 +24,9 @@
   <!-- Chart.js for performance visualizations -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
+  <!-- Socket.IO for real-time communication -->
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js" crossorigin="anonymous"></script>
+
   <!-- Custom CSS (New Modular System) -->
   <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/popup-styles.css') }}">
@@ -117,8 +120,11 @@
         {% include 'components/panels/finder-panel.html' %}
         {% include 'components/panels/disruptions-panel.html' %}
         {% include 'components/panels/metrics-panel.html' %}
+        {% include 'components/panels/experiment-runner-panel.html' %}
+        <!-- 
         {% include 'components/panels/demo-runner-panel.html' %}
-        {% include 'components/panels/demo-creator-panel.html' %}
+        {% include 'components/panels/demo-creator-panel.html' %} 
+        -->
         {% include 'components/panels/developer-panel.html' %}
         {% include 'components/panels/comparison-panel.html' %}
       </div>
@@ -156,8 +162,11 @@
   <script src="{{ url_for('static', filename='js/csv-export.js') }}"></script>
   <!-- demo-automation.js removed - redundant with demo-runner.js -->
   <script src="{{ url_for('static', filename='js/logging-system.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/experiment-runner.js') }}"></script>
+  <!--   
   <script src="{{ url_for('static', filename='js/demo-runner.js') }}"></script>
   <script src="{{ url_for('static', filename='js/demo-creator.js') }}"></script>
+  -->
 
   <script>
 

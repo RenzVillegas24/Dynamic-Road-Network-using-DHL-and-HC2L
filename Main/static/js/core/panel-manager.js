@@ -126,46 +126,53 @@ const PanelManager = (function () {
       size: 'xl',
       isPassable: () => true
     },
-    'demo-runner': {
-      id: 'demo-runner-panel',
-      title: 'Demo Runner',
+     'experiment-runner': {
+      id: 'experiment-runner-panel',
+      title: 'Experiment Runner',
       icon: 'play-circle',
       size: 'xl',
       isPassable: () => true
     },
-    'demo-creator': {
-      id: 'demo-creator-panel',
-      title: 'Demo Creator',
-      icon: 'plus-circle',
-      size: 'lg',
-      isPassable: () => {
-        if (isDemoRunning()) {
-          // Show modal dialog instead of toast
-          showDemoStopModal('demo-creator', 'sidebar');
-          return false;
-        }
+    // 'demo-runner': {
+    //   id: 'demo-runner-panel',
+    //   title: 'Demo Runner',
+    //   icon: 'play-circle',
+    //   size: 'xl',
+    //   isPassable: () => true
+    // },
+    // 'demo-creator': {
+    //   id: 'demo-creator-panel',
+    //   title: 'Demo Creator',
+    //   icon: 'plus-circle',
+    //   size: 'lg',
+    //   isPassable: () => {
+    //     if (isDemoRunning()) {
+    //       // Show modal dialog instead of toast
+    //       showDemoStopModal('demo-creator', 'sidebar');
+    //       return false;
+    //     }
 
-        resetSystemState();
+    //     resetSystemState();
 
-        // Save the current Route Finder state before making any changes
-        saveRouteFinderState();
+    //     // Save the current Route Finder state before making any changes
+    //     saveRouteFinderState();
 
-        // Turn off admin panel toggles to prevent interference during demo
-        const incidentToggle = document.getElementById('show-active-incidents');
-        const flowToggle = document.getElementById('show-traffic-overlay');
+    //     // Turn off admin panel toggles to prevent interference during demo
+    //     const incidentToggle = document.getElementById('show-active-incidents');
+    //     const flowToggle = document.getElementById('show-traffic-overlay');
 
-        if (incidentToggle && incidentToggle.checked) {
-          incidentToggle.checked = false;
-          incidentToggle.dispatchEvent(new Event('change'));
-        }
-        if (flowToggle && flowToggle.checked) {
-          flowToggle.checked = false;
-          flowToggle.dispatchEvent(new Event('change'));
-        }
+    //     if (incidentToggle && incidentToggle.checked) {
+    //       incidentToggle.checked = false;
+    //       incidentToggle.dispatchEvent(new Event('change'));
+    //     }
+    //     if (flowToggle && flowToggle.checked) {
+    //       flowToggle.checked = false;
+    //       flowToggle.dispatchEvent(new Event('change'));
+    //     }
 
-        return true;
-      }
-    }
+    //     return true;
+    //   }
+    // }
   };
 
   // State

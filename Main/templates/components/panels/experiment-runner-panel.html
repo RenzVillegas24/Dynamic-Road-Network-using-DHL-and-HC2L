@@ -1,0 +1,406 @@
+<!-- Experiment Runner Panel -->
+<div id="experiment-runner-panel" class="panel translate-x-full">
+  <div class="panel__header panel__header--purple">
+    <div class="panel__icon">
+      <i data-lucide="flask-conical" class="w-6 h-6"></i>
+    </div>
+    <div class="panel__title-group">
+      <h2 class="panel__title">Experiment Runner</h2>
+      <p class="panel__subtitle">Run performance experiments</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <!-- Connection Status Indicator -->
+      <div id="experiment-connection-status" class="w-3 h-3 rounded-full bg-gray-400" title="Disconnected"></div>
+      <button id="close-experiment-runner" class="panel__close">
+        <i data-lucide="x" class="w-6 h-6"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Tab Navigation -->
+  <div class="panel__nav">
+    <div class="tabs tabs--pills">
+      <div class="tabs__list">
+        <button data-experiment-tab="settings" class="tabs__tab bg-purple-600 text-white" aria-selected="true">
+          <i data-lucide="settings" class="w-4 h-4"></i> Settings
+        </button>
+        <button data-experiment-tab="running" class="tabs__tab bg-gray-200 text-gray-700">
+          <i data-lucide="play" class="w-4 h-4"></i> Running
+        </button>
+        <button data-experiment-tab="results" class="tabs__tab bg-gray-200 text-gray-700">
+          <i data-lucide="bar-chart-3" class="w-4 h-4"></i> Results
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab Content: Settings -->
+  <div id="experiment-tab-settings" data-experiment-tab-content class="panel__body space-y-4">
+    <!-- Fixed Parameters Notice -->
+    <div class="bg-purple-50 border border-purple-200 rounded-lg p-3 text-xs text-purple-800">
+      <p class="font-bold mb-1">🧪 Fixed Experiment Parameters</p>
+      <ul class="list-disc list-inside space-y-1">
+        <li><strong>3 Trials</strong> - Each configuration tested 3 times</li>
+        <li><strong>3 Batches per Trial</strong> - Sequential update batches</li>
+        <li><strong>1,000 Disruptions per Batch</strong> - Total 3,000 per trial</li>
+        <li><strong>1,000 Queries per Batch</strong> - Total 3,000 queries per trial</li>
+        <li><strong>Both Algorithms</strong> - DHL & HC2L compared</li>
+      </ul>
+    </div>
+
+    <!-- Preset Experiments -->
+    <div class="section-card section-card--info">
+      <div class="section-card__header">
+        <div class="section-card__icon section-card__icon--info">
+          <i data-lucide="folder" class="w-5 h-5"></i>
+        </div>
+        <h4 class="section-card__title">Preset Experiments</h4>
+      </div>
+      <div class="section-card__body">
+        <div id="experiment-preset-list" class="space-y-2">
+          <p class="text-muted text-center py-4">Loading presets...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Threading Configuration -->
+    <div class="section-card section-card--warning">
+      <div class="section-card__header">
+        <div class="section-card__icon section-card__icon--warning">
+          <i data-lucide="cpu" class="w-5 h-5"></i>
+        </div>
+        <h4 class="section-card__title">Threading Configuration</h4>
+      </div>
+      <div class="section-card__body space-y-3">
+        <div class="form-group">
+          <label class="form-group__label">Thread Count</label>
+          <div class="flex items-center justify-between bg-gray-50 rounded-lg p-3">
+            <div>
+              <span class="font-medium">Advanced Mode (9 threads)</span>
+              <p class="text-xs text-gray-500">3 trials × 3 batches = 9 parallel threads</p>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="experiment-thread-count">
+              <span class="toggle-switch__slider"></span>
+            </label>
+          </div>
+          <div class="mt-2 text-xs text-gray-500">
+            Default: 3 threads (one per trial). Enable for faster execution with higher resource usage.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tau Configuration -->
+    <div class="section-card section-card--success">
+      <div class="section-card__header">
+        <div class="section-card__icon section-card__icon--success">
+          <i data-lucide="sliders" class="w-5 h-5"></i>
+        </div>
+        <h4 class="section-card__title">Tau Threshold Configuration</h4>
+      </div>
+      <div class="section-card__body space-y-4">
+        <!-- Tau Mode -->
+        <div class="form-group">
+          <label class="form-group__label">Tau Mode</label>
+          <div class="nav-select nav-select--grid">
+            <label class="nav-select__option tau-mode-option" data-color="blue">
+              <input type="radio" name="experiment-tau-mode" value="fixed">
+              <div class="nav-select__icon"><i data-lucide="lock" class="w-4 h-4"></i></div>
+              <div class="nav-select__content">
+                <span class="nav-select__title">Fixed</span>
+                <span class="nav-select__description">Same τ for all queries</span>
+              </div>
+            </label>
+            <label class="nav-select__option tau-mode-option" data-color="amber">
+              <input type="radio" name="experiment-tau-mode" value="random" checked>
+              <div class="nav-select__icon"><i data-lucide="shuffle" class="w-4 h-4"></i></div>
+              <div class="nav-select__content">
+                <span class="nav-select__title">Random</span>
+                <span class="nav-select__description">Random τ per scope</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Fixed Tau Settings -->
+        <div id="experiment-tau-fixed-settings" class="hidden space-y-3">
+          <div class="form-group">
+            <label class="form-group__label">Fixed Tau Value</label>
+            <input type="number" id="experiment-tau-fixed-value" value="0.5" min="0" max="1" step="0.1"
+              class="form-input">
+          </div>
+        </div>
+
+        <!-- Random Tau Settings -->
+        <div id="experiment-tau-random-settings" class="space-y-3">
+          <div class="grid grid-cols-2 gap-3">
+            <div class="form-group">
+              <label class="form-group__label">Min Tau</label>
+              <input type="number" id="experiment-tau-random-min" value="0.1" min="0" max="1" step="0.1"
+                class="form-input">
+            </div>
+            <div class="form-group">
+              <label class="form-group__label">Max Tau</label>
+              <input type="number" id="experiment-tau-random-max" value="0.9" min="0" max="1" step="0.1"
+                class="form-input">
+            </div>
+          </div>
+
+          <!-- Tau Scope -->
+          <div class="form-group">
+            <label class="form-group__label">Tau Scope</label>
+            <div class="nav-select nav-select--grid nav-select--2cols">
+              <label class="nav-select__option tau-scope-option" data-color="blue">
+                <input type="radio" name="experiment-tau-scope" value="all">
+                <div class="nav-select__content">
+                  <span class="nav-select__title">All</span>
+                  <span class="nav-select__description">Same τ everywhere</span>
+                </div>
+              </label>
+              <label class="nav-select__option tau-scope-option" data-color="green">
+                <input type="radio" name="experiment-tau-scope" value="per-trial">
+                <div class="nav-select__content">
+                  <span class="nav-select__title">Per Trial</span>
+                  <span class="nav-select__description">New τ each trial</span>
+                </div>
+              </label>
+              <label class="nav-select__option tau-scope-option" data-color="amber">
+                <input type="radio" name="experiment-tau-scope" value="per-route">
+                <div class="nav-select__content">
+                  <span class="nav-select__title">Per Route</span>
+                  <span class="nav-select__description">New τ each route</span>
+                </div>
+              </label>
+              <label class="nav-select__option tau-scope-option ring-2 ring-purple-500 border-purple-500" data-color="purple">
+                <input type="radio" name="experiment-tau-scope" value="per-trial-route" checked>
+                <div class="nav-select__content">
+                  <span class="nav-select__title">Per Trial-Route</span>
+                  <span class="nav-select__description">New τ each trial+route</span>
+                </div>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Start Button -->
+    <div class="sticky bottom-0 bg-white py-4 border-t border-gray-200">
+      <button id="start-experiment-btn" class="btn btn--success btn--lg w-full">
+        <i data-lucide="play" class="w-5 h-5"></i>
+        <span>Start Experiment</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Tab Content: Running -->
+  <div id="experiment-tab-running" data-experiment-tab-content class="hidden panel__body space-y-4">
+    <!-- Status Card -->
+    <div class="section-card section-card--primary">
+      <div class="section-card__header">
+        <div class="section-card__icon section-card__icon--primary">
+          <i data-lucide="activity" class="w-5 h-5"></i>
+        </div>
+        <h4 class="section-card__title">Experiment Status</h4>
+        <span id="experiment-status" class="text-sm font-medium text-green-600">Initializing</span>
+      </div>
+      <div class="section-card__body space-y-3">
+        <!-- Overall Progress -->
+        <div>
+          <div class="flex items-center justify-between text-sm mb-1">
+            <span class="text-gray-600">Overall Progress</span>
+            <span id="experiment-overall-progress-text" class="font-medium">0%</span>
+          </div>
+          <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+            <div id="experiment-overall-progress-bar" class="bg-purple-600 h-full transition-all duration-300"
+              style="width: 0%"></div>
+          </div>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="grid grid-cols-3 gap-3 text-center">
+          <div class="bg-gray-50 rounded-lg p-2">
+            <div class="text-xs text-gray-500">Routes</div>
+            <div id="experiment-route-count" class="font-bold text-purple-600">0 / 0</div>
+          </div>
+          <div class="bg-gray-50 rounded-lg p-2">
+            <div class="text-xs text-gray-500">ETA</div>
+            <div id="experiment-eta" class="font-bold text-purple-600">--</div>
+          </div>
+          <div class="bg-gray-50 rounded-lg p-2">
+            <div class="text-xs text-gray-500">Last Update</div>
+            <div id="experiment-last-update" class="font-bold text-gray-600 text-xs">--</div>
+          </div>
+        </div>
+
+        <!-- Control Buttons -->
+        <div class="flex gap-2">
+          <button id="pause-experiment-btn" class="btn btn--warning btn--sm flex-1">
+            <i data-lucide="pause" class="w-4 h-4"></i>
+            <span class="btn-text">Pause</span>
+          </button>
+          <button id="stop-experiment-btn" class="btn btn--danger btn--sm flex-1">
+            <i data-lucide="square" class="w-4 h-4"></i>
+            <span>Stop</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Disruption Display -->
+    <div id="experiment-disruption-display" class="section-card section-card--warning">
+      <div class="section-card__header">
+        <div class="section-card__icon section-card__icon--warning">
+          <i data-lucide="traffic-cone" class="w-5 h-5"></i>
+        </div>
+        <h4 class="section-card__title">Active Disruptions</h4>
+        <span class="disruption-count text-sm text-gray-500">0 disruptions</span>
+      </div>
+      <div class="section-card__body">
+        <div class="flex items-center gap-4 text-sm">
+          <label class="flex items-center gap-2">
+            <input type="checkbox" id="experiment-show-incidents" checked class="form-checkbox">
+            <span>Show Incidents</span>
+          </label>
+          <label class="flex items-center gap-2">
+            <input type="checkbox" id="experiment-show-flow" checked class="form-checkbox">
+            <span>Show Flow</span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Thread Displays Container -->
+    <div class="section-card">
+      <div class="section-card__header">
+        <div class="section-card__icon section-card__icon--info">
+          <i data-lucide="cpu" class="w-5 h-5"></i>
+        </div>
+        <h4 class="section-card__title">Thread Progress</h4>
+      </div>
+      <div id="experiment-threads-container" class="section-card__body space-y-4">
+        <!-- Thread displays will be dynamically inserted here -->
+        <p class="text-muted text-center py-4">Waiting for experiment to start...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab Content: Results -->
+  <div id="experiment-tab-results" data-experiment-tab-content class="hidden panel__body space-y-4">
+    <!-- Results Summary Card -->
+    <div class="section-card section-card--success">
+      <div class="section-card__header">
+        <div class="section-card__icon section-card__icon--success">
+          <i data-lucide="check-circle" class="w-5 h-5"></i>
+        </div>
+        <h4 class="section-card__title">Results Summary</h4>
+      </div>
+      <div id="experiment-results-summary" class="section-card__body">
+        <p class="text-muted text-center py-4">No results yet. Run an experiment to see results.</p>
+      </div>
+    </div>
+
+    <!-- Algorithm Comparison -->
+    <div class="section-card section-card--info">
+      <div class="section-card__header">
+        <div class="section-card__icon section-card__icon--info">
+          <i data-lucide="bar-chart-2" class="w-5 h-5"></i>
+        </div>
+        <h4 class="section-card__title">Algorithm Comparison</h4>
+      </div>
+      <div id="experiment-algorithm-comparison" class="section-card__body">
+        <div class="grid grid-cols-2 gap-4">
+          <!-- DHL Column -->
+          <div class="bg-blue-50 rounded-lg p-4">
+            <h5 class="font-bold text-blue-700 mb-3 flex items-center gap-2">
+              <i data-lucide="zap" class="w-4 h-4"></i> DHL
+            </h5>
+            <div class="space-y-2 text-sm">
+              <div class="flex justify-between">
+                <span class="text-gray-600">Avg Query Time</span>
+                <span id="result-dhl-avg-time" class="font-medium">--</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-600">Min Query Time</span>
+                <span id="result-dhl-min-time" class="font-medium">--</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-600">Max Query Time</span>
+                <span id="result-dhl-max-time" class="font-medium">--</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-600">Avg Label Size</span>
+                <span id="result-dhl-label-size" class="font-medium">--</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- HC2L Column -->
+          <div class="bg-green-50 rounded-lg p-4">
+            <h5 class="font-bold text-green-700 mb-3 flex items-center gap-2">
+              <i data-lucide="layers" class="w-4 h-4"></i> HC2L
+            </h5>
+            <div class="space-y-2 text-sm">
+              <div class="flex justify-between">
+                <span class="text-gray-600">Avg Query Time</span>
+                <span id="result-hc2l-avg-time" class="font-medium">--</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-600">Min Query Time</span>
+                <span id="result-hc2l-min-time" class="font-medium">--</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-600">Max Query Time</span>
+                <span id="result-hc2l-max-time" class="font-medium">--</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-600">Avg Label Size</span>
+                <span id="result-hc2l-label-size" class="font-medium">--</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-600">Nodes Repaired</span>
+                <span id="result-hc2l-nodes-repaired" class="font-medium">--</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Export Options -->
+    <div class="section-card">
+      <div class="section-card__header">
+        <div class="section-card__icon">
+          <i data-lucide="download" class="w-5 h-5"></i>
+        </div>
+        <h4 class="section-card__title">Export Results</h4>
+      </div>
+      <div class="section-card__body">
+        <div class="flex gap-2">
+          <button onclick="ExperimentRunner.exportResults('json')" class="btn btn--primary btn--sm flex-1">
+            <i data-lucide="file-json" class="w-4 h-4"></i>
+            Export JSON
+          </button>
+          <button onclick="ExperimentRunner.exportResults('csv')" class="btn btn--success btn--sm flex-1">
+            <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+            Export CSV
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Detailed Results List -->
+    <div class="section-card">
+      <div class="section-card__header">
+        <div class="section-card__icon">
+          <i data-lucide="list" class="w-5 h-5"></i>
+        </div>
+        <h4 class="section-card__title">Detailed Results</h4>
+      </div>
+      <div id="experiment-results-list" class="section-card__body max-h-96 overflow-y-auto">
+        <p class="text-muted text-center py-4">Run an experiment to see detailed results.</p>
+      </div>
+    </div>
+  </div>
+</div>

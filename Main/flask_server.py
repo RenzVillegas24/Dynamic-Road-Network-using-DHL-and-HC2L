@@ -1,5 +1,6 @@
 # flask_server.py - Enhanced with HC2L (Hierarchical Cut Labelling) Routing
 from flask import Flask, request, jsonify, render_template
+from flask_socketio import SocketIO
 import pandas as pd
 import time
 import json
@@ -49,6 +50,9 @@ from user_disruptions import (
     cleanup_old_user_incidents
 )
 
+# Import experiment runner backend
+from experiment_runner_backend import experiment_bp, init_experiment_runner
+
 # Import route recalculation endpoint
 import route_recalculation_endpoint
 
@@ -56,6 +60,9 @@ import route_recalculation_endpoint
 console_logger = get_logger("FlaskServer")
 
 app = Flask(__name__)
+
+# Initialize Flask-SocketIO for WebSocket support
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 # Configure Flask from config file
 app.config['DEBUG'] = Config.FLASK_DEBUG
@@ -189,6 +196,12 @@ console_logger.info("Initializing Route Recalculation Endpoint")
 route_recalculation_endpoint.init_route_recalculation(app, gps_router, dhl_router, console_logger)
 console_logger.success("Route Recalculation Endpoint initialized")
 
+# Initialize Experiment Runner Backend with WebSocket support
+console_logger.info("Initializing Experiment Runner Backend")
+app.register_blueprint(experiment_bp)
+experiment_runner = init_experiment_runner(socketio, gps_router, dhl_router, mapper)
+console_logger.success("Experiment Runner Backend initialized with WebSocket support")
+
 # ============================================================================
 # USER-REPORTED DISRUPTIONS HELPERS
 # ============================================================================
@@ -206,28 +219,18 @@ def get_user_disruptions_for_api() -> list:
 # ============================================================================
 # These functions create demo-specific disruption CSV files for routers
 
+# Import shared road network utilities for consistent snapping across modules
+from road_network_utils import snap_location_to_edge_data, get_random_road_points_data
+
 def snap_location_to_edge(lat: float, lng: float) -> dict:
     """
     Snap a location to the nearest road edge.
     Returns edge source/target and coordinates.
+    Uses shared road_network_utils for consistent behavior across modules.
     """
-    try:
-        snap_result = mapper.snap_to_nearest_road(lat, lng, max_distance=500)
-        if snap_result:
-            return {
-                'success': True,
-                'source': snap_result['edge'][0],
-                'target': snap_result['edge'][1],
-                'source_lat': snap_result['source_coord']['lat'],
-                'source_lon': snap_result['source_coord']['lng'],
-                'target_lat': snap_result['target_coord']['lat'],
-                'target_lon': snap_result['target_coord']['lng'],
-                'road_name': snap_result.get('road_name', 'Unknown'),
-                'highway_type': snap_result.get('highway_type', 'unknown')
-            }
-        return {'success': False, 'error': 'No nearby edge found'}
-    except Exception as e:
-        return {'success': False, 'error': str(e)}
+    # Use the shared utility function which properly looks up node coordinates
+    result = snap_location_to_edge_data(lat, lng, node_mapper=mapper, max_distance=500)
+    return result
 
 
 def validate_location_near_road(lat: float, lng: float, max_distance: float = 100) -> dict:
@@ -6173,13 +6176,15 @@ if __name__ == '__main__':
     console_logger.data("Auto-recalculation: Enabled for active routes")
     console_logger.data("Settings: Persistent (survives page refresh)")
     
-    console_logger.info("Starting Flask Server")
+    console_logger.info("Starting Flask Server with WebSocket Support")
     console_logger.data(f"Environment: {Config.FLASK_ENV}")
     console_logger.data(f"Debug: {Config.FLASK_DEBUG}")
     console_logger.data(f"Address: http://{Config.FLASK_HOST}:{Config.FLASK_PORT}")
+    console_logger.data("WebSocket: Enabled (/experiment namespace)")
     
-    # Start Flask server
-    app.run(
+    # Start Flask server with SocketIO for WebSocket support
+    socketio.run(
+        app,
         debug=Config.FLASK_DEBUG,
         host=Config.FLASK_HOST,
         port=Config.FLASK_PORT,
