@@ -513,7 +513,7 @@ const ExperimentRunner = {
             thread_count: threadCount,
             trials: 3,
             batches_per_trial: 3,
-            routes_per_batch: 1000,
+            routes_per_batch: 10,
             algorithms: ['DHL', 'HC2L'],
             route_mode: routeMode,
             disruption_mode: disruptionMode,
@@ -555,8 +555,11 @@ const ExperimentRunner = {
             this.updateDisruptionDisplay(data.disruption_display);
         }
         
-        // Check for completion
-        if (data.status === 'completed') {
+        // Check for completion or finalizing
+        if (data.status === 'finalizing') {
+            // Show finalizing status with progress message
+            this.handleExperimentFinalizing(data.finalization_phase || 'Processing results...');
+        } else if (data.status === 'completed') {
             this.handleExperimentComplete();
         } else if (data.status === 'error') {
             this.handleExperimentError(data.error_message);
@@ -570,7 +573,12 @@ const ExperimentRunner = {
         // Update status
         const statusEl = document.getElementById('experiment-status');
         if (statusEl) {
-            statusEl.textContent = this.formatStatus(data.status);
+            // If finalizing, show the finalization phase message
+            if (data.status === 'finalizing' && data.finalization_phase) {
+                statusEl.textContent = data.finalization_phase;
+            } else {
+                statusEl.textContent = this.formatStatus(data.status);
+            }
             statusEl.className = `text-sm font-medium ${this.getStatusColor(data.status)}`;
         }
         
@@ -589,13 +597,22 @@ const ExperimentRunner = {
         // Update route counts
         const routeCountEl = document.getElementById('experiment-route-count');
         if (routeCountEl) {
-            routeCountEl.textContent = `${data.completed_routes || 0} / ${data.total_routes || 0}`;
+            if (data.status === 'finalizing') {
+                // Show finalization progress instead of route counts
+                routeCountEl.textContent = `Finalizing... (${data.finalization_percentage || 0}% of finalization phase)`;
+            } else {
+                routeCountEl.textContent = `${data.completed_routes || 0} / ${data.total_routes || 0}`;
+            }
         }
         
-        // Update ETA
+        // Update ETA - hide during finalization
         const etaEl = document.getElementById('experiment-eta');
         if (etaEl) {
-            etaEl.textContent = data.estimated_time_remaining || '--';
+            if (data.status === 'finalizing') {
+                etaEl.textContent = 'Computing...';
+            } else {
+                etaEl.textContent = data.estimated_time_remaining || '--';
+            }
         }
     },
     
@@ -1088,6 +1105,7 @@ const ExperimentRunner = {
             'initializing': 'Initializing',
             'running': 'Running',
             'paused': 'Paused',
+            'finalizing': 'Finalizing',
             'completed': 'Completed',
             'error': 'Error',
             'stopped': 'Stopped',
@@ -1101,6 +1119,7 @@ const ExperimentRunner = {
             'initializing': 'text-yellow-600',
             'running': 'text-green-600',
             'paused': 'text-orange-600',
+            'finalizing': 'text-purple-600',
             'completed': 'text-blue-600',
             'error': 'text-red-600',
             'stopped': 'text-gray-600'
@@ -1113,12 +1132,18 @@ const ExperimentRunner = {
             'initializing': 'bg-yellow-100 text-yellow-700',
             'running': 'bg-green-100 text-green-700',
             'paused': 'bg-orange-100 text-orange-700',
+            'finalizing': 'bg-purple-100 text-purple-700',
             'completed': 'bg-blue-100 text-blue-700',
             'error': 'bg-red-100 text-red-700',
             'stopped': 'bg-gray-100 text-gray-700',
             'not_started': 'bg-gray-100 text-gray-600'
         };
         return colorMap[status] || 'bg-gray-100 text-gray-600';
+    },
+    
+    handleExperimentFinalizing(message) {
+        console.log('🔄 Experiment finalizing:', message);
+        this.showNotification(message || 'Processing results...', 'info');
     },
     
     handleExperimentComplete() {
@@ -1136,7 +1161,7 @@ const ExperimentRunner = {
         this.loadResultsList();
         
         // Show results list tab
-        this.showTab('results-list');
+        this.showTab('results');
     },
     
     // =========================================================================
