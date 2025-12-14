@@ -520,7 +520,7 @@ function initializeEventHandlers() {
   if (adminResetBtn) {
     adminResetBtn.onclick = () => {
       // Use the comprehensive system reset function
-      quickResetMap();
+      resetSystemState();
     };
   }
 

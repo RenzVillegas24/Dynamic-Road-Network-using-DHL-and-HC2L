@@ -29,6 +29,10 @@ const ExperimentRunner = {
     
     // Results data from backend
     resultsData: null,
+    currentResultId: null,
+    
+    // Chart instances (for cleanup)
+    chartInstances: {},
     
     // Display settings
     threadColors: [
@@ -72,6 +76,9 @@ const ExperimentRunner = {
         
         // Load presets
         this.loadPresets();
+        
+        // Load results list
+        this.loadResultsList();
         
         // Initialize UI event listeners
         this.initEventListeners();
@@ -168,16 +175,35 @@ const ExperimentRunner = {
             selectedTab.classList.remove('hidden');
         }
         
-        // Update tab button states
+        // Update tab button states (only for visible nav tabs)
         document.querySelectorAll('[data-experiment-tab]').forEach(btn => {
             if (btn.dataset.experimentTab === tabId) {
                 btn.classList.add('bg-purple-600', 'text-white');
                 btn.classList.remove('bg-gray-200', 'text-gray-700');
+                btn.setAttribute('aria-selected', 'true');
             } else {
                 btn.classList.remove('bg-purple-600', 'text-white');
                 btn.classList.add('bg-gray-200', 'text-gray-700');
+                btn.setAttribute('aria-selected', 'false');
             }
         });
+        
+        // Special handling for results-list tab
+        if (tabId === 'results-list') {
+            this.refreshResultsList();
+        }
+
+        const nav = document.getElementById('experiment-panel-nav');
+        if (nav){
+            if (tabId === 'running' || tabId === 'results') {
+                nav.classList.add('hidden');
+            } else {
+                nav.classList.remove('hidden');
+            }
+        }
+        
+
+
         
         // Refresh icons
         if (typeof lucide !== 'undefined') {
@@ -359,7 +385,7 @@ const ExperimentRunner = {
         
         this.showNotification('Preparing experiment...', 'info');
         
-        // Show preparing status in running tab
+        // Show running tab (automatically during execution)
         this.showTab('running');
         this.showPreparationStatus('Checking preset configuration...');
         
@@ -681,6 +707,14 @@ const ExperimentRunner = {
         // Label Size
         const labelEl = section.querySelector('[data-metric="label-size"]');
         if (labelEl) labelEl.textContent = lastResult.label_size || '--';
+        
+        // Tau
+        const tauEl = section.querySelector('[data-metric="tau"]');
+        if (tauEl) tauEl.textContent = (lastResult.tau || 0).toFixed(3);
+        
+        // Disrupted Edges
+        const edgesEl = section.querySelector('[data-metric="disrupted-edges"]');
+        if (edgesEl) edgesEl.textContent = lastResult.disrupted_edges || '0';
     },
     
     updateThreadUpdatePhase(container, updatePhase) {
@@ -890,6 +924,8 @@ const ExperimentRunner = {
                         <div><span class="text-gray-500">Actual ETA:</span> <span data-metric="actual-eta" class="font-medium">--</span></div>
                         <div><span class="text-gray-500">Time Impact:</span> <span data-metric="time-impact" class="font-medium">--</span></div>
                         <div><span class="text-gray-500">Label Size:</span> <span data-metric="label-size" class="font-medium">--</span></div>
+                        <div><span class="text-gray-500">Tau (τ):</span> <span data-metric="tau" class="font-medium">--</span></div>
+                        <div><span class="text-gray-500">Disrupted Edges:</span> <span data-metric="disrupted-edges" class="font-medium">0</span></div>
                     </div>
                 </div>
                 
@@ -1069,13 +1105,153 @@ const ExperimentRunner = {
         this.isRunning = false;
         this.disconnectWebSocket();
         this.showNotification('Experiment completed!', 'success');
-        this.showTab('results');
         
         // Clear map centering flag for next run
         this.mapCentered = false;
         
         // Fetch and display results
         this.fetchAndDisplayResults();
+        
+        // Refresh results list to show the new result
+        this.loadResultsList();
+        
+        // Show results list tab
+        this.showTab('results-list');
+    },
+    
+    // =========================================================================
+    // RESULTS LIST MANAGEMENT
+    // =========================================================================
+    
+    async loadResultsList() {
+        try {
+            const response = await fetch('/api/experiment/results/list');
+            const result = await response.json();
+            
+            if (result.success) {
+                this.renderResultsList(result.results || []);
+            } else {
+                console.error('Failed to load results list:', result.error);
+            }
+        } catch (error) {
+            console.error('Error loading results list:', error);
+        }
+    },
+    
+    async refreshResultsList() {
+        await this.loadResultsList();
+    },
+    
+    renderResultsList(results) {
+        const container = document.getElementById('results-list-container');
+        if (!container) return;
+        
+        if (!results || results.length === 0) {
+            // Show empty state
+            const template = document.getElementById('template-empty-results-list');
+            if (template) {
+                container.innerHTML = template.innerHTML;
+            } else {
+                container.innerHTML = `
+                    <div class="empty-state text-center py-12">
+                        <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
+                            <i data-lucide="inbox" class="w-8 h-8 text-gray-400"></i>
+                        </div>
+                        <h4 class="font-semibold text-gray-700 mb-2">No Results Yet</h4>
+                        <p class="text-sm text-gray-500 mb-4">Run your first experiment to see results here</p>
+                        <button onclick="ExperimentRunner.showTab('settings')" class="btn btn--primary btn--sm">
+                            <i data-lucide="play" class="w-4 h-4"></i> Start Experiment
+                        </button>
+                    </div>
+                `;
+            }
+        } else {
+            // Render result items
+            container.innerHTML = results.map(result => {
+                const date = new Date(result.timestamp * 1000);
+                const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+                
+                return `
+                    <div class="card card--bordered hover:border-purple-300 hover:shadow-md transition-all cursor-pointer" 
+                         onclick="ExperimentRunner.viewResult('${result.id}')" data-id="${result.id}">
+                        <div class="p-4">
+                            <div class="flex items-start justify-between mb-3">
+                                <div class="flex-1">
+                                    <h4 class="font-semibold text-gray-800 mb-1">${result.id}</h4>
+                                    <p class="text-xs text-gray-500">${dateStr}</p>
+                                </div>
+                                <span class="badge badge--success">${result.completed.toFixed(0)}% Complete</span>
+                            </div>
+                            <div class="grid grid-cols-4 gap-3 text-xs">
+                                <div class="text-center bg-blue-50 rounded py-2">
+                                    <div class="text-blue-600 font-medium">Trials</div>
+                                    <div class="font-bold text-blue-700">${result.trials}</div>
+                                </div>
+                                <div class="text-center bg-green-50 rounded py-2">
+                                    <div class="text-green-600 font-medium">Batches</div>
+                                    <div class="font-bold text-green-700">${result.batches}</div>
+                                </div>
+                                <div class="text-center bg-purple-50 rounded py-2">
+                                    <div class="text-purple-600 font-medium">Routes</div>
+                                    <div class="font-bold text-purple-700">${result.routes_per_batch}</div>
+                                </div>
+                                <div class="text-center bg-amber-50 rounded py-2">
+                                    <div class="text-amber-600 font-medium">Status</div>
+                                    <div class="font-bold text-amber-700 text-xs">Complete</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        // Refresh icons
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    },
+    
+    async viewResult(resultId) {
+        try {
+            const response = await fetch(`/api/experiment/results/${resultId}`);
+            const result = await response.json();
+            
+            if (result.success && result.result) {
+                this.currentResultId = resultId;
+                this.resultsData = result.result;
+                this.populateResultsDashboard(result.result);
+                this.showTab('results');
+            } else {
+                this.showNotification('Failed to load result', 'error');
+            }
+        } catch (error) {
+            console.error('Error loading result:', error);
+            this.showNotification('Error loading result', 'error');
+        }
+    },
+    
+    async deleteResult(resultId) {
+        if (!confirm('Are you sure you want to delete this result?')) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/api/experiment/results/${resultId}`, {
+                method: 'DELETE'
+            });
+            const result = await response.json();
+            
+            if (result.success) {
+                this.showNotification('Result deleted successfully', 'success');
+                this.refreshResultsList();
+            } else {
+                this.showNotification('Failed to delete result', 'error');
+            }
+        } catch (error) {
+            console.error('Error deleting result:', error);
+            this.showNotification('Error deleting result', 'error');
+        }
     },
     
     // =========================================================================
@@ -1114,6 +1290,12 @@ const ExperimentRunner = {
         this.populateDynamicUpdates(data.dynamic_updates || []);
         this.populateQueryPerformance(data.query_performance || []);
         this.populateRouteSimilarity(data.route_similarity || []);
+        
+        // Populate additional similarity metrics
+        this.populateSimilarityExtra(data.similarity_extra || {});
+        
+        // Populate graphs
+        this.populateGraphs(data.graph_data || {});
         
         // Initialize result tab navigation
         this.initResultTabNavigation();
@@ -1206,15 +1388,25 @@ const ExperimentRunner = {
         
         // Group by trial
         const groupedByTrial = {};
+        const averages = [];
+        
         data.forEach(row => {
-            const trial = row.trial || 1;
-            if (!groupedByTrial[trial]) {
-                groupedByTrial[trial] = [];
+            // Check if this is an average row
+            if (row.trial === 'Average' || row.trial === 'Overall' || row.batch === 'Average') {
+                averages.push(row);
+            } else {
+                const trial = row.trial || 1;
+                if (!groupedByTrial[trial]) {
+                    groupedByTrial[trial] = [];
+                }
+                groupedByTrial[trial].push(row);
             }
-            groupedByTrial[trial].push(row);
         });
         
-        container.innerHTML = Object.entries(groupedByTrial).map(([trial, batches]) => `
+        let html = '';
+        
+        // Render trial data
+        html += Object.entries(groupedByTrial).map(([trial, batches]) => `
             <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
                 <div class="bg-purple-50 px-3 py-2 border-b border-gray-200">
                     <span class="font-semibold text-purple-700">Trial ${trial}</span>
@@ -1225,7 +1417,7 @@ const ExperimentRunner = {
                             <tr>
                                 <th class="text-left p-2">Batch</th>
                                 <th class="text-left p-2">Algorithm</th>
-                                <th class="text-right p-2">Disruption Level (%)</th>
+                                <th class="text-right p-2">Disruption Level</th>
                                 <th class="text-right p-2">Lazy Update (ms)</th>
                                 <th class="text-right p-2">Threshold Rebuild (ms)</th>
                                 <th class="text-right p-2">Peak Label (MB)</th>
@@ -1244,7 +1436,7 @@ const ExperimentRunner = {
                                             ${batch.algorithm || '--'}
                                         </span>
                                     </td>
-                                    <td class="p-2 text-right font-mono">${this.formatNumber(batch.disruption_level * 100, 1)}%</td>
+                                    <td class="p-2 text-right font-mono">${batch.disruption_level !== '-' ? this.formatNumber(batch.disruption_level * 100, 1) + '%' : '-'}</td>
                                     <td class="p-2 text-right font-mono">${this.formatNumber(batch.lazy_update_time_ms, 3)}</td>
                                     <td class="p-2 text-right font-mono">${this.formatNumber(batch.threshold_rebuild_time_ms, 3)}</td>
                                     <td class="p-2 text-right font-mono">${this.formatNumber(batch.peak_label_size_mb, 2)}</td>
@@ -1261,6 +1453,63 @@ const ExperimentRunner = {
                 </div>
             </div>
         `).join('');
+        
+        // Render averages section
+        if (averages.length > 0) {
+            html += `
+                <div class="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border-2 border-purple-300 overflow-hidden mt-4">
+                    <div class="bg-gradient-to-r from-purple-600 to-indigo-600 px-3 py-2 text-white">
+                        <span class="font-semibold">📊 Averages</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-xs">
+                            <thead class="bg-purple-100">
+                                <tr>
+                                    <th class="text-left p-2">Scope</th>
+                                    <th class="text-left p-2">Trial</th>
+                                    <th class="text-left p-2">Batch</th>
+                                    <th class="text-left p-2">Algorithm</th>
+                                    <th class="text-right p-2">Lazy Update (ms)</th>
+                                    <th class="text-right p-2">Threshold Rebuild (ms)</th>
+                                    <th class="text-right p-2">Peak Label (MB)</th>
+                                    <th class="text-right p-2">% Size Change</th>
+                                    <th class="text-right p-2">Query Avg (ms)</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-purple-200 bg-white">
+                                ${averages.map(avg => {
+                                    let scope = 'Per-Batch';
+                                    if (avg.trial === 'Overall') scope = 'Overall';
+                                    else if (avg.batch === 'Average') scope = 'Per-Trial';
+                                    
+                                    return `
+                                        <tr class="hover:bg-purple-50 font-medium">
+                                            <td class="p-2 text-purple-700">${scope}</td>
+                                            <td class="p-2">${avg.trial || '-'}</td>
+                                            <td class="p-2">${avg.batch || '-'}</td>
+                                            <td class="p-2">
+                                                <span class="px-1 py-0.5 rounded text-xs ${avg.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}">
+                                                    ${avg.algorithm || '--'}
+                                                </span>
+                                            </td>
+                                            <td class="p-2 text-right font-mono text-purple-700">${this.formatNumber(avg.lazy_update_time_ms, 3)}</td>
+                                            <td class="p-2 text-right font-mono text-purple-700">${this.formatNumber(avg.threshold_rebuild_time_ms, 3)}</td>
+                                            <td class="p-2 text-right font-mono text-purple-700">${this.formatNumber(avg.peak_label_size_mb, 2)}</td>
+                                            <td class="p-2 text-right font-mono text-purple-700">
+                                                ${avg.label_size_change_pct >= 0 ? '+' : ''}${this.formatNumber(avg.label_size_change_pct, 1)}%
+                                            </td>
+                                            <td class="p-2 text-right font-mono text-purple-700">${this.formatNumber(avg.query_avg_ms, 3)}</td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+        
+        container.innerHTML = html;
     },
     
     populateQueryPerformance(data) {
@@ -1339,6 +1588,482 @@ const ExperimentRunner = {
         } else {
             return { label: 'Fair', class: 'bg-orange-100 text-orange-700' };
         }
+    },
+    
+    populateSimilarityExtra(data) {
+        // Update additional similarity metrics
+        const pathOverlapEl = document.getElementById('similarity-path-overlap');
+        const distDeviationEl = document.getElementById('similarity-distance-deviation');
+        const altRoutesEl = document.getElementById('similarity-alternative-routes');
+        
+        if (pathOverlapEl) pathOverlapEl.textContent = data.path_overlap_pct ? `${data.path_overlap_pct}%` : '--';
+        if (distDeviationEl) distDeviationEl.textContent = data.distance_deviation_pct ? `${data.distance_deviation_pct}%` : '--';
+        if (altRoutesEl) altRoutesEl.textContent = data.alternative_route_count || '0';
+    },
+    
+    // =========================================================================
+    // GRAPH RENDERING
+    // =========================================================================
+    
+    populateGraphs(graphData) {
+        if (!graphData || Object.keys(graphData).length === 0) {
+            console.warn('No graph data available');
+            return;
+        }
+        
+        // Clean up existing charts
+        Object.values(this.chartInstances).forEach(chart => {
+            if (chart) chart.destroy();
+        });
+        this.chartInstances = {};
+        
+        // Render each graph
+        this.renderQueryTimeSeriesChart(graphData.time_series);
+        this.renderUpdateTimeSeriesChart(graphData.time_series);
+        this.renderAverageQueryTimeChart(graphData.algorithm_comparison);
+        this.renderAverageLabelSizeChart(graphData.algorithm_comparison);
+        this.renderPerTrialBreakdownChart(graphData.per_trial);
+        this.renderOverallComparisonChart(graphData.algorithm_comparison);
+        this.renderRebuildAnalysisChart(graphData.rebuild_analysis);
+        this.renderLabelSizeTrendChart(graphData.label_size_trend);
+    },
+    
+    renderQueryTimeSeriesChart(timeSeriesData) {
+        if (!timeSeriesData) return;
+        
+        const ctx = document.getElementById('chart-query-time-series');
+        if (!ctx) return;
+        
+        const dhlData = timeSeriesData.DHL || {};
+        const hc2lData = timeSeriesData.HC2L || {};
+        
+        this.chartInstances['query-time-series'] = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: dhlData.batch_labels || [],
+                datasets: [
+                    {
+                        label: 'DHL Query Time',
+                        data: dhlData.query_times || [],
+                        borderColor: '#3B82F6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        tension: 0.4
+                    },
+                    {
+                        label: 'HC2L Query Time',
+                        data: hc2lData.query_times || [],
+                        borderColor: '#10B981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        tension: 0.4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Query Time Performance Over Batches'
+                    },
+                    legend: {
+                        position: 'top'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Time (ms)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Trial-Batch'
+                        }
+                    }
+                }
+            }
+        });
+    },
+    
+    renderUpdateTimeSeriesChart(timeSeriesData) {
+        if (!timeSeriesData) return;
+        
+        const ctx = document.getElementById('chart-update-time-series');
+        if (!ctx) return;
+        
+        const dhlData = timeSeriesData.DHL || {};
+        const hc2lData = timeSeriesData.HC2L || {};
+        
+        this.chartInstances['update-time-series'] = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: dhlData.batch_labels || [],
+                datasets: [
+                    {
+                        label: 'DHL Update Time',
+                        data: dhlData.update_times || [],
+                        borderColor: '#3B82F6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        tension: 0.4
+                    },
+                    {
+                        label: 'HC2L Update Time',
+                        data: hc2lData.update_times || [],
+                        borderColor: '#10B981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        tension: 0.4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Lazy Update Time Over Batches'
+                    },
+                    legend: {
+                        position: 'top'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Time (ms)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Trial-Batch'
+                        }
+                    }
+                }
+            }
+        });
+    },
+    
+    renderAverageQueryTimeChart(comparisonData) {
+        if (!comparisonData) return;
+        
+        const ctx = document.getElementById('chart-avg-query-time');
+        if (!ctx) return;
+        
+        const avgQueryTime = comparisonData.avg_query_time || {};
+        
+        this.chartInstances['avg-query-time'] = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['DHL', 'HC2L'],
+                datasets: [{
+                    label: 'Average Query Time (ms)',
+                    data: [avgQueryTime.DHL || 0, avgQueryTime.HC2L || 0],
+                    backgroundColor: ['rgba(59, 130, 246, 0.7)', 'rgba(16, 185, 129, 0.7)'],
+                    borderColor: ['#3B82F6', '#10B981'],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Average Query Time Comparison'
+                    },
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Time (ms)'
+                        }
+                    }
+                }
+            }
+        });
+    },
+    
+    renderAverageLabelSizeChart(comparisonData) {
+        if (!comparisonData) return;
+        
+        const ctx = document.getElementById('chart-avg-label-size');
+        if (!ctx) return;
+        
+        const avgLabelSize = comparisonData.avg_label_size || {};
+        
+        this.chartInstances['avg-label-size'] = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['DHL', 'HC2L'],
+                datasets: [{
+                    label: 'Average Label Size (MB)',
+                    data: [avgLabelSize.DHL || 0, avgLabelSize.HC2L || 0],
+                    backgroundColor: ['rgba(139, 92, 246, 0.7)', 'rgba(251, 191, 36, 0.7)'],
+                    borderColor: ['#8B5CF6', '#FBBF24'],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Average Label Size Comparison'
+                    },
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Size (MB)'
+                        }
+                    }
+                }
+            }
+        });
+    },
+    
+    renderPerTrialBreakdownChart(perTrialData) {
+        if (!perTrialData) return;
+        
+        const ctx = document.getElementById('chart-per-trial-breakdown');
+        if (!ctx) return;
+        
+        this.chartInstances['per-trial-breakdown'] = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: perTrialData.trial_labels || [],
+                datasets: [
+                    {
+                        label: 'DHL Query Time',
+                        data: perTrialData.DHL_query || [],
+                        backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                        borderColor: '#3B82F6',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'HC2L Query Time',
+                        data: perTrialData.HC2L_query || [],
+                        backgroundColor: 'rgba(16, 185, 129, 0.7)',
+                        borderColor: '#10B981',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Query Time by Trial'
+                    },
+                    legend: {
+                        position: 'top'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Time (ms)'
+                        }
+                    }
+                }
+            }
+        });
+    },
+    
+    renderOverallComparisonChart(comparisonData) {
+        if (!comparisonData) return;
+        
+        const ctx = document.getElementById('chart-overall-comparison');
+        if (!ctx) return;
+        
+        const avgQueryTime = comparisonData.avg_query_time || {};
+        const avgLabelSize = comparisonData.avg_label_size || {};
+        
+        this.chartInstances['overall-comparison'] = new Chart(ctx, {
+            type: 'radar',
+            data: {
+                labels: ['Query Time', 'Label Size Efficiency', 'Overall Performance'],
+                datasets: [
+                    {
+                        label: 'DHL',
+                        data: [
+                            avgQueryTime.DHL ? 100 - (avgQueryTime.DHL / 10) : 0,
+                            avgLabelSize.DHL ? 100 - (avgLabelSize.DHL * 10) : 0,
+                            50
+                        ],
+                        backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                        borderColor: '#3B82F6',
+                        pointBackgroundColor: '#3B82F6'
+                    },
+                    {
+                        label: 'HC2L',
+                        data: [
+                            avgQueryTime.HC2L ? 100 - (avgQueryTime.HC2L / 10) : 0,
+                            avgLabelSize.HC2L ? 100 - (avgLabelSize.HC2L * 10) : 0,
+                            50
+                        ],
+                        backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                        borderColor: '#10B981',
+                        pointBackgroundColor: '#10B981'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Overall Algorithm Comparison (Higher = Better)'
+                    },
+                    legend: {
+                        position: 'top'
+                    }
+                },
+                scales: {
+                    r: {
+                        beginAtZero: true,
+                        max: 100
+                    }
+                }
+            }
+        });
+    },
+    
+    renderRebuildAnalysisChart(rebuildData) {
+        if (!rebuildData) return;
+        
+        const ctx = document.getElementById('chart-rebuild-time-analysis');
+        if (!ctx) return;
+        
+        const labels = rebuildData.DHL_rebuild_times.map((_, i) => `Batch ${Math.floor(i / 3) + 1}.${(i % 3) + 1}`);
+        
+        this.chartInstances['rebuild-analysis'] = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'DHL Rebuild Time',
+                        data: rebuildData.DHL_rebuild_times || [],
+                        borderColor: '#EF4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        tension: 0.4
+                    },
+                    {
+                        label: 'HC2L Rebuild Time',
+                        data: rebuildData.HC2L_rebuild_times || [],
+                        borderColor: '#F59E0B',
+                        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                        tension: 0.4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Threshold Rebuild Time Analysis'
+                    },
+                    legend: {
+                        position: 'top'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Time (ms)'
+                        }
+                    }
+                }
+            }
+        });
+    },
+    
+    renderLabelSizeTrendChart(labelSizeData) {
+        if (!labelSizeData) return;
+        
+        const ctx = document.getElementById('chart-label-size-trend');
+        if (!ctx) return;
+        
+        this.chartInstances['label-size-trend'] = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labelSizeData.batch_labels || [],
+                datasets: [
+                    {
+                        label: 'DHL Label Size',
+                        data: labelSizeData.DHL_labels || [],
+                        borderColor: '#8B5CF6',
+                        backgroundColor: 'rgba(139, 92, 246, 0.2)',
+                        fill: true,
+                        tension: 0.4
+                    },
+                    {
+                        label: 'HC2L Label Size',
+                        data: labelSizeData.HC2L_labels || [],
+                        borderColor: '#EC4899',
+                        backgroundColor: 'rgba(236, 72, 153, 0.2)',
+                        fill: true,
+                        tension: 0.4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Label Size Evolution Over Time'
+                    },
+                    legend: {
+                        position: 'top'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Size (MB)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Trial-Batch'
+                        }
+                    }
+                }
+            }
+        });
     },
     
     formatNumber(value, decimals = 2) {

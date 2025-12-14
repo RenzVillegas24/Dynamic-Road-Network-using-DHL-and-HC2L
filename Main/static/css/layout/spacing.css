@@ -68,6 +68,8 @@
 .p-12 { padding: var(--spacing-12); }
 .p-14 { padding: var(--spacing-14); }
 .p-16 { padding: var(--spacing-16); }
+.p-20 { padding: var(--spacing-20); }
+.p-24 { padding: var(--spacing-24); }
 
 /* Horizontal (left & right) */
 .px-0 { padding-left: 0; padding-right: 0; }
@@ -83,6 +85,10 @@
 .px-8 { padding-left: var(--spacing-8); padding-right: var(--spacing-8); }
 .px-10 { padding-left: var(--spacing-10); padding-right: var(--spacing-10); }
 .px-12 { padding-left: var(--spacing-12); padding-right: var(--spacing-12); }
+.px-14 { padding-left: var(--spacing-14); padding-right: var(--spacing-14); }
+.px-16 { padding-left: var(--spacing-16); padding-right: var(--spacing-16); }
+.px-20 { padding-left: var(--spacing-20); padding-right: var(--spacing-20); }
+.px-24 { padding-left: var(--spacing-24); padding-right: var(--spacing-24); }
 
 /* Vertical (top & bottom) */
 .py-0 { padding-top: 0; padding-bottom: 0; }
@@ -98,6 +104,10 @@
 .py-8 { padding-top: var(--spacing-8); padding-bottom: var(--spacing-8); }
 .py-10 { padding-top: var(--spacing-10); padding-bottom: var(--spacing-10); }
 .py-12 { padding-top: var(--spacing-12); padding-bottom: var(--spacing-12); }
+.py-14 { padding-top: var(--spacing-14); padding-bottom: var(--spacing-14); }
+.py-16 { padding-top: var(--spacing-16); padding-bottom: var(--spacing-16); }
+.py-20 { padding-top: var(--spacing-20); padding-bottom: var(--spacing-20); }
+.py-24 { padding-top: var(--spacing-24); padding-bottom: var(--spacing-24); }
 
 /* Top */
 .pt-0 { padding-top: 0; }
@@ -112,6 +122,10 @@
 .pt-8 { padding-top: var(--spacing-8); }
 .pt-10 { padding-top: var(--spacing-10); }
 .pt-12 { padding-top: var(--spacing-12); }
+.pt-14 { padding-top: var(--spacing-14); }
+.pt-16 { padding-top: var(--spacing-16); }
+.pt-20 { padding-top: var(--spacing-20); }
+.pt-24 { padding-top: var(--spacing-24); }
 
 /* Right */
 .pr-0 { padding-right: 0; }
@@ -126,6 +140,10 @@
 .pr-8 { padding-right: var(--spacing-8); }
 .pr-10 { padding-right: var(--spacing-10); }
 .pr-12 { padding-right: var(--spacing-12); }
+.pr-14 { padding-right: var(--spacing-14); }
+.pr-16 { padding-right: var(--spacing-16); }
+.pr-20 { padding-right: var(--spacing-20); }
+.pr-24 { padding-right: var(--spacing-24); }
 
 /* Bottom */
 .pb-0 { padding-bottom: 0; }
@@ -140,6 +158,10 @@
 .pb-8 { padding-bottom: var(--spacing-8); }
 .pb-10 { padding-bottom: var(--spacing-10); }
 .pb-12 { padding-bottom: var(--spacing-12); }
+.pb-14 { padding-bottom: var(--spacing-14); }
+.pb-16 { padding-bottom: var(--spacing-16); }
+.pb-20 { padding-bottom: var(--spacing-20); }
+.pb-24 { padding-bottom: var(--spacing-24); }
 
 /* Left */
 .pl-0 { padding-left: 0; }
@@ -154,6 +176,10 @@
 .pl-8 { padding-left: var(--spacing-8); }
 .pl-10 { padding-left: var(--spacing-10); }
 .pl-12 { padding-left: var(--spacing-12); }
+.pl-14 { padding-left: var(--spacing-14); }
+.pl-16 { padding-left: var(--spacing-16); }
+.pl-20 { padding-left: var(--spacing-20); }
+.pl-24 { padding-left: var(--spacing-24); }
 
 /* =====================
    MARGIN

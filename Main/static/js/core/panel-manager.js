@@ -14,7 +14,7 @@ const PanelManager = (function () {
       icon: 'navigation',
       size: 'md',
       isPassable: () => {
-        if (isDemoRunning()) {
+        if (isExperimentRunning()) {
           // Show modal dialog instead of toast
           showDemoStopModal('route-finder', 'sidebar');
           return false;
@@ -28,7 +28,7 @@ const PanelManager = (function () {
       icon: 'route',
       size: 'md',
       isPassable: () => {
-        if (isDemoRunning()) {
+        if (isExperimentRunning()) {
           // Show modal dialog instead of toast
           showDemoStopModal('current-route', 'sidebar');
           return false;
@@ -54,7 +54,7 @@ const PanelManager = (function () {
       icon: 'list',
       size: 'lg',
       isPassable: () => {
-        if (window.currentRouteData == null && !isDemoRunning()) {
+        if (window.currentRouteData == null && !isExperimentRunning()) {
           showNoRouteModal();
           return false;
         }
@@ -67,7 +67,7 @@ const PanelManager = (function () {
       icon: 'activity',
       size: 'lg',
       isPassable: () => {
-        if (window.currentRouteData == null && !isDemoRunning()) {
+        if (window.currentRouteData == null && !isExperimentRunning()) {
           showNoRouteModal();
           return false;
         }
@@ -84,7 +84,7 @@ const PanelManager = (function () {
           showNoRouteModal();
           return false;
         }
-        if (isDemoRunning()) {
+        if (isExperimentRunning()) {
           // Show modal dialog instead of toast
           showDemoStopModal('current-route', 'sidebar');
           return false;
@@ -131,7 +131,33 @@ const PanelManager = (function () {
       title: 'Experiment Runner',
       icon: 'play-circle',
       size: 'xl',
-      isPassable: () => true
+      isPassable: () => {
+         if (isExperimentRunning()) {
+          // Show modal dialog instead of toast
+          showDemoStopModal('demo-creator', 'sidebar');
+          return false;
+        }
+
+        resetSystemState();
+
+        // Save the current Route Finder state before making any changes
+        saveRouteFinderState();
+
+        // Turn off admin panel toggles to prevent interference during demo
+        const incidentToggle = document.getElementById('show-active-incidents');
+        const flowToggle = document.getElementById('show-traffic-overlay');
+
+        if (incidentToggle && incidentToggle.checked) {
+          incidentToggle.checked = false;
+          incidentToggle.dispatchEvent(new Event('change'));
+        }
+        if (flowToggle && flowToggle.checked) {
+          flowToggle.checked = false;
+          flowToggle.dispatchEvent(new Event('change'));
+        }
+
+        return true;
+      }
     },
     // 'demo-runner': {
     //   id: 'demo-runner-panel',
@@ -146,7 +172,7 @@ const PanelManager = (function () {
     //   icon: 'plus-circle',
     //   size: 'lg',
     //   isPassable: () => {
-    //     if (isDemoRunning()) {
+    //     if (isExperimentRunning()) {
     //       // Show modal dialog instead of toast
     //       showDemoStopModal('demo-creator', 'sidebar');
     //       return false;
@@ -198,8 +224,8 @@ const PanelManager = (function () {
     console.log('[PanelManager] Initialized');
   }
 
-  function isDemoRunning() {
-    return (typeof DemoRunner !== 'undefined' && DemoRunner.isRunning);
+  function isExperimentRunning() {
+    return (typeof ExperimentRunner !== 'undefined' && ExperimentRunner.isRunning);
   }
 
   /**

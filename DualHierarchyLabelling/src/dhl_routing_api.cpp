@@ -82,6 +82,39 @@ inline string escape_json_string(const string& input) {
     return output;
 }
 
+// ============================================================
+// IMPACT SCORE CALCULATION (Manuscript Equations 1-3)
+// ============================================================
+// Computes disruption impact score based on:
+//   - Equation 1: Impact Score = f_Δw × f_jam × f_closure
+//   - Equation 2: f_Δw = (v_new - v_old) / v_old = relative travel time impact
+//   - Equation 3: f_jam = jam_factor / 10 (normalized to [0,1])
+//
+// Parameters:
+//   speed_ratio: v_new / v_old = base_weight / new_weight
+//   jam_factor: traffic jam intensity (0-10 scale)
+//   is_closed: whether the road segment is fully closed
+//
+// Returns: Impact score in [0, 1] range
+inline double compute_impact_score(double speed_ratio, double jam_factor, bool is_closed) {
+    if (is_closed) {
+        return 1.0;  // Maximum impact for closed roads
+    }
+    
+    // Equation 2: f_Δw = (v_new - v_old) / v_old
+    // Since speed_ratio = v_new / v_old, we have:
+    // f_Δw = (v_new - v_old) / v_old = v_new/v_old - 1 = speed_ratio - 1
+    // But we want impact of slowdown, so: f_Δw = 1 - speed_ratio
+    double f_delta_w = 1.0 - speed_ratio;
+    
+    // Equation 3: Normalize jam_factor from [0,10] to [0,1]
+    double f_jam = jam_factor / 10.0;
+    
+    // Equation 1: Impact Score = f_Δw × f_jam × f_closure
+    // For open roads, f_closure = 0, so we compute: f_Δw × f_jam
+    return f_delta_w * f_jam;
+}
+
 // Helper structure for edge with geometry
 // (MOVED TO: ApiUtils/src/shared_routing_structures.h)
 
@@ -1598,11 +1631,16 @@ int main(int argc, char* argv[]) {
                                 }
                             }
                         }
-                        double impact = 0.0;
-                        if (base_weight > 0) {
-                            impact = min(1.0, max(0.0, (static_cast<double>(new_weight) - base_weight) / static_cast<double>(base_weight)));
-                        }
-                        disruption_impact_score = max(disruption_impact_score, impact);
+                        
+                        // Calculate impact using correct formula from manuscript
+                        // Equation 2: f_Δw = (v_new - v_old) / v_old
+                        // Since speed is inversely proportional to weight:
+                        // speed_ratio = v_new / v_old = base_weight / new_weight
+                        double speed_ratio = (new_weight > 0) ? 
+                            (static_cast<double>(base_weight) / static_cast<double>(new_weight)) : 1.0;
+                        double jam_factor_val = flow_ptr ? flow_ptr->jam_factor : 0.0;
+                        double calculated_impact = compute_impact_score(speed_ratio, jam_factor_val, false);
+                        disruption_impact_score = max(disruption_impact_score, calculated_impact);
                     }
                     
                     affected_nodes.insert(source);
@@ -1618,10 +1656,10 @@ int main(int argc, char* argv[]) {
                         }
                     }
                     
-                    double jam_factor_val = flow_ptr ? flow_ptr->jam_factor : 0.0;
                     string type_label = incident_ptr ? incident_ptr->type : (flow_ptr ? "flow" : "unknown");
+                    double jam_factor_for_log = flow_ptr ? flow_ptr->jam_factor : 0.0;
                     cerr << "   ⚡ Immediate update for edge " << source << "->" << target 
-                         << " (Weight=" << new_weight << ", Jam=" << jam_factor_val 
+                         << " (Weight=" << new_weight << ", Jam=" << jam_factor_for_log 
                          << ", Highway=" << highway_type << ", Type=" << type_label << ")" << endl;
                     
                     disruption_count++;

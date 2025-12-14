@@ -89,6 +89,9 @@ class Config:
     # Graph data files (CSV format)
     NODES_CSV = RAW_DATA_DIR / 'quezon_city_nodes.csv'
     EDGES_CSV = RAW_DATA_DIR / 'quezon_city_edges.csv'
+
+    # Experiment data files
+    EXPERIMENT_DATA_DIR = DATA_DIR / 'experiments'
     
     # Disruption scenario files
     DISRUPTIONS_CSV = DISRUPTIONS_DIR / 'qc_scenario_for_cpp_1.csv'

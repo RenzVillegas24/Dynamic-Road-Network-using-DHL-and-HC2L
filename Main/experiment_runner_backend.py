@@ -377,6 +377,8 @@ class ExperimentMetricsCollector:
                 "dynamic_updates": self._compute_dynamic_updates(),
                 "query_performance": self._compute_query_performance(),
                 "route_similarity": self._compute_route_similarity(),
+                "similarity_extra": self._compute_similarity_extra(),
+                "graph_data": self._compute_graph_data(),
                 "summary": self._compute_summary()
             }
             return results
@@ -410,8 +412,19 @@ class ExperimentMetricsCollector:
         """Compute Dynamic Updates (Appendix 1.2) metrics - returns flat list for frontend"""
         rows = []
         
+        # Track metrics for computing averages
+        trial_averages = {}  # trial -> {algorithm -> metrics}
+        batch_averages = {}  # batch -> {algorithm -> metrics}
+        overall_averages = {"DHL": [], "DHC2L": []}
+        
         for trial in range(self.trials):
+            if trial not in trial_averages:
+                trial_averages[trial] = {"DHL": [], "DHC2L": []}
+                
             for batch in range(self.batches):
+                if batch not in batch_averages:
+                    batch_averages[batch] = {"DHL": [], "DHC2L": []}
+                
                 # Get per-batch data for DHL
                 dhl_query_times = self._batch_query_times_dhl[trial][batch]
                 dhl_lazy_times = self._batch_lazy_times_dhl[trial][batch]
@@ -422,23 +435,29 @@ class ExperimentMetricsCollector:
                     dhl_max_query = np.max(dhl_query_times)
                     dhl_avg_lazy = np.mean(dhl_lazy_times) if dhl_lazy_times else 0
                     dhl_peak_label = self.peak_label_size_dhl[trial, batch]
+                    dhl_rebuild_time = self.threshold_rebuild_time_dhl[trial, batch]
                     
                     initial_label = self.initial_label_size_dhl[trial] if self.construction_recorded_dhl[trial] else 1
                     label_change_pct = ((dhl_peak_label - initial_label) / initial_label * 100) if initial_label > 0 else 0
                     
-                    rows.append({
+                    row_data = {
                         "batch": batch + 1,
                         "trial": trial + 1,
                         "algorithm": "DHL",
                         "disruption_level": round(len(dhl_query_times) / self.routes_per_batch, 2) if self.routes_per_batch > 0 else 0,
                         "lazy_update_time_ms": round(dhl_avg_lazy, 3),
-                        "threshold_rebuild_time_ms": round(self.threshold_rebuild_time_dhl[trial, batch], 3),
+                        "threshold_rebuild_time_ms": round(dhl_rebuild_time, 3),
                         "peak_label_size_mb": round(dhl_peak_label, 2),
                         "label_size_change_pct": round(label_change_pct, 1),
                         "query_avg_ms": round(dhl_avg_query, 3),
                         "query_min_ms": round(dhl_min_query, 3),
                         "query_max_ms": round(dhl_max_query, 3)
-                    })
+                    }
+                    
+                    rows.append(row_data)
+                    trial_averages[trial]["DHL"].append(row_data)
+                    batch_averages[batch]["DHL"].append(row_data)
+                    overall_averages["DHL"].append(row_data)
                 
                 # Get per-batch data for HC2L
                 hc2l_query_times = self._batch_query_times_hc2l[trial][batch]
@@ -450,23 +469,81 @@ class ExperimentMetricsCollector:
                     hc2l_max_query = np.max(hc2l_query_times)
                     hc2l_avg_lazy = np.mean(hc2l_lazy_times) if hc2l_lazy_times else 0
                     hc2l_peak_label = self.peak_label_size_hc2l[trial, batch]
+                    hc2l_rebuild_time = self.threshold_rebuild_time_hc2l[trial, batch]
                     
                     initial_label = self.initial_label_size_hc2l[trial] if self.construction_recorded_hc2l[trial] else 1
                     label_change_pct = ((hc2l_peak_label - initial_label) / initial_label * 100) if initial_label > 0 else 0
                     
-                    rows.append({
+                    row_data = {
                         "batch": batch + 1,
                         "trial": trial + 1,
                         "algorithm": "DHC2L",
                         "disruption_level": round(len(hc2l_query_times) / self.routes_per_batch, 2) if self.routes_per_batch > 0 else 0,
                         "lazy_update_time_ms": round(hc2l_avg_lazy, 3),
-                        "threshold_rebuild_time_ms": round(self.threshold_rebuild_time_hc2l[trial, batch], 3),
+                        "threshold_rebuild_time_ms": round(hc2l_rebuild_time, 3),
                         "peak_label_size_mb": round(hc2l_peak_label, 2),
                         "label_size_change_pct": round(label_change_pct, 1),
                         "query_avg_ms": round(hc2l_avg_query, 3),
                         "query_min_ms": round(hc2l_min_query, 3),
                         "query_max_ms": round(hc2l_max_query, 3)
+                    }
+                    
+                    rows.append(row_data)
+                    trial_averages[trial]["DHC2L"].append(row_data)
+                    batch_averages[batch]["DHC2L"].append(row_data)
+                    overall_averages["DHC2L"].append(row_data)
+        
+        # Compute and append averages
+        def compute_avg(data_list):
+            if not data_list:
+                return None
+            return {
+                "lazy_update_time_ms": round(float(np.mean([d["lazy_update_time_ms"] for d in data_list])), 3),
+                "threshold_rebuild_time_ms": round(float(np.mean([d["threshold_rebuild_time_ms"] for d in data_list])), 3),
+                "peak_label_size_mb": round(float(np.mean([d["peak_label_size_mb"] for d in data_list])), 2),
+                "label_size_change_pct": round(float(np.mean([d["label_size_change_pct"] for d in data_list])), 1),
+                "query_avg_ms": round(float(np.mean([d["query_avg_ms"] for d in data_list])), 3),
+                "query_min_ms": round(float(np.mean([d["query_min_ms"] for d in data_list])), 3),
+                "query_max_ms": round(float(np.mean([d["query_max_ms"] for d in data_list])), 3)
+            }
+        
+        # Add per-batch averages
+        for batch in range(self.batches):
+            for algorithm in ["DHL", "DHC2L"]:
+                avg_data = compute_avg(batch_averages[batch][algorithm])
+                if avg_data:
+                    rows.append({
+                        "batch": batch + 1,
+                        "trial": "Average",
+                        "algorithm": algorithm,
+                        "disruption_level": "-",
+                        **avg_data
                     })
+        
+        # Add per-trial averages
+        for trial in range(self.trials):
+            for algorithm in ["DHL", "DHC2L"]:
+                avg_data = compute_avg(trial_averages[trial][algorithm])
+                if avg_data:
+                    rows.append({
+                        "batch": "Average",
+                        "trial": trial + 1,
+                        "algorithm": algorithm,
+                        "disruption_level": "-",
+                        **avg_data
+                    })
+        
+        # Add overall averages
+        for algorithm in ["DHL", "DHC2L"]:
+            avg_data = compute_avg(overall_averages[algorithm])
+            if avg_data:
+                rows.append({
+                    "batch": "Average",
+                    "trial": "Overall",
+                    "algorithm": algorithm,
+                    "disruption_level": "-",
+                    **avg_data
+                })
         
         return rows
     
@@ -606,7 +683,7 @@ class ExperimentMetricsCollector:
                         dhl_time = self.travel_time_dhl[trial, batch, route]
                         hc2l_time = self.travel_time_hc2l[trial, batch, route]
                         
-                        # Frechet distance calculation (simplified)
+                        # Frechet distance calculation using recorded path coordinates
                         key = (trial, batch, route)
                         frechet_distance = 0
                         if key in self.route_paths_dhl and key in self.route_paths_hc2l:
@@ -614,11 +691,18 @@ class ExperimentMetricsCollector:
                                 self.route_paths_dhl[key], 
                                 self.route_paths_hc2l[key]
                             )
+                        else:
+                            # If paths not recorded, estimate based on distance difference
+                            # This is a fallback - in ideal case both paths should be recorded
+                            frechet_distance = abs(dhl_dist - hc2l_dist) * 1000  # Convert km to meters approximation
                         
-                        # Calculate deviations
-                        avg_dist = (dhl_dist + hc2l_dist) / 2 if (dhl_dist + hc2l_dist) > 0 else 1
-                        avg_time = (dhl_time + hc2l_time) / 2 if (dhl_time + hc2l_time) > 0 else 1
-                        time_deviation = abs(dhl_time - hc2l_time) / avg_time * 100 if avg_time > 0 else 0
+                        # Calculate time deviation properly
+                        # Use the travel times in seconds for comparison
+                        if dhl_time > 0 and hc2l_time > 0:
+                            avg_time = (dhl_time + hc2l_time) / 2
+                            time_deviation = abs(dhl_time - hc2l_time) / avg_time * 100 if avg_time > 0 else 0
+                        else:
+                            time_deviation = 0
                         
                         # Rating based on Frechet distance
                         if frechet_distance < 200:
@@ -638,8 +722,8 @@ class ExperimentMetricsCollector:
                         
                         rows.append({
                             "od_pair": "S → D",
-                            "distance_km": round(avg_dist, 2),
-                            "travel_time_min": round(avg_time / 60, 2),
+                            "distance_km": round((dhl_dist + hc2l_dist) / 2, 2),
+                            "travel_time_min": round((dhl_time + hc2l_time) / 2 / 60, 2) if (dhl_time + hc2l_time) > 0 else 0,
                             "frechet_distance_m": round(frechet_distance, 2),
                             "fd_rating": fd_rating,
                             "travel_time_deviation_pct": round(time_deviation, 2),
@@ -720,6 +804,239 @@ class ExperimentMetricsCollector:
             "total_expected": self.trials * self.batches * self.routes_per_batch * 2,
             "completion_pct": round((total_dhl + total_hc2l) / (self.trials * self.batches * self.routes_per_batch * 2) * 100, 2)
         }
+    
+    def _compute_similarity_extra(self) -> Dict:
+        """Compute additional similarity metrics"""
+        path_overlaps = []
+        distance_deviations = []
+        alternative_route_count = 0
+        
+        for trial in range(self.trials):
+            for batch in range(self.batches):
+                for route in range(self.routes_per_batch):
+                    if self.filled_dhl[trial, batch, route] and self.filled_hc2l[trial, batch, route]:
+                        # Distance deviation
+                        dhl_dist = self.distance_km_dhl[trial, batch, route]
+                        hc2l_dist = self.distance_km_hc2l[trial, batch, route]
+                        if dhl_dist > 0:
+                            deviation = abs(dhl_dist - hc2l_dist) / dhl_dist * 100
+                            distance_deviations.append(deviation)
+                        
+                        # Check if routes are significantly different (alternative routes)
+                        key = (trial, batch, route)
+                        if key in self.route_paths_dhl and key in self.route_paths_hc2l:
+                            # If Frechet distance is large, consider it an alternative route
+                            frechet = self._compute_frechet_distance(
+                                self.route_paths_dhl[key], 
+                                self.route_paths_hc2l[key]
+                            )
+                            if frechet > 500:  # More than 500m difference
+                                alternative_route_count += 1
+                            
+                            # Estimate path overlap (simplified)
+                            # Paths with low Frechet distance have high overlap
+                            if frechet < 200:
+                                overlap = 95  # High overlap
+                            elif frechet < 400:
+                                overlap = 70  # Medium overlap
+                            else:
+                                overlap = 40  # Low overlap
+                            path_overlaps.append(overlap)
+        
+        return {
+            "path_overlap_pct": round(float(np.mean(path_overlaps)), 1) if path_overlaps else 0,
+            "distance_deviation_pct": round(float(np.mean(distance_deviations)), 1) if distance_deviations else 0,
+            "alternative_route_count": alternative_route_count
+        }
+    
+    def _compute_graph_data(self) -> Dict:
+        """Compute comprehensive data for graph visualizations"""
+        graph_data = {
+            "time_series": {},
+            "algorithm_comparison": {},
+            "per_trial": {},
+            "rebuild_analysis": {},
+            "label_size_trend": {}
+        }
+        
+        # =====================================================================
+        # TIME SERIES DATA - Query time and update time over batches
+        # =====================================================================
+        for algorithm in ["DHL", "HC2L"]:
+            is_dhl = (algorithm == "DHL")
+            query_data = self.query_time_dhl if is_dhl else self.query_time_hc2l
+            lazy_data = self.lazy_update_time_dhl if is_dhl else self.lazy_update_time_hc2l
+            rebuild_data = self.threshold_rebuild_time_dhl if is_dhl else self.threshold_rebuild_time_hc2l
+            filled = self.filled_dhl if is_dhl else self.filled_hc2l
+            
+            batch_labels = []
+            query_times = []
+            update_times = []
+            rebuild_times = []
+            
+            for trial in range(self.trials):
+                for batch in range(self.batches):
+                    batch_label = f"T{trial+1}B{batch+1}"
+                    batch_labels.append(batch_label)
+                    
+                    # Average query time for this batch
+                    mask = filled[trial, batch, :]
+                    if np.any(mask):
+                        avg_query = float(np.mean(query_data[trial, batch, :][mask]))
+                        query_times.append(round(avg_query, 3))
+                    else:
+                        query_times.append(0)
+                    
+                    # Average lazy update time
+                    key = "lazy_times_dhl" if is_dhl else "lazy_times_hc2l"
+                    if trial < len(self._batch_lazy_times_dhl if is_dhl else self._batch_lazy_times_hc2l):
+                        batch_lazy = (self._batch_lazy_times_dhl if is_dhl else self._batch_lazy_times_hc2l)[trial][batch]
+                        if batch_lazy:
+                            update_times.append(round(float(np.mean(batch_lazy)), 3))
+                        else:
+                            update_times.append(0)
+                    else:
+                        update_times.append(0)
+                    
+                    # Threshold rebuild time
+                    rebuild_times.append(round(float(rebuild_data[trial, batch]), 3))
+            
+            graph_data["time_series"][algorithm] = {
+                "batch_labels": batch_labels,
+                "query_times": query_times,
+                "update_times": update_times,
+                "rebuild_times": rebuild_times
+            }
+        
+        # =====================================================================
+        # ALGORITHM COMPARISON - Average metrics across all trials
+        # =====================================================================
+        dhl_avg_query = []
+        hc2l_avg_query = []
+        dhl_avg_label = []
+        hc2l_avg_label = []
+        
+        for trial in range(self.trials):
+            dhl_mask = self.filled_dhl[trial, :, :]
+            hc2l_mask = self.filled_hc2l[trial, :, :]
+            
+            if np.any(dhl_mask):
+                dhl_avg_query.append(float(np.mean(self.query_time_dhl[trial, :, :][dhl_mask])))
+                dhl_avg_label.append(float(np.mean(self.label_size_dhl[trial, :, :][dhl_mask])))
+            
+            if np.any(hc2l_mask):
+                hc2l_avg_query.append(float(np.mean(self.query_time_hc2l[trial, :, :][hc2l_mask])))
+                hc2l_avg_label.append(float(np.mean(self.label_size_hc2l[trial, :, :][hc2l_mask])))
+        
+        graph_data["algorithm_comparison"] = {
+            "avg_query_time": {
+                "DHL": round(float(np.mean(dhl_avg_query)), 3) if dhl_avg_query else 0,
+                "HC2L": round(float(np.mean(hc2l_avg_query)), 3) if hc2l_avg_query else 0
+            },
+            "avg_label_size": {
+                "DHL": round(float(np.mean(dhl_avg_label)), 3) if dhl_avg_label else 0,
+                "HC2L": round(float(np.mean(hc2l_avg_label)), 3) if hc2l_avg_label else 0
+            }
+        }
+        
+        # =====================================================================
+        # PER-TRIAL BREAKDOWN
+        # =====================================================================
+        trial_labels = [f"Trial {i+1}" for i in range(self.trials)]
+        dhl_trial_query = []
+        hc2l_trial_query = []
+        dhl_trial_update = []
+        hc2l_trial_update = []
+        
+        for trial in range(self.trials):
+            # Query times
+            dhl_mask = self.filled_dhl[trial, :, :]
+            hc2l_mask = self.filled_hc2l[trial, :, :]
+            
+            if np.any(dhl_mask):
+                dhl_trial_query.append(round(float(np.mean(self.query_time_dhl[trial, :, :][dhl_mask])), 3))
+            else:
+                dhl_trial_query.append(0)
+            
+            if np.any(hc2l_mask):
+                hc2l_trial_query.append(round(float(np.mean(self.query_time_hc2l[trial, :, :][hc2l_mask])), 3))
+            else:
+                hc2l_trial_query.append(0)
+            
+            # Update times (lazy + rebuild)
+            dhl_lazy_all = []
+            hc2l_lazy_all = []
+            for batch in range(self.batches):
+                dhl_lazy_all.extend(self._batch_lazy_times_dhl[trial][batch])
+                hc2l_lazy_all.extend(self._batch_lazy_times_hc2l[trial][batch])
+            
+            dhl_trial_update.append(round(float(np.mean(dhl_lazy_all)), 3) if dhl_lazy_all else 0)
+            hc2l_trial_update.append(round(float(np.mean(hc2l_lazy_all)), 3) if hc2l_lazy_all else 0)
+        
+        graph_data["per_trial"] = {
+            "trial_labels": trial_labels,
+            "DHL_query": dhl_trial_query,
+            "HC2L_query": hc2l_trial_query,
+            "DHL_update": dhl_trial_update,
+            "HC2L_update": hc2l_trial_update
+        }
+        
+        # =====================================================================
+        # REBUILD ANALYSIS - Threshold rebuild times and counts
+        # =====================================================================
+        dhl_rebuild_times = []
+        hc2l_rebuild_times = []
+        dhl_rebuild_counts = []
+        hc2l_rebuild_counts = []
+        
+        for trial in range(self.trials):
+            for batch in range(self.batches):
+                dhl_rebuild_times.append(float(self.threshold_rebuild_time_dhl[trial, batch]))
+                hc2l_rebuild_times.append(float(self.threshold_rebuild_time_hc2l[trial, batch]))
+                dhl_rebuild_counts.append(int(self.rebuild_count_dhl[trial, batch]))
+                hc2l_rebuild_counts.append(int(self.rebuild_count_hc2l[trial, batch]))
+        
+        graph_data["rebuild_analysis"] = {
+            "DHL_rebuild_times": [round(t, 3) for t in dhl_rebuild_times],
+            "HC2L_rebuild_times": [round(t, 3) for t in hc2l_rebuild_times],
+            "DHL_rebuild_counts": dhl_rebuild_counts,
+            "HC2L_rebuild_counts": hc2l_rebuild_counts,
+            "total_DHL_rebuilds": sum(dhl_rebuild_counts),
+            "total_HC2L_rebuilds": sum(hc2l_rebuild_counts)
+        }
+        
+        # =====================================================================
+        # LABEL SIZE TREND - How label sizes change over batches
+        # =====================================================================
+        dhl_label_trend = []
+        hc2l_label_trend = []
+        batch_labels = []
+        
+        for trial in range(self.trials):
+            for batch in range(self.batches):
+                batch_labels.append(f"T{trial+1}B{batch+1}")
+                
+                # Average label size for this batch
+                dhl_mask = self.filled_dhl[trial, batch, :]
+                hc2l_mask = self.filled_hc2l[trial, batch, :]
+                
+                if np.any(dhl_mask):
+                    dhl_label_trend.append(round(float(np.mean(self.label_size_dhl[trial, batch, :][dhl_mask])), 3))
+                else:
+                    dhl_label_trend.append(0)
+                
+                if np.any(hc2l_mask):
+                    hc2l_label_trend.append(round(float(np.mean(self.label_size_hc2l[trial, batch, :][hc2l_mask])), 3))
+                else:
+                    hc2l_label_trend.append(0)
+        
+        graph_data["label_size_trend"] = {
+            "batch_labels": batch_labels,
+            "DHL_labels": dhl_label_trend,
+            "HC2L_labels": hc2l_label_trend
+        }
+        
+        return graph_data
     
     def get_progress_stats(self) -> Dict:
         """Get current progress statistics for real-time display"""
@@ -1484,8 +1801,8 @@ class ExperimentRunner:
             # Store results_path in progress for later access
             progress.results_path = results_path
             
-            # Save initial progress
-            self._save_progress(experiment_id, results_path)
+            # # Save initial progress
+            # self._save_progress(experiment_id, results_path)
             
             # Start worker threads
             self._start_worker_threads(experiment_id, config, base_path, results_path)
@@ -1912,6 +2229,13 @@ class ExperimentRunner:
                             self.metrics_collectors[experiment_id].record_metric(
                                 trial_idx, b_idx, route_idx, algorithm, result
                             )
+                            
+                            # Record route path coordinates for Frechet distance calculation
+                            path_coords = result.get("path_coordinates", [])
+                            if path_coords:
+                                self.metrics_collectors[experiment_id].record_route_path(
+                                    trial_idx, b_idx, route_idx, algorithm, path_coords
+                                )
                         
                         # Update progress
                         completed += 1
@@ -1989,6 +2313,9 @@ class ExperimentRunner:
             if all_completed:
                 progress.status = "completed"
                 progress.end_time = time.time()
+                
+                # Save results to preset/results directory
+                self._save_final_results(experiment_id)
             
             self._broadcast_progress(experiment_id)
             logger.success(f"Thread {thread_id} completed for experiment {experiment_id}")
@@ -2167,7 +2494,9 @@ class ExperimentRunner:
             "baseline_eta": baseline_eta,
             "actual_eta": actual_eta,
             "time_impact_seconds": round(time_impact_seconds, 1) if time_impact_seconds else 0,
-            "label_size": round(label_size_mb, 2)  # In MB
+            "label_size": round(label_size_mb, 2),  # In MB
+            "tau": round(tau, 3),
+            "disrupted_edges": route_disruptions.get("total_disrupted_edges", 0)
         }
         
         # Update Phase - extract from lazy_hc2l or dhl_update_info
@@ -2226,6 +2555,18 @@ class ExperimentRunner:
             "label_size_mb": label_size_mb
         }
         
+        # Extract route path coordinates for Frechet distance calculation
+        path_coords = []
+        geometry = route_data.get("geometry", [])
+        if geometry:
+            for segment in geometry:
+                coords = segment.get("coordinates", [])
+                if coords:
+                    path_coords.extend(coords)
+        
+        result["path_coordinates"] = path_coords
+        
+
         return result
     
     def _format_seconds(self, seconds: float) -> str:
@@ -2243,6 +2584,51 @@ class ExperimentRunner:
             return f"{minutes}m {secs}s"
         else:
             return f"{secs}s"
+    
+    def _save_final_results(self, experiment_id: str):
+        """Save final results to preset/results directory when experiment completes"""
+        try:
+            if experiment_id not in self.experiments:
+                return
+            
+            progress = self.experiments[experiment_id]
+            
+            # Get metrics collector
+            if experiment_id not in self.metrics_collectors:
+                logger.warning(f"No metrics collector found for {experiment_id}")
+                return
+            
+            collector = self.metrics_collectors[experiment_id]
+            
+            # Compute all results
+            results = collector.compute_results()
+            
+            # Add experiment metadata
+            results["experiment_id"] = experiment_id
+            results["timestamp"] = datetime.now().isoformat()
+            results["start_time"] = progress.start_time if progress.start_time else time.time()
+            results["end_time"] = progress.end_time if progress.end_time else time.time()
+            results["duration_seconds"] = (progress.end_time - progress.start_time) if (progress.end_time and progress.start_time) else 0
+            results["status"] = progress.status
+            results["total_routes"] = progress.total_routes
+            results["completed_routes"] = progress.completed_routes
+            
+            # Save to preset/results directory
+            results_dir = Path(Config.EXPERIMENT_DATA_DIR) / "preset" / "results"
+            results_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Generate filename with timestamp
+            timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+            result_file = results_dir / f"experiment_{timestamp_str}.json"
+            
+            with open(result_file, 'w') as f:
+                json.dump(results, f, indent=2)
+            
+            logger.success(f"Saved final results to {result_file}")
+            
+        except Exception as e:
+            logger.error(f"Failed to save final results for {experiment_id}: {e}")
+            logger.error(traceback.format_exc())
     
     def _generate_tau(self, tau_settings: Dict, trial_idx: int, route_idx: int) -> float:
         """Generate tau value based on settings"""
@@ -2339,30 +2725,30 @@ class ExperimentRunner:
             }
         }
     
-    def _save_progress(self, experiment_id: str, results_path: Path):
-        """Save progress to progress.json file"""
-        progress = self.experiments.get(experiment_id)
-        if not progress:
-            return
+    # def _save_progress(self, experiment_id: str, results_path: Path):
+    #     """Save progress to progress.json file"""
+    #     progress = self.experiments.get(experiment_id)
+    #     if not progress:
+    #         return
         
-        progress_file = results_path / "progress.json"
-        try:
-            with open(progress_file, 'w') as f:
-                json.dump(progress.to_dict(), f, indent=2)
-        except Exception as e:
-            logger.error(f"Error saving progress: {e}")
+    #     progress_file = results_path / "progress.json"
+    #     try:
+    #         with open(progress_file, 'w') as f:
+    #             json.dump(progress.to_dict(), f, indent=2)
+    #     except Exception as e:
+    #         logger.error(f"Error saving progress: {e}")
     
-    def _save_result(self, experiment_id: str, thread_id: str, 
-                     result: Dict, results_path: Path):
-        """Save individual route result to file"""
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-        result_file = results_path / f"result_{thread_id}_{timestamp}.json"
+    # def _save_result(self, experiment_id: str, thread_id: str, 
+    #                  result: Dict, results_path: Path):
+    #     """Save individual route result to file"""
+    #     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    #     result_file = results_path / f"result_{thread_id}_{timestamp}.json"
         
-        try:
-            with open(result_file, 'w') as f:
-                json.dump(result, f, indent=2)
-        except Exception as e:
-            logger.error(f"Error saving result: {e}")
+    #     try:
+    #         with open(result_file, 'w') as f:
+    #             json.dump(result, f, indent=2)
+    #     except Exception as e:
+    #         logger.error(f"Error saving result: {e}")
     
     def _broadcast_progress(self, experiment_id: str):
         """Broadcast progress update via WebSocket and save to file"""
@@ -2390,12 +2776,12 @@ class ExperimentRunner:
         except Exception as e:
             logger.debug(f"Error calculating overall ETA: {e}")
         
-        # Save progress to file if results_path is available
-        if progress.results_path:
-            try:
-                self._save_progress(experiment_id, progress.results_path)
-            except Exception as e:
-                logger.error(f"Error saving progress to file: {e}")
+        # # Save progress to file if results_path is available
+        # if progress.results_path:
+        #     try:
+        #         self._save_progress(experiment_id, progress.results_path)
+        #     except Exception as e:
+        #         logger.error(f"Error saving progress to file: {e}")
         
         # Broadcast via WebSocket
         if not self.socketio:
@@ -2616,3 +3002,98 @@ def cleanup_temporary():
     
     result = experiment_runner.cleanup_temporary(experiment_id)
     return jsonify(result)
+
+
+@experiment_bp.route('/results/list', methods=['GET'])
+def list_saved_results():
+    """List all saved experiment results"""
+    if not experiment_runner:
+        return jsonify({"success": False, "error": "Experiment runner not initialized"}), 500
+    
+    try:
+        results_dir = Path(Config.EXPERIMENT_DATA_DIR) / "preset" / "results"
+        results_dir.mkdir(parents=True, exist_ok=True)
+        
+        results_list = []
+        for result_file in results_dir.glob("*.json"):
+            try:
+                with open(result_file, 'r') as f:
+                    result_data = json.load(f)
+                    
+                    # Extract summary info
+                    summary = result_data.get("summary", {})
+                    
+                    results_list.append({
+                        "id": result_file.stem,
+                        "filename": result_file.name,
+                        "timestamp": result_file.stat().st_mtime,
+                        "trials": summary.get("total_trials", 0),
+                        "batches": summary.get("total_batches", 0),
+                        "routes_per_batch": summary.get("routes_per_batch", 0),
+                        "completed": summary.get("completion_pct", 0)
+                    })
+            except Exception as e:
+                logger.error(f"Error reading result file {result_file}: {e}")
+                continue
+        
+        # Sort by timestamp (newest first)
+        results_list.sort(key=lambda x: x["timestamp"], reverse=True)
+        
+        return jsonify({
+            "success": True,
+            "results": results_list,
+            "count": len(results_list)
+        })
+    except Exception as e:
+        logger.error(f"Error listing saved results: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@experiment_bp.route('/results/<result_id>', methods=['GET'])
+def get_saved_result(result_id):
+    """Get a specific saved experiment result"""
+    if not experiment_runner:
+        return jsonify({"success": False, "error": "Experiment runner not initialized"}), 500
+    
+    try:
+        results_dir = Path(Config.EXPERIMENT_DATA_DIR) / "preset" / "results"
+        result_file = results_dir / f"{result_id}.json"
+        
+        if not result_file.exists():
+            return jsonify({"success": False, "error": "Result not found"}), 404
+        
+        with open(result_file, 'r') as f:
+            result_data = json.load(f)
+        
+        return jsonify({
+            "success": True,
+            "result": result_data
+        })
+    except Exception as e:
+        logger.error(f"Error retrieving saved result {result_id}: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@experiment_bp.route('/results/<result_id>', methods=['DELETE'])
+def delete_saved_result(result_id):
+    """Delete a saved experiment result"""
+    if not experiment_runner:
+        return jsonify({"success": False, "error": "Experiment runner not initialized"}), 500
+    
+    try:
+        results_dir = Path(Config.EXPERIMENT_DATA_DIR) / "preset" / "results"
+        result_file = results_dir / f"{result_id}.json"
+        
+        if not result_file.exists():
+            return jsonify({"success": False, "error": "Result not found"}), 404
+        
+        result_file.unlink()
+        
+        return jsonify({
+            "success": True,
+            "message": "Result deleted successfully"
+        })
+    except Exception as e:
+        logger.error(f"Error deleting saved result {result_id}: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+

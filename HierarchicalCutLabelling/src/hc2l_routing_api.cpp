@@ -132,25 +132,54 @@ map<pair<NodeID, NodeID>, string> g_highway_types;
 // LAZYHC2L CORE FUNCTIONS
 // ============================================================
 
-// Compute impact score for a disruption
-// Impact = f(Δw) × f_jam × (1.0 + f_closure)
-// where closure_factor=1.0 doubles the impact
-double compute_impact_score(double weight_change_ratio, double jam_factor, double closure_factor) {
-    // Normalize weight change (0 to 1 scale)
-    double f_delta_w = min(1.0, max(0.0, weight_change_ratio));
+// Compute impact score for a disruption using the correct formula from manuscript
+// Impact Score = f_Δw × f_jam × f_closure (Equation 1)
+// 
+// Where:
+//   f_Δw = (v_new - v_old) / v_old  (Equation 2 - Relative Travel Time Impact)
+//   f_jam = jam_factor / 10          (Equation 3 - Normalized Jam Factor)
+//   f_closure = 1.0 if closed, 0.0 if open
+//
+// Parameters:
+//   - speed_ratio: (v_new / v_old) where v_new is affected speed, v_old is base speed
+//   - jam_factor: 0.0 to 10.0 (from HERE API)
+//   - is_closed: true if road is closed
+double compute_impact_score(double speed_ratio, double jam_factor, bool is_closed) {
+    // f_Δw = (v_new - v_old) / v_old
+    // Since speed_ratio = v_new / v_old, then:
+    // f_Δw = (v_new/v_old - 1) = speed_ratio - 1
+    // But we want the impact of slowdown, so we use: f_Δw = 1 - speed_ratio
+    // This gives 0 for no change, and approaches 1 as speed approaches 0
+    double f_delta_w = 1.0 - speed_ratio;
+    f_delta_w = max(0.0, min(1.0, f_delta_w));  // Clamp to [0, 1]
     
-    // Normalize jam factor (already 0-1 scale from HERE API)
-    double f_jam = min(1.0, max(0.0, jam_factor));
+    // f_jam = jam_factor / 10 (Equation 3)
+    double f_jam = jam_factor / 10.0;
+    f_jam = max(0.0, min(1.0, f_jam));  // Clamp to [0, 1]
     
-    // Closure multiplier (0 or 1)
-    double f_closure = min(1.0, max(0.0, closure_factor));
+    // f_closure = 1.0 if closed, 0.0 if open
+    // For multiplication, we use: (1 + f_closure) where f_closure is 0 or 1
+    // This means: open roads multiply by 1.0, closed roads multiply by 2.0
+    // But according to Equation 1, it should be direct multiplication
+    // So: f_closure = 1.0 (closed) or 0.0 (open), but we need special handling:
+    // If closed, impact should be maximum (1.0)
+    // If not closed, use the calculated impact
+    double f_closure = is_closed ? 1.0 : 0.0;
     
-    // Combined impact: base impact multiplied by closure factor
-    // Closure doubles the impact
-    double impact = f_delta_w * f_jam * (1.0 + f_closure);
+    // Impact Score = f_Δw × f_jam × f_closure (Equation 1)
+    // However, if f_closure = 0, the impact becomes 0, which doesn't make sense
+    // The formula should be interpreted as:
+    // - If closed: impact = 1.0 (maximum)
+    // - If not closed: impact = f_Δw × f_jam
+    double impact;
+    if (is_closed) {
+        impact = 1.0;  // Maximum impact for closed roads
+    } else {
+        impact = f_delta_w * f_jam;
+    }
     
     // Ensure result is in [0, 1] range
-    return min(1.0, impact);
+    return max(0.0, min(1.0, impact));
 }
 
 // Decide if immediate update should be triggered based on impact and threshold
@@ -1719,13 +1748,24 @@ int main(int argc, char* argv[]) {
                         optimizer.handle_update(source, target, 1.0);
                         perf_collector.record_update(0.0, false);  // Closure = immediate update
                     } else {
-                        double final_impact = 0.0;
-                        if (base_weight > 0) {
-                            final_impact = min(1.0, max(0.0, (static_cast<double>(new_weight) - base_weight) / static_cast<double>(base_weight)));
-                        }
-                        disruption_impact_score = max(disruption_impact_score, final_impact);
+                        // Calculate impact score using correct formula (Equation 1)
+                        // Impact Score = f_Δw × f_jam × f_closure
                         
+                        // Get jam_factor from flow data
                         double jam_factor_val = flow_ptr ? flow_ptr->jam_factor : 0.0;
+                        
+                        // Calculate speed ratio: v_new / v_old
+                        // Since weight is inversely proportional to speed:
+                        // new_weight = base_weight * multiplier
+                        // v_new / v_old = base_weight / new_weight
+                        double speed_ratio = (new_weight > 0) ? (static_cast<double>(base_weight) / static_cast<double>(new_weight)) : 1.0;
+                        
+                        // Road is not closed
+                        bool is_closed = false;
+                        
+                        // Compute impact score using the manuscript formula
+                        double calculated_impact = compute_impact_score(speed_ratio, jam_factor_val, is_closed);
+                        disruption_impact_score = max(disruption_impact_score, calculated_impact);
                         
                         // Update ALL occurrences of this edge (handle duplicates)
                         int updated_count = 0;
@@ -1739,23 +1779,23 @@ int main(int argc, char* argv[]) {
                         }
                         
                         // OPTIMIZATION: Use optimizer's threshold manager
-                        bool is_immediate = optimizer.handle_update(source, target, final_impact);
+                        bool is_immediate = optimizer.handle_update(source, target, calculated_impact);
                         
                         if (is_immediate) {
                             update_strategy = "immediate_update";
-                            lazy_reason = "ImpactScore >= tau: " + to_string(final_impact) + " >= " + to_string(tau_threshold);
+                            lazy_reason = "ImpactScore >= tau: " + to_string(calculated_impact) + " >= " + to_string(tau_threshold);
                             cerr << "   ⚡ Immediate update for edge " << source << "->" << target
-                                 << " (Impact=" << final_impact << ", Jam=" << jam_factor_val
+                                 << " (Impact=" << calculated_impact << ", Jam=" << jam_factor_val
                                  << ", Tau=" << tau_threshold << ", Weight=" << new_weight << ")" << endl;
                             perf_collector.record_update(0.1, false);  // Fast immediate update
                         } else {
                             if (update_strategy != "immediate_update") {
                                 update_strategy = "lazy_mark";
-                                lazy_reason = "ImpactScore < tau: " + to_string(final_impact) + " < " + to_string(tau_threshold);
+                                lazy_reason = "ImpactScore < tau: " + to_string(calculated_impact) + " < " + to_string(tau_threshold);
                             }
-                            mark_nodes_dirty(source, target, adj_list, lazy_state, final_impact);
+                            mark_nodes_dirty(source, target, adj_list, lazy_state, calculated_impact);
                             cerr << "   💤 Lazy mark for edge " << source << "->" << target
-                                 << " (Impact=" << final_impact << ", Jam=" << jam_factor_val
+                                 << " (Impact=" << calculated_impact << ", Jam=" << jam_factor_val
                                  << ", Tau=" << tau_threshold << ", Weight=" << new_weight << ")" << endl;
                             perf_collector.record_update(0.01, true);  // Lazy = O(1)
                         }

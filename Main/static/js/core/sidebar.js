@@ -52,7 +52,7 @@ const Sidebar = (function () {
     console.log('[Sidebar] Initialized');
   }
 
-  function isDemoRunning() {
+  function isExperimentRunning() {
     return (typeof DemoRunner !== 'undefined' && DemoRunner.isRunning);
   }
 
@@ -321,7 +321,7 @@ const Sidebar = (function () {
    */
   function setActive(panelKey) {
     sidebarElement?.querySelectorAll('.nav-item').forEach(item => {
-      if (isDemoRunning() &&
+      if (isExperimentRunning() &&
         (
           panelKey === 'route-finder' ||
           panelKey === 'current-route' ||
