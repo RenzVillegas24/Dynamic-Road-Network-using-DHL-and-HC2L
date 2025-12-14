@@ -483,6 +483,15 @@ class StructuredLogger:
     def search(self, message: str) -> str:
         """Log search message"""
         return self._log(LogLevel.INFO, f"[{self.name}] {message}", ConsoleFormatter.search)
+    
+    def disable_logging(self, disable: bool = True):
+        """Disable all logging output"""
+        if not disable:
+            self._log = lambda level, message, formatter_func: formatter_func(message)
+        else:
+            def noop(message: str) -> str:
+                return ""
+            self._log = lambda level, message, formatter_func: noop(message)
 
 def get_logger(name: str) -> StructuredLogger:
     """Get a structured logger instance"""

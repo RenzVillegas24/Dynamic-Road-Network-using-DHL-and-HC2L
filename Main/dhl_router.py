@@ -78,7 +78,7 @@ class DHLRouter:
                      disruption_file: str = "",
                      tau_threshold: float = 0.5,
                      generate_alternatives: bool = True,
-                     verbose: bool = True
+                     verbose: bool = False
                      ) -> Dict:
         """
         Compute route using DHL algorithm via JSON API with snap point information
@@ -105,9 +105,11 @@ class DHLRouter:
                           DHL always performs immediate updates, unlike LazyHC2L.
             generate_alternatives: Whether to generate alternative routes (default True for backward compatibility)
         """
+
+        logger.disable_logging(not verbose)
+
         try:
-            if verbose:
-                logger.processing("Executing DHL JSON API route computation...")
+            logger.processing("Executing DHL JSON API route computation...")
             
             # Build command with DHL argument structure
             # Args: 14 routing params + 3 data files + optional disruption_file + optional tau_threshold + optional generate_alternatives
@@ -140,31 +142,26 @@ class DHLRouter:
                         flow_files = sorted(flow_dir.glob('flow_*.csv'), key=lambda f: f.stat().st_mtime, reverse=True)
                         if flow_files:
                             latest_flow = flow_files[0]
-                            if verbose:
-                                logger.info(f"Latest flow file: {latest_flow.name} (mtime: {latest_flow.stat().st_mtime})")
+                            logger.info(f"Latest flow file: {latest_flow.name} (mtime: {latest_flow.stat().st_mtime})")
                     
                     if incident_dir.exists():
                         incident_files = sorted(incident_dir.glob('incident_*.csv'), key=lambda f: f.stat().st_mtime, reverse=True)
                         if incident_files:
                             latest_incident = incident_files[0]
-                            if verbose:
-                                logger.info(f"Latest incident file: {latest_incident.name} (mtime: {latest_incident.stat().st_mtime})")
+                            logger.info(f"Latest incident file: {latest_incident.name} (mtime: {latest_incident.stat().st_mtime})")
                 except Exception as e:
                     logger.warning(f"Could not verify disruption files: {e}")
                 
-                if verbose:
-                    logger.info(f"Adding disruption directory: {disruption_file}")
+                logger.info(f"Adding disruption directory: {disruption_file}")
                 cmd.append(str(disruption_file))
                 cmd.append(str(tau_threshold))
             else:
-                if verbose:
-                    logger.warning(f"No disruption directory passed (disruption_file={repr(disruption_file)})")
+                logger.warning(f"No disruption directory passed (disruption_file={repr(disruption_file)})")
             
             # Add generate_alternatives flag (pass 1 for True, 0 for False)
             cmd.append(str(1 if generate_alternatives else 0))
             
-            if verbose:
-                logger.processing(f"Command: {' '.join(cmd)}")
+            logger.processing(f"Command: {' '.join(cmd)}")
             
             result = subprocess.run(
                 cmd, 
@@ -173,10 +170,9 @@ class DHLRouter:
                 timeout=30
             )
             
-            if verbose:
-                logger.info(f"DHL executable return code: {result.returncode}")
-                logger.info(f"DHL stdout: {result.stdout[:500] if result.stdout else '(empty)'}")
-                logger.info(f"DHL stderr: {result.stderr[:500] if result.stderr else '(empty)'}")
+            logger.info(f"DHL executable return code: {result.returncode}")
+            logger.info(f"DHL stdout: {result.stdout[:500] if result.stdout else '(empty)'}")
+            logger.info(f"DHL stderr: {result.stderr[:500] if result.stderr else '(empty)'}")
             
             if result.returncode != 0:
                 error_msg = result.stderr if result.stderr else result.stdout
@@ -218,11 +214,10 @@ class DHLRouter:
                 if disruption_analysis:
                     route_disruptions = disruption_analysis.get('route_disruptions', {})
                     time_impact = disruption_analysis.get('time_impact', {})
-                    if verbose:
-                        logger.warning("DHL Disruption Analysis:")
-                        logger.info(f"Total disruptions on route: {route_disruptions.get('total_count', 0)}")
-                        logger.info(f"Road closures: {route_disruptions.get('closures', 0)}")
-                        logger.info(f"Added delay: {time_impact.get('added_delay_seconds', 0):.1f}s ({time_impact.get('percentage_increase', 0):.1f}%)")
+                    logger.warning("DHL Disruption Analysis:")
+                    logger.info(f"Total disruptions on route: {route_disruptions.get('total_count', 0)}")
+                    logger.info(f"Road closures: {route_disruptions.get('closures', 0)}")
+                    logger.info(f"Added delay: {time_impact.get('added_delay_seconds', 0):.1f}s ({time_impact.get('percentage_increase', 0):.1f}%)")
                 
                 # Convert DHL JSON output to our route format
                 parsed_data = self._convert_dhl_to_route_format(dhl_data)
