@@ -126,18 +126,12 @@ const PanelManager = (function () {
       size: 'xl',
       isPassable: () => true
     },
-     'experiment-runner': {
+    'experiment-runner': {
       id: 'experiment-runner-panel',
       title: 'Experiment Runner',
       icon: 'play-circle',
       size: 'xl',
       isPassable: () => {
-         if (isExperimentRunning()) {
-          // Show modal dialog instead of toast
-          showDemoStopModal('demo-creator', 'sidebar');
-          return false;
-        }
-
         resetSystemState();
 
         // Save the current Route Finder state before making any changes

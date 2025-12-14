@@ -295,7 +295,8 @@
     </div>
 
     <!-- Footer -->
-    <div class="absolute bottom-0 left-0 right-0 bg-white p-4 border-t border-gray-200 flex gap-2" style="z-index: 100;">
+    <div class="absolute bottom-0 left-0 right-0 bg-white p-4 border-t border-gray-200 flex gap-2"
+      style="z-index: 100;">
       <button id="start-experiment-btn" class="btn btn--success btn--lg w-full">
         <i data-lucide="play" class="w-5 h-5"></i>
         <span>Start Experiment</span>
@@ -305,9 +306,9 @@
 
   <!-- Tab Content: Running (Hidden from main nav, shown during execution) -->
   <div id="experiment-tab-running" data-experiment-tab-content class="hidden overflow-x-auto">
-    <div class="panel__body overflow-hidden space-y-4" style="margin-bottom: 14rem;"> 
+    <div class="panel__body overflow-hidden space-y-4" style="margin-bottom: 14rem;">
       <!-- Disruption Display -->
-      <div id="experiment-disruption-display" class="section-card section-card--warning">
+      <!-- <div id="experiment-disruption-display" class="section-card section-card--warning">
         <div class="section-card__header">
           <div class="section-card__icon section-card__icon--warning">
             <i data-lucide="traffic-cone" class="w-5 h-5"></i>
@@ -327,7 +328,7 @@
             </label>
           </div>
         </div>
-      </div>
+      </div> -->
 
       <!-- Thread Displays Container -->
       <div class="section-card">
@@ -466,340 +467,467 @@
 
   <!-- Tab Content: Individual Result View -->
   <div id="experiment-tab-results" data-experiment-tab-content class="hidden overflow-x-auto pb-20">
-    <div class="panel__body overflow-hidden space-y-4">
+    <div class="panel__body overflow-hidden space-y-6">
       <!-- Back Button -->
-      <button onclick="ExperimentRunner.showTab('results-list')" class="btn btn--ghost btn--sm">
+      <button onclick="ExperimentRunner.showTab('results-list')"
+        class="btn btn--ghost btn--sm hover:bg-gray-100 transition-colors duration-200">
         <i data-lucide="arrow-left" class="w-4 h-4"></i>
         Back to Results List
       </button>
 
       <!-- Dashboard Header -->
-      <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg p-4">
-        <h3 class="font-bold text-lg mb-1">DHC2L Performance Metrics Dashboard</h3>
-        <p class="text-purple-200 text-sm">Comprehensive evaluation for dynamic graph labeling</p>
+      <div
+        class="relative overflow-hidden rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 text-white px-6 py-8 shadow-lg border border-purple-400 border-opacity-20">
+        <div class="flex items-start justify-between">
+          <div class="flex-1">
+            <div class="flex items-center gap-2 mb-2">
+              <div class="w-1 h-6 bg-white rounded"></div>
+              <h2 class="text-3xl font-bold tracking-tight">Performance Metrics</h2>
+            </div>
+            <p class="text-purple-100 text-sm font-medium">DHC2L vs DHL Algorithm Comparison</p>
+            <p class="text-purple-200 text-xs mt-1">Comprehensive evaluation for dynamic graph labeling</p>
+          </div>
+          <div class="text-right">
+            <div class="inline-block backdrop-blur-md rounded-lg px-3 py-2"
+              style="background: rgba(255, 255, 255, 0.1);">
+              <p class="text-xs text-purple-100 font-medium">DASHBOARD</p>
+              <p class="text-sm font-bold text-white">Active Analysis</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Experiment Summary -->
-      <div class="grid grid-cols-3 gap-3">
-        <div class="bg-blue-50 rounded-lg p-3 text-center">
-          <div class="text-xs text-blue-600">Total Trials</div>
-          <div id="result-total-trials" class="text-2xl font-bold text-blue-700">3</div>
+      <div class="grid grid-cols-3 gap-4">
+        <div class="group">
+          <div
+            class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-5 shadow-sm hover:shadow-md transition-all duration-300 border border-blue-200 border-opacity-50">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs font-semibold text-blue-600 uppercase tracking-wider">Total Trials</span>
+              <div class="w-8 h-8 bg-blue-200 rounded-lg flex items-center justify-center">
+                <i data-lucide="beaker" class="w-4 h-4 text-blue-600"></i>
+              </div>
+            </div>
+            <div id="result-total-trials" class="text-4xl font-black text-blue-700 leading-none">3</div>
+            <p class="text-xs text-blue-600 mt-2 font-medium">Experiment repetitions</p>
+          </div>
         </div>
-        <div class="bg-green-50 rounded-lg p-3 text-center">
-          <div class="text-xs text-green-600">Configured Batches</div>
-          <div id="result-total-batches" class="text-2xl font-bold text-green-700">3</div>
+        <div class="group">
+          <div
+            class="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-5 shadow-sm hover:shadow-md transition-all duration-300 border border-green-200 border-opacity-50">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs font-semibold text-green-600 uppercase tracking-wider">Configured Batches</span>
+              <div class="w-8 h-8 bg-green-200 rounded-lg flex items-center justify-center">
+                <i data-lucide="layers" class="w-4 h-4 text-green-600"></i>
+              </div>
+            </div>
+            <div id="result-total-batches" class="text-4xl font-black text-green-700 leading-none">3</div>
+            <p class="text-xs text-green-600 mt-2 font-medium">Update batches per trial</p>
+          </div>
         </div>
-        <div class="bg-purple-50 rounded-lg p-3 text-center">
-          <div class="text-xs text-purple-600">Algorithms Compared</div>
-          <div id="result-algorithms" class="text-lg font-bold text-purple-700">2 (DHL vs DHC2L)</div>
+        <div class="group">
+          <div
+            class="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-5 shadow-sm hover:shadow-md transition-all duration-300 border border-purple-200 border-opacity-50">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs font-semibold text-purple-600 uppercase tracking-wider">Algorithms</span>
+              <div class="w-8 h-8 bg-purple-200 rounded-lg flex items-center justify-center">
+                <i data-lucide="git-compare" class="w-4 h-4 text-purple-600"></i>
+              </div>
+            </div>
+            <div id="result-algorithms" class="text-2xl font-black text-purple-700 leading-none">2</div>
+            <p class="text-xs text-purple-600 mt-2 font-medium">DHL vs DHC2L</p>
+          </div>
         </div>
       </div>
 
       <!-- Results Tab Navigation -->
-      <div class="tabs tabs--pills border-b border-gray-200 pb-2">
-        <div class="tabs__list flex flex-wrap gap-1">
+      <div class="relative">
+        <div class="flex gap-2 overflow-x-auto pb-4 border-b-2 border-gray-200">
+          <style>
+            .tabs__tab-scroll {
+              display: flex;
+              gap: 0.5rem;
+              overflow-x: auto;
+              padding-bottom: 1rem;
+              scrollbar-width: none;
+            }
+
+            .tabs__tab-scroll::-webkit-scrollbar {
+              display: none;
+            }
+          </style>
           <button data-result-tab="construction"
-            class="tabs__tab text-xs px-3 py-1 bg-purple-600 text-white rounded-full" aria-selected="true">
-            <i data-lucide="hammer" class="w-3 h-3 inline"></i> Construction
+            class="tabs__tab whitespace-nowrap px-4 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-purple-600 to-indigo-600 rounded-lg shadow-md hover:shadow-lg transition-all duration-200 flex items-center gap-2 border border-purple-500 border-opacity-30"
+            aria-selected="true">
+            <i data-lucide="hammer" class="w-4 h-4"></i> Construction
           </button>
-          <button data-result-tab="updates" class="tabs__tab text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-full">
-            <i data-lucide="refresh-cw" class="w-3 h-3 inline"></i> Updates
+          <button data-result-tab="updates"
+            class="tabs__tab whitespace-nowrap px-4 py-2.5 text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 flex items-center gap-2 border border-gray-300 border-opacity-40">
+            <i data-lucide="refresh-cw" class="w-4 h-4"></i> Updates
           </button>
           <button data-result-tab="performance"
-            class="tabs__tab text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-full">
-            <i data-lucide="gauge" class="w-3 h-3 inline"></i> Performance
+            class="tabs__tab whitespace-nowrap px-4 py-2.5 text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 flex items-center gap-2 border border-gray-300 border-opacity-40">
+            <i data-lucide="gauge" class="w-4 h-4"></i> Performance
           </button>
           <button data-result-tab="similarity"
-            class="tabs__tab text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-full">
-            <i data-lucide="git-compare" class="w-3 h-3 inline"></i> Similarity
+            class="tabs__tab whitespace-nowrap px-4 py-2.5 text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 flex items-center gap-2 border border-gray-300 border-opacity-40">
+            <i data-lucide="git-compare" class="w-4 h-4"></i> Similarity
           </button>
-          <button data-result-tab="graphs" class="tabs__tab text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-full">
-            <i data-lucide="bar-chart-4" class="w-3 h-3 inline"></i> Graphs
+          <button data-result-tab="graphs"
+            class="tabs__tab whitespace-nowrap px-4 py-2.5 text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 flex items-center gap-2 border border-gray-300 border-opacity-40">
+            <i data-lucide="bar-chart-4" class="w-4 h-4"></i> Graphs
           </button>
         </div>
-      </div>
+        <style>
+          [data-result-tab]:has([aria-selected="true"]) button {
+            background: linear-gradient(135deg, #9333ea 0%, #4f46e5 100%);
+            color: white;
+            border-color: rgba(168, 85, 247, 0.5);
+          }
+        </style>
 
-      <!-- Construction Phase Tab -->
-      <div id="result-tab-construction" data-result-tab-content class="space-y-3">
-        <div class="flex justify-between items-center">
-          <h4 class="font-semibold text-gray-800">Appendix 1.1: Initial Construction Performance</h4>
-          <button onclick="ExperimentRunner.exportTab('construction')" class="btn btn--success btn--xs">
-            <i data-lucide="download" class="w-3 h-3"></i> Export CSV
-          </button>
-        </div>
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm">
-            <thead class="bg-gray-100">
-              <tr>
-                <th class="text-left p-2 font-semibold text-gray-700">Trial</th>
-                <th class="text-left p-2 font-semibold text-gray-700">Algorithm</th>
-                <th class="text-right p-2 font-semibold text-gray-700">Initial Construction Time (ms)</th>
-                <th class="text-right p-2 font-semibold text-gray-700">Initial Label Size (MB)</th>
-              </tr>
-            </thead>
-            <tbody id="result-construction-tbody" class="divide-y divide-gray-200">
-              <tr>
-                <td colspan="4" class="text-center text-gray-500 py-4">No data yet</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- Dynamic Updates Tab -->
-      <div id="result-tab-updates" data-result-tab-content class="hidden space-y-3">
-        <div class="flex justify-between items-center">
-          <h4 class="font-semibold text-gray-800">Appendix 1.2: Dynamic Performance Log</h4>
-          <button onclick="ExperimentRunner.exportTab('updates')" class="btn btn--success btn--xs">
-            <i data-lucide="download" class="w-3 h-3"></i> Export CSV
-          </button>
-        </div>
-        <div id="result-updates-container" class="space-y-4 max-h-96 overflow-y-auto">
-          <p class="text-center text-gray-500 py-4">No data yet</p>
-        </div>
-      </div>
-
-      <!-- Query Performance Tab -->
-      <div id="result-tab-performance" data-result-tab-content class="hidden space-y-3">
-        <div class="flex justify-between items-center">
-          <h4 class="font-semibold text-gray-800">Appendix 1.3: Combined DHL vs DHC2L Performance Summary</h4>
-          <button onclick="ExperimentRunner.exportTab('performance')" class="btn btn--success btn--xs">
-            <i data-lucide="download" class="w-3 h-3"></i> Export CSV
-          </button>
-        </div>
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm">
-            <thead class="bg-gray-100">
-              <tr>
-                <th class="text-left p-2 font-semibold text-gray-700">Metric</th>
-                <th class="text-right p-2 font-semibold text-blue-700">DHL (Avg of 3 Trials)</th>
-                <th class="text-right p-2 font-semibold text-green-700">DHC2L (Avg of 3 Trials)</th>
-                <th class="text-right p-2 font-semibold text-purple-700">% Improvement</th>
-              </tr>
-            </thead>
-            <tbody id="result-performance-tbody" class="divide-y divide-gray-200">
-              <tr>
-                <td colspan="4" class="text-center text-gray-500 py-4">No data yet</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- Route Similarity Tab -->
-      <div id="result-tab-similarity" data-result-tab-content class="hidden space-y-3">
-        <div class="flex justify-between items-center">
-          <h4 class="font-semibold text-gray-800">Appendix 1.4: Route Similarity Evaluation</h4>
-          <button onclick="ExperimentRunner.exportTab('similarity')" class="btn btn--success btn--xs">
-            <i data-lucide="download" class="w-3 h-3"></i> Export CSV
-          </button>
-        </div>
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm">
-            <thead class="bg-gray-100">
-              <tr>
-                <th class="text-left p-2 font-semibold text-gray-700">OD Pair</th>
-                <th class="text-right p-2 font-semibold text-gray-700">Distance (km)</th>
-                <th class="text-right p-2 font-semibold text-gray-700">Travel Time (min)</th>
-                <th class="text-right p-2 font-semibold text-gray-700">Fréchet Distance (m)</th>
-                <th class="text-center p-2 font-semibold text-gray-700">FD Rating</th>
-                <th class="text-right p-2 font-semibold text-gray-700">Travel Time Deviation (%)</th>
-                <th class="text-center p-2 font-semibold text-gray-700">TTD Rating</th>
-              </tr>
-            </thead>
-            <tbody id="result-similarity-tbody" class="divide-y divide-gray-200">
-              <tr>
-                <td colspan="7" class="text-center text-gray-500 py-4">No data yet</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <!-- Rating Criteria -->
-        <div class="grid grid-cols-2 gap-4 mt-4 text-xs">
-          <div class="bg-gray-50 rounded-lg p-3">
-            <h5 class="font-semibold text-gray-700 mb-2">Rating Criteria:</h5>
-            <div class="space-y-1 text-gray-600">
-              <div><span class="text-green-600 font-medium">Fréchet Distance:</span></div>
-              <div class="pl-2">• Excellent: &lt; 200m</div>
-              <div class="pl-2">• Good: 200-400m</div>
-              <div class="pl-2">• Fair: &gt; 400m</div>
+        <!-- Construction Phase Tab -->
+        <div id="result-tab-construction" data-result-tab-content class="space-y-4">
+          <div
+            class="flex items-center justify-between bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl px-5 py-4 border border-gray-200">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                <i data-lucide="hammer" class="w-5 h-5 text-purple-600"></i>
+              </div>
+              <div>
+                <h4 class="font-bold text-gray-800 text-sm">Initial Construction Performance</h4>
+                <p class="text-xs text-gray-500 mt-0.5">Appendix 1.1</p>
+              </div>
             </div>
+            <button onclick="ExperimentRunner.exportTab('construction')"
+              class="btn btn--success btn--xs hover:shadow-md transition-all">
+              <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+            </button>
           </div>
-          <div class="bg-gray-50 rounded-lg p-3">
-            <div class="space-y-1 text-gray-600">
-              <div><span class="text-blue-600 font-medium">Travel Time Deviation:</span></div>
-              <div class="pl-2">• Excellent: &lt; 5%</div>
-              <div class="pl-2">• Good: 5-10%</div>
-              <div class="pl-2">• Fair: &gt; 10%</div>
-            </div>
+          <div class="overflow-x-auto rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+            <table class="w-full text-sm">
+              <thead class="bg-gradient-to-r from-purple-50 to-indigo-50 border-b-2 border-purple-200">
+                <tr>
+                  <th class="text-left p-3 font-semibold text-purple-700">Trial</th>
+                  <th class="text-left p-3 font-semibold text-purple-700">Algorithm</th>
+                  <th class="text-right p-3 font-semibold text-purple-700">Construction Time (ms)</th>
+                  <th class="text-right p-3 font-semibold text-purple-700">Label Size (MB)</th>
+                </tr>
+              </thead>
+              <tbody id="result-construction-tbody" class="divide-y divide-gray-200">
+                <tr class="hover:bg-gray-50 transition-colors">
+                  <td colspan="4" class="text-center text-gray-500 py-6 font-medium">No data yet</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
 
-        <!-- Additional Similarity Metrics -->
-        <div class="section-card section-card--info mt-4">
-          <div class="section-card__header">
-            <div class="section-card__icon section-card__icon--info">
-              <i data-lucide="git-merge" class="w-5 h-5"></i>
+        <!-- Dynamic Updates Tab -->
+        <div id="result-tab-updates" data-result-tab-content class="hidden space-y-4">
+          <div
+            class="flex items-center justify-between bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl px-5 py-4 border border-gray-200">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <i data-lucide="refresh-cw" class="w-5 h-5 text-blue-600"></i>
+              </div>
+              <div>
+                <h4 class="font-bold text-gray-800 text-sm">Dynamic Performance Log</h4>
+                <p class="text-xs text-gray-500 mt-0.5">Appendix 1.2</p>
+              </div>
             </div>
-            <h4 class="section-card__title">Additional Similarity Metrics</h4>
+            <button onclick="ExperimentRunner.exportTab('updates')"
+              class="btn btn--success btn--xs hover:shadow-md transition-all">
+              <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+            </button>
           </div>
-          <div class="section-card__body">
+          <div id="result-updates-container" class="space-y-3 max-h-96 overflow-y-auto pr-3">
+            <p class="text-center text-gray-500 py-8 font-medium">No data yet</p>
+          </div>
+        </div>
+
+        <!-- Query Performance Tab -->
+        <div id="result-tab-performance" data-result-tab-content class="hidden space-y-4">
+          <div
+            class="flex items-center justify-between bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl px-5 py-4 border border-gray-200">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                <i data-lucide="gauge" class="w-5 h-5 text-green-600"></i>
+              </div>
+              <div>
+                <h4 class="font-bold text-gray-800 text-sm">Combined DHL vs DHC2L Performance Summary</h4>
+                <p class="text-xs text-gray-500 mt-0.5">Appendix 1.3</p>
+              </div>
+            </div>
+            <button onclick="ExperimentRunner.exportTab('performance')"
+              class="btn btn--success btn--xs hover:shadow-md transition-all">
+              <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+            </button>
+          </div>
+          <div class="overflow-x-auto rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+            <table class="w-full text-sm">
+              <thead class="bg-gradient-to-r from-green-50 to-emerald-50 border-b-2 border-green-200">
+                <tr>
+                  <th class="text-left p-3 font-semibold text-green-700">Metric</th>
+                  <th class="text-right p-3 font-semibold text-blue-600">DHL (Avg of 3)</th>
+                  <th class="text-right p-3 font-semibold text-emerald-600">DHC2L (Avg of 3)</th>
+                  <th class="text-right p-3 font-semibold text-purple-600">% Improvement</th>
+                </tr>
+              </thead>
+              <tbody id="result-performance-tbody" class="divide-y divide-gray-200">
+                <tr class="hover:bg-gray-50 transition-colors">
+                  <td colspan="4" class="text-center text-gray-500 py-6 font-medium">No data yet</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Route Similarity Tab -->
+        <div id="result-tab-similarity" data-result-tab-content class="hidden space-y-4">
+          <div
+            class="flex items-center justify-between bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl px-5 py-4 border border-gray-200">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
+                <i data-lucide="git-compare" class="w-5 h-5 text-amber-600"></i>
+              </div>
+              <div>
+                <h4 class="font-bold text-gray-800 text-sm">Route Similarity Evaluation</h4>
+                <p class="text-xs text-gray-500 mt-0.5">Appendix 1.4</p>
+              </div>
+            </div>
+            <button onclick="ExperimentRunner.exportTab('similarity')"
+              class="btn btn--success btn--xs hover:shadow-md transition-all">
+              <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+            </button>
+          </div>
+          <div class="overflow-x-auto rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+            <table class="w-full text-sm">
+              <thead class="bg-gradient-to-r from-amber-50 to-orange-50 border-b-2 border-amber-200">
+                <tr>
+                  <th class="text-left p-3 font-semibold text-amber-700">OD Pair</th>
+                  <th class="text-right p-3 font-semibold text-amber-700">Distance (km)</th>
+                  <th class="text-right p-3 font-semibold text-amber-700">Travel Time (min)</th>
+                  <th class="text-right p-3 font-semibold text-amber-700">Fréchet Distance (m)</th>
+                  <th class="text-center p-3 font-semibold text-amber-700">FD Rating</th>
+                  <th class="text-right p-3 font-semibold text-amber-700">Time Dev (%)</th>
+                  <th class="text-center p-3 font-semibold text-amber-700">TTD Rating</th>
+                </tr>
+              </thead>
+              <tbody id="result-similarity-tbody" class="divide-y divide-gray-200">
+                <tr class="hover:bg-gray-50 transition-colors">
+                  <td colspan="7" class="text-center text-gray-500 py-6 font-medium">No data yet</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Rating Criteria -->
+          <div class="grid grid-cols-2 gap-4">
+            <div class="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-4 border border-green-200 shadow-sm">
+              <div class="flex items-center gap-2 mb-3">
+                <div class="w-6 h-6 bg-green-200 rounded flex items-center justify-center">
+                  <i data-lucide="check-circle" class="w-4 h-4 text-green-600"></i>
+                </div>
+                <h5 class="font-bold text-gray-800">Fréchet Distance</h5>
+              </div>
+              <div class="space-y-2 text-xs">
+                <div class="flex items-center gap-2">
+                  <span class="inline-block w-2 h-2 rounded-full bg-green-500"></span>
+                  <span><span class="font-semibold text-green-700">Excellent:</span> &lt; 200m</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="inline-block w-2 h-2 rounded-full bg-amber-500"></span>
+                  <span><span class="font-semibold text-amber-700">Good:</span> 200-400m</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="inline-block w-2 h-2 rounded-full bg-red-500"></span>
+                  <span><span class="font-semibold text-red-700">Fair:</span> &gt; 400m</span>
+                </div>
+              </div>
+            </div>
+            <div class="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl p-4 border border-blue-200 shadow-sm">
+              <div class="flex items-center gap-2 mb-3">
+                <div class="w-6 h-6 bg-blue-200 rounded flex items-center justify-center">
+                  <i data-lucide="timer" class="w-4 h-4 text-blue-600"></i>
+                </div>
+                <h5 class="font-bold text-gray-800">Travel Time Deviation</h5>
+              </div>
+              <div class="space-y-2 text-xs">
+                <div class="flex items-center gap-2">
+                  <span class="inline-block w-2 h-2 rounded-full bg-green-500"></span>
+                  <span><span class="font-semibold text-green-700">Excellent:</span> &lt; 5%</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="inline-block w-2 h-2 rounded-full bg-amber-500"></span>
+                  <span><span class="font-semibold text-amber-700">Good:</span> 5-10%</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="inline-block w-2 h-2 rounded-full bg-red-500"></span>
+                  <span><span class="font-semibold text-red-700">Fair:</span> &gt; 10%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Additional Similarity Metrics -->
+          <div class="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-xl p-6 border border-indigo-200 shadow-sm">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-8 h-8 bg-indigo-200 rounded-lg flex items-center justify-center">
+                <i data-lucide="git-merge" class="w-5 h-5 text-indigo-600"></i>
+              </div>
+              <h4 class="font-bold text-gray-800">Additional Similarity Metrics</h4>
+            </div>
             <div class="grid grid-cols-3 gap-4" id="additional-similarity-metrics">
-              <div class="text-center bg-blue-50 rounded-lg p-3">
-                <div class="text-xs text-blue-600 font-medium">Path Overlap</div>
-                <div id="similarity-path-overlap" class="text-2xl font-bold text-blue-700">--</div>
-                <div class="text-xs text-gray-500 mt-1">Average % of shared edges</div>
+              <div
+                class="bg-white rounded-lg p-4 text-center border border-blue-100 shadow-xs hover:shadow-sm transition-shadow">
+                <div class="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-2">Path Overlap</div>
+                <div id="similarity-path-overlap" class="text-3xl font-black text-blue-700 leading-none mb-1">--</div>
+                <div class="text-xs text-gray-500">% of shared edges</div>
               </div>
-              <div class="text-center bg-green-50 rounded-lg p-3">
-                <div class="text-xs text-green-600 font-medium">Distance Deviation</div>
-                <div id="similarity-distance-deviation" class="text-2xl font-bold text-green-700">--</div>
-                <div class="text-xs text-gray-500 mt-1">Average % difference</div>
+              <div
+                class="bg-white rounded-lg p-4 text-center border border-emerald-100 shadow-xs hover:shadow-sm transition-shadow">
+                <div class="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-2">Distance Deviation
+                </div>
+                <div id="similarity-distance-deviation" class="text-3xl font-black text-emerald-700 leading-none mb-1">
+                  --</div>
+                <div class="text-xs text-gray-500">% difference</div>
               </div>
-              <div class="text-center bg-purple-50 rounded-lg p-3">
-                <div class="text-xs text-purple-600 font-medium">Alternative Routes</div>
-                <div id="similarity-alternative-routes" class="text-2xl font-bold text-purple-700">--</div>
-                <div class="text-xs text-gray-500 mt-1">Count of different paths</div>
+              <div
+                class="bg-white rounded-lg p-4 text-center border border-purple-100 shadow-xs hover:shadow-sm transition-shadow">
+                <div class="text-xs font-semibold text-purple-600 uppercase tracking-wide mb-2">Alternative Routes</div>
+                <div id="similarity-alternative-routes" class="text-3xl font-black text-purple-700 leading-none mb-1">--
+                </div>
+                <div class="text-xs text-gray-500">different paths</div>
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- Similarity Distribution Chart -->
-        <div class="section-card mt-4">
-          <div class="section-card__header">
-            <div class="section-card__icon section-card__icon--purple">
-              <i data-lucide="bar-chart-2" class="w-5 h-5"></i>
+          <!-- Similarity Distribution Chart -->
+          <div class="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-5">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                <i data-lucide="bar-chart-2" class="w-5 h-5 text-purple-600"></i>
+              </div>
+              <h4 class="font-bold text-gray-800">Similarity Distribution</h4>
             </div>
-            <h4 class="section-card__title">Similarity Distribution</h4>
-          </div>
-          <div class="section-card__body">
             <canvas id="similarity-distribution-chart" height="200"></canvas>
           </div>
         </div>
-      </div>
 
-      <!-- Graphs Tab -->
-      <div id="result-tab-graphs" data-result-tab-content class="hidden space-y-4">
-        <h4 class="font-semibold text-gray-800">Performance Visualizations</h4>
-
-        <!-- Time Series Graphs -->
-        <div class="section-card">
-          <div class="section-card__header">
-            <div class="section-card__icon section-card__icon--blue">
-              <i data-lucide="trending-up" class="w-5 h-5"></i>
+        <!-- Graphs Tab -->
+        <div id="result-tab-graphs" data-result-tab-content class="hidden space-y-5">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+              <i data-lucide="bar-chart-4" class="w-5 h-5 text-purple-600"></i>
             </div>
-            <h4 class="section-card__title">Query Time Over Batches</h4>
+            <h4 class="font-bold text-gray-800 text-lg">Performance Visualizations</h4>
           </div>
-          <div class="section-card__body">
+
+          <!-- Time Series Graphs -->
+          <div class="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-5">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                <i data-lucide="trending-up" class="w-5 h-5 text-blue-600"></i>
+              </div>
+              <h5 class="font-bold text-gray-800">Query Time Over Batches</h5>
+            </div>
             <canvas id="chart-query-time-series" height="300"></canvas>
           </div>
-        </div>
 
-        <div class="section-card">
-          <div class="section-card__header">
-            <div class="section-card__icon section-card__icon--green">
-              <i data-lucide="activity" class="w-5 h-5"></i>
+          <div class="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-5">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                <i data-lucide="activity" class="w-5 h-5 text-green-600"></i>
+              </div>
+              <h5 class="font-bold text-gray-800">Update Time Over Batches</h5>
             </div>
-            <h4 class="section-card__title">Update Time Over Batches</h4>
-          </div>
-          <div class="section-card__body">
             <canvas id="chart-update-time-series" height="300"></canvas>
           </div>
-        </div>
 
-        <!-- Algorithm Comparison Bar Charts -->
-        <div class="grid grid-cols-2 gap-4">
-          <div class="section-card">
-            <div class="section-card__header">
-              <div class="section-card__icon section-card__icon--purple">
-                <i data-lucide="bar-chart" class="w-5 h-5"></i>
+          <!-- Algorithm Comparison Bar Charts -->
+          <div class="grid grid-cols-2 gap-5">
+            <div class="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-5">
+              <div class="flex items-center gap-3 mb-4">
+                <div class="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                  <i data-lucide="bar-chart" class="w-5 h-5 text-purple-600"></i>
+                </div>
+                <h5 class="font-bold text-gray-800">Average Query Time</h5>
               </div>
-              <h4 class="section-card__title">Average Query Time</h4>
-            </div>
-            <div class="section-card__body">
               <canvas id="chart-avg-query-time" height="250"></canvas>
             </div>
-          </div>
 
-          <div class="section-card">
-            <div class="section-card__header">
-              <div class="section-card__icon section-card__icon--amber">
-                <i data-lucide="bar-chart-2" class="w-5 h-5"></i>
+            <div class="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-5">
+              <div class="flex items-center gap-3 mb-4">
+                <div class="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center">
+                  <i data-lucide="bar-chart-2" class="w-5 h-5 text-amber-600"></i>
+                </div>
+                <h5 class="font-bold text-gray-800">Average Label Size</h5>
               </div>
-              <h4 class="section-card__title">Average Label Size</h4>
-            </div>
-            <div class="section-card__body">
               <canvas id="chart-avg-label-size" height="250"></canvas>
             </div>
           </div>
-        </div>
 
-        <!-- Per-Trial Breakdown -->
-        <div class="section-card">
-          <div class="section-card__header">
-            <div class="section-card__icon section-card__icon--indigo">
-              <i data-lucide="layers" class="w-5 h-5"></i>
+          <!-- Per-Trial Breakdown -->
+          <div class="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-5">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center">
+                <i data-lucide="layers" class="w-5 h-5 text-indigo-600"></i>
+              </div>
+              <h5 class="font-bold text-gray-800">Per-Trial Performance Breakdown</h5>
             </div>
-            <h4 class="section-card__title">Per-Trial Performance Breakdown</h4>
-          </div>
-          <div class="section-card__body">
             <canvas id="chart-per-trial-breakdown" height="300"></canvas>
           </div>
-        </div>
 
-        <!-- Combined Performance Metrics -->
-        <div class="section-card">
-          <div class="section-card__header">
-            <div class="section-card__icon section-card__icon--teal">
-              <i data-lucide="git-compare" class="w-5 h-5"></i>
+          <!-- Combined Performance Metrics -->
+          <div class="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-5">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-8 h-8 bg-teal-100 rounded-lg flex items-center justify-center">
+                <i data-lucide="git-compare" class="w-5 h-5 text-teal-600"></i>
+              </div>
+              <h5 class="font-bold text-gray-800">Overall Performance Comparison</h5>
             </div>
-            <h4 class="section-card__title">Overall Performance Comparison</h4>
-          </div>
-          <div class="section-card__body">
             <canvas id="chart-overall-comparison" height="350"></canvas>
           </div>
-        </div>
 
-        <!-- Threshold Rebuild Time Analysis -->
-        <div class="section-card">
-          <div class="section-card__header">
-            <div class="section-card__icon section-card__icon--red">
-              <i data-lucide="zap" class="w-5 h-5"></i>
+          <!-- Threshold Rebuild Time Analysis -->
+          <div class="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-5">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
+                <i data-lucide="zap" class="w-5 h-5 text-red-600"></i>
+              </div>
+              <h5 class="font-bold text-gray-800">Threshold Rebuild Time Analysis</h5>
             </div>
-            <h4 class="section-card__title">Threshold Rebuild Time Analysis</h4>
-          </div>
-          <div class="section-card__body">
             <canvas id="chart-rebuild-time-analysis" height="300"></canvas>
           </div>
-        </div>
 
-        <!-- Label Size Change Trend -->
-        <div class="section-card">
-          <div class="section-card__header">
-            <div class="section-card__icon section-card__icon--orange">
-              <i data-lucide="hard-drive" class="w-5 h-5"></i>
+          <!-- Label Size Change Trend -->
+          <div class="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-5">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
+                <i data-lucide="hard-drive" class="w-5 h-5 text-orange-600"></i>
+              </div>
+              <h5 class="font-bold text-gray-800">Label Size Change Over Time</h5>
             </div>
-            <h4 class="section-card__title">Label Size Change Over Time</h4>
-          </div>
-          <div class="section-card__body">
             <canvas id="chart-label-size-trend" height="300"></canvas>
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- Footer -->
-    <div class="absolute bottom-0 left-0 right-0 bg-white p-4 border-t border-gray-200 flex gap-2">
-      <button onclick="ExperimentRunner.exportResults('json')" class="btn btn--primary flex-1">
-        <i data-lucide="file-json" class="w-4 h-4"></i> Export Full JSON
-      </button>
-      <button onclick="ExperimentRunner.exportResults('csv')" class="btn btn--success flex-1">
-        <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Export All CSV
-      </button>
+      <!-- Footer -->
+      <div
+        class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-white to-gray-50 p-4 border-t border-gray-200 flex gap-3 shadow-lg">
+        <button onclick="ExperimentRunner.exportResults('json')"
+          class="btn btn--primary flex-1 hover:shadow-lg transition-all duration-200">
+          <i data-lucide="file-json" class="w-4 h-4"></i> Export Full JSON
+        </button>
+        <button onclick="ExperimentRunner.exportResults('csv')"
+          class="btn btn--success flex-1 hover:shadow-lg transition-all duration-200">
+          <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Export All CSV
+        </button>
+      </div>
     </div>
   </div>
-</div>
 
-<!-- Chart.js CDN -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>

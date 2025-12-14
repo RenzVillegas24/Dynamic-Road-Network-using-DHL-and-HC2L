@@ -681,6 +681,10 @@ const ExperimentRunner = {
         const algoEl = section.querySelector('[data-metric="algorithm"]');
         if (algoEl) algoEl.textContent = lastResult.algorithm || '--';
         
+        // Path Length
+        const pathLengthEl = section.querySelector('[data-metric="path-length"]');
+        if (pathLengthEl) pathLengthEl.textContent = lastResult.path_length || '--';
+        
         // Query Time
         const queryTimeEl = section.querySelector('[data-metric="query-time"]');
         if (queryTimeEl) queryTimeEl.textContent = `${(lastResult.query_time_ms || 0).toFixed(3)} ms`;
@@ -689,12 +693,20 @@ const ExperimentRunner = {
         const distanceEl = section.querySelector('[data-metric="distance"]');
         if (distanceEl) distanceEl.textContent = `${(lastResult.distance_km || 0).toFixed(2)} km`;
         
+        // Index Load Time
+        const indexLoadTimeEl = section.querySelector('[data-metric="index-load-time"]');
+        if (indexLoadTimeEl) indexLoadTimeEl.textContent = `${(lastResult.index_load_time_ms || 0).toFixed(3)} ms`;
+        
         // ETAs
         const baselineEtaEl = section.querySelector('[data-metric="baseline-eta"]');
         if (baselineEtaEl) baselineEtaEl.textContent = lastResult.baseline_eta || '--';
         
         const actualEtaEl = section.querySelector('[data-metric="actual-eta"]');
         if (actualEtaEl) actualEtaEl.textContent = lastResult.actual_eta || '--';
+        
+        // Max Cut Size
+        const maxCutSizeEl = section.querySelector('[data-metric="max-cut-size"]');
+        if (maxCutSizeEl) maxCutSizeEl.textContent = lastResult.max_cut_size || '--';
         
         // Time Impact
         const impactEl = section.querySelector('[data-metric="time-impact"]');
@@ -703,6 +715,10 @@ const ExperimentRunner = {
             impactEl.textContent = `${impact >= 0 ? '+' : ''}${impact.toFixed(1)}s`;
             impactEl.className = impact > 0 ? 'text-red-500' : 'text-green-500';
         }
+        
+        // Non-Empty Cuts
+        const nonEmptyCutsEl = section.querySelector('[data-metric="non-empty-cuts"]');
+        if (nonEmptyCutsEl) nonEmptyCutsEl.textContent = lastResult.non_empty_cuts || '--';
         
         // Label Size
         const labelEl = section.querySelector('[data-metric="label-size"]');
@@ -918,11 +934,15 @@ const ExperimentRunner = {
                     <div class="grid grid-cols-2 gap-2 text-xs">
                         <div><span class="text-gray-500">Route:</span> <span data-metric="route" class="font-medium">--</span></div>
                         <div><span class="text-gray-500">Algorithm:</span> <span data-metric="algorithm" class="font-medium">--</span></div>
+                        <div><span class="text-gray-500">Path Length:</span> <span data-metric="path-length" class="font-medium">--</span></div>
                         <div><span class="text-gray-500">Query Time:</span> <span data-metric="query-time" class="font-medium">--</span></div>
                         <div><span class="text-gray-500">Distance:</span> <span data-metric="distance" class="font-medium">--</span></div>
+                        <div><span class="text-gray-500">Index Load Time:</span> <span data-metric="index-load-time" class="font-medium">--</span></div>
                         <div><span class="text-gray-500">Baseline ETA:</span> <span data-metric="baseline-eta" class="font-medium">--</span></div>
                         <div><span class="text-gray-500">Actual ETA:</span> <span data-metric="actual-eta" class="font-medium">--</span></div>
+                        <div><span class="text-gray-500">Max Cut Size:</span> <span data-metric="max-cut-size" class="font-medium">--</span></div>
                         <div><span class="text-gray-500">Time Impact:</span> <span data-metric="time-impact" class="font-medium">--</span></div>
+                        <div><span class="text-gray-500">Non-Empty Cuts:</span> <span data-metric="non-empty-cuts" class="font-medium">--</span></div>
                         <div><span class="text-gray-500">Label Size:</span> <span data-metric="label-size" class="font-medium">--</span></div>
                         <div><span class="text-gray-500">Tau (τ):</span> <span data-metric="tau" class="font-medium">--</span></div>
                         <div><span class="text-gray-500">Disrupted Edges:</span> <span data-metric="disrupted-edges" class="font-medium">0</span></div>

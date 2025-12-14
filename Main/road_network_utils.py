@@ -123,6 +123,7 @@ def _get_available_matched_edges() -> List[Dict]:
                                 'source_lon': s_lon,
                                 'target_lat': t_lat,
                                 'target_lon': t_lon,
+                                'id_hash': row.get('id_hash', ''),
                                 'road_name': row.get('road_name', 'Unknown Road'),
                                 'highway_type': row.get('highway_type', 'unknown'),
                                 'free_flow_speed': float(row.get('free_flow_speed', 60))

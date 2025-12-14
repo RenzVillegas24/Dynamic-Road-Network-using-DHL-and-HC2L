@@ -1200,16 +1200,20 @@ class DisruptionCacheManager:
                 logger.warning("No matched edges available for disruption generation")
                 return
             
-            # Randomly select number of disruptions (5-20)
-            total_disruptions = random.randint(5, 20)
-            flow_count = int(total_disruptions * ratio_flow / 100)
+            # Calculate counts based on ratio (total should be 1000 disruptions per batch)
+            total_disruptions = 1000
+            total_ratio = ratio_flow + ratio_incident
+            flow_count = int((ratio_flow / total_ratio) * total_disruptions)
             incident_count = total_disruptions - flow_count
             
-            # Ensure at least 1 of each if ratios allow
-            if ratio_flow > 0 and flow_count == 0:
-                flow_count = 1
-            if ratio_incident > 0 and incident_count == 0:
-                incident_count = 1
+            # Ensure we don't exceed available edges
+            available_edges = len(edges)
+            if total_disruptions > available_edges:
+                logger.warning(f"Requested {total_disruptions} disruptions but only {available_edges} edges available")
+                # Scale down proportionally
+                scale = available_edges / total_disruptions
+                flow_count = int(flow_count * scale)
+                incident_count = available_edges - flow_count
             
             timestamp = datetime.now().strftime('%Y%m%dT%H%M%S%f')[:18]
             
@@ -1233,7 +1237,7 @@ class DisruptionCacheManager:
                 flow_speed = max(5.0, free_flow_kph * (1.0 - (jam_factor / 10.0)))
                 
                 flow_rows.append({
-                    'id_hash': f'exp_{batch_idx}_{route_idx}_{i}',
+                    'id_hash': edge.get('id_hash', f'exp_{batch_idx}_{route_idx}_{i}'),
                     'source_lat': edge.get('source_lat'),
                     'source_lon': edge.get('source_lon'),
                     'target_lat': edge.get('target_lat'),
@@ -1277,10 +1281,10 @@ class DisruptionCacheManager:
                     'source_lon': edge.get('source_lon'),
                     'target_lat': edge.get('target_lat'),
                     'target_lon': edge.get('target_lon'),
-                    'incident_id': f'exp_{batch_idx}_{route_idx}_{len(incident_rows)}',
+                    'incident_id': edge.get('id_hash', f'exp_{batch_idx}_{route_idx}_{len(incident_rows)}'),
                     'incident_type': random.choice(incident_types),
                     'incident_criticality': criticality,
-                    'incident_description': f'Experiment incident on {edge.get("road_name", "road")}',
+                    'incident_description': f'Experiment incident on {edge.get("road_name", "Unknown Road")}',
                     'incident_road_closed': severity > 0.8,
                     'incident_start_time': datetime.now().isoformat() + 'Z',
                     'incident_end_time': (datetime.now() + timedelta(hours=3)).isoformat() + 'Z',
@@ -2489,11 +2493,15 @@ class ExperimentRunner:
         result["summary"] = {
             "route": "Start → End",
             "algorithm": algorithm,
+            "path_length": metrics.get("path_length", 0),  # Number of nodes in path
             "query_time_ms": round(metrics.get("query_time_ms", 0), 3),
             "distance_km": round(distance_km, 2) if distance_km else 0,
+            "index_load_time_ms": round(labeling_info.get("index_load_time_ms", 0), 3),
             "baseline_eta": baseline_eta,
             "actual_eta": actual_eta,
+            "max_cut_size": labeling_info.get("max_cut_size", 0),
             "time_impact_seconds": round(time_impact_seconds, 1) if time_impact_seconds else 0,
+            "non_empty_cuts": labeling_info.get("non_empty_cuts", 0),
             "label_size": round(label_size_mb, 2),  # In MB
             "tau": round(tau, 3),
             "disrupted_edges": route_disruptions.get("total_disrupted_edges", 0)
