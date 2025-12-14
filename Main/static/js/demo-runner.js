@@ -20,7 +20,8 @@ const DemoRunner = {
     pauseDemo: function() { if (typeof ExperimentRunner !== "undefined") ExperimentRunner.togglePause(); },
     loadSavedConfigs: function() {},
     refreshSavedResults: function() {},
-    switchDataTab: function() {}
+    switchDataTab: function() {},
+    updateExperimentTauUI: function() { if (typeof ExperimentRunner !== "undefined") ExperimentRunner.updateTauUI(); }
 };
 
 document.addEventListener("DOMContentLoaded", function() { DemoRunner.init(); });

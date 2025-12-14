@@ -27,6 +27,9 @@ const ExperimentRunner = {
     reconnectDelay: 1000,
     lastUpdateTimestamp: null,
     
+    // Results data from backend
+    resultsData: null,
+    
     // Display settings
     threadColors: [
         '#3B82F6', // blue
@@ -219,10 +222,15 @@ const ExperimentRunner = {
             }
         });
         
-        // Progress updates
+        // Progress updates (experiment running)
         this.socket.on('progress_update', (data) => {
             this.lastUpdateTimestamp = new Date();
             this.handleProgressUpdate(data);
+        });
+        
+        // Preset progress updates (during preset creation/loading)
+        this.socket.on('preset_progress', (data) => {
+            this.handlePresetProgress(data);
         });
         
         // Error handling
@@ -233,6 +241,47 @@ const ExperimentRunner = {
         
         // Start keepalive ping
         this.startKeepalive();
+    },
+    
+    handlePresetProgress(data) {
+        console.log('Preset progress:', data);
+        
+        const statusEl = document.getElementById('experiment-status');
+        const progressBar = document.getElementById('experiment-overall-progress-bar');
+        const progressText = document.getElementById('experiment-overall-progress-text');
+        
+        // Update status message
+        if (statusEl) {
+            statusEl.textContent = data.message || 'Preparing...';
+            
+            // Color based on status
+            const statusColors = {
+                'loading': 'text-blue-600',
+                'creating': 'text-yellow-600',
+                'loading_complete': 'text-green-600',
+                'creating_complete': 'text-green-600',
+                'error': 'text-red-600'
+            };
+            statusEl.className = `text-sm font-medium ${statusColors[data.status] || 'text-gray-600'}`;
+        }
+        
+        // Update progress bar
+        if (progressBar) {
+            progressBar.style.width = `${data.progress || 0}%`;
+        }
+        
+        if (progressText) {
+            progressText.textContent = `${data.progress || 0}%`;
+        }
+        
+        // Show notification for completion or errors
+        if (data.status === 'loading_complete') {
+            this.showNotification('Preset loaded successfully', 'success');
+        } else if (data.status === 'creating_complete') {
+            this.showNotification('Preset created successfully', 'success');
+        } else if (data.status === 'error') {
+            this.showNotification(`Preset error: ${data.message}`, 'error');
+        }
     },
     
     disconnectWebSocket() {
@@ -308,7 +357,11 @@ const ExperimentRunner = {
         // Gather settings from UI
         const config = this.gatherExperimentConfig();
         
-        this.showNotification('Starting experiment...', 'info');
+        this.showNotification('Preparing experiment...', 'info');
+        
+        // Show preparing status in running tab
+        this.showTab('running');
+        this.showPreparationStatus('Checking preset configuration...');
         
         try {
             const response = await fetch('/api/experiment/start', {
@@ -324,11 +377,8 @@ const ExperimentRunner = {
                 this.isRunning = true;
                 this.isPaused = false;
                 
-                // Connect WebSocket for real-time updates
+                // Connect WebSocket for real-time updates (including preset progress)
                 this.connectWebSocket(result.experiment_id);
-                
-                // Show running tab
-                this.showTab('running');
                 
                 // Initialize thread displays
                 this.initializeThreadDisplays(config.thread_count || 3);
@@ -336,10 +386,27 @@ const ExperimentRunner = {
                 this.showNotification(`Experiment started: ${result.experiment_id}`, 'success');
             } else {
                 this.showNotification(`Failed to start experiment: ${result.error}`, 'error');
+                this.showTab('settings'); // Return to settings on error
             }
         } catch (error) {
             console.error('Error starting experiment:', error);
             this.showNotification(`Error: ${error.message}`, 'error');
+            this.showTab('settings'); // Return to settings on error
+        }
+    },
+    
+    showPreparationStatus(message) {
+        // Show status in the status card
+        const statusEl = document.getElementById('experiment-status');
+        if (statusEl) {
+            statusEl.textContent = message;
+            statusEl.className = 'text-sm font-medium text-yellow-600';
+        }
+        
+        // Show in progress bar area
+        const progressText = document.getElementById('experiment-overall-progress-text');
+        if (progressText) {
+            progressText.textContent = '...';
         }
     },
     
@@ -397,16 +464,39 @@ const ExperimentRunner = {
         // Get settings from UI
         const threadCount = document.getElementById('experiment-thread-count')?.checked ? 9 : 3;
         
+        // Route mode
+        const routeMode = document.querySelector('input[name="experiment-route-mode"]:checked')?.value || 'preset';
+        
+        // Disruption mode
+        const disruptionMode = document.querySelector('input[name="experiment-disruption-mode"]:checked')?.value || 'preset';
+        
+        // Severity range
+        const severityMin = parseFloat(document.getElementById('experiment-severity-min')?.value || 0.1);
+        const severityMax = parseFloat(document.getElementById('experiment-severity-max')?.value || 0.9);
+        
+        // Flow:Incident ratio
+        const ratioFlow = parseInt(document.getElementById('experiment-ratio-flow')?.value || 95);
+        const ratioIncident = parseInt(document.getElementById('experiment-ratio-incident')?.value || 5);
+        
+        // Tau settings
         const tauMode = document.querySelector('input[name="experiment-tau-mode"]:checked')?.value || 'random';
         const tauScope = document.querySelector('input[name="experiment-tau-scope"]:checked')?.value || 'per-trial-route';
         
         return {
-            is_preset: true,
+            is_preset: routeMode === 'preset',
             thread_count: threadCount,
             trials: 3,
             batches_per_trial: 3,
             routes_per_batch: 1000,
             algorithms: ['DHL', 'HC2L'],
+            route_mode: routeMode,
+            disruption_mode: disruptionMode,
+            disruption_settings: {
+                ratio_flow: ratioFlow,
+                ratio_incident: ratioIncident,
+                severity_min: severityMin,
+                severity_max: severityMax
+            },
             tau_settings: {
                 mode: tauMode,
                 scope: tauScope,
@@ -893,8 +983,8 @@ const ExperimentRunner = {
     updateTauUI() {
         const mode = document.querySelector('input[name="experiment-tau-mode"]:checked')?.value || 'random';
         
-        const fixedSettings = document.getElementById('experiment-tau-fixed-settings');
-        const randomSettings = document.getElementById('experiment-tau-random-settings');
+        const fixedSettings = document.getElementById('experiment-tau-fixed-setting');
+        const randomSettings = document.getElementById('experiment-tau-random-setting');
         
         if (fixedSettings) {
             fixedSettings.classList.toggle('hidden', mode !== 'fixed');
@@ -902,6 +992,11 @@ const ExperimentRunner = {
         
         if (randomSettings) {
             randomSettings.classList.toggle('hidden', mode !== 'random');
+        }
+        
+        // Refresh icons
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
         }
     },
     
@@ -978,6 +1073,432 @@ const ExperimentRunner = {
         
         // Clear map centering flag for next run
         this.mapCentered = false;
+        
+        // Fetch and display results
+        this.fetchAndDisplayResults();
+    },
+    
+    // =========================================================================
+    // RESULTS DASHBOARD
+    // =========================================================================
+    
+    async fetchAndDisplayResults() {
+        if (!this.currentExperimentId) {
+            console.warn('No experiment ID available for results');
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/api/experiment/${this.currentExperimentId}/result`);
+            const result = await response.json();
+            
+            if (result.success && result.result) {
+                this.resultsData = result.result;
+                this.populateResultsDashboard(result.result);
+            } else {
+                console.error('Failed to fetch results:', result.error);
+                this.showNotification('Failed to load results', 'error');
+            }
+        } catch (error) {
+            console.error('Error fetching results:', error);
+            this.showNotification('Error loading results', 'error');
+        }
+    },
+    
+    populateResultsDashboard(data) {
+        // Update summary cards
+        this.updateResultsSummary(data);
+        
+        // Populate each tab
+        this.populateConstructionPhase(data.construction_phase || []);
+        this.populateDynamicUpdates(data.dynamic_updates || []);
+        this.populateQueryPerformance(data.query_performance || []);
+        this.populateRouteSimilarity(data.route_similarity || []);
+        
+        // Initialize result tab navigation
+        this.initResultTabNavigation();
+        
+        // Refresh icons
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    },
+    
+    updateResultsSummary(data) {
+        const trialsEl = document.getElementById('result-total-trials');
+        const batchesEl = document.getElementById('result-total-batches');
+        const algorithmsEl = document.getElementById('result-algorithms');
+        
+        if (trialsEl) trialsEl.textContent = data.total_trials || 3;
+        if (batchesEl) batchesEl.textContent = data.total_batches || 3;
+        if (algorithmsEl) algorithmsEl.textContent = '2 (DHL vs DHC2L)';
+    },
+    
+    initResultTabNavigation() {
+        document.querySelectorAll('[data-result-tab]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const tabId = e.currentTarget.dataset.resultTab;
+                this.showResultTab(tabId);
+            });
+        });
+    },
+    
+    showResultTab(tabId) {
+        // Hide all result tabs
+        document.querySelectorAll('[data-result-tab-content]').forEach(tab => {
+            tab.classList.add('hidden');
+        });
+        
+        // Show selected tab
+        const selectedTab = document.getElementById(`result-tab-${tabId}`);
+        if (selectedTab) {
+            selectedTab.classList.remove('hidden');
+        }
+        
+        // Update tab button states
+        document.querySelectorAll('[data-result-tab]').forEach(btn => {
+            if (btn.dataset.resultTab === tabId) {
+                btn.classList.add('bg-purple-600', 'text-white');
+                btn.classList.remove('bg-gray-200', 'text-gray-700');
+            } else {
+                btn.classList.remove('bg-purple-600', 'text-white');
+                btn.classList.add('bg-gray-200', 'text-gray-700');
+            }
+        });
+        
+        // Refresh icons
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    },
+    
+    populateConstructionPhase(data) {
+        const tbody = document.getElementById('result-construction-tbody');
+        if (!tbody) return;
+        
+        if (!data || data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-gray-500 py-4">No construction data available</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = data.map(row => `
+            <tr class="hover:bg-gray-50">
+                <td class="p-2 text-gray-700">${row.trial || '--'}</td>
+                <td class="p-2">
+                    <span class="px-2 py-1 rounded text-xs font-medium ${row.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}">
+                        ${row.algorithm || '--'}
+                    </span>
+                </td>
+                <td class="p-2 text-right font-mono">${this.formatNumber(row.initial_construction_time_ms, 3)} ms</td>
+                <td class="p-2 text-right font-mono">${this.formatNumber(row.initial_label_size_mb, 2)} MB</td>
+            </tr>
+        `).join('');
+    },
+    
+    populateDynamicUpdates(data) {
+        const container = document.getElementById('result-updates-container');
+        if (!container) return;
+        
+        if (!data || data.length === 0) {
+            container.innerHTML = '<p class="text-center text-gray-500 py-4">No dynamic update data available</p>';
+            return;
+        }
+        
+        // Group by trial
+        const groupedByTrial = {};
+        data.forEach(row => {
+            const trial = row.trial || 1;
+            if (!groupedByTrial[trial]) {
+                groupedByTrial[trial] = [];
+            }
+            groupedByTrial[trial].push(row);
+        });
+        
+        container.innerHTML = Object.entries(groupedByTrial).map(([trial, batches]) => `
+            <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                <div class="bg-purple-50 px-3 py-2 border-b border-gray-200">
+                    <span class="font-semibold text-purple-700">Trial ${trial}</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="text-left p-2">Batch</th>
+                                <th class="text-left p-2">Algorithm</th>
+                                <th class="text-right p-2">Disruption Level (%)</th>
+                                <th class="text-right p-2">Lazy Update (ms)</th>
+                                <th class="text-right p-2">Threshold Rebuild (ms)</th>
+                                <th class="text-right p-2">Peak Label (MB)</th>
+                                <th class="text-right p-2">% Size Change</th>
+                                <th class="text-right p-2">Query Avg (ms)</th>
+                                <th class="text-right p-2">Query Min (ms)</th>
+                                <th class="text-right p-2">Query Max (ms)</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            ${batches.map(batch => `
+                                <tr class="hover:bg-gray-50">
+                                    <td class="p-2">${batch.batch || '--'}</td>
+                                    <td class="p-2">
+                                        <span class="px-1 py-0.5 rounded text-xs ${batch.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}">
+                                            ${batch.algorithm || '--'}
+                                        </span>
+                                    </td>
+                                    <td class="p-2 text-right font-mono">${this.formatNumber(batch.disruption_level * 100, 1)}%</td>
+                                    <td class="p-2 text-right font-mono">${this.formatNumber(batch.lazy_update_time_ms, 3)}</td>
+                                    <td class="p-2 text-right font-mono">${this.formatNumber(batch.threshold_rebuild_time_ms, 3)}</td>
+                                    <td class="p-2 text-right font-mono">${this.formatNumber(batch.peak_label_size_mb, 2)}</td>
+                                    <td class="p-2 text-right font-mono ${batch.label_size_change_pct > 0 ? 'text-red-600' : 'text-green-600'}">
+                                        ${batch.label_size_change_pct >= 0 ? '+' : ''}${this.formatNumber(batch.label_size_change_pct, 1)}%
+                                    </td>
+                                    <td class="p-2 text-right font-mono">${this.formatNumber(batch.query_avg_ms, 3)}</td>
+                                    <td class="p-2 text-right font-mono">${this.formatNumber(batch.query_min_ms, 3)}</td>
+                                    <td class="p-2 text-right font-mono">${this.formatNumber(batch.query_max_ms, 3)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `).join('');
+    },
+    
+    populateQueryPerformance(data) {
+        const tbody = document.getElementById('result-performance-tbody');
+        if (!tbody) return;
+        
+        if (!data || data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-gray-500 py-4">No performance data available</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = data.map(row => {
+            const improvement = row.improvement_pct || 0;
+            const improvementClass = improvement > 0 ? 'text-green-600' : (improvement < 0 ? 'text-red-600' : 'text-gray-600');
+            const improvementIcon = improvement > 0 ? '↓' : (improvement < 0 ? '↑' : '−');
+            
+            return `
+                <tr class="hover:bg-gray-50">
+                    <td class="p-2 font-medium text-gray-700">${row.metric || '--'}</td>
+                    <td class="p-2 text-right font-mono text-blue-700">${this.formatMetricValue(row.dhl_value, row.unit)}</td>
+                    <td class="p-2 text-right font-mono text-green-700">${this.formatMetricValue(row.dhc2l_value, row.unit)}</td>
+                    <td class="p-2 text-right font-mono ${improvementClass}">
+                        ${improvementIcon} ${Math.abs(improvement).toFixed(1)}%
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    },
+    
+    populateRouteSimilarity(data) {
+        const tbody = document.getElementById('result-similarity-tbody');
+        if (!tbody) return;
+        
+        if (!data || data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-gray-500 py-4">No similarity data available</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = data.map(row => {
+            const fdRating = this.getFrechetRating(row.frechet_distance_m);
+            const ttdRating = this.getTravelTimeDeviationRating(row.travel_time_deviation_pct);
+            
+            return `
+                <tr class="hover:bg-gray-50">
+                    <td class="p-2 font-mono text-xs">${row.od_pair || '--'}</td>
+                    <td class="p-2 text-right font-mono">${this.formatNumber(row.distance_km, 2)}</td>
+                    <td class="p-2 text-right font-mono">${this.formatNumber(row.travel_time_min, 1)}</td>
+                    <td class="p-2 text-right font-mono">${this.formatNumber(row.frechet_distance_m, 0)}</td>
+                    <td class="p-2 text-center">
+                        <span class="px-2 py-1 rounded text-xs font-medium ${fdRating.class}">${fdRating.label}</span>
+                    </td>
+                    <td class="p-2 text-right font-mono">${this.formatNumber(row.travel_time_deviation_pct, 1)}%</td>
+                    <td class="p-2 text-center">
+                        <span class="px-2 py-1 rounded text-xs font-medium ${ttdRating.class}">${ttdRating.label}</span>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    },
+    
+    getFrechetRating(distance) {
+        if (distance < 200) {
+            return { label: 'Excellent', class: 'bg-green-100 text-green-700' };
+        } else if (distance <= 400) {
+            return { label: 'Good', class: 'bg-yellow-100 text-yellow-700' };
+        } else {
+            return { label: 'Fair', class: 'bg-orange-100 text-orange-700' };
+        }
+    },
+    
+    getTravelTimeDeviationRating(deviation) {
+        if (deviation < 5) {
+            return { label: 'Excellent', class: 'bg-green-100 text-green-700' };
+        } else if (deviation <= 10) {
+            return { label: 'Good', class: 'bg-yellow-100 text-yellow-700' };
+        } else {
+            return { label: 'Fair', class: 'bg-orange-100 text-orange-700' };
+        }
+    },
+    
+    formatNumber(value, decimals = 2) {
+        if (value === null || value === undefined || isNaN(value)) {
+            return '--';
+        }
+        return Number(value).toFixed(decimals);
+    },
+    
+    formatMetricValue(value, unit) {
+        if (value === null || value === undefined) return '--';
+        
+        const formatted = this.formatNumber(value, unit === 'ms' ? 3 : 2);
+        return unit ? `${formatted} ${unit}` : formatted;
+    },
+    
+    // =========================================================================
+    // EXPORT FUNCTIONALITY
+    // =========================================================================
+    
+    async exportResults(format) {
+        if (!this.currentExperimentId) {
+            this.showNotification('No experiment results to export', 'warning');
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/api/experiment/${this.currentExperimentId}/result`);
+            const result = await response.json();
+            
+            if (!result.success || !result.result) {
+                this.showNotification('No results available for export', 'warning');
+                return;
+            }
+            
+            const data = result.result;
+            
+            if (format === 'json') {
+                this.downloadFile(
+                    JSON.stringify(data, null, 2),
+                    `experiment_${this.currentExperimentId}_results.json`,
+                    'application/json'
+                );
+            } else if (format === 'csv') {
+                // Export all tabs as separate CSV files in a zip or combined
+                this.exportAllCSV(data);
+            }
+            
+            this.showNotification(`Results exported as ${format.toUpperCase()}`, 'success');
+        } catch (error) {
+            console.error('Error exporting results:', error);
+            this.showNotification('Error exporting results', 'error');
+        }
+    },
+    
+    exportTab(tabName) {
+        if (!this.resultsData) {
+            this.showNotification('No results data available', 'warning');
+            return;
+        }
+        
+        let data;
+        let filename;
+        
+        switch (tabName) {
+            case 'construction':
+                data = this.resultsData.construction_phase || [];
+                filename = `appendix_1_1_construction_phase_${this.currentExperimentId}.csv`;
+                break;
+            case 'updates':
+                data = this.resultsData.dynamic_updates || [];
+                filename = `appendix_1_2_dynamic_updates_${this.currentExperimentId}.csv`;
+                break;
+            case 'performance':
+                data = this.resultsData.query_performance || [];
+                filename = `appendix_1_3_query_performance_${this.currentExperimentId}.csv`;
+                break;
+            case 'similarity':
+                data = this.resultsData.route_similarity || [];
+                filename = `appendix_1_4_route_similarity_${this.currentExperimentId}.csv`;
+                break;
+            default:
+                this.showNotification('Unknown tab', 'error');
+                return;
+        }
+        
+        if (!data || data.length === 0) {
+            this.showNotification('No data available for this tab', 'warning');
+            return;
+        }
+        
+        const csv = this.convertToCSV(data);
+        this.downloadFile(csv, filename, 'text/csv');
+        this.showNotification(`Exported ${tabName} data to CSV`, 'success');
+    },
+    
+    exportAllCSV(data) {
+        // Export each section
+        if (data.construction_phase && data.construction_phase.length > 0) {
+            this.downloadFile(
+                this.convertToCSV(data.construction_phase),
+                `appendix_1_1_construction_phase_${this.currentExperimentId}.csv`,
+                'text/csv'
+            );
+        }
+        
+        if (data.dynamic_updates && data.dynamic_updates.length > 0) {
+            this.downloadFile(
+                this.convertToCSV(data.dynamic_updates),
+                `appendix_1_2_dynamic_updates_${this.currentExperimentId}.csv`,
+                'text/csv'
+            );
+        }
+        
+        if (data.query_performance && data.query_performance.length > 0) {
+            this.downloadFile(
+                this.convertToCSV(data.query_performance),
+                `appendix_1_3_query_performance_${this.currentExperimentId}.csv`,
+                'text/csv'
+            );
+        }
+        
+        if (data.route_similarity && data.route_similarity.length > 0) {
+            this.downloadFile(
+                this.convertToCSV(data.route_similarity),
+                `appendix_1_4_route_similarity_${this.currentExperimentId}.csv`,
+                'text/csv'
+            );
+        }
+    },
+    
+    convertToCSV(data) {
+        if (!data || data.length === 0) return '';
+        
+        const headers = Object.keys(data[0]);
+        const rows = data.map(row => 
+            headers.map(header => {
+                let value = row[header];
+                if (value === null || value === undefined) value = '';
+                // Escape quotes and wrap in quotes if contains comma
+                if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
+                    value = `"${value.replace(/"/g, '""')}"`;
+                }
+                return value;
+            }).join(',')
+        );
+        
+        return [headers.join(','), ...rows].join('\n');
+    },
+    
+    downloadFile(content, filename, mimeType) {
+        const blob = new Blob([content], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     },
     
     handleExperimentError(errorMessage) {

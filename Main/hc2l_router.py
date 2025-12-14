@@ -111,7 +111,9 @@ class HC2LRouter:
                      start_edge_source: int, start_edge_target: int, start_edge_oneway: int,
                      dest_edge_source: int, dest_edge_target: int, dest_edge_oneway: int,
                      disruption_file: str = "", tau_threshold: float = 0.5,
-                     generate_alternatives: bool = True) -> Dict:
+                     generate_alternatives: bool = True,
+                     verbose: bool = True
+                     ) -> Dict:
         """
         Compute route using HC2L Routing Service with snap point information
         Returns enhanced route data with Google Maps integration
@@ -167,26 +169,31 @@ class HC2LRouter:
                         flow_files = sorted(flow_dir.glob('flow_*.csv'), key=lambda f: f.stat().st_mtime, reverse=True)
                         if flow_files:
                             latest_flow = flow_files[0]
-                            logger.info(f"Latest flow file: {latest_flow.name} (mtime: {latest_flow.stat().st_mtime})")
+                            if verbose:
+                                logger.info(f"Latest flow file: {latest_flow.name} (mtime: {latest_flow.stat().st_mtime})")
                     
                     if incident_dir.exists():
                         incident_files = sorted(incident_dir.glob('incident_*.csv'), key=lambda f: f.stat().st_mtime, reverse=True)
                         if incident_files:
                             latest_incident = incident_files[0]
-                            logger.info(f"Latest incident file: {latest_incident.name} (mtime: {latest_incident.stat().st_mtime})")
+                            if verbose:
+                                logger.info(f"Latest incident file: {latest_incident.name} (mtime: {latest_incident.stat().st_mtime})")
                 except Exception as e:
                     logger.warning(f"Could not verify disruption files: {e}")
                 
-                logger.info(f"Adding disruption directory: {disruption_file}")
+                if verbose:
+                    logger.info(f"Adding disruption directory: {disruption_file}")
                 cmd.append(str(disruption_file))
                 cmd.append(str(tau_threshold))
             else:
-                logger.warning(f"No disruption directory passed (disruption_file={repr(disruption_file)})")
+                if verbose:
+                    logger.warning(f"No disruption directory passed (disruption_file={repr(disruption_file)})")
             
             # Add generate_alternatives flag (pass 1 for True, 0 for False)
             cmd.append(str(1 if generate_alternatives else 0))
             
-            logger.processing(f"Executing HC2L routing: {' '.join(cmd)}")
+            if verbose:
+                logger.processing(f"Executing HC2L routing: {' '.join(cmd)}")
             
             # Execute command directly - file paths are provided as arguments
             result = subprocess.run(
@@ -245,22 +252,24 @@ class HC2LRouter:
                 # Debug: Print the metrics received from C++ API
                 if route_data.get('success', False):
                     metrics = route_data.get('metrics', {})
-                    logger.data(f"Received metrics from C++ API:")
-                    logger.info(f"Query time: {metrics.get('query_time_ms', 'N/A')} ms")
-                    logger.info(f"Distance: {metrics.get('calculated_distance_km', 'N/A')} km")
-                    logger.info(f"ETA: {metrics.get('eta_formatted', 'N/A')}")
-                    logger.info(f"Labeling size: {metrics.get('labeling_size_kb', 'N/A')} KB")
-                    logger.info(f"Labeling time: {metrics.get('labeling_time_ms', 'N/A')} s")
+                    if verbose:
+                        logger.data(f"Received metrics from C++ API:")
+                        logger.info(f"Query time: {metrics.get('query_time_ms', 'N/A')} ms")
+                        logger.info(f"Distance: {metrics.get('calculated_distance_km', 'N/A')} km")
+                        logger.info(f"ETA: {metrics.get('eta_formatted', 'N/A')}")
+                        logger.info(f"Labeling size: {metrics.get('labeling_size_kb', 'N/A')} KB")
+                        logger.info(f"Labeling time: {metrics.get('labeling_time_ms', 'N/A')} s")
                     
                     # Log disruption analysis if present
                     disruption_analysis = route_data.get('disruption_analysis', {})
                     if disruption_analysis:
                         route_disruptions = disruption_analysis.get('route_disruptions', {})
                         time_impact = disruption_analysis.get('time_impact', {})
-                        logger.warning("Disruption Analysis:")
-                        logger.info(f"Total disruptions on route: {route_disruptions.get('total_count', 0)}")
-                        logger.info(f"Road closures: {route_disruptions.get('closures', 0)}")
-                        logger.info(f"Added delay: {time_impact.get('added_delay_seconds', 0):.1f}s ({time_impact.get('percentage_increase', 0):.1f}%)")
+                        if verbose:
+                            logger.warning("Disruption Analysis:")
+                            logger.info(f"Total disruptions on route: {route_disruptions.get('total_count', 0)}")
+                            logger.info(f"Road closures: {route_disruptions.get('closures', 0)}")
+                            logger.info(f"Added delay: {time_impact.get('added_delay_seconds', 0):.1f}s ({time_impact.get('percentage_increase', 0):.1f}%)")
                 
                 # Enhance with coordinate data if available
                 if route_data.get('success', False):
@@ -269,7 +278,8 @@ class HC2LRouter:
                 
                 # Debug: Verify geometry is in route_data before returning
                 geometry_count = len(route_data.get('route', {}).get('geometry', []))
-                logger.data(f"HC2L Router: Returning route_data with {geometry_count} geometry segments")
+                if verbose:
+                    logger.data(f"HC2L Router: Returning route_data with {geometry_count} geometry segments")
                 
                 return route_data
                 

@@ -48,17 +48,114 @@
       </ul>
     </div>
 
-    <!-- Preset Experiments -->
+    <!-- Query Configuration -->
     <div class="section-card section-card--info">
       <div class="section-card__header">
         <div class="section-card__icon section-card__icon--info">
-          <i data-lucide="folder" class="w-5 h-5"></i>
+          <i data-lucide="map-pin" class="w-5 h-5"></i>
         </div>
-        <h4 class="section-card__title">Preset Experiments</h4>
+        <h4 class="section-card__title">Query Configuration</h4>
       </div>
-      <div class="section-card__body">
-        <div id="experiment-preset-list" class="space-y-2">
-          <p class="text-muted text-center py-4">Loading presets...</p>
+      <div class="section-card__body space-y-3">
+        <div class="form-group">
+          <label class="form-group__label">Route Generation Mode</label>
+          <div class="nav-select nav-select--grid">
+            <label class="nav-select__option" data-color="blue">
+              <input type="radio" name="experiment-route-mode" value="preset" checked>
+              <div class="nav-select__icon"><i data-lucide="save" class="w-4 h-4"></i></div>
+              <div class="nav-select__content">
+                <span class="nav-select__title">Preset</span>
+                <span class="nav-select__description">Use saved or generate once</span>
+              </div>
+            </label>
+            <label class="nav-select__option" data-color="amber">
+              <input type="radio" name="experiment-route-mode" value="random">
+              <div class="nav-select__icon"><i data-lucide="shuffle" class="w-4 h-4"></i></div>
+              <div class="nav-select__content">
+                <span class="nav-select__title">Random</span>
+                <span class="nav-select__description">New routes every run</span>
+              </div>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Disruption Configuration -->
+    <div class="section-card section-card--warning">
+      <div class="section-card__header">
+        <div class="section-card__icon section-card__icon--warning">
+          <i data-lucide="traffic-cone" class="w-5 h-5"></i>
+        </div>
+        <h4 class="section-card__title">Disruption Configuration</h4>
+      </div>
+      <div class="section-card__body space-y-4">
+        <div class="form-group">
+          <label class="form-group__label">Disruption Generation Mode</label>
+          <div class="nav-select nav-select--grid">
+            <label class="nav-select__option" data-color="amber">
+              <input type="radio" name="experiment-disruption-mode" value="preset" checked>
+              <div class="nav-select__icon"><i data-lucide="save" class="w-4 h-4"></i></div>
+              <div class="nav-select__content">
+                <span class="nav-select__title">Preset</span>
+                <span class="nav-select__description">Use saved or generate once</span>
+              </div>
+            </label>
+            <label class="nav-select__option" data-color="orange">
+              <input type="radio" name="experiment-disruption-mode" value="random">
+              <div class="nav-select__icon"><i data-lucide="shuffle" class="w-4 h-4"></i></div>
+              <div class="nav-select__content">
+                <span class="nav-select__title">Random</span>
+                <span class="nav-select__description">New disruptions every run</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Severity Range -->
+        <div class="border-t border-amber-200 pt-3">
+          <h5 class="form-group__label">Severity Range</h5>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="form-group">
+              <label class="form-group__label text-sm">Min Severity</label>
+              <div class="flex items-center gap-2">
+                <input type="range" id="experiment-severity-min" min="0" max="0.9" step="0.1" value="0.1"
+                  oninput="document.getElementById('experiment-severity-min-display').textContent = this.value"
+                  class="form-range flex-1">
+                <span id="experiment-severity-min-display" class="badge badge--warning w-8">0.1</span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-group__label text-sm">Max Severity</label>
+              <div class="flex items-center gap-2">
+                <input type="range" id="experiment-severity-max" min="0.1" max="1" step="0.1" value="0.9"
+                  oninput="document.getElementById('experiment-severity-max-display').textContent = this.value"
+                  class="form-range flex-1">
+                <span id="experiment-severity-max-display" class="badge badge--warning w-8">0.9</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Flow:Incident Ratio -->
+        <div class="border-t border-amber-200 pt-3">
+          <h5 class="form-group__label">Flow : Incident Ratio</h5>
+          <div class="flex items-center gap-3">
+            <div class="flex-1">
+              <label class="form-group__label text-xs text-amber-700">Flow %</label>
+              <input type="number" id="experiment-ratio-flow" value="95" min="0" max="100" 
+                onchange="document.getElementById('experiment-ratio-incident').value = 100 - this.value"
+                class="form-input text-center font-semibold">
+            </div>
+            <span class="text-gray-400 font-bold text-xl pt-4">:</span>
+            <div class="flex-1">
+              <label class="form-group__label text-xs text-orange-700">Incident %</label>
+              <input type="number" id="experiment-ratio-incident" value="5" min="0" max="100"
+                onchange="document.getElementById('experiment-ratio-flow').value = 100 - this.value"
+                class="form-input text-center font-semibold">
+            </div>
+          </div>
+          <p class="text-xs text-muted mt-1">Total: 1,000 disruptions (950 flow + 50 incidents at 95:5)</p>
         </div>
       </div>
     </div>
@@ -91,94 +188,102 @@
       </div>
     </div>
 
-    <!-- Tau Configuration -->
-    <div class="section-card section-card--success">
+    <!-- TAU (τ) Settings -->
+    <div class="section-card section-card--purple">
       <div class="section-card__header">
-        <div class="section-card__icon section-card__icon--success">
+        <div class="section-card__icon section-card__icon--purple">
           <i data-lucide="sliders" class="w-5 h-5"></i>
         </div>
-        <h4 class="section-card__title">Tau Threshold Configuration</h4>
+        <h4 class="section-card__title">Threshold (τ) Settings</h4>
       </div>
       <div class="section-card__body space-y-4">
-        <!-- Tau Mode -->
-        <div class="form-group">
-          <label class="form-group__label">Tau Mode</label>
+        <!-- TAU Scope -->
+        <div>
+          <label class="form-group__label mb-3">TAU (τ) Scope</label>
+          <div class="nav-select nav-select--purple">
+            <label class="nav-select__option tau-scope-option" data-color="purple">
+              <input type="radio" name="experiment-tau-scope" value="all" onchange="ExperimentRunner.updateTauUI()">
+              <div class="nav-select__icon"><i data-lucide="globe" class="w-4 h-4"></i></div>
+              <div class="nav-select__content">
+                <span class="nav-select__title">Same for All</span>
+                <span class="nav-select__description">All routes use the same TAU</span>
+              </div>
+            </label>
+            <label class="nav-select__option tau-scope-option" data-color="indigo">
+              <input type="radio" name="experiment-tau-scope" value="per-trial" onchange="ExperimentRunner.updateTauUI()">
+              <div class="nav-select__icon"><i data-lucide="repeat" class="w-4 h-4"></i></div>
+              <div class="nav-select__content">
+                <span class="nav-select__title">Per Trial</span>
+                <span class="nav-select__description">Each trial gets unique TAU</span>
+              </div>
+            </label>
+            <label class="nav-select__option tau-scope-option" data-color="teal">
+              <input type="radio" name="experiment-tau-scope" value="per-route" onchange="ExperimentRunner.updateTauUI()">
+              <div class="nav-select__icon"><i data-lucide="git-branch" class="w-4 h-4"></i></div>
+              <div class="nav-select__content">
+                <span class="nav-select__title">Per Route</span>
+                <span class="nav-select__description">Each route gets unique TAU</span>
+              </div>
+            </label>
+            <label class="nav-select__option tau-scope-option" data-color="slate">
+              <input type="radio" name="experiment-tau-scope" value="per-trial-route" checked onchange="ExperimentRunner.updateTauUI()">
+              <div class="nav-select__icon"><i data-lucide="shuffle" class="w-4 h-4"></i></div>
+              <div class="nav-select__content">
+                <span class="nav-select__title">Per Trial & Route</span>
+                <span class="nav-select__description">Unique TAU for each combination</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- TAU Value Input Mode -->
+        <div class="border-t border-purple-200 pt-3">
+          <label class="form-group__label mb-3">Value Input Mode</label>
           <div class="nav-select nav-select--grid">
-            <label class="nav-select__option tau-mode-option" data-color="blue">
-              <input type="radio" name="experiment-tau-mode" value="fixed">
-              <div class="nav-select__icon"><i data-lucide="lock" class="w-4 h-4"></i></div>
+            <label class="nav-select__option tau-mode-option" data-color="indigo">
+              <input type="radio" name="experiment-tau-mode" value="fixed" onchange="ExperimentRunner.updateTauUI()">
+              <div class="nav-select__icon"><i data-lucide="crosshair" class="w-4 h-4"></i></div>
               <div class="nav-select__content">
                 <span class="nav-select__title">Fixed</span>
-                <span class="nav-select__description">Same τ for all queries</span>
               </div>
             </label>
             <label class="nav-select__option tau-mode-option" data-color="amber">
-              <input type="radio" name="experiment-tau-mode" value="random" checked>
-              <div class="nav-select__icon"><i data-lucide="shuffle" class="w-4 h-4"></i></div>
+              <input type="radio" name="experiment-tau-mode" value="random" checked onchange="ExperimentRunner.updateTauUI()">
+              <div class="nav-select__icon"><i data-lucide="dice-5" class="w-4 h-4"></i></div>
               <div class="nav-select__content">
                 <span class="nav-select__title">Random</span>
-                <span class="nav-select__description">Random τ per scope</span>
               </div>
             </label>
           </div>
         </div>
 
-        <!-- Fixed Tau Settings -->
-        <div id="experiment-tau-fixed-settings" class="hidden space-y-3">
-          <div class="form-group">
-            <label class="form-group__label">Fixed Tau Value</label>
-            <input type="number" id="experiment-tau-fixed-value" value="0.5" min="0" max="1" step="0.1"
-              class="form-input">
-          </div>
+        <!-- Fixed TAU Input -->
+        <div id="experiment-tau-fixed-setting" class="hidden border-t border-purple-200 pt-3">
+          <label class="form-group__label">Fixed TAU Value (0.0 - 1.0)</label>
+          <input type="number" id="experiment-tau-fixed-value" value="0.5" min="0" max="1" step="0.1" class="form-input">
         </div>
 
-        <!-- Random Tau Settings -->
-        <div id="experiment-tau-random-settings" class="space-y-3">
+        <!-- Random TAU Range -->
+        <div id="experiment-tau-random-setting" class="border-t border-purple-200 pt-3">
+          <label class="form-group__label">Random TAU Range</label>
           <div class="grid grid-cols-2 gap-3">
             <div class="form-group">
-              <label class="form-group__label">Min Tau</label>
-              <input type="number" id="experiment-tau-random-min" value="0.1" min="0" max="1" step="0.1"
-                class="form-input">
+              <label class="form-group__label text-sm">Min</label>
+              <div class="flex items-center gap-2">
+                <input type="range" id="experiment-tau-random-min" min="0" max="0.9" step="0.1" value="0.1"
+                  oninput="document.getElementById('experiment-tau-min-display').textContent = this.value"
+                  class="form-range flex-1">
+                <span id="experiment-tau-min-display" class="badge badge--purple w-8">0.1</span>
+              </div>
             </div>
             <div class="form-group">
-              <label class="form-group__label">Max Tau</label>
-              <input type="number" id="experiment-tau-random-max" value="0.9" min="0" max="1" step="0.1"
-                class="form-input">
-            </div>
-          </div>
-
-          <!-- Tau Scope -->
-          <div class="form-group">
-            <label class="form-group__label">Tau Scope</label>
-            <div class="nav-select nav-select--grid nav-select--2cols">
-              <label class="nav-select__option tau-scope-option" data-color="blue">
-                <input type="radio" name="experiment-tau-scope" value="all">
-                <div class="nav-select__content">
-                  <span class="nav-select__title">All</span>
-                  <span class="nav-select__description">Same τ everywhere</span>
-                </div>
-              </label>
-              <label class="nav-select__option tau-scope-option" data-color="green">
-                <input type="radio" name="experiment-tau-scope" value="per-trial">
-                <div class="nav-select__content">
-                  <span class="nav-select__title">Per Trial</span>
-                  <span class="nav-select__description">New τ each trial</span>
-                </div>
-              </label>
-              <label class="nav-select__option tau-scope-option" data-color="amber">
-                <input type="radio" name="experiment-tau-scope" value="per-route">
-                <div class="nav-select__content">
-                  <span class="nav-select__title">Per Route</span>
-                  <span class="nav-select__description">New τ each route</span>
-                </div>
-              </label>
-              <label class="nav-select__option tau-scope-option ring-2 ring-purple-500 border-purple-500" data-color="purple">
-                <input type="radio" name="experiment-tau-scope" value="per-trial-route" checked>
-                <div class="nav-select__content">
-                  <span class="nav-select__title">Per Trial-Route</span>
-                  <span class="nav-select__description">New τ each trial+route</span>
-                </div>
-              </label>
+              <label class="form-group__label text-sm">Max</label>
+              <div class="flex items-center gap-2">
+                <input type="range" id="experiment-tau-random-max" min="0.1" max="1" step="0.1" value="0.9"
+                  oninput="document.getElementById('experiment-tau-max-display').textContent = this.value"
+                  class="form-range flex-1">
+                <span id="experiment-tau-max-display" class="badge badge--purple w-8">0.9</span>
+              </div>
             </div>
           </div>
         </div>
@@ -286,120 +391,168 @@
     </div>
   </div>
 
-  <!-- Tab Content: Results -->
+  <!-- Tab Content: Results Dashboard -->
   <div id="experiment-tab-results" data-experiment-tab-content class="hidden panel__body space-y-4">
-    <!-- Results Summary Card -->
-    <div class="section-card section-card--success">
-      <div class="section-card__header">
-        <div class="section-card__icon section-card__icon--success">
-          <i data-lucide="check-circle" class="w-5 h-5"></i>
-        </div>
-        <h4 class="section-card__title">Results Summary</h4>
+    <!-- Dashboard Header -->
+    <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg p-4">
+      <h3 class="font-bold text-lg mb-1">DHC2L Performance Metrics Dashboard</h3>
+      <p class="text-purple-200 text-sm">Comprehensive evaluation for dynamic graph labeling</p>
+    </div>
+
+    <!-- Experiment Summary -->
+    <div class="grid grid-cols-3 gap-3">
+      <div class="bg-blue-50 rounded-lg p-3 text-center">
+        <div class="text-xs text-blue-600">Total Trials</div>
+        <div id="result-total-trials" class="text-2xl font-bold text-blue-700">3</div>
       </div>
-      <div id="experiment-results-summary" class="section-card__body">
-        <p class="text-muted text-center py-4">No results yet. Run an experiment to see results.</p>
+      <div class="bg-green-50 rounded-lg p-3 text-center">
+        <div class="text-xs text-green-600">Configured Batches</div>
+        <div id="result-total-batches" class="text-2xl font-bold text-green-700">3</div>
+      </div>
+      <div class="bg-purple-50 rounded-lg p-3 text-center">
+        <div class="text-xs text-purple-600">Algorithms Compared</div>
+        <div id="result-algorithms" class="text-lg font-bold text-purple-700">2 (DHL vs DHC2L)</div>
       </div>
     </div>
 
-    <!-- Algorithm Comparison -->
-    <div class="section-card section-card--info">
-      <div class="section-card__header">
-        <div class="section-card__icon section-card__icon--info">
-          <i data-lucide="bar-chart-2" class="w-5 h-5"></i>
-        </div>
-        <h4 class="section-card__title">Algorithm Comparison</h4>
+    <!-- Results Tab Navigation -->
+    <div class="tabs tabs--pills border-b border-gray-200 pb-2">
+      <div class="tabs__list flex flex-wrap gap-1">
+        <button data-result-tab="construction" class="tabs__tab text-xs px-3 py-1 bg-purple-600 text-white rounded-full" aria-selected="true">
+          <i data-lucide="hammer" class="w-3 h-3 inline"></i> Construction Phase
+        </button>
+        <button data-result-tab="updates" class="tabs__tab text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-full">
+          <i data-lucide="refresh-cw" class="w-3 h-3 inline"></i> Dynamic Updates
+        </button>
+        <button data-result-tab="performance" class="tabs__tab text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-full">
+          <i data-lucide="gauge" class="w-3 h-3 inline"></i> Query Performance
+        </button>
+        <button data-result-tab="similarity" class="tabs__tab text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded-full">
+          <i data-lucide="git-compare" class="w-3 h-3 inline"></i> Route Similarity
+        </button>
       </div>
-      <div id="experiment-algorithm-comparison" class="section-card__body">
-        <div class="grid grid-cols-2 gap-4">
-          <!-- DHL Column -->
-          <div class="bg-blue-50 rounded-lg p-4">
-            <h5 class="font-bold text-blue-700 mb-3 flex items-center gap-2">
-              <i data-lucide="zap" class="w-4 h-4"></i> DHL
-            </h5>
-            <div class="space-y-2 text-sm">
-              <div class="flex justify-between">
-                <span class="text-gray-600">Avg Query Time</span>
-                <span id="result-dhl-avg-time" class="font-medium">--</span>
-              </div>
-              <div class="flex justify-between">
-                <span class="text-gray-600">Min Query Time</span>
-                <span id="result-dhl-min-time" class="font-medium">--</span>
-              </div>
-              <div class="flex justify-between">
-                <span class="text-gray-600">Max Query Time</span>
-                <span id="result-dhl-max-time" class="font-medium">--</span>
-              </div>
-              <div class="flex justify-between">
-                <span class="text-gray-600">Avg Label Size</span>
-                <span id="result-dhl-label-size" class="font-medium">--</span>
-              </div>
-            </div>
+    </div>
+
+    <!-- Construction Phase Tab -->
+    <div id="result-tab-construction" data-result-tab-content class="space-y-3">
+      <div class="flex justify-between items-center">
+        <h4 class="font-semibold text-gray-800">Appendix 1.1: Initial Construction Performance</h4>
+        <button onclick="ExperimentRunner.exportTab('construction')" class="btn btn--success btn--xs">
+          <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+        </button>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-100">
+            <tr>
+              <th class="text-left p-2 font-semibold text-gray-700">Trial</th>
+              <th class="text-left p-2 font-semibold text-gray-700">Algorithm</th>
+              <th class="text-right p-2 font-semibold text-gray-700">Initial Construction Time (ms)</th>
+              <th class="text-right p-2 font-semibold text-gray-700">Initial Label Size (MB)</th>
+            </tr>
+          </thead>
+          <tbody id="result-construction-tbody" class="divide-y divide-gray-200">
+            <tr><td colspan="4" class="text-center text-gray-500 py-4">No data yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Dynamic Updates Tab -->
+    <div id="result-tab-updates" data-result-tab-content class="hidden space-y-3">
+      <div class="flex justify-between items-center">
+        <h4 class="font-semibold text-gray-800">Appendix 1.2: Dynamic Performance Log</h4>
+        <button onclick="ExperimentRunner.exportTab('updates')" class="btn btn--success btn--xs">
+          <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+        </button>
+      </div>
+      <div id="result-updates-container" class="space-y-4 max-h-96 overflow-y-auto">
+        <p class="text-center text-gray-500 py-4">No data yet</p>
+      </div>
+    </div>
+
+    <!-- Query Performance Tab -->
+    <div id="result-tab-performance" data-result-tab-content class="hidden space-y-3">
+      <div class="flex justify-between items-center">
+        <h4 class="font-semibold text-gray-800">Appendix 1.3: Combined DHL vs DHC2L Performance Summary</h4>
+        <button onclick="ExperimentRunner.exportTab('performance')" class="btn btn--success btn--xs">
+          <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+        </button>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-100">
+            <tr>
+              <th class="text-left p-2 font-semibold text-gray-700">Metric</th>
+              <th class="text-right p-2 font-semibold text-blue-700">DHL (Avg of 3 Trials)</th>
+              <th class="text-right p-2 font-semibold text-green-700">DHC2L (Avg of 3 Trials)</th>
+              <th class="text-right p-2 font-semibold text-purple-700">% Improvement</th>
+            </tr>
+          </thead>
+          <tbody id="result-performance-tbody" class="divide-y divide-gray-200">
+            <tr><td colspan="4" class="text-center text-gray-500 py-4">No data yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Route Similarity Tab -->
+    <div id="result-tab-similarity" data-result-tab-content class="hidden space-y-3">
+      <div class="flex justify-between items-center">
+        <h4 class="font-semibold text-gray-800">Appendix 1.4: Route Similarity Evaluation</h4>
+        <button onclick="ExperimentRunner.exportTab('similarity')" class="btn btn--success btn--xs">
+          <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+        </button>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-100">
+            <tr>
+              <th class="text-left p-2 font-semibold text-gray-700">OD Pair</th>
+              <th class="text-right p-2 font-semibold text-gray-700">Distance (km)</th>
+              <th class="text-right p-2 font-semibold text-gray-700">Travel Time (min)</th>
+              <th class="text-right p-2 font-semibold text-gray-700">Fréchet Distance (m)</th>
+              <th class="text-center p-2 font-semibold text-gray-700">FD Rating</th>
+              <th class="text-right p-2 font-semibold text-gray-700">Travel Time Deviation (%)</th>
+              <th class="text-center p-2 font-semibold text-gray-700">TTD Rating</th>
+            </tr>
+          </thead>
+          <tbody id="result-similarity-tbody" class="divide-y divide-gray-200">
+            <tr><td colspan="7" class="text-center text-gray-500 py-4">No data yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <!-- Rating Criteria -->
+      <div class="grid grid-cols-2 gap-4 mt-4 text-xs">
+        <div class="bg-gray-50 rounded-lg p-3">
+          <h5 class="font-semibold text-gray-700 mb-2">Rating Criteria:</h5>
+          <div class="space-y-1 text-gray-600">
+            <div><span class="text-green-600 font-medium">Fréchet Distance:</span></div>
+            <div class="pl-2">• Excellent: &lt; 200m</div>
+            <div class="pl-2">• Good: 200-400m</div>
+            <div class="pl-2">• Fair: &gt; 400m</div>
           </div>
-
-          <!-- HC2L Column -->
-          <div class="bg-green-50 rounded-lg p-4">
-            <h5 class="font-bold text-green-700 mb-3 flex items-center gap-2">
-              <i data-lucide="layers" class="w-4 h-4"></i> HC2L
-            </h5>
-            <div class="space-y-2 text-sm">
-              <div class="flex justify-between">
-                <span class="text-gray-600">Avg Query Time</span>
-                <span id="result-hc2l-avg-time" class="font-medium">--</span>
-              </div>
-              <div class="flex justify-between">
-                <span class="text-gray-600">Min Query Time</span>
-                <span id="result-hc2l-min-time" class="font-medium">--</span>
-              </div>
-              <div class="flex justify-between">
-                <span class="text-gray-600">Max Query Time</span>
-                <span id="result-hc2l-max-time" class="font-medium">--</span>
-              </div>
-              <div class="flex justify-between">
-                <span class="text-gray-600">Avg Label Size</span>
-                <span id="result-hc2l-label-size" class="font-medium">--</span>
-              </div>
-              <div class="flex justify-between">
-                <span class="text-gray-600">Nodes Repaired</span>
-                <span id="result-hc2l-nodes-repaired" class="font-medium">--</span>
-              </div>
-            </div>
+        </div>
+        <div class="bg-gray-50 rounded-lg p-3">
+          <div class="space-y-1 text-gray-600">
+            <div><span class="text-blue-600 font-medium">Travel Time Deviation:</span></div>
+            <div class="pl-2">• Excellent: &lt; 5%</div>
+            <div class="pl-2">• Good: 5-10%</div>
+            <div class="pl-2">• Fair: &gt; 10%</div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Export Options -->
-    <div class="section-card">
-      <div class="section-card__header">
-        <div class="section-card__icon">
-          <i data-lucide="download" class="w-5 h-5"></i>
-        </div>
-        <h4 class="section-card__title">Export Results</h4>
-      </div>
-      <div class="section-card__body">
-        <div class="flex gap-2">
-          <button onclick="ExperimentRunner.exportResults('json')" class="btn btn--primary btn--sm flex-1">
-            <i data-lucide="file-json" class="w-4 h-4"></i>
-            Export JSON
-          </button>
-          <button onclick="ExperimentRunner.exportResults('csv')" class="btn btn--success btn--sm flex-1">
-            <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
-            Export CSV
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Detailed Results List -->
-    <div class="section-card">
-      <div class="section-card__header">
-        <div class="section-card__icon">
-          <i data-lucide="list" class="w-5 h-5"></i>
-        </div>
-        <h4 class="section-card__title">Detailed Results</h4>
-      </div>
-      <div id="experiment-results-list" class="section-card__body max-h-96 overflow-y-auto">
-        <p class="text-muted text-center py-4">Run an experiment to see detailed results.</p>
+    <!-- Export All -->
+    <div class="border-t border-gray-200 pt-4">
+      <div class="flex gap-2">
+        <button onclick="ExperimentRunner.exportResults('json')" class="btn btn--primary btn--sm flex-1">
+          <i data-lucide="file-json" class="w-4 h-4"></i> Export Full JSON
+        </button>
+        <button onclick="ExperimentRunner.exportResults('csv')" class="btn btn--success btn--sm flex-1">
+          <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Export All CSV
+        </button>
       </div>
     </div>
   </div>
