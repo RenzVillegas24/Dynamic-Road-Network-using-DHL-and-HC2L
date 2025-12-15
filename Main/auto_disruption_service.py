@@ -193,11 +193,11 @@ class AutoDisruptionService:
             current_time = time.time()
             time_since_last_file = current_time - latest_timestamp
             should_fetch = time_since_last_file >= self.update_interval
+            remaining = self.update_interval - time_since_last_file
             
             if should_fetch:
                 logger.success(f"Fetch allowed: {time_since_last_file:.0f}s since latest file >= {self.update_interval}s")
-            else:
-                remaining = self.update_interval - time_since_last_file
+            elif remaining < 30:
                 logger.wait(f"Fetch blocked: {remaining:.0f}s remaining until next fetch")
             
             return should_fetch

@@ -2061,13 +2061,53 @@ class ExperimentRunner:
         }
     
     def get_result(self, experiment_id: str) -> Dict:
-        """Get final experiment results computed from numpy metrics collector"""
+        """Get final experiment results.
+        
+        Strategy:
+        1. If a saved JSON file exists for this experiment, return that (most reliable)
+        2. Otherwise, compute results from the metrics collector (for in-progress experiments)
+        3. Return "success": False if results are not available
+        """
         if experiment_id not in self.experiments:
             return {"success": False, "error": "Experiment not found"}
         
         progress = self.experiments[experiment_id]
         
-        # Compute results from metrics collector
+        # ========================================================================
+        # Step 1: Try to load from saved JSON file (most reliable)
+        # ========================================================================
+        try:
+            results_dir = Path(Config.EXPERIMENT_DATA_DIR) / "preset" / "results"
+            
+            # Find the most recent results file for this experiment
+            # (files are named with timestamps, so we search for files and check their content)
+            for result_file in sorted(results_dir.glob("*.json"), reverse=True):
+                try:
+                    with open(result_file, 'r') as f:
+                        result_data = json.load(f)
+                        if result_data.get("experiment_id") == experiment_id:
+                            # Found the results file for this experiment
+                            logger.success(f"Loaded results from saved file: {result_file}")
+                            return {
+                                "success": True,
+                                "experiment_id": experiment_id,
+                                "status": "completed",
+                                "total_routes": result_data.get("total_routes", 0),
+                                "completed_routes": result_data.get("completed_routes", 0),
+                                "start_time": result_data.get("start_time", 0),
+                                "end_time": result_data.get("end_time", 0),
+                                "duration_seconds": result_data.get("duration_seconds", 0),
+                                "result": result_data  # Return the full saved results object
+                            }
+                except Exception as e:
+                    logger.debug(f"Failed to read result file {result_file}: {e}")
+                    continue
+        except Exception as e:
+            logger.debug(f"Error searching for saved results: {e}")
+        
+        # ========================================================================
+        # Step 2: Compute results from metrics collector (fallback)
+        # ========================================================================
         computed_results = {}
         if experiment_id in self.metrics_collectors:
             try:
@@ -2077,8 +2117,11 @@ class ExperimentRunner:
                 logger.error(f"Error computing results: {e}")
                 logger.error(traceback.format_exc())
         
+        # Only return success if we have some results
+        has_results = bool(computed_results) or progress.status == "completed"
+        
         return {
-            "success": True,
+            "success": has_results,
             "experiment_id": experiment_id,
             "status": progress.status,
             "total_routes": progress.total_routes,
@@ -2086,7 +2129,8 @@ class ExperimentRunner:
             "start_time": progress.start_time,
             "end_time": progress.end_time,
             "duration_seconds": progress.end_time - progress.start_time if progress.end_time > 0 else 0,
-            "result": computed_results  # Changed from "results" to "result" for frontend compatibility
+            "result": computed_results,
+            "error": "Results not ready yet" if not has_results else None
         }
     
     def get_metrics_summary(self, experiment_id: str) -> Dict:
@@ -2882,17 +2926,27 @@ class ExperimentRunner:
                     # Broadcast finalizing status immediately
                     self._broadcast_progress(experiment_id)
                     
-                    # Save results to preset/results directory with progress callback
-                    self._save_final_results(experiment_id, progress)
+                    # Save results to preset/results directory
+                    # This returns the result file path if successful, None otherwise
+                    result_file = self._save_final_results(experiment_id, progress)
                     
-                    # NOW mark as completed after results are saved
-                    progress.status = "completed"
-                    progress.finalization_phase = "Results saved successfully"
-                    progress.finalization_percentage = 10.0
-                    progress.overall_percentage = 100.0
-                    progress.end_time = time.time()
+                    # Only mark as completed if results file was successfully saved
+                    if result_file and result_file.exists():
+                        progress.status = "completed"
+                        progress.finalization_phase = "Results saved successfully"
+                        progress.finalization_percentage = 10.0
+                        progress.overall_percentage = 100.0
+                        progress.end_time = time.time()
+                        logger.success(f"✓ Experiment {experiment_id} completed - results ready at {result_file}")
+                    else:
+                        # File save failed - mark as error
+                        progress.status = "error"
+                        progress.finalization_phase = "Failed to save results file"
+                        progress.error_message = "Results file could not be saved or verified"
+                        progress.end_time = time.time()
+                        logger.error(f"✗ Experiment {experiment_id} failed: results file not saved")
                     
-                    # Broadcast final completion status
+                    # Broadcast final status (completed or error)
                     self._broadcast_progress(experiment_id)
                 else:
                     # Broadcast progress for this thread completion
@@ -3207,7 +3261,7 @@ class ExperimentRunner:
         else:
             return f"{secs}s"
     
-    def _save_final_results(self, experiment_id: str, progress: ExperimentProgress = None):
+    def _save_final_results(self, experiment_id: str, progress: ExperimentProgress = None) -> Optional[Path]:
         """
         Save final results to preset/results directory when experiment completes.
         
@@ -3222,6 +3276,9 @@ class ExperimentRunner:
         8. Computing summary (70-80%)
         9. Preparing output data (80-90%)
         10. Writing to file (90-100%)
+        
+        Returns:
+            Path to the saved results file if successful, None otherwise.
         """
         try:
             logger.info(f"Starting to save final results for {experiment_id}...")
@@ -3378,7 +3435,24 @@ class ExperimentRunner:
             with open(result_file, 'w') as f:
                 json.dump(results, f, indent=2)
             
-            logger.success(f"Saved final results to {result_file}")
+            # Verify file was written successfully
+            if not result_file.exists():
+                logger.error(f"Result file does not exist after write: {result_file}")
+                return None
+            
+            # Verify file is readable by attempting to load it
+            try:
+                with open(result_file, 'r') as f:
+                    test_data = json.load(f)
+                    if not test_data.get("experiment_id"):
+                        logger.error(f"Result file is invalid or incomplete: {result_file}")
+                        return None
+            except Exception as verify_error:
+                logger.error(f"Failed to verify result file: {verify_error}")
+                return None
+            
+            logger.success(f"✓ Saved and verified final results to {result_file}")
+            return result_file
             
         except Exception as e:
             logger.error(f"Failed to save final results for {experiment_id}: {e}")
@@ -3388,6 +3462,8 @@ class ExperimentRunner:
             if experiment_id in self.experiments:
                 progress_obj = self.experiments[experiment_id]
                 progress_obj.finalization_phase = f"Error: {str(e)}"
+            
+            return None
 
     
     def _generate_tau(self, tau_settings: Dict, trial_idx: int, route_idx: int) -> float:

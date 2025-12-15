@@ -1213,45 +1213,69 @@ const ExperimentRunner = {
     handleExperimentComplete() {
         this.isRunning = false;
         this.disconnectWebSocket();
-        this.showNotification('Experiment completed!', 'success');
+        this.showNotification('Experiment completed! Loading results...', 'success');
         
         // Clear map centering flag for next run
         this.mapCentered = false;
         
-        // Wait for results to be saved before navigating
-        // Poll for the result to be available
+        // CRITICAL: Poll for the result endpoint until JSON file is saved and readable
+        // This ensures the file is fully written to disk before attempting to load
         const experimentId = this.currentExperimentId;
         let attempts = 0;
-        const maxAttempts = 30; // 30 seconds max wait
+        const maxAttempts = 60; // 60 seconds max wait (results file might be large)
+        const pollInterval = 500; // Check every 500ms initially, then every 1s after 10 attempts
         
         const checkResults = async () => {
             attempts++;
+            
+            // Increase poll interval after multiple attempts to reduce server load
+            const delay = attempts > 10 ? 1000 : 500;
+            
             try {
                 const response = await fetch(`/api/experiment/${experimentId}/result`);
+                
+                // Check if response is actually valid JSON with results
                 if (response.ok) {
-                    // Results are ready
-                    await this.fetchAndDisplayResults();
-                    this.loadResultsList();
-                    this.showTab('results');
-                } else if (attempts < maxAttempts) {
-                    // Wait 1 second and try again
-                    setTimeout(checkResults, 1000);
+                    const data = await response.json();
+                    if (data.success && data.result && data.result.summary) {
+                        // Results are ready and valid
+                        console.log(`✓ Results loaded successfully after ${attempts} attempts`);
+                        await this.fetchAndDisplayResults();
+                        await this.loadResultsList();
+                        this.showTab('results');
+                        this.showNotification('Results loaded successfully!', 'success');
+                        return; // Success - stop polling
+                    }
+                }
+                
+                // Results not ready yet - continue polling
+                if (attempts < maxAttempts) {
+                    console.log(`Waiting for results... (attempt ${attempts}/${maxAttempts})`);
+                    setTimeout(checkResults, delay);
                 } else {
-                    // Timeout - show results list anyway
-                    this.showNotification('Results may take a moment to appear', 'warning');
-                    this.loadResultsList();
+                    // Timeout after max attempts
+                    console.warn(`Timeout waiting for results after ${maxAttempts} attempts`);
+                    this.showNotification('Results are processing, they will appear in the list shortly', 'warning');
+                    await this.loadResultsList();
                     this.showTab('results-list');
                 }
             } catch (error) {
+                // Network error - continue polling
+                console.debug(`Error checking results (attempt ${attempts}/${maxAttempts}):`, error.message);
+                
                 if (attempts < maxAttempts) {
-                    setTimeout(checkResults, 1000);
+                    setTimeout(checkResults, delay);
                 } else {
-                    this.showNotification('Error loading results', 'error');
+                    // Max attempts exceeded
+                    console.error(`Failed to load results after ${maxAttempts} attempts`);
+                    this.showNotification('Results may take a moment to appear', 'warning');
+                    await this.loadResultsList();
                     this.showTab('results-list');
                 }
             }
         };
         
+        // Start polling
         checkResults();
     },
     
