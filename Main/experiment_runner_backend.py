@@ -64,6 +64,9 @@ from road_network_utils import (
     get_random_road_points_data
 )
 
+# Import road name mapper for getting edge road names
+from road_name_mapper import RoadNameMapper
+
 # Get logger instance
 logger = get_logger("ExperimentRunner")
 
@@ -1502,6 +1505,13 @@ class ExperimentRunner:
         self.dhl_router = None
         self.node_mapper = None
         
+        # Road name mapper for getting edge information
+        try:
+            self.road_mapper = RoadNameMapper(str(Config.EDGES_CSV))
+        except Exception as e:
+            logger.warning(f"Failed to initialize RoadNameMapper: {e}")
+            self.road_mapper = None
+        
         logger.success("ExperimentRunner initialized")
         logger.info(f"Preset path: {self.preset_path}")
         logger.info(f"Temporary path: {self.temporary_path}")
@@ -2290,13 +2300,38 @@ class ExperimentRunner:
                             remaining_time = remaining_routes / (completed / elapsed)
                             thread_progress.estimated_time_remaining = self._format_time(remaining_time)
                         
-                        # Update last result
-                        thread_progress.last_result = result.get("summary", {})
+                        # Get route node information from result (before updating last_result)
+                        route_coords = result.get("route_coords", {})
+                        start_node = route_coords.get("start_node", 0)
+                        end_node = route_coords.get("end_node", 0)
+                        start_edge_target = route_coords.get("start_edge_target", 0)
+                        end_edge_target = route_coords.get("end_edge_target", 0)
+                        
+                        # Get road names for start and end nodes
+                        start_road_name = "Unknown Road"
+                        end_road_name = "Unknown Road"
+                        
+                        if self.road_mapper:
+                            try:
+                                start_road_name = self.road_mapper.get_road_name(start_node, start_edge_target)
+                                end_road_name = self.road_mapper.get_road_name(end_node, end_edge_target)
+                            except Exception as e:
+                                logger.debug(f"Error getting road names: {e}")
+                        
+                        # Update last result with route information
+                        last_result = result.get("summary", {})
+                        last_result["start_node"] = start_node
+                        last_result["end_node"] = end_node
+                        last_result["start_road_name"] = start_road_name
+                        last_result["end_road_name"] = end_road_name
+                        thread_progress.last_result = last_result
                         thread_progress.update_phase = result.get("update_phase", {})
                         
                         # Update query phase with accumulated statistics
                         query_time = result.get("query_phase", {}).get("query_time_ms", 0)
                         label_size = result.get("summary", {}).get("label_size", 0)
+                        distance_km = result.get("summary", {}).get("distance_km", 0)
+                        actual_eta = result.get("summary", {}).get("actual_eta", "")
                         
                         # Initialize query history if not exists
                         if not hasattr(thread_progress, 'query_times'):
@@ -2323,14 +2358,21 @@ class ExperimentRunner:
                         else:
                             thread_progress.query_phase = result.get("query_phase", {})
                         
-                        # Add to history (limit to 10)
+                        # Add to history (limit to 5 as requested)
+                        # Note: start_node, end_node, start_road_name, end_road_name already obtained above
                         thread_progress.results_history.append({
+                            "query_number": completed,
                             "timestamp": datetime.now().isoformat(),
-                            "route": f"Route {route_idx}",
+                            "start_node": start_node,
+                            "end_node": end_node,
+                            "start_road_name": start_road_name,
+                            "end_road_name": end_road_name,
                             "algorithm": algorithm,
-                            "query_time_ms": query_time
+                            "query_time_ms": query_time,
+                            "distance_km": distance_km,
+                            "actual_eta": actual_eta
                         })
-                        if len(thread_progress.results_history) > 10:
+                        if len(thread_progress.results_history) > 5:
                             thread_progress.results_history.pop(0)
                         
                         # Update overall progress (90% for thread tasks)
@@ -2456,6 +2498,12 @@ class ExperimentRunner:
             "summary": {},
             "update_phase": {},
             "query_phase": {},
+            "route_coords": {
+                "start_node": route_coords["start"]["edge_source"],
+                "end_node": route_coords["end"]["edge_source"],
+                "start_edge_target": route_coords["start"]["edge_target"],
+                "end_edge_target": route_coords["end"]["edge_target"]
+            },
             "error": None
         }
         

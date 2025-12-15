@@ -625,16 +625,14 @@ const PanelManager = (function () {
     UniversalModal.showModal({
       icon: 'alert-circle',
       variant: 'warning',
-      title: 'Demo is Running',
-      subtitle: 'A demo is currently in progress',
-      body: '<p class="text-sm text-slate-700 leading-relaxed">You are attempting to navigate while the demo is running. Would you like to stop the demo and navigate, or cancel this action?</p>',
+      title: 'Experiment is Running',
+      subtitle: 'An experiment is currently in progress',
+      body: '<p class="text-sm text-slate-700 leading-relaxed">You are attempting to navigate while the experiment is running. Would you like to stop the experiment and navigate, or cancel this action?</p>',
       buttons: {
-        'Stop Demo & Navigate': (closeModal) => {
-          // Stop the demo
-          if (typeof DemoCreator !== 'undefined' && DemoCreator.isRunning) {
-            DemoCreator.stopDemo();
-          } else if (typeof DemoRunner !== 'undefined' && DemoRunner.isRunning) {
-            DemoRunner.stopDemo();
+        'Stop Experiment & Navigate': (closeModal) => {
+          // Stop the experiment
+          if (typeof ExperimentRunner !== 'undefined' && ExperimentRunner.isRunning) {
+            ExperimentRunner.stopExperiment();
           }
 
           // Close modal

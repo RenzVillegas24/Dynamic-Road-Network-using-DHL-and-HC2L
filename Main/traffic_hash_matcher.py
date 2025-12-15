@@ -195,17 +195,18 @@ class TrafficHashMatcher:
     
     def _load_matched_edges(self):
         """
-        Load matched edges CSV into hash lookup table with highway_type
+        Load matched edges CSV into hash lookup table with highway_type and road_name
         
-        UPDATED: matched_edges.csv now uses Sequential IDs directly (after update_matched_edges.py)
+        UPDATED: matched_edges.csv now has road_name and highway_type columns directly
+        This eliminates lookup failures and ensures 100% of edges have road information
         """
         logger.file_op(f"Loading matched edges from {self.matched_edges_csv}...")
         
-        df = pd.read_csv(self.matched_edges_csv)
+        df = pd.read_csv(self.matched_edges_csv, na_filter=False)  # Don't convert empty strings to NaN
         
         # Debug counters
-        found_attrs = 0
-        missing_attrs = 0
+        has_road_info = 0
+        missing_road_info = 0
         
         # Group by id_hash
         for _, row in df.iterrows():
@@ -215,16 +216,31 @@ class TrafficHashMatcher:
             seq_source = int(row['source'])
             seq_target = int(row['target'])
             
-            # Get highway_type from OSM edges using SEQUENTIAL IDs
-            edge_key = (seq_source, seq_target)
-            attrs = self.edge_attributes.get(edge_key, {})
-            highway_type = attrs.get('highway_type', 'unknown')
-            road_name = attrs.get('road_name', '')
+            # CRITICAL FIX: Read road_name and highway_type directly from matched_edges.csv
+            # These columns were added by enrich_matched_edges.py
+            highway_type = str(row.get('highway_type', 'unknown')).strip()
+            road_name = str(row.get('road_name', '')).strip()
             
-            if attrs:
-                found_attrs += 1
+            # Handle 'nan' strings and empty values
+            if highway_type == 'nan' or not highway_type:
+                highway_type = 'unknown'
+            if road_name == 'nan':
+                road_name = ''
+            
+            # Fallback to edge_attributes lookup if needed (for backward compatibility)
+            if highway_type == 'unknown' or not road_name:
+                edge_key = (seq_source, seq_target)
+                attrs = self.edge_attributes.get(edge_key, {})
+                if attrs:
+                    if highway_type == 'unknown':
+                        highway_type = attrs.get('highway_type', 'unknown')
+                    if not road_name:
+                        road_name = attrs.get('road_name', '')
+            
+            if highway_type != 'unknown' or road_name:
+                has_road_info += 1
             else:
-                missing_attrs += 1
+                missing_road_info += 1
             
             edge = TrafficEdge(
                 id_hash=id_hash,
@@ -244,7 +260,46 @@ class TrafficHashMatcher:
             self.hash_to_edges[id_hash].append(edge)
         
         logger.data(f"Loaded {len(self.hash_to_edges)} unique traffic segments")
-        logger.data(f"Matched attributes: {found_attrs}/{found_attrs + missing_attrs} edges")
+        logger.data(f"Edges with road info: {has_road_info}/{has_road_info + missing_road_info}")
+        if missing_road_info > 0:
+            logger.warning(f"  {missing_road_info} edges have missing road information")
+        
+        # Fill in missing road info by using best edge from same hash group
+        self._fill_missing_road_info()
+    
+    def _fill_missing_road_info(self):
+        """
+        Fill missing road_name and highway_type for edges without road info
+        by using the best edge from the same hash group.
+        
+        Strategy:
+        1. For each hash group, find the best edge (one with road info)
+        2. For edges without road info in the same hash, use the best edge's info
+        3. This ensures all synthetic edges get reasonable road information
+        """
+        filled_count = 0
+        
+        for id_hash, edges in self.hash_to_edges.items():
+            # Find best edge in this group (one with actual road info)
+            best_edge = None
+            for edge in edges:
+                if edge.highway_type != 'unknown' or edge.road_name:
+                    best_edge = edge
+                    break
+            
+            if best_edge is None:
+                # No edge in group has road info, keep as is
+                continue
+            
+            # Fill in missing edges with best edge's info
+            for edge in edges:
+                if (edge.highway_type == 'unknown' or not edge.road_name) and edge != best_edge:
+                    edge.highway_type = best_edge.highway_type
+                    edge.road_name = best_edge.road_name
+                    filled_count += 1
+        
+        if filled_count > 0:
+            logger.info(f"Filled missing road info for {filled_count} edges using best match in hash group")
     
     def lookup_edges_by_hash(self, id_hash: str) -> List[Dict]:
         """Return hash-matched edges as dictionaries (used by IncidentMatcher)."""

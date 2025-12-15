@@ -479,7 +479,7 @@ const ExperimentRunner = {
                 this.showNotification('Experiment stopped', 'warning');
                 
                 // Show results tab
-                this.showTab('results');
+                this.showTab('settings');
             }
         } catch (error) {
             console.error('Error stopping experiment:', error);
@@ -679,6 +679,9 @@ const ExperimentRunner = {
         // Update Query Phase section
         this.updateThreadQueryPhase(container, threadData.query_phase);
         
+        // Update Route History section (last 5 routes)
+        this.updateThreadRouteHistory(container, threadData.results_history);
+        
         // Update throughput
         const throughputEl = container.querySelector('.thread-throughput');
         if (throughputEl) {
@@ -693,9 +696,21 @@ const ExperimentRunner = {
         const section = container.querySelector('.thread-last-result');
         if (!section) return;
         
-        // Route
+        // Route: Show as "start_node -> end_node"
         const routeEl = section.querySelector('[data-metric="route"]');
-        if (routeEl) routeEl.textContent = lastResult.route || '--';
+        if (routeEl) {
+            const startNode = lastResult.start_node || '--';
+            const endNode = lastResult.end_node || '--';
+            routeEl.textContent = `${startNode} → ${endNode}`;
+        }
+        
+        // Start Road Name
+        const startRoadEl = section.querySelector('[data-metric="start-road"]');
+        if (startRoadEl) startRoadEl.textContent = lastResult.start_road_name || 'Unknown Road';
+        
+        // End Road Name
+        const endRoadEl = section.querySelector('[data-metric="end-road"]');
+        if (endRoadEl) endRoadEl.textContent = lastResult.end_road_name || 'Unknown Road';
         
         // Algorithm
         const algoEl = section.querySelector('[data-metric="algorithm"]');
@@ -827,6 +842,44 @@ const ExperimentRunner = {
         if (countEl) countEl.textContent = queryPhase.queries_count || 0;
     },
     
+    updateThreadRouteHistory(container, routeHistory) {
+        if (!routeHistory || routeHistory.length === 0) return;
+        
+        const historyContainer = container.querySelector('.thread-route-history');
+        if (!historyContainer) return;
+        
+        // Build HTML for each route in history (last 5)
+        const routesHtml = routeHistory.slice(-5).reverse().map((route, idx) => {
+            const routeNum = route.query_number || '--';  // Use actual query number from history
+            const startNode = route.start_node || '--';
+            const endNode = route.end_node || '--';
+            const startRoad = route.start_road_name || 'Unknown';
+            const endRoad = route.end_road_name || 'Unknown';
+            const queryTime = (route.query_time_ms || 0).toFixed(2);
+            const distance = (route.distance_km || 0).toFixed(2);
+            const eta = route.actual_eta || '--';
+            
+            return `
+                <div class="bg-white rounded p-2 border border-green-200 text-xs space-y-1">
+                    <div class="flex items-center justify-between">
+                        <span class="font-medium text-gray-700">Query ${routeNum}: ${startNode} → ${endNode}</span>
+                        <span class="text-gray-500">${queryTime}ms</span>
+                    </div>
+                    <div class="text-gray-600 space-y-0.5">
+                        <div><span class="text-gray-400">Start:</span> ${startRoad}</div>
+                        <div><span class="text-gray-400">End:</span> ${endRoad}</div>
+                        <div class="flex gap-3">
+                            <span><span class="text-gray-400">Distance:</span> ${distance}km</span>
+                            <span><span class="text-gray-400">ETA:</span> ${eta}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        historyContainer.innerHTML = routesHtml || '<p class="text-gray-400 text-xs italic">No routes executed yet</p>';
+    },
+    
     updateDisruptionDisplay(disruptionData) {
         const container = document.getElementById('experiment-disruption-display');
         if (!container) return;
@@ -954,6 +1007,8 @@ const ExperimentRunner = {
                     <div class="grid grid-cols-2 gap-2 text-xs">
                         <div><span class="text-gray-500">Route:</span> <span data-metric="route" class="font-medium">--</span></div>
                         <div><span class="text-gray-500">Algorithm:</span> <span data-metric="algorithm" class="font-medium">--</span></div>
+                        <div><span class="text-gray-500">Start Road:</span> <span data-metric="start-road" class="font-medium text-blue-600">Unknown Road</span></div>
+                        <div><span class="text-gray-500">End Road:</span> <span data-metric="end-road" class="font-medium text-blue-600">Unknown Road</span></div>
                         <div><span class="text-gray-500">Path Length:</span> <span data-metric="path-length" class="font-medium">--</span></div>
                         <div><span class="text-gray-500">Query Time:</span> <span data-metric="query-time" class="font-medium">--</span></div>
                         <div><span class="text-gray-500">Distance:</span> <span data-metric="distance" class="font-medium">--</span></div>
@@ -999,6 +1054,14 @@ const ExperimentRunner = {
                         <div><span class="text-gray-500">Max Time:</span> <span data-metric="max-time" class="font-medium">--</span></div>
                         <div><span class="text-gray-500">P95 Latency:</span> <span data-metric="p95" class="font-medium">--</span></div>
                         <div><span class="text-gray-500">Queries:</span> <span data-metric="queries-count" class="font-medium">--</span></div>
+                    </div>
+                    
+                    <!-- Route History (Last 5 Routes) -->
+                    <div class="mt-3 border-t border-green-200 pt-3">
+                        <h5 class="text-xs font-semibold text-green-700 mb-2">Last 5 Routes</h5>
+                        <div class="thread-route-history space-y-1 max-h-40 overflow-y-auto">
+                            <p class="text-gray-400 text-xs italic">No routes executed yet</p>
+                        </div>
                     </div>
                 </div>
             </div>
