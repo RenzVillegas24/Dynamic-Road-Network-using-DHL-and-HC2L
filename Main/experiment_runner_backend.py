@@ -243,6 +243,7 @@ class ExperimentMetricsCollector:
                 lazy_time = update_phase.get("lazy_update_time_ms", 0)
                 nodes_updated = update_phase.get("nodes_repaired", 0)
                 impact_score = update_phase.get("impact_score", 0)
+                threshold_rebuild_time = update_phase.get("threshold_rebuild_time_ms", 0)  # Extract threshold rebuild time
                 is_rebuild = update_phase.get("update_strategy", "") == "immediate_update"
                 
                 # Record construction time from first route of each trial (batch 0, route 0)
@@ -284,6 +285,11 @@ class ExperimentMetricsCollector:
                     if label_size > self.peak_label_size_dhl[trial, batch]:
                         self.peak_label_size_dhl[trial, batch] = label_size
                     
+                    # Threshold rebuild time tracking (Equation 7: sum and average per batch)
+                    # Record only on first route of batch to avoid double-counting
+                    if route == 0 and threshold_rebuild_time > 0:
+                        self.threshold_rebuild_time_dhl[trial, batch] = threshold_rebuild_time
+                    
                     # Rebuild tracking
                     if is_rebuild:
                         self.rebuild_count_dhl[trial, batch] += 1
@@ -305,6 +311,11 @@ class ExperimentMetricsCollector:
                     # Peak label size tracking
                     if label_size > self.peak_label_size_hc2l[trial, batch]:
                         self.peak_label_size_hc2l[trial, batch] = label_size
+                    
+                    # Threshold rebuild time tracking (Equation 7: sum and average per batch)
+                    # Record only on first route of batch to avoid double-counting
+                    if route == 0 and threshold_rebuild_time > 0:
+                        self.threshold_rebuild_time_hc2l[trial, batch] = threshold_rebuild_time
                     
                     # Rebuild tracking
                     if is_rebuild:
@@ -2594,6 +2605,7 @@ class ExperimentRunner:
             nodes_repaired = lazy_hc2l.get("nodes_repaired", 0)
             dirty_nodes = lazy_hc2l.get("dirty_nodes_marked", 0)
             impact_score = lazy_hc2l.get("disruption_impact_score", 0)
+            threshold_rebuild_time = lazy_hc2l.get("threshold_rebuild_time_ms", 0)  # Extract from HC2L output
             
             result["update_phase"] = {
                 "status": "lazy_repair" if update_strategy == "lazy_marking" else "immediate_update",
@@ -2603,11 +2615,13 @@ class ExperimentRunner:
                 "min_label_size": 0,  # Not provided in API
                 "nodes_repaired": nodes_repaired if nodes_repaired is not None else 0,
                 "dirty_nodes": dirty_nodes if dirty_nodes is not None else 0,
-                "impact_score": round(impact_score, 3) if isinstance(impact_score, (int, float)) else 0
+                "impact_score": round(impact_score, 3) if isinstance(impact_score, (int, float)) else 0,
+                "threshold_rebuild_time_ms": round(threshold_rebuild_time, 3) if threshold_rebuild_time else 0
             }
         else:  # DHL
             nodes_updated = dhl_update_info.get("nodes_updated", 0)
             impact_score = dhl_update_info.get("disruption_impact_score", 1.0)
+            threshold_rebuild_time = dhl_update_info.get("threshold_rebuild_time_ms", 0)  # Extract from DHL output
             
             result["update_phase"] = {
                 "status": "immediate_update",
@@ -2617,7 +2631,8 @@ class ExperimentRunner:
                 "min_label_size": 0,  # Not provided in API
                 "nodes_repaired": nodes_updated if nodes_updated is not None else 0,
                 "dirty_nodes": 0,  # DHL doesn't use dirty nodes
-                "impact_score": round(impact_score, 3) if isinstance(impact_score, (int, float)) else 1.0
+                "impact_score": round(impact_score, 3) if isinstance(impact_score, (int, float)) else 1.0,
+                "threshold_rebuild_time_ms": round(threshold_rebuild_time, 3) if threshold_rebuild_time else 0
             }
         
         # Query Phase - single query statistics (will be accumulated in thread)

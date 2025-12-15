@@ -493,6 +493,9 @@ const ExperimentRunner = {
         // Route mode
         const routeMode = document.querySelector('input[name="experiment-route-mode"]:checked')?.value || 'preset';
         
+        // Routes per batch
+        const routesPerBatch = parseInt(document.getElementById('experiment-routes-per-batch')?.value || 1000);
+        
         // Disruption mode
         const disruptionMode = document.querySelector('input[name="experiment-disruption-mode"]:checked')?.value || 'preset';
         
@@ -513,7 +516,7 @@ const ExperimentRunner = {
             thread_count: threadCount,
             trials: 3,
             batches_per_trial: 3,
-            routes_per_batch: 10,
+            routes_per_batch: routesPerBatch,
             algorithms: ['DHL', 'HC2L'],
             route_mode: routeMode,
             disruption_mode: disruptionMode,

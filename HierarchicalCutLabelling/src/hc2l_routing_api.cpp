@@ -633,6 +633,7 @@ void output_json_response(bool success, const string& error_message = "",
                          double disruption_impact_score = 0.0,
                          const string& update_strategy = "",
                          const string& lazy_reason = "",
+                         double threshold_rebuild_time_ms = 0.0,
                          int dirty_nodes_on_path = 0,
                          double lazy_repair_time_ms = 0.0,
                          int nodes_repaired = 0,
@@ -758,6 +759,7 @@ void output_json_response(bool success, const string& error_message = "",
         cout << "    \"tau_threshold\": " << fixed << setprecision(2) << tau_threshold << "," << endl;
         cout << "    \"update_strategy\": \"" << update_strategy << "\"," << endl;
         cout << "    \"reason\": \"" << lazy_reason << "\"," << endl;
+        cout << "    \"threshold_rebuild_time_ms\": " << fixed << setprecision(3) << threshold_rebuild_time_ms << "," << endl;
         
         if (lazy_state != nullptr) {
             cout << "    \"dirty_nodes_marked\": " << lazy_state->dirty_labels.size() << "," << endl;
@@ -1564,6 +1566,7 @@ int main(int argc, char* argv[]) {
         double lazy_repair_time_ms = 0.0;
         int nodes_repaired = 0;
         bool cache_hit = false;
+        double threshold_rebuild_time_ms = 0.0;  // Track threshold rebuild time (Equation 7)
         
         // Load node ID mapping (OSM ID -> Sequential ID)
         cerr << "📋 Loading node ID mapping from: " << mapping_file << endl;
@@ -1660,6 +1663,10 @@ int main(int argc, char* argv[]) {
                 
                 int disruption_count = 0;
                 int closed_roads_count = 0;
+                
+                // Track threshold rebuild time (Equation 7: Formula for immediate updates)
+                auto rebuild_start = chrono::high_resolution_clock::now();
+                int immediate_update_count = 0;
                 
                 for (const auto& edge_key : disruption_edges) {
                     NodeID source = edge_key.first;
@@ -1788,6 +1795,7 @@ int main(int argc, char* argv[]) {
                                  << " (Impact=" << calculated_impact << ", Jam=" << jam_factor_val
                                  << ", Tau=" << tau_threshold << ", Weight=" << new_weight << ")" << endl;
                             perf_collector.record_update(0.1, false);  // Fast immediate update
+                            immediate_update_count++;  // Count threshold rebuild
                         } else {
                             if (update_strategy != "immediate_update") {
                                 update_strategy = "lazy_mark";
@@ -1810,6 +1818,12 @@ int main(int argc, char* argv[]) {
                 cerr << "   - Strategy: " << update_strategy << endl;
                 cerr << "   - Dirty nodes: " << lazy_state.dirty_labels.size() << endl;
                 cerr << "   - Flow segments: " << flow_data.size() << endl;
+                
+                // Calculate threshold rebuild time (Equation 7: avg = sum(rebuild_times) / count)
+                auto rebuild_end = chrono::high_resolution_clock::now();
+                threshold_rebuild_time_ms = chrono::duration<double, milli>(rebuild_end - rebuild_start).count();
+                cerr << "⏱️  Threshold Rebuild Time: " << fixed << setprecision(3) << threshold_rebuild_time_ms 
+                     << "ms (" << immediate_update_count << " immediate updates)" << endl;
             }
         } else {
             // *** DATASET MODE = 'NONE': RESET ALL EDGE WEIGHTS TO BASE VALUES ***
@@ -2204,9 +2218,9 @@ int main(int argc, char* argv[]) {
                            edge_geometries, use_disruptions, disruption_file,
                            &ci, index_load_time_ms,
                            tau_threshold, &lazy_state, disruption_impact_score,
-                           update_strategy, lazy_reason, dirty_nodes_on_path,
-                           lazy_repair_time_ms, nodes_repaired, cache_hit,
-                           flow_data, alternatives, incident_data);
+                           update_strategy, lazy_reason, threshold_rebuild_time_ms,
+                           dirty_nodes_on_path, lazy_repair_time_ms, nodes_repaired,
+                           cache_hit, flow_data, alternatives, incident_data);
         
         // Print optimization statistics to stderr
         cerr << endl;

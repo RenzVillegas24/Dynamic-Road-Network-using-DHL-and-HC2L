@@ -524,6 +524,7 @@ void output_json_response(bool success, const string& error_message = "",
                          const string& update_strategy = "",
                          const string& update_reason = "",
                          int nodes_updated = 0,
+                         double threshold_rebuild_time_ms = 0.0,
                          const map<pair<NodeID, NodeID>, TrafficFlowData>& flow_data = map<pair<NodeID, NodeID>, TrafficFlowData>(),
                          const map<pair<NodeID, NodeID>, IncidentInfo>& disruption_map = map<pair<NodeID, NodeID>, IncidentInfo>(),
                          const ContractionIndex* ci = nullptr,
@@ -659,6 +660,7 @@ void output_json_response(bool success, const string& error_message = "",
         cout << "    \"reason\": \"" << update_reason << "\"," << endl;
         cout << "    \"disruption_impact_score\": " << fixed << setprecision(3) << disruption_impact_score << "," << endl;
         cout << "    \"nodes_updated\": " << nodes_updated << "," << endl;
+        cout << "    \"threshold_rebuild_time_ms\": " << fixed << setprecision(3) << threshold_rebuild_time_ms << "," << endl;
         cout << "    \"note\": \"DHL performs immediate update for all disruptions (no lazy marking)\"" << endl;
         cout << "  }," << endl;
         
@@ -1432,6 +1434,7 @@ int main(int argc, char* argv[]) {
         double disruption_impact_score = 0.0;
         string update_strategy = "none";
         string update_reason = "No disruptions loaded";
+        double threshold_rebuild_time_ms = 0.0;  // Track threshold rebuild time (Equation 7)
         
         // Derive node ID mapping file path from nodes_csv path
         // nodes_csv is like "/path/to/data/raw/quezon_city_nodes.csv"
@@ -1541,6 +1544,9 @@ int main(int argc, char* argv[]) {
                 int disruption_count = 0;
                 int closed_roads_count = 0;
                 set<NodeID> affected_nodes;
+                
+                // Track threshold rebuild time (Equation 7: Formula for immediate updates)
+                auto rebuild_start = chrono::high_resolution_clock::now();
                 
                 for (const auto& edge_key : disruption_edges) {
                     NodeID source = edge_key.first;
@@ -1669,10 +1675,16 @@ int main(int argc, char* argv[]) {
                 update_strategy = "immediate_update";
                 update_reason = "DHL baseline: always immediate update for all disruptions";
                 
+                // Calculate threshold rebuild time (Equation 7: avg = sum(rebuild_times) / count)
+                auto rebuild_end = chrono::high_resolution_clock::now();
+                threshold_rebuild_time_ms = chrono::duration<double, milli>(rebuild_end - rebuild_start).count();
+                
                 cerr << "✅ DHL processed " << disruption_count << " disruptions with caching" << endl;
                 cerr << "   - Closed roads: " << closed_roads_count << endl;
                 cerr << "   - Active disruptions: " << (disruption_count - closed_roads_count) << endl;
                 cerr << "   - Nodes updated: " << nodes_updated << endl;
+                cerr << "⏱️  Threshold Rebuild Time: " << fixed << setprecision(3) << threshold_rebuild_time_ms 
+                     << "ms (" << disruption_count << " immediate updates)" << endl;
             }
         }
         
@@ -1886,7 +1898,8 @@ int main(int argc, char* argv[]) {
                            path, coordinates,
                            edge_geometries, use_disruptions, tau_threshold,
                            disruption_file, disruption_impact_score,
-                           update_strategy, update_reason, nodes_updated, flow_data, incident_data, &ci, adj_list, generate_alternatives);
+                           update_strategy, update_reason, nodes_updated, threshold_rebuild_time_ms,
+                           flow_data, incident_data, &ci, adj_list, generate_alternatives);
         
         return 0;
         
