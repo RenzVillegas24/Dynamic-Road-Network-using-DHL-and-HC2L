@@ -32,6 +32,7 @@ from flow_service import FlowService
 from incident_service import IncidentService
 from console_formatter import get_logger
 
+
 # Load environment
 load_dotenv()
 

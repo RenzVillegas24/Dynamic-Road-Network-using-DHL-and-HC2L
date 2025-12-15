@@ -420,6 +420,10 @@ class StructuredLogger:
         """Log validation message"""
         return self._log(LogLevel.INFO, f"[{self.name}] {message}", ConsoleFormatter.validation)
     
+    def error_validation(self, message: str) -> str:
+        """Log validation error message"""
+        return self._log(LogLevel.ERROR, f"[{self.name}] {message}", ConsoleFormatter.error_validation)
+    
     def location(self, message: str) -> str:
         """Log location message"""
         return self._log(LogLevel.INFO, f"[{self.name}] {message}", ConsoleFormatter.location)

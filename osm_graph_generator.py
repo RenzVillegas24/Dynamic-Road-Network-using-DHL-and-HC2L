@@ -14,7 +14,16 @@ from typing import Dict, List, Tuple, Optional
 import numpy as np
 from pathlib import Path
 import pandas as pd
+import sys
+import os
+
+# Add Main directory to path for imports
+SCRIPT_DIR = Path(__file__).parent
+MAIN_DIR = SCRIPT_DIR / "Main"
+sys.path.insert(0, str(MAIN_DIR))
+
 from console_formatter import get_logger
+from config import Config
 
 logger = get_logger("OSMRoadSnapper")
 
@@ -419,8 +428,6 @@ class OSMRoadSnapper:
 
 # Test function
 if __name__ == "__main__":
-    from config import Config
-    
     logger.info("Testing OSM Road Snapper (CSV-based)...")
     
     # Use paths from config
