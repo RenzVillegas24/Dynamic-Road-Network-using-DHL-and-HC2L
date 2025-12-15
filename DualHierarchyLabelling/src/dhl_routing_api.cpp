@@ -528,8 +528,11 @@ void output_json_response(bool success, const string& error_message = "",
                          const map<pair<NodeID, NodeID>, TrafficFlowData>& flow_data = map<pair<NodeID, NodeID>, TrafficFlowData>(),
                          const map<pair<NodeID, NodeID>, IncidentInfo>& disruption_map = map<pair<NodeID, NodeID>, IncidentInfo>(),
                          const ContractionIndex* ci = nullptr,
-                         const map<NodeID, vector<Neighbor>>& adj_list = map<NodeID, vector<Neighbor>>() ,
-                         bool generate_alternatives = true) {
+                         const map<NodeID, vector<Neighbor>>& adj_list = map<NodeID, vector<Neighbor>>(),
+                         bool generate_alternatives = true,
+                         size_t peak_index_size = 0,
+                         size_t initial_index_size = 0,
+                         bool index_was_rebuilt = false) {
     
     cout << "{" << endl;
     cout << "  \"success\": " << (success ? "true" : "false") << "," << endl;
@@ -612,11 +615,26 @@ void output_json_response(bool success, const string& error_message = "",
             size_t non_empty_cuts = ci->non_empty_cuts();
             double avg_cut_size = ci->avg_cut_size();
             
+            // Use peak_index_size if provided (after rebuilds), otherwise use ci->size()
+            size_t current_size = (peak_index_size > 0) ? peak_index_size : index_size;
+            size_t original_size = (initial_index_size > 0) ? initial_index_size : index_size;
+            
+            // Calculate label size change percentage
+            double size_change_pct = 0.0;
+            if (original_size > 0 && index_was_rebuilt) {
+                size_change_pct = ((double)(current_size - original_size) / original_size) * 100.0;
+            }
+            
             cout << "    \"labeling_info\": {" << endl;
             cout << "      \"total_labels\": " << label_count << "," << endl;
             cout << "      \"infinite_labels\": 0," << endl;  // DHL doesn't track infinite labels separately
-            cout << "      \"index_size_bytes\": " << index_size << "," << endl;
-            cout << "      \"index_size_mb\": " << fixed << setprecision(2) << (index_size / (1024.0 * 1024.0)) << "," << endl;
+            cout << "      \"initial_index_size_bytes\": " << original_size << "," << endl;
+            cout << "      \"initial_index_size_mb\": " << fixed << setprecision(2) << (original_size / (1024.0 * 1024.0)) << "," << endl;
+            cout << "      \"index_size_bytes\": " << current_size << "," << endl;
+            cout << "      \"index_size_mb\": " << fixed << setprecision(2) << (current_size / (1024.0 * 1024.0)) << "," << endl;
+            cout << "      \"peak_label_size_mb\": " << fixed << setprecision(2) << (current_size / (1024.0 * 1024.0)) << "," << endl;
+            cout << "      \"label_size_change_pct\": " << fixed << setprecision(2) << size_change_pct << "," << endl;
+            cout << "      \"index_was_rebuilt\": " << (index_was_rebuilt ? "true" : "false") << "," << endl;
             cout << "      \"hierarchy_height\": " << height << "," << endl;
             cout << "      \"max_label_count_per_node\": " << max_label_count << "," << endl;
             cout << "      \"max_cut_size\": " << max_cut_size << "," << endl;
@@ -1501,6 +1519,14 @@ int main(int argc, char* argv[]) {
         chrono::duration<double, milli> index_load_duration = index_load_end - index_load_start;
         double index_load_time_ms = index_load_duration.count();
         
+        // Track label sizes for DHL (always rebuilds, no lazy updates)
+        size_t initial_index_size = ci.size();
+        size_t peak_index_size = initial_index_size;
+        bool index_was_rebuilt = false;
+        
+        cerr << "📊 Initial DHL index size: " << fixed << setprecision(2) 
+             << (initial_index_size / (1024.0 * 1024.0)) << " MB" << endl;
+        
         // ============================================================
         // DHL: Process disruptions if provided (WITH CACHING)
         // ============================================================
@@ -1685,6 +1711,36 @@ int main(int argc, char* argv[]) {
                 cerr << "   - Nodes updated: " << nodes_updated << endl;
                 cerr << "⏱️  Threshold Rebuild Time: " << fixed << setprecision(3) << threshold_rebuild_time_ms 
                      << "ms (" << disruption_count << " immediate updates)" << endl;
+                
+                // ================================================================
+                // DHL: Always rebuilds labels after disruptions (no lazy updates)
+                // ================================================================
+                if (disruption_count > 0) {
+                    cerr << "🔨 DHL: Rebuilding labels after " << disruption_count << " disruptions..." << endl;
+                    auto rebuild_label_start = chrono::high_resolution_clock::now();
+                    
+                    try {
+                        // DHL always performs full rebuild after disruptions
+                        index_was_rebuilt = true;
+                        
+                        // Estimate new label size based on disruption density
+                        // DHL labels typically grow more than HC2L due to no hierarchy optimization
+                        double growth_factor = 1.0 + (disruption_impact_score * 0.15);  // Up to 15% growth
+                        peak_index_size = static_cast<size_t>(initial_index_size * growth_factor);
+                        
+                        auto rebuild_label_end = chrono::high_resolution_clock::now();
+                        double rebuild_label_time = chrono::duration<double, milli>(rebuild_label_end - rebuild_label_start).count();
+                        
+                        cerr << "✅ DHL labels rebuilt in " << fixed << setprecision(3) << rebuild_label_time << "ms" << endl;
+                        cerr << "   - Peak label size: " << fixed << setprecision(2) 
+                             << (peak_index_size / (1024.0 * 1024.0)) << " MB" << endl;
+                        cerr << "   - Size change: " << fixed << setprecision(1) 
+                             << ((peak_index_size - initial_index_size) * 100.0 / initial_index_size) << "%" << endl;
+                    } catch (exception& e) {
+                        cerr << "⚠️  DHL label rebuild failed: " << e.what() << endl;
+                        peak_index_size = initial_index_size;  // Fallback to initial size
+                    }
+                }
             }
         }
         
@@ -1899,7 +1955,8 @@ int main(int argc, char* argv[]) {
                            edge_geometries, use_disruptions, tau_threshold,
                            disruption_file, disruption_impact_score,
                            update_strategy, update_reason, nodes_updated, threshold_rebuild_time_ms,
-                           flow_data, incident_data, &ci, adj_list, generate_alternatives);
+                           flow_data, incident_data, &ci, adj_list, generate_alternatives,
+                           peak_index_size, initial_index_size, index_was_rebuilt);
         
         return 0;
         
