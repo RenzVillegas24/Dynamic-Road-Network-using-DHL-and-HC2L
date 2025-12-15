@@ -1603,7 +1603,7 @@ const ExperimentRunner = {
                     </span>
                 </td>
                 <td class="p-2 text-right font-mono">${this.formatNumber(row.initial_construction_time_ms, 3)} ms</td>
-                <td class="p-2 text-right font-mono">${this.formatNumber(row.initial_label_size_mb, 2)} MB</td>
+                <td class="p-2 text-right font-mono">${this.formatNumber(row.initial_label_size_mb, 5)} MB</td>
             </tr>
         `).join('');
     },
@@ -1670,7 +1670,7 @@ const ExperimentRunner = {
                                     <td class="p-2 text-right font-mono">${batch.disruption_level !== '-' ? this.formatNumber(batch.disruption_level * 100, 1) + '%' : '-'}</td>
                                     <td class="p-2 text-right font-mono">${this.formatNumber(batch.lazy_update_time_ms, 3)}</td>
                                     <td class="p-2 text-right font-mono">${this.formatNumber(batch.threshold_rebuild_time_ms, 3)}</td>
-                                    <td class="p-2 text-right font-mono">${this.formatNumber(batch.peak_label_size_mb, 2)}</td>
+                                    <td class="p-2 text-right font-mono">${this.formatNumber(batch.peak_label_size_mb, 5)}</td>
                                     <td class="p-2 text-right font-mono ${batch.label_size_change_pct > 0 ? 'text-red-600' : 'text-green-600'}">
                                         ${batch.label_size_change_pct >= 0 ? '+' : ''}${this.formatNumber(batch.label_size_change_pct, 1)}%
                                     </td>
@@ -1725,7 +1725,7 @@ const ExperimentRunner = {
                                             </td>
                                             <td class="p-2 text-right font-mono text-purple-700">${this.formatNumber(avg.lazy_update_time_ms, 3)}</td>
                                             <td class="p-2 text-right font-mono text-purple-700">${this.formatNumber(avg.threshold_rebuild_time_ms, 3)}</td>
-                                            <td class="p-2 text-right font-mono text-purple-700">${this.formatNumber(avg.peak_label_size_mb, 2)}</td>
+                                            <td class="p-2 text-right font-mono text-purple-700">${this.formatNumber(avg.peak_label_size_mb, 5)}</td>
                                             <td class="p-2 text-right font-mono text-purple-700">
                                                 ${avg.label_size_change_pct >= 0 ? '+' : ''}${this.formatNumber(avg.label_size_change_pct, 1)}%
                                             </td>
@@ -1962,7 +1962,79 @@ const ExperimentRunner = {
             if (runningProgressBar) runningProgressBar.style.width = `${pct}%`;
             if (runningProgressText) runningProgressText.textContent = `${progress.completed} / ${progress.total}`;
             if (runningProgressPct) runningProgressPct.textContent = `${pct.toFixed(1)}%`;
-            if (runningProgressEta) runningProgressEta.textContent = progress.eta ? `ETA: ${progress.eta}` : 'ETA: --';
+            if (runningProgressEta) runningProgressEta.textContent = progress.eta ? `ETA: ${progress.eta}` : 'ETA: Calculating...';
+            
+            // Update error count
+            const errorCountEl = document.getElementById('running-here-error-count');
+            if (errorCountEl) errorCountEl.textContent = progress.errors || 0;
+            
+            // Update last route info and compute live metrics from the full results data
+            if (progress.current_route !== undefined) {
+                const lastRouteEl = document.getElementById('running-here-last-route-idx');
+                if (lastRouteEl) lastRouteEl.textContent = progress.current_route;
+            }
+            
+            // Compute and display live metrics from resultsData if available
+            this.updateHereComparisonRunningMetrics();
+        }
+    },
+    
+    updateHereComparisonRunningMetrics() {
+        /**
+         * Compute and display live metrics from progress data
+         * Backend calculates running averages and sends them in progress updates
+         */
+        if (!this.hereComparisonProgress) return;
+        
+        const progress = this.hereComparisonProgress;
+        
+        // Update HC2L metrics from progress
+        if (progress.hc2l_avg_query_ms !== undefined) {
+            const hc2lQueryEl = document.getElementById('running-here-hc2l-avg-query');
+            if (hc2lQueryEl) hc2lQueryEl.textContent = progress.hc2l_avg_query_ms.toFixed(1) + ' ms';
+        }
+        
+        if (progress.hc2l_avg_distance_km !== undefined) {
+            const hc2lDistanceEl = document.getElementById('running-here-hc2l-avg-distance');
+            if (hc2lDistanceEl) hc2lDistanceEl.textContent = progress.hc2l_avg_distance_km.toFixed(2) + ' km';
+        }
+        
+        if (progress.hc2l_avg_time_min !== undefined) {
+            const hc2lTimeEl = document.getElementById('running-here-hc2l-avg-time');
+            if (hc2lTimeEl) hc2lTimeEl.textContent = progress.hc2l_avg_time_min.toFixed(2) + ' min';
+        }
+        
+        // Update HERE metrics from progress
+        if (progress.here_avg_query_ms !== undefined) {
+            const hereQueryEl = document.getElementById('running-here-here-avg-query');
+            if (hereQueryEl) hereQueryEl.textContent = progress.here_avg_query_ms.toFixed(1) + ' ms';
+        }
+        
+        if (progress.here_avg_distance_km !== undefined) {
+            const hereDistanceEl = document.getElementById('running-here-here-avg-distance');
+            if (hereDistanceEl) hereDistanceEl.textContent = progress.here_avg_distance_km.toFixed(2) + ' km';
+        }
+        
+        if (progress.here_avg_time_min !== undefined) {
+            const hereTimeEl = document.getElementById('running-here-here-avg-time');
+            if (hereTimeEl) hereTimeEl.textContent = progress.here_avg_time_min.toFixed(2) + ' min';
+        }
+        
+        // Update quality metrics from progress
+        if (progress.avg_frechet_m !== undefined) {
+            const avgFrechetEl = document.getElementById('running-here-avg-frechet');
+            if (avgFrechetEl) avgFrechetEl.textContent = progress.avg_frechet_m.toFixed(0);
+        }
+        
+        if (progress.avg_time_deviation_pct !== undefined) {
+            const avgTimeDevEl = document.getElementById('running-here-avg-time-dev');
+            if (avgTimeDevEl) avgTimeDevEl.textContent = progress.avg_time_deviation_pct.toFixed(2) + '%';
+        }
+        
+        // Update last route frechet distance
+        if (progress.last_frechet_m !== undefined) {
+            const lastFrechetEl = document.getElementById('running-here-last-frechet');
+            if (lastFrechetEl) lastFrechetEl.textContent = progress.last_frechet_m.toFixed(0) + ' m';
         }
     },
     

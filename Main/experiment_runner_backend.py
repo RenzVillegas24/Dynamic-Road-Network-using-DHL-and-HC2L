@@ -417,7 +417,7 @@ class ExperimentMetricsCollector:
                 self.here_comparison_progress['start_time'] = time.time()
     
     def get_here_comparison_progress(self) -> Dict:
-        """Get current HERE comparison progress with computed ETA"""
+        """Get current HERE comparison progress with computed ETA and running metrics"""
         with self.lock:
             progress = self.here_comparison_progress.copy()
             
@@ -445,6 +445,29 @@ class ExperimentMetricsCollector:
                         progress['eta'] = f"{int(eta_seconds)}s"
                 else:
                     progress['eta'] = 'Calculating...'
+            
+            # Add running statistics from comparison data
+            if self.here_comparison_data:
+                valid_data = [d for d in self.here_comparison_data if not d.get('error')]
+                
+                if valid_data:
+                    # Calculate averages for HC2L
+                    progress['hc2l_avg_query_ms'] = sum(d.get('query_time_ms_hc2l', 0) for d in valid_data) / len(valid_data)
+                    progress['hc2l_avg_distance_km'] = sum(d.get('distance_km_hc2l', 0) for d in valid_data) / len(valid_data)
+                    progress['hc2l_avg_time_min'] = sum(d.get('travel_time_min_hc2l', 0) for d in valid_data) / len(valid_data)
+                    
+                    # Calculate averages for HERE
+                    progress['here_avg_query_ms'] = sum(d.get('query_time_ms_here', 0) for d in valid_data) / len(valid_data)
+                    progress['here_avg_distance_km'] = sum(d.get('distance_km_here', 0) for d in valid_data) / len(valid_data)
+                    progress['here_avg_time_min'] = sum(d.get('travel_time_min_here', 0) for d in valid_data) / len(valid_data)
+                    
+                    # Quality metrics
+                    progress['avg_frechet_m'] = sum(d.get('frechet_distance_m', 0) for d in valid_data) / len(valid_data)
+                    progress['avg_time_deviation_pct'] = sum(d.get('time_deviation_pct', 0) for d in valid_data) / len(valid_data)
+                    
+                    # Last route data
+                    last_route = valid_data[-1]
+                    progress['last_frechet_m'] = last_route.get('frechet_distance_m', 0)
             
             return progress
     
@@ -518,7 +541,7 @@ class ExperimentMetricsCollector:
                     "trial": trial + 1,
                     "algorithm": "DHC2L",
                     "initial_construction_time_ms": round(self.construction_time_hc2l[trial], 2),
-                    "initial_label_size_mb": round(self.initial_label_size_hc2l[trial], 2)
+                    "initial_label_size_mb": round(self.initial_label_size_hc2l[trial], 5)
                 })
             
             # DHL row
@@ -527,7 +550,7 @@ class ExperimentMetricsCollector:
                     "trial": trial + 1,
                     "algorithm": "DHL",
                     "initial_construction_time_ms": round(self.construction_time_dhl[trial], 2),
-                    "initial_label_size_mb": round(self.initial_label_size_dhl[trial], 2)
+                    "initial_label_size_mb": round(self.initial_label_size_dhl[trial], 5)
                 })
         
         return rows
@@ -571,7 +594,7 @@ class ExperimentMetricsCollector:
                         "disruption_level": round(len(dhl_query_times) / self.routes_per_batch, 2) if self.routes_per_batch > 0 else 0,
                         "lazy_update_time_ms": round(dhl_avg_lazy, 3),
                         "threshold_rebuild_time_ms": round(dhl_rebuild_time, 3),
-                        "peak_label_size_mb": round(dhl_peak_label, 2),
+                        "peak_label_size_mb": round(dhl_peak_label, 5),
                         "label_size_change_pct": round(label_change_pct, 1),
                         "query_avg_ms": round(dhl_avg_query, 3),
                         "query_min_ms": round(dhl_min_query, 3),
@@ -605,7 +628,7 @@ class ExperimentMetricsCollector:
                         "disruption_level": round(len(hc2l_query_times) / self.routes_per_batch, 2) if self.routes_per_batch > 0 else 0,
                         "lazy_update_time_ms": round(hc2l_avg_lazy, 3),
                         "threshold_rebuild_time_ms": round(hc2l_rebuild_time, 3),
-                        "peak_label_size_mb": round(hc2l_peak_label, 2),
+                        "peak_label_size_mb": round(hc2l_peak_label, 5),
                         "label_size_change_pct": round(label_change_pct, 1),
                         "query_avg_ms": round(hc2l_avg_query, 3),
                         "query_min_ms": round(hc2l_min_query, 3),
@@ -624,7 +647,7 @@ class ExperimentMetricsCollector:
             return {
                 "lazy_update_time_ms": round(float(np.mean([d["lazy_update_time_ms"] for d in data_list])), 3),
                 "threshold_rebuild_time_ms": round(float(np.mean([d["threshold_rebuild_time_ms"] for d in data_list])), 3),
-                "peak_label_size_mb": round(float(np.mean([d["peak_label_size_mb"] for d in data_list])), 2),
+                "peak_label_size_mb": round(float(np.mean([d["peak_label_size_mb"] for d in data_list])), 5),
                 "label_size_change_pct": round(float(np.mean([d["label_size_change_pct"] for d in data_list])), 1),
                 "query_avg_ms": round(float(np.mean([d["query_avg_ms"] for d in data_list])), 3),
                 "query_min_ms": round(float(np.mean([d["query_min_ms"] for d in data_list])), 3),
@@ -2791,14 +2814,36 @@ class ExperimentRunner:
                         
                         # Record metrics to numpy collector (instead of saving file)
                         if experiment_id in self.metrics_collectors:
-                            self.metrics_collectors[experiment_id].record_metric(
+                            metrics_collector = self.metrics_collectors[experiment_id]
+                            
+                            # Record construction time on first route of each trial/algorithm
+                            construction_info = result.get("construction_info", {})
+                            if construction_info.get("construction_time_ms", 0) > 0:
+                                if algorithm.upper() == "DHL":
+                                    if not metrics_collector.construction_recorded_dhl[trial_idx]:
+                                        metrics_collector.record_construction(
+                                            trial_idx,
+                                            algorithm,
+                                            construction_info.get("construction_time_ms", 0),
+                                            construction_info.get("label_size_mb", 0)
+                                        )
+                                elif algorithm.upper() == "HC2L":
+                                    if not metrics_collector.construction_recorded_hc2l[trial_idx]:
+                                        metrics_collector.record_construction(
+                                            trial_idx,
+                                            algorithm,
+                                            construction_info.get("construction_time_ms", 0),
+                                            construction_info.get("label_size_mb", 0)
+                                        )
+                            
+                            metrics_collector.record_metric(
                                 trial_idx, b_idx, route_idx, algorithm, result
                             )
                             
                             # Record route path coordinates for Frechet distance calculation
                             path_coords = result.get("path_coordinates", [])
                             if path_coords:
-                                self.metrics_collectors[experiment_id].record_route_path(
+                                metrics_collector.record_route_path(
                                     trial_idx, b_idx, route_idx, algorithm, path_coords
                                 )
                         
@@ -3222,13 +3267,18 @@ class ExperimentRunner:
         }
         
         # Construction info - extracted from labeling_info for first route of each trial
-        construction_time = labeling_info.get("construction_time_ms", 0)
+        # Use index_load_time_ms (time to load index = construction time for that trial)
+        construction_time = labeling_info.get("index_load_time_ms", 0)
         if not construction_time:
-            construction_time = labeling_info.get("labeling_time_ms", 0)
+            # Fallback to other fields if index_load_time_ms not available
+            construction_time = labeling_info.get("construction_time_ms", 0)
+            if not construction_time:
+                construction_time = labeling_info.get("labeling_time_ms", 0)
         
         result["construction_info"] = {
             "construction_time_ms": construction_time,
-            "label_size_mb": label_size_mb
+            "label_size_mb": label_size_mb,
+            "index_load_time_ms": labeling_info.get("index_load_time_ms", 0)
         }
         
         # Extract route path coordinates for Frechet distance calculation

@@ -741,10 +741,10 @@ void output_json_response(bool success, const string& error_message = "",
             cout << "      \"total_labels\": " << label_count << "," << endl;
             cout << "      \"infinite_labels\": " << inf_label_count << "," << endl;
             cout << "      \"initial_index_size_bytes\": " << original_size << "," << endl;
-            cout << "      \"initial_index_size_mb\": " << fixed << setprecision(2) << (original_size / (1024.0 * 1024.0)) << "," << endl;
+            cout << "      \"initial_index_size_mb\": " << fixed << setprecision(5) << (original_size / (1024.0 * 1024.0)) << "," << endl;
             cout << "      \"index_size_bytes\": " << index_size << "," << endl;
-            cout << "      \"index_size_mb\": " << fixed << setprecision(2) << (index_size / (1024.0 * 1024.0)) << "," << endl;
-            cout << "      \"peak_label_size_mb\": " << fixed << setprecision(2) << (index_size / (1024.0 * 1024.0)) << "," << endl;
+            cout << "      \"index_size_mb\": " << fixed << setprecision(5) << (index_size / (1024.0 * 1024.0)) << "," << endl;
+            cout << "      \"peak_label_size_mb\": " << fixed << setprecision(5) << (index_size / (1024.0 * 1024.0)) << "," << endl;
             cout << "      \"label_size_change_pct\": " << fixed << setprecision(2) << size_change_pct << "," << endl;
             cout << "      \"index_was_rebuilt\": " << (index_was_rebuilt ? "true" : "false") << "," << endl;
             cout << "      \"hierarchy_height\": " << height << "," << endl;
