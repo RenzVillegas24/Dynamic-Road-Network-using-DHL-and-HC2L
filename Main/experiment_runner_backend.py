@@ -1830,7 +1830,7 @@ class ExperimentRunner:
             
             # Create results directory
             results_path = base_path / "results" / experiment_id
-            results_path.mkdir(parents=True, exist_ok=True)
+            # results_path.mkdir(parents=True, exist_ok=True)
             
             # Store results_path in progress for later access
             progress.results_path = results_path
