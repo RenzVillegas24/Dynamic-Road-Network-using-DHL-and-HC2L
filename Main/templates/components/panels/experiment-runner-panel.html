@@ -19,14 +19,22 @@
 
   <!-- Tab Navigation -->
   <div class="panel__nav" id="experiment-panel-nav">
-    <div class="tabs tabs--pills p-4 bg-gray-100 border-b border-gray-200">
-      <div class="tabs__list bg-gray-100">
-        <button data-experiment-tab="settings" class="tabs__tab bg-purple-600 text-white" aria-selected="true">
-          <i data-lucide="settings" class="w-4 h-4"></i> Settings
-        </button>
-        <button data-experiment-tab="results-list" class="tabs__tab bg-gray-200 text-gray-700">
-          <i data-lucide="list" class="w-4 h-4"></i> Results List
-        </button>
+    <div class="px-5 pt-4 pb-2 bg-gray-100 border-b border-gray-200">
+      <div class="nav-select nav-select--grid nav-select--grid-2">
+        <label class="nav-select__option" data-color="purple">
+          <input type="radio" name="experiment-main-tab" value="settings" checked onchange="ExperimentRunner.showTab('settings')">
+          <div class="nav-select__icon"><i data-lucide="settings" class="w-4 h-4"></i></div>
+          <div class="nav-select__content">
+            <span class="nav-select__title">Settings</span>
+          </div>
+        </label>
+        <label class="nav-select__option" data-color="blue">
+          <input type="radio" name="experiment-main-tab" value="results-list" onchange="ExperimentRunner.showTab('results-list')">
+          <div class="nav-select__icon"><i data-lucide="list" class="w-4 h-4"></i></div>
+          <div class="nav-select__content">
+            <span class="nav-select__title">Results List</span>
+          </div>
+        </label>
       </div>
     </div>
   </div>
@@ -580,50 +588,45 @@
       </div>
 
       <!-- Results Tab Navigation -->
-      <div class="relative">
-        <div class="flex gap-2 overflow-x-auto pb-4 border-b-2 border-gray-200">
-          <style>
-            .tabs__tab-scroll {
-              display: flex;
-              gap: 0.5rem;
-              overflow-x: auto;
-              padding-bottom: 1rem;
-              scrollbar-width: none;
-            }
-
-            .tabs__tab-scroll::-webkit-scrollbar {
-              display: none;
-            }
-          </style>
-          <button data-result-tab="construction"
-            class="tabs__tab whitespace-nowrap px-4 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-purple-600 to-indigo-600 rounded-lg shadow-md hover:shadow-lg transition-all duration-200 flex items-center gap-2 border border-purple-500 border-opacity-30"
-            aria-selected="true">
-            <i data-lucide="hammer" class="w-4 h-4"></i> Construction
-          </button>
-          <button data-result-tab="updates"
-            class="tabs__tab whitespace-nowrap px-4 py-2.5 text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 flex items-center gap-2 border border-gray-300 border-opacity-40">
-            <i data-lucide="refresh-cw" class="w-4 h-4"></i> Updates
-          </button>
-          <button data-result-tab="performance"
-            class="tabs__tab whitespace-nowrap px-4 py-2.5 text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 flex items-center gap-2 border border-gray-300 border-opacity-40">
-            <i data-lucide="gauge" class="w-4 h-4"></i> Performance
-          </button>
-          <button data-result-tab="similarity"
-            class="tabs__tab whitespace-nowrap px-4 py-2.5 text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 flex items-center gap-2 border border-gray-300 border-opacity-40">
-            <i data-lucide="git-compare" class="w-4 h-4"></i> Similarity
-          </button>
-          <button data-result-tab="graphs"
-            class="tabs__tab whitespace-nowrap px-4 py-2.5 text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 flex items-center gap-2 border border-gray-300 border-opacity-40">
-            <i data-lucide="bar-chart-4" class="w-4 h-4"></i> Graphs
-          </button>
+      <div class="mb-4">
+        <div class="nav-select nav-select--grid nav-select--grid-5">
+          <label class="nav-select__option" data-color="purple">
+            <input type="radio" name="result-main-tab" value="construction" checked onchange="ExperimentRunner.showResultTab('construction')">
+            <div class="nav-select__icon"><i data-lucide="hammer" class="w-4 h-4"></i></div>
+            <div class="nav-select__content">
+              <span class="nav-select__title">Construction</span>
+            </div>
+          </label>
+          <label class="nav-select__option" data-color="indigo">
+            <input type="radio" name="result-main-tab" value="updates" onchange="ExperimentRunner.showResultTab('updates')">
+            <div class="nav-select__icon"><i data-lucide="refresh-cw" class="w-4 h-4"></i></div>
+            <div class="nav-select__content">
+              <span class="nav-select__title">Updates</span>
+            </div>
+          </label>
+          <label class="nav-select__option" data-color="teal">
+            <input type="radio" name="result-main-tab" value="performance" onchange="ExperimentRunner.showResultTab('performance')">
+            <div class="nav-select__icon"><i data-lucide="gauge" class="w-4 h-4"></i></div>
+            <div class="nav-select__content">
+              <span class="nav-select__title">Performance</span>
+            </div>
+          </label>
+          <label class="nav-select__option" data-color="amber">
+            <input type="radio" name="result-main-tab" value="similarity" onchange="ExperimentRunner.showResultTab('similarity')">
+            <div class="nav-select__icon"><i data-lucide="git-compare" class="w-4 h-4"></i></div>
+            <div class="nav-select__content">
+              <span class="nav-select__title">Similarity</span>
+            </div>
+          </label>
+          <label class="nav-select__option" data-color="red">
+            <input type="radio" name="result-main-tab" value="graphs" onchange="ExperimentRunner.showResultTab('graphs')">
+            <div class="nav-select__icon"><i data-lucide="bar-chart-4" class="w-4 h-4"></i></div>
+            <div class="nav-select__content">
+              <span class="nav-select__title">Graphs</span>
+            </div>
+          </label>
         </div>
-        <style>
-          [data-result-tab]:has([aria-selected="true"]) button {
-            background: linear-gradient(135deg, #9333ea 0%, #4f46e5 100%);
-            color: white;
-            border-color: rgba(168, 85, 247, 0.5);
-          }
-        </style>
+      </div>
 
         <!-- Construction Phase Tab -->
         <div id="result-tab-construction" data-result-tab-content class="space-y-4">
@@ -634,7 +637,7 @@
                 <i data-lucide="hammer" class="w-5 h-5 text-purple-600"></i>
               </div>
               <div>
-                <h4 class="font-bold text-gray-800 text-sm">Initial Construction Performance</h4>
+                <h4 class="font-bold text-gray-800 text-sm mb-1">Initial Construction Performance</h4>
                 <p class="text-xs text-gray-500 mt-0.5">Appendix 1.1</p>
               </div>
             </div>
@@ -667,11 +670,11 @@
           <div
             class="flex items-center justify-between bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl px-5 py-4 border border-gray-200">
             <div class="flex items-center gap-3">
-              <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                <i data-lucide="refresh-cw" class="w-5 h-5 text-blue-600"></i>
+              <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+                <i data-lucide="refresh-cw" class="w-5 h-5 text-indigo-600"></i>
               </div>
               <div>
-                <h4 class="font-bold text-gray-800 text-sm">Dynamic Performance Log</h4>
+                <h4 class="font-bold text-gray-800 text-sm mb-1">Dynamic Performance Log</h4>
                 <p class="text-xs text-gray-500 mt-0.5">Appendix 1.2</p>
               </div>
             </div>
@@ -690,11 +693,11 @@
           <div
             class="flex items-center justify-between bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl px-5 py-4 border border-gray-200">
             <div class="flex items-center gap-3">
-              <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                <i data-lucide="gauge" class="w-5 h-5 text-green-600"></i>
+              <div class="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
+                <i data-lucide="gauge" class="w-5 h-5 text-emerald-600"></i>
               </div>
               <div>
-                <h4 class="font-bold text-gray-800 text-sm">Combined DHL vs DHC2L Performance Summary</h4>
+                <h4 class="font-bold text-gray-800 text-sm mb-1">Combined DHL vs DHC2L Performance Summary</h4>
                 <p class="text-xs text-gray-500 mt-0.5">Appendix 1.3</p>
               </div>
             </div>
@@ -727,11 +730,11 @@
           <div
             class="flex items-center justify-between bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl px-5 py-4 border border-gray-200">
             <div class="flex items-center gap-3">
-              <div class="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
-                <i data-lucide="git-compare" class="w-5 h-5 text-amber-600"></i>
+              <div class="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
+                <i data-lucide="git-compare" class="w-5 h-5 text-yellow-600"></i>
               </div>
               <div>
-                <h4 class="font-bold text-gray-800 text-sm">HERE vs HC2L Route Comparison</h4>
+                <h4 class="font-bold text-gray-800 text-sm mb-1">HERE vs HC2L Route Comparison</h4>
                 <p class="text-xs text-gray-500 mt-0.5">Appendix 1.4 - Real-time API validation</p>
               </div>
             </div>
@@ -890,11 +893,16 @@
 
         <!-- Graphs Tab -->
         <div id="result-tab-graphs" data-result-tab-content class="hidden space-y-5">
-          <div class="flex items-center gap-3 mb-4">
-            <div class="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
-              <i data-lucide="bar-chart-4" class="w-5 h-5 text-purple-600"></i>
+          <div
+            class="flex items-center justify-between bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl px-5 py-4 border border-gray-200">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                <i data-lucide="gauge" class="w-5 h-5 text-red-600"></i>
+              </div>
+              <div>
+                <h4 class="font-bold text-gray-800 text-sm">Performance Visualizations</h4>
+              </div>
             </div>
-            <h4 class="font-bold text-gray-800 text-lg">Performance Visualizations</h4>
           </div>
 
           <!-- Time Series Graphs -->

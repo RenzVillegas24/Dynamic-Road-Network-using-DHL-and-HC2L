@@ -110,13 +110,7 @@ const ExperimentRunner = {
             closeBtn.addEventListener('click', () => this.closePanel());
         }
         
-        // Tab navigation
-        document.querySelectorAll('[data-experiment-tab]').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const tabId = e.currentTarget.dataset.experimentTab;
-                this.showTab(tabId);
-            });
-        });
+        // Tab navigation - now handled by radio input onchange handlers in HTML
         
         // Thread count toggle
         const threadCountToggle = document.getElementById('experiment-thread-count');
@@ -181,18 +175,11 @@ const ExperimentRunner = {
             selectedTab.classList.remove('hidden');
         }
         
-        // Update tab button states (only for visible nav tabs)
-        document.querySelectorAll('[data-experiment-tab]').forEach(btn => {
-            if (btn.dataset.experimentTab === tabId) {
-                btn.classList.add('bg-purple-600', 'text-white');
-                btn.classList.remove('bg-gray-200', 'text-gray-700');
-                btn.setAttribute('aria-selected', 'true');
-            } else {
-                btn.classList.remove('bg-purple-600', 'text-white');
-                btn.classList.add('bg-gray-200', 'text-gray-700');
-                btn.setAttribute('aria-selected', 'false');
-            }
-        });
+        // Update radio button state
+        const radioBtn = document.querySelector(`input[name="experiment-main-tab"][value="${tabId}"]`);
+        if (radioBtn) {
+            radioBtn.checked = true;
+        }
         
         // Special handling for results-list tab
         if (tabId === 'results-list') {
@@ -1466,12 +1453,7 @@ const ExperimentRunner = {
     },
     
     initResultTabNavigation() {
-        document.querySelectorAll('[data-result-tab]').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const tabId = e.currentTarget.dataset.resultTab;
-                this.showResultTab(tabId);
-            });
-        });
+        // Result tabs now handled by radio input onchange handlers in HTML
     },
     
     showResultTab(tabId) {
@@ -1486,16 +1468,11 @@ const ExperimentRunner = {
             selectedTab.classList.remove('hidden');
         }
         
-        // Update tab button states
-        document.querySelectorAll('[data-result-tab]').forEach(btn => {
-            if (btn.dataset.resultTab === tabId) {
-                btn.classList.add('bg-purple-600', 'text-white');
-                btn.classList.remove('bg-gray-200', 'text-gray-700');
-            } else {
-                btn.classList.remove('bg-purple-600', 'text-white');
-                btn.classList.add('bg-gray-200', 'text-gray-700');
-            }
-        });
+        // Update radio button state
+        const radioBtn = document.querySelector(`input[name="result-main-tab"][value="${tabId}"]`);
+        if (radioBtn) {
+            radioBtn.checked = true;
+        }
         
         // Refresh icons
         if (typeof lucide !== 'undefined') {

@@ -760,6 +760,8 @@
    NAV-SELECT COMPACT VARIANT
    ===================== */
 
+
+
 .nav-select--compact .nav-select__option {
   padding: var(--spacing-2) var(--spacing-3);
 }
@@ -787,8 +789,16 @@
   gap: var(--spacing-2);
 }
 
+.nav-select--grid-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
 .nav-select--grid-3 {
   grid-template-columns: repeat(3, 1fr);
+}
+
+.nav-select--grid-5 {
+  grid-template-columns: repeat(5, 1fr);
 }
 
 .nav-select--grid-row-4 {
@@ -800,6 +810,7 @@
   flex-direction: column;
   align-items: center;
   text-align: center;
+  gap: 0;
   padding: var(--spacing-3);
 }
 
