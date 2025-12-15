@@ -67,6 +67,9 @@ from road_network_utils import (
 # Import road name mapper for getting edge road names
 from road_name_mapper import RoadNameMapper
 
+# Import HERE routing service for route similarity
+from here_routing_service import HereRoutingService
+
 # Get logger instance
 logger = get_logger("ExperimentRunner")
 
@@ -117,6 +120,14 @@ class ExperimentProgress:
         "show_flow": True,
         "current_disruptions": [],
         "total_count": 0
+    })
+    # HERE comparison thread progress
+    here_comparison: Dict = field(default_factory=lambda: {
+        "status": "not_started",
+        "completed": 0,
+        "total": 0,
+        "current_route": 0,
+        "errors": 0
     })
     error_message: str = ""
     results_path: Optional[Path] = None  # Path for saving progress (not serialized)
@@ -216,6 +227,22 @@ class ExperimentMetricsCollector:
         self._batch_label_sizes_hc2l = [[[] for _ in range(batches)] for _ in range(trials)]
         self._batch_lazy_times_dhl = [[[] for _ in range(batches)] for _ in range(trials)]
         self._batch_lazy_times_hc2l = [[[] for _ in range(batches)] for _ in range(trials)]
+        
+        # ====================================================================
+        # HERE vs HC2L COMPARISON DATA (for Route Similarity Analysis)
+        # ====================================================================
+        # This stores the comparison between HERE API routes and HC2L baseline (no disruptions)
+        # Shape: (routes_per_batch,) - only one batch of routes is compared
+        self.here_comparison_data = []  # List of dicts with all comparison metrics
+        self.here_comparison_progress = {
+            'completed': 0,
+            'total': routes_per_batch,
+            'status': 'not_started',
+            'current_route': 0,
+            'errors': 0,
+            'start_time': None,
+            'eta': ''
+        }
         
         logger.info(f"ExperimentMetricsCollector initialized: {trials} trials × {batches} batches × {routes_per_batch} routes")
     
@@ -346,36 +373,93 @@ class ExperimentMetricsCollector:
                     self.initial_label_size_hc2l[trial] = label_size_mb
                     self.construction_recorded_hc2l[trial] = True
     
+    def record_here_comparison(self, route_idx: int, comparison_data: Dict):
+        """
+        Record HERE vs HC2L comparison data for a single route.
+        
+        Args:
+            route_idx: Route index (0-based)
+            comparison_data: Dict containing:
+                - route_idx: Route number
+                - source_node: HC2L source node ID
+                - target_node: HC2L target node ID
+                - start_road_hc2l: Road name at origin (from HC2L/road mapper)
+                - end_road_hc2l: Road name at destination (from HC2L/road mapper)
+                - start_road_here: Road name at origin (from HERE API)
+                - end_road_here: Road name at destination (from HERE API)
+                - distance_km_hc2l: HC2L distance in km
+                - distance_km_here: HERE distance in km
+                - travel_time_min_hc2l: HC2L travel time in minutes
+                - travel_time_min_here: HERE travel time in minutes
+                - query_time_ms_hc2l: HC2L query time in ms
+                - query_time_ms_here: HERE API response time in ms
+                - frechet_distance_m: Fréchet distance in meters
+                - fd_rating: Quality rating (Excellent/Good/Fair)
+                - time_deviation_pct: % deviation between HERE and HC2L times
+                - ttd_rating: Time deviation rating
+                - distance_deviation_pct: % deviation in distances
+                - error: Error message if any
+        """
+        with self.lock:
+            self.here_comparison_data.append(comparison_data)
+            self.here_comparison_progress['completed'] = len(self.here_comparison_data)
+            self.here_comparison_progress['current_route'] = route_idx
+            if comparison_data.get('error'):
+                self.here_comparison_progress['errors'] += 1
+    
+    def update_here_comparison_status(self, status: str, total: int = None):
+        """Update the HERE comparison thread status"""
+        with self.lock:
+            self.here_comparison_progress['status'] = status
+            if total is not None:
+                self.here_comparison_progress['total'] = total
+            if status == 'running' and not self.here_comparison_progress.get('start_time'):
+                self.here_comparison_progress['start_time'] = time.time()
+    
+    def get_here_comparison_progress(self) -> Dict:
+        """Get current HERE comparison progress with computed ETA"""
+        with self.lock:
+            progress = self.here_comparison_progress.copy()
+            
+            # Compute ETA based on current progress
+            if progress['status'] == 'running' and progress.get('start_time'):
+                completed = progress['completed']
+                total = progress['total']
+                elapsed = time.time() - progress['start_time']
+                
+                if completed > 0 and total > completed:
+                    rate = completed / elapsed  # routes per second
+                    remaining = total - completed
+                    eta_seconds = remaining / rate
+                    
+                    # Format ETA
+                    if eta_seconds >= 3600:
+                        hours = int(eta_seconds // 3600)
+                        mins = int((eta_seconds % 3600) // 60)
+                        progress['eta'] = f"{hours}h {mins}m"
+                    elif eta_seconds >= 60:
+                        mins = int(eta_seconds // 60)
+                        secs = int(eta_seconds % 60)
+                        progress['eta'] = f"{mins}m {secs}s"
+                    else:
+                        progress['eta'] = f"{int(eta_seconds)}s"
+                else:
+                    progress['eta'] = 'Calculating...'
+            
+            return progress
+    
     def record_route_path(self, trial: int, batch: int, route: int, 
                           algorithm: str, path_coords: List):
         """
         Record route path temporarily and compute Frechet distance when both algorithms complete.
         This optimizes memory by computing Frechet distance immediately and discarding path data.
+        
+        NOTE: This method is now deprecated for DHL/HC2L worker threads.
+        Fréchet distance is only computed in the HERE comparison thread.
         """
-        with self.lock:
-            key = (trial, batch, route)
-            alg = algorithm.upper()
-            
-            # Store path temporarily
-            if alg == "DHL":
-                self.temp_path_dhl[key] = path_coords
-            else:
-                self.temp_path_hc2l[key] = path_coords
-            
-            # Check if both algorithms have completed for this route
-            if key in self.temp_path_dhl and key in self.temp_path_hc2l:
-                # Compute Frechet distance immediately
-                frechet = self._compute_frechet_distance_optimized(
-                    self.temp_path_dhl[key],
-                    self.temp_path_hc2l[key]
-                )
-                self.frechet_distances[trial, batch, route] = frechet
-                
-                # Clear temporary paths to free memory
-                del self.temp_path_dhl[key]
-                del self.temp_path_hc2l[key]
-                
-                logger.debug(f"Computed Frechet distance for T{trial}B{batch}R{route}: {frechet:.2f}m")
+        # DEPRECATED: Fréchet distance is now computed only in HERE comparison thread
+        # Keeping method for backward compatibility but not storing paths
+        pass
     
     def _parse_eta_to_seconds(self, eta_str: str) -> float:
         """Parse ETA string like '5m 30s' to seconds"""
@@ -700,77 +784,52 @@ class ExperimentMetricsCollector:
         return comparison
     
     def _compute_route_similarity(self) -> List[Dict]:
-        """Compute Route Similarity (Appendix 1.4) metrics - returns list for frontend (OPTIMIZED)"""
-        rows = []
+        """
+        Compute Route Similarity (Appendix 1.4) metrics using HERE vs HC2L comparison data.
         
-        # Pre-compute valid mask (both algorithms completed)
-        valid_mask = self.filled_dhl & self.filled_hc2l
-        
-        # Find all valid indices
-        valid_indices = np.argwhere(valid_mask)
-        
-        # Sample up to 10 routes for display
-        max_samples = 10
-        sample_indices = valid_indices[:max_samples] if len(valid_indices) > max_samples else valid_indices
-        
-        if len(sample_indices) == 0:
+        Returns list of route similarity records with:
+        - Route index, OD pair, road names
+        - Distance and travel time (HC2L / HERE)
+        - Fréchet distance and rating
+        - Time and distance deviation percentages
+        - Query time comparison
+        """
+        with self.lock:
+            # Return the HERE comparison data directly
+            # This data is collected by the HERE comparison thread
+            if not self.here_comparison_data:
+                logger.info("✓ Route similarity computed from HERE comparison: 0 routes")
+                return []
+            
+            # Format data for frontend display
+            rows = []
+            for data in self.here_comparison_data:
+                if data.get('error'):
+                    continue  # Skip routes with errors
+                
+                rows.append({
+                    "route_idx": data.get('route_idx', 0) + 1,  # 1-based for display
+                    "batch": data.get('batch', 0),
+                    "od_pair": f"{data.get('source_node', 'S')} → {data.get('target_node', 'D')}",
+                    "start_road_hc2l": data.get('start_road_hc2l', 'Unknown'),
+                    "end_road_hc2l": data.get('end_road_hc2l', 'Unknown'),
+                    "start_road_here": data.get('start_road_here', 'Unknown'),
+                    "end_road_here": data.get('end_road_here', 'Unknown'),
+                    "distance_km_hc2l": round(data.get('distance_km_hc2l', 0), 2),
+                    "distance_km_here": round(data.get('distance_km_here', 0), 2),
+                    "travel_time_min_hc2l": round(data.get('travel_time_min_hc2l', 0), 1),
+                    "travel_time_min_here": round(data.get('travel_time_min_here', 0), 1),
+                    "query_time_ms_hc2l": round(data.get('query_time_ms_hc2l', 0), 3),
+                    "query_time_ms_here": round(data.get('query_time_ms_here', 0), 3),
+                    "frechet_distance_m": round(data.get('frechet_distance_m', 0), 0),
+                    "fd_rating": data.get('fd_rating', 'N/A'),
+                    "time_deviation_pct": round(data.get('time_deviation_pct', 0), 1),
+                    "ttd_rating": data.get('ttd_rating', 'N/A'),
+                    "distance_deviation_pct": round(data.get('distance_deviation_pct', 0), 1)
+                })
+            
+            logger.info(f"✓ Route similarity computed from HERE comparison: {len(rows)} routes")
             return rows
-        
-        # Vectorized data extraction
-        trials_idx = sample_indices[:, 0]
-        batches_idx = sample_indices[:, 1]
-        routes_idx = sample_indices[:, 2]
-        
-        dhl_dists = self.distance_km_dhl[trials_idx, batches_idx, routes_idx]
-        hc2l_dists = self.distance_km_hc2l[trials_idx, batches_idx, routes_idx]
-        dhl_times = self.travel_time_dhl[trials_idx, batches_idx, routes_idx]
-        hc2l_times = self.travel_time_hc2l[trials_idx, batches_idx, routes_idx]
-        
-        # Vectorized average calculations
-        avg_dists = (dhl_dists + hc2l_dists) / 2
-        avg_times = (dhl_times + hc2l_times) / 2
-        
-        # Vectorized time deviation calculation
-        time_deviations = np.where(
-            avg_times > 0,
-            np.abs(dhl_times - hc2l_times) / avg_times * 100,
-            0
-        )
-        
-        # Get pre-computed Frechet distances (NO COMPUTATION NEEDED - already done during route execution!)
-        frechet_distances = self.frechet_distances[trials_idx, batches_idx, routes_idx]
-        
-        # Vectorized rating assignments using numpy where
-        fd_ratings = np.where(frechet_distances < 200, "Excellent",
-                     np.where(frechet_distances < 400, "Good", "Fair"))
-        
-        ttd_ratings = np.where(time_deviations < 5, "Excellent",
-                      np.where(time_deviations < 10, "Good", "Fair"))
-        
-        # Build rows using vectorized data
-        for i in range(len(sample_indices)):
-            rows.append({
-                "od_pair": "S → D",
-                "distance_km": round(float(avg_dists[i]), 2),
-                "travel_time_min": round(float(avg_times[i] / 60), 2) if avg_times[i] > 0 else 0,
-                "frechet_distance_m": round(float(frechet_distances[i]), 2),
-                "fd_rating": fd_ratings[i],
-                "travel_time_deviation_pct": round(float(time_deviations[i]), 2),
-                "ttd_rating": ttd_ratings[i]
-            })
-        
-        # Calculate averages using numpy (much faster)
-        if rows:
-            avg_row = {
-                "od_pair": "Average",
-                "distance_km": round(float(np.mean(avg_dists)), 2),
-                "travel_time_min": round(float(np.mean(avg_times / 60)), 2),
-                "frechet_distance_m": round(float(np.mean(frechet_distances)), 2),
-                "fd_rating": "-",
-                "travel_time_deviation_pct": round(float(np.mean(time_deviations)), 2),
-                "ttd_rating": "-"
-            }
-            rows.append(avg_row)
         
         return rows
     
@@ -844,35 +903,76 @@ class ExperimentMetricsCollector:
         }
     
     def _compute_similarity_extra(self) -> Dict:
-        """Compute additional similarity metrics (OPTIMIZED - uses pre-computed Frechet distances)"""
-        # Use vectorized operations for distance deviations
-        valid_mask = self.filled_dhl & self.filled_hc2l
-        valid_dhl_dists = self.distance_km_dhl[valid_mask]
-        valid_hc2l_dists = self.distance_km_hc2l[valid_mask]
+        """
+        Compute additional similarity metrics from HERE comparison data.
         
-        # Vectorized distance deviation calculation
-        mask_nonzero = valid_dhl_dists > 0
-        distance_deviations = np.where(
-            mask_nonzero,
-            np.abs(valid_dhl_dists - valid_hc2l_dists) / valid_dhl_dists * 100,
-            0
-        )[mask_nonzero]
-        
-        # Use pre-computed Frechet distances (NO COMPUTATION NEEDED!)
-        valid_frechet = self.frechet_distances[valid_mask]
-        
-        # Vectorized path overlap estimation
-        path_overlaps = np.where(valid_frechet < 200, 95,
-                        np.where(valid_frechet < 400, 70, 40))
-        
-        # Count alternative routes (Frechet > 500m)
-        alternative_route_count = int(np.sum(valid_frechet > 500))
-        
-        return {
-            "path_overlap_pct": round(float(np.mean(path_overlaps)), 1) if len(path_overlaps) > 0 else 0,
-            "distance_deviation_pct": round(float(np.mean(distance_deviations)), 1) if len(distance_deviations) > 0 else 0,
-            "alternative_route_count": alternative_route_count
-        }
+        Returns summary statistics:
+        - Average Fréchet distance
+        - Percentage of routes rated "Excellent"
+        - Average time deviation
+        - Average distance deviation
+        - Average query time comparison
+        """
+        with self.lock:
+            if not self.here_comparison_data:
+                return {
+                    "avg_frechet_distance_m": 0,
+                    "excellent_pct": 0,
+                    "good_pct": 0,
+                    "fair_pct": 0,
+                    "avg_time_deviation_pct": 0,
+                    "avg_distance_deviation_pct": 0,
+                    "avg_query_time_hc2l_ms": 0,
+                    "avg_query_time_here_ms": 0,
+                    "total_routes_compared": 0,
+                    "errors_count": self.here_comparison_progress.get('errors', 0)
+                }
+            
+            # Filter out errors
+            valid_data = [d for d in self.here_comparison_data if not d.get('error')]
+            
+            if not valid_data:
+                return {
+                    "avg_frechet_distance_m": 0,
+                    "excellent_pct": 0,
+                    "good_pct": 0,
+                    "fair_pct": 0,
+                    "avg_time_deviation_pct": 0,
+                    "avg_distance_deviation_pct": 0,
+                    "avg_query_time_hc2l_ms": 0,
+                    "avg_query_time_here_ms": 0,
+                    "total_routes_compared": 0,
+                    "errors_count": self.here_comparison_progress.get('errors', 0)
+                }
+            
+            # Extract metrics
+            frechet_distances = [d.get('frechet_distance_m', 0) for d in valid_data]
+            time_deviations = [d.get('time_deviation_pct', 0) for d in valid_data]
+            distance_deviations = [d.get('distance_deviation_pct', 0) for d in valid_data]
+            query_times_hc2l = [d.get('query_time_ms_hc2l', 0) for d in valid_data]
+            query_times_here = [d.get('query_time_ms_here', 0) for d in valid_data]
+            fd_ratings = [d.get('fd_rating', 'N/A') for d in valid_data]
+            
+            # Count ratings
+            excellent_count = sum(1 for r in fd_ratings if r == 'Excellent')
+            good_count = sum(1 for r in fd_ratings if r == 'Good')
+            fair_count = sum(1 for r in fd_ratings if r == 'Fair')
+            total = len(valid_data)
+            
+            logger.info(f"✓ Similarity extra computed: {len(valid_data)} metrics")
+            
+            return {
+                "avg_frechet_distance_m": round(np.mean(frechet_distances), 1) if frechet_distances else 0,
+                "excellent_pct": round(excellent_count / total * 100, 1) if total > 0 else 0,
+                "good_pct": round(good_count / total * 100, 1) if total > 0 else 0,
+                "fair_pct": round(fair_count / total * 100, 1) if total > 0 else 0,
+                "avg_time_deviation_pct": round(np.mean(time_deviations), 1) if time_deviations else 0,
+                "avg_distance_deviation_pct": round(np.mean(distance_deviations), 1) if distance_deviations else 0,
+                "avg_query_time_hc2l_ms": round(np.mean(query_times_hc2l), 3) if query_times_hc2l else 0,
+                "avg_query_time_here_ms": round(np.mean(query_times_here), 3) if query_times_here else 0,
+                "total_routes_compared": total,
+                "errors_count": self.here_comparison_progress.get('errors', 0)
+            }
     
     def _compute_graph_data(self) -> Dict:
         """Compute comprehensive data for graph visualizations"""
@@ -2188,6 +2288,377 @@ class ExperimentRunner:
                     thread_idx += 1
         
         self.experiment_threads[experiment_id] = threads
+        
+        # Start HERE comparison thread (runs in parallel with worker threads)
+        # This compares HERE API routes with HC2L baseline (no disruptions)
+        here_thread = threading.Thread(
+            target=self._here_comparison_thread,
+            args=(experiment_id, config),
+            daemon=True,
+            name=f"here_comparison_{experiment_id}"
+        )
+        here_thread.start()
+        logger.info(f"Started HERE comparison thread for {experiment_id}")
+    
+    def _here_comparison_thread(self, experiment_id: str, config: Dict):
+        """
+        Dedicated thread for HERE vs HC2L route similarity comparison.
+        
+        This thread:
+        1. Uses the same routes as the experiment (from config)
+        2. Computes HC2L routes WITHOUT disruptions
+        3. Fetches HERE API routes for the same OD pairs
+        4. Calculates Fréchet distance between routes
+        5. Records all metrics for the Route Similarity tab
+        
+        Args:
+            experiment_id: Experiment identifier
+            config: Experiment configuration with routes
+        """
+        try:
+            if experiment_id not in self.metrics_collectors:
+                logger.error(f"No metrics collector for {experiment_id}")
+                return
+            
+            collector = self.metrics_collectors[experiment_id]
+            routes = config.get("routes", [])
+            routes_per_batch = config.get("routes_per_batch", 1000)
+            
+            # Limit to routes_per_batch routes (we only compare one batch's worth)
+            routes_to_compare = routes[:routes_per_batch]
+            total_routes = len(routes_to_compare)
+            
+            if total_routes == 0:
+                logger.warning("No routes available for HERE comparison")
+                collector.update_here_comparison_status('completed', 0)
+                return
+            
+            logger.info(f"Starting HERE comparison for {total_routes} routes...")
+            collector.update_here_comparison_status('running', total_routes)
+            
+            # Initialize HERE routing service
+            here_service = HereRoutingService()
+            
+            # Process routes in batches of 10 to respect API rate limits
+            batch_size = 10
+            completed = 0
+            
+            for route_idx, route_data in enumerate(routes_to_compare):
+                # Check if experiment is still running
+                if experiment_id not in self.experiments:
+                    logger.info(f"Experiment {experiment_id} stopped, ending HERE comparison")
+                    break
+                
+                if self.stop_events.get(experiment_id, threading.Event()).is_set():
+                    logger.info(f"Experiment {experiment_id} stop requested, ending HERE comparison")
+                    break
+                
+                try:
+                    comparison_result = self._compare_single_route_here_vs_hc2l(
+                        route_idx, route_data, here_service, config
+                    )
+                    collector.record_here_comparison(route_idx, comparison_result)
+                    completed += 1
+                    
+                    # Rate limiting: small delay between requests
+                    if (route_idx + 1) % batch_size == 0:
+                        time.sleep(0.5)  # 500ms delay every 10 requests
+                        
+                        # Broadcast progress update
+                        if experiment_id in self.experiments:
+                            self._broadcast_progress(experiment_id)
+                    
+                except Exception as e:
+                    logger.error(f"Error comparing route {route_idx}: {e}")
+                    collector.record_here_comparison(route_idx, {
+                        'route_idx': route_idx,
+                        'error': str(e)
+                    })
+            
+            collector.update_here_comparison_status('completed', total_routes)
+            logger.success(f"HERE comparison completed: {completed} routes compared")
+            
+        except Exception as e:
+            logger.error(f"HERE comparison thread error: {e}")
+            logger.error(traceback.format_exc())
+            if experiment_id in self.metrics_collectors:
+                self.metrics_collectors[experiment_id].update_here_comparison_status('error', 0)
+    
+    def _compare_single_route_here_vs_hc2l(self, route_idx: int, route_data: Dict,
+                                           here_service: HereRoutingService, 
+                                           config: Dict) -> Dict:
+        """
+        Compare a single route between HERE API and HC2L (no disruptions).
+        
+        Args:
+            route_idx: Route index
+            route_data: Route data with start/end coordinates
+            here_service: HERE routing service instance
+            config: Experiment configuration
+            
+        Returns:
+            Dict with all comparison metrics
+        """
+        result = {
+            'route_idx': route_idx,
+            'batch': 0,
+            'source_node': 0,
+            'target_node': 0,
+            'start_road_hc2l': 'Unknown',
+            'end_road_hc2l': 'Unknown',
+            'start_road_here': 'Unknown',
+            'end_road_here': 'Unknown',
+            'distance_km_hc2l': 0,
+            'distance_km_here': 0,
+            'travel_time_min_hc2l': 0,
+            'travel_time_min_here': 0,
+            'query_time_ms_hc2l': 0,
+            'query_time_ms_here': 0,
+            'frechet_distance_m': 0,
+            'fd_rating': 'N/A',
+            'time_deviation_pct': 0,
+            'ttd_rating': 'N/A',
+            'distance_deviation_pct': 0,
+            'error': None
+        }
+        
+        try:
+            # Extract route coordinates
+            start_data = route_data.get('start', {})
+            end_data = route_data.get('end', {})
+            
+            start_lat = start_data.get('pin_lat', start_data.get('snap_lat', start_data.get('lat', 0)))
+            start_lng = start_data.get('pin_lng', start_data.get('snap_lng', start_data.get('lng', 0)))
+            end_lat = end_data.get('pin_lat', end_data.get('snap_lat', end_data.get('lat', 0)))
+            end_lng = end_data.get('pin_lng', end_data.get('snap_lng', end_data.get('lng', 0)))
+            
+            source_node = start_data.get('edge_source', 0)
+            target_node = end_data.get('edge_source', 0)
+            
+            result['source_node'] = source_node
+            result['target_node'] = target_node
+            
+            # Get road names from road mapper
+            if self.road_mapper:
+                try:
+                    result['start_road_hc2l'] = self.road_mapper.get_road_name(
+                        start_data.get('edge_source', 0),
+                        start_data.get('edge_target', 0)
+                    ) or 'Unknown'
+                    result['end_road_hc2l'] = self.road_mapper.get_road_name(
+                        end_data.get('edge_source', 0),
+                        end_data.get('edge_target', 0)
+                    ) or 'Unknown'
+                except:
+                    pass
+            
+            # ================================================================
+            # Step 1: Call HC2L router WITHOUT disruptions
+            # ================================================================
+            hc2l_start_time = time.time()
+            hc2l_result = None
+            hc2l_path = []
+            
+            if self.hc2l_router:
+                hc2l_result = self.hc2l_router.compute_route(
+                    start_pin_lat=start_lat,
+                    start_pin_lng=start_lng,
+                    dest_pin_lat=end_lat,
+                    dest_pin_lng=end_lng,
+                    start_snap_lat=start_data.get('snap_lat', start_lat),
+                    start_snap_lng=start_data.get('snap_lng', start_lng),
+                    dest_snap_lat=end_data.get('snap_lat', end_lat),
+                    dest_snap_lng=end_data.get('snap_lng', end_lng),
+                    start_edge_source=start_data.get('edge_source', 0),
+                    start_edge_target=start_data.get('edge_target', 0),
+                    start_edge_oneway=start_data.get('edge_oneway', 0),
+                    dest_edge_source=end_data.get('edge_source', 0),
+                    dest_edge_target=end_data.get('edge_target', 0),
+                    dest_edge_oneway=end_data.get('edge_oneway', 0),
+                    disruption_file="",  # NO DISRUPTIONS
+                    tau_threshold=0.5,
+                    generate_alternatives=False,
+                    verbose=False
+                )
+            
+            hc2l_query_time = (time.time() - hc2l_start_time) * 1000
+            
+            if hc2l_result and hc2l_result.get('success'):
+                metrics = hc2l_result.get('metrics', {})
+                route_info = hc2l_result.get('route', {})
+                
+                result['distance_km_hc2l'] = metrics.get('calculated_distance_km', 0)
+                if not result['distance_km_hc2l'] and metrics.get('calculated_distance_meters'):
+                    result['distance_km_hc2l'] = metrics.get('calculated_distance_meters') / 1000
+                
+                # Extract travel time
+                eta_seconds = metrics.get('eta_seconds', 0)
+                result['travel_time_min_hc2l'] = eta_seconds / 60 if eta_seconds else 0
+                
+                result['query_time_ms_hc2l'] = metrics.get('query_time_ms', hc2l_query_time)
+                
+                # Extract path coordinates for Fréchet calculation
+                geometry = route_info.get('geometry', [])
+                for segment in geometry:
+                    coords = segment.get('coordinates', [])
+                    hc2l_path.extend(coords)
+            else:
+                result['error'] = 'HC2L routing failed'
+                return result
+            
+            # ================================================================
+            # Step 2: Call HERE Routing API
+            # ================================================================
+            here_start_time = time.time()
+            here_result = here_service.get_directions(
+                start_lat=start_lat,
+                start_lng=start_lng,
+                dest_lat=end_lat,
+                dest_lng=end_lng,
+                traffic_mode='disabled'  # No traffic to match baseline
+            )
+            here_query_time = (time.time() - here_start_time) * 1000
+            
+            here_path = []
+            
+            if here_result and here_result.get('success'):
+                result['distance_km_here'] = here_result.get('distance_meters', 0) / 1000
+                result['travel_time_min_here'] = here_result.get('duration_seconds', 0) / 60
+                result['query_time_ms_here'] = here_query_time
+                
+                # Extract path coordinates
+                here_path = here_result.get('coordinates', [])
+            else:
+                result['error'] = f"HERE API failed: {here_result.get('error', 'Unknown error')}"
+                return result
+            
+            # ================================================================
+            # Step 3: Calculate Fréchet Distance
+            # ================================================================
+            if hc2l_path and here_path:
+                # Convert HERE path format if needed (HERE returns [lat, lng], we need consistency)
+                frechet = self._compute_frechet_distance_for_comparison(hc2l_path, here_path)
+                result['frechet_distance_m'] = frechet
+                
+                # Determine FD rating
+                if frechet < 100:
+                    result['fd_rating'] = 'Excellent'
+                elif frechet < 500:
+                    result['fd_rating'] = 'Good'
+                else:
+                    result['fd_rating'] = 'Fair'
+            
+            # ================================================================
+            # Step 4: Calculate Deviation Percentages
+            # ================================================================
+            # Time deviation
+            avg_time = (result['travel_time_min_hc2l'] + result['travel_time_min_here']) / 2
+            if avg_time > 0:
+                result['time_deviation_pct'] = abs(
+                    result['travel_time_min_hc2l'] - result['travel_time_min_here']
+                ) / avg_time * 100
+            
+            # TTD rating
+            if result['time_deviation_pct'] < 5:
+                result['ttd_rating'] = 'Excellent'
+            elif result['time_deviation_pct'] < 15:
+                result['ttd_rating'] = 'Good'
+            else:
+                result['ttd_rating'] = 'Fair'
+            
+            # Distance deviation
+            if result['distance_km_hc2l'] > 0:
+                result['distance_deviation_pct'] = abs(
+                    result['distance_km_hc2l'] - result['distance_km_here']
+                ) / result['distance_km_hc2l'] * 100
+            
+            return result
+            
+        except Exception as e:
+            result['error'] = str(e)
+            logger.error(f"Error in route comparison {route_idx}: {e}")
+            return result
+    
+    def _compute_frechet_distance_for_comparison(self, path1: List, path2: List) -> float:
+        """
+        Compute Fréchet distance between two paths for HERE vs HC2L comparison.
+        
+        Args:
+            path1: HC2L path coordinates [[lng, lat], ...]
+            path2: HERE path coordinates [[lat, lng], ...] (different format!)
+            
+        Returns:
+            Fréchet distance in meters
+        """
+        if not path1 or not path2:
+            return 0
+        
+        try:
+            # Normalize coordinate formats
+            # HC2L uses [lng, lat], HERE uses [lat, lng]
+            p1 = []
+            for coord in path1:
+                if len(coord) >= 2:
+                    p1.append([coord[1], coord[0]])  # Convert to [lat, lng]
+            
+            p2 = []
+            for coord in path2:
+                if len(coord) >= 2:
+                    p2.append([coord[0], coord[1]])  # Already [lat, lng]
+            
+            if not p1 or not p2:
+                return 0
+            
+            # Use optimized Fréchet distance calculation
+            p1_arr = np.array(p1, dtype=np.float64)
+            p2_arr = np.array(p2, dtype=np.float64)
+            
+            n, m = len(p1_arr), len(p2_arr)
+            
+            # Limit size for performance (sample if too large)
+            max_points = 100
+            if n > max_points:
+                indices = np.linspace(0, n - 1, max_points, dtype=int)
+                p1_arr = p1_arr[indices]
+                n = max_points
+            if m > max_points:
+                indices = np.linspace(0, m - 1, max_points, dtype=int)
+                p2_arr = p2_arr[indices]
+                m = max_points
+            
+            # Haversine distance matrix
+            lat1 = p1_arr[:, 0][:, np.newaxis]
+            lon1 = p1_arr[:, 1][:, np.newaxis]
+            lat2 = p2_arr[:, 0][np.newaxis, :]
+            lon2 = p2_arr[:, 1][np.newaxis, :]
+            
+            R = 6371000  # Earth radius in meters
+            phi1 = np.radians(lat1)
+            phi2 = np.radians(lat2)
+            dphi = np.radians(lat2 - lat1)
+            dlambda = np.radians(lon2 - lon1)
+            
+            a = np.sin(dphi/2)**2 + np.cos(phi1) * np.cos(phi2) * np.sin(dlambda/2)**2
+            distances = 2 * R * np.arcsin(np.sqrt(np.clip(a, 0, 1)))
+            
+            # Iterative DP for Fréchet
+            ca = np.full((n, m), np.inf, dtype=np.float64)
+            ca[0, 0] = distances[0, 0]
+            
+            for i in range(1, n):
+                ca[i, 0] = max(ca[i-1, 0], distances[i, 0])
+            for j in range(1, m):
+                ca[0, j] = max(ca[0, j-1], distances[0, j])
+            
+            for i in range(1, n):
+                for j in range(1, m):
+                    ca[i, j] = max(min(ca[i-1, j], ca[i-1, j-1], ca[i, j-1]), distances[i, j])
+            
+            return float(ca[n-1, m-1])
+            
+        except Exception as e:
+            logger.warning(f"Fréchet calculation error: {e}")
+            return 0
     
     def _worker_thread(self, experiment_id: str, thread_id: str, 
                        trial_idx: int, batch_idx: Optional[int],
@@ -2864,8 +3335,8 @@ class ExperimentRunner:
             self._broadcast_progress(experiment_id)
             
             results = {
-                "total_trials": self.trials,
-                "total_batches": self.batches,
+                "total_trials": collector.trials,
+                "total_batches": collector.batches,
                 "construction_phase": construction_phase,
                 "dynamic_updates": dynamic_updates,
                 "query_performance": query_performance,
@@ -3044,6 +3515,14 @@ class ExperimentRunner:
         progress = self.experiments.get(experiment_id)
         if not progress:
             return
+        
+        # Update HERE comparison progress from metrics collector
+        if experiment_id in self.metrics_collectors:
+            try:
+                here_progress = self.metrics_collectors[experiment_id].get_here_comparison_progress()
+                progress.here_comparison = here_progress
+            except Exception as e:
+                logger.debug(f"Error getting HERE comparison progress: {e}")
         
         # Calculate overall estimated time remaining based on thread progress
         try:

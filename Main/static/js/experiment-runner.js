@@ -67,6 +67,12 @@ const ExperimentRunner = {
         tauRandomMax: 0.9
     },
     
+    // HERE comparison pagination state
+    similarityData: [],           // All similarity data from backend
+    similarityDisplayedCount: 0,  // Number of rows currently displayed
+    similarityPageSize: 20,       // Rows per page (infinite scroll)
+    hereComparisonProgress: null, // HERE comparison thread progress
+    
     // =========================================================================
     // INITIALIZATION
     // =========================================================================
@@ -551,6 +557,11 @@ const ExperimentRunner = {
             Object.entries(data.threads).forEach(([threadId, threadData]) => {
                 this.updateThreadProgress(threadId, threadData);
             });
+        }
+        
+        // Update HERE comparison progress
+        if (data.here_comparison) {
+            this.updateHereComparisonProgress(data.here_comparison);
         }
         
         // Update disruption display
@@ -1220,14 +1231,41 @@ const ExperimentRunner = {
         // Clear map centering flag for next run
         this.mapCentered = false;
         
-        // Fetch and display results
-        this.fetchAndDisplayResults();
+        // Wait for results to be saved before navigating
+        // Poll for the result to be available
+        const experimentId = this.currentExperimentId;
+        let attempts = 0;
+        const maxAttempts = 30; // 30 seconds max wait
         
-        // Refresh results list to show the new result
-        this.loadResultsList();
+        const checkResults = async () => {
+            attempts++;
+            try {
+                const response = await fetch(`/api/experiment/${experimentId}/result`);
+                if (response.ok) {
+                    // Results are ready
+                    await this.fetchAndDisplayResults();
+                    this.loadResultsList();
+                    this.showTab('results');
+                } else if (attempts < maxAttempts) {
+                    // Wait 1 second and try again
+                    setTimeout(checkResults, 1000);
+                } else {
+                    // Timeout - show results list anyway
+                    this.showNotification('Results may take a moment to appear', 'warning');
+                    this.loadResultsList();
+                    this.showTab('results-list');
+                }
+            } catch (error) {
+                if (attempts < maxAttempts) {
+                    setTimeout(checkResults, 1000);
+                } else {
+                    this.showNotification('Error loading results', 'error');
+                    this.showTab('results-list');
+                }
+            }
+        };
         
-        // Show results list tab
-        this.showTab('results');
+        checkResults();
     },
     
     // =========================================================================
@@ -1654,31 +1692,196 @@ const ExperimentRunner = {
         const tbody = document.getElementById('result-similarity-tbody');
         if (!tbody) return;
         
+        // Store full data for pagination
+        this.similarityData = data || [];
+        this.similarityDisplayedCount = 0;
+        
         if (!data || data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-gray-500 py-4">No similarity data available</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="11" class="text-center text-gray-500 py-4">No similarity data available</td></tr>';
+            this.updateLoadMoreButton(false);
             return;
         }
         
-        tbody.innerHTML = data.map(row => {
+        // Clear table and load first page
+        tbody.innerHTML = '';
+        this.loadMoreSimilarityData();
+    },
+    
+    loadMoreSimilarityData() {
+        const tbody = document.getElementById('result-similarity-tbody');
+        if (!tbody) return;
+        
+        const startIdx = this.similarityDisplayedCount;
+        const endIdx = Math.min(startIdx + this.similarityPageSize, this.similarityData.length);
+        
+        for (let i = startIdx; i < endIdx; i++) {
+            const row = this.similarityData[i];
             const fdRating = this.getFrechetRating(row.frechet_distance_m);
-            const ttdRating = this.getTravelTimeDeviationRating(row.travel_time_deviation_pct);
+            const ttdRating = this.getTravelTimeDeviationRating(row.time_deviation_pct);
             
-            return `
-                <tr class="hover:bg-gray-50">
-                    <td class="p-2 font-mono text-xs">${row.od_pair || '--'}</td>
-                    <td class="p-2 text-right font-mono">${this.formatNumber(row.distance_km, 2)}</td>
-                    <td class="p-2 text-right font-mono">${this.formatNumber(row.travel_time_min, 1)}</td>
-                    <td class="p-2 text-right font-mono">${this.formatNumber(row.frechet_distance_m, 0)}</td>
-                    <td class="p-2 text-center">
-                        <span class="px-2 py-1 rounded text-xs font-medium ${fdRating.class}">${fdRating.label}</span>
-                    </td>
-                    <td class="p-2 text-right font-mono">${this.formatNumber(row.travel_time_deviation_pct, 1)}%</td>
-                    <td class="p-2 text-center">
-                        <span class="px-2 py-1 rounded text-xs font-medium ${ttdRating.class}">${ttdRating.label}</span>
-                    </td>
-                </tr>
+            // Parse od_pair if it exists (format: "source_node → target_node")
+            let sourceNode = '--';
+            let targetNode = '--';
+            if (row.od_pair) {
+                const parts = row.od_pair.split('→').map(p => p.trim());
+                if (parts.length === 2) {
+                    sourceNode = parts[0];
+                    targetNode = parts[1];
+                }
+            }
+            
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-gray-50';
+            tr.innerHTML = `
+                <td class="p-2 font-mono text-xs text-gray-600">${row.route_idx || i + 1}</td>
+                <td class="p-2 font-mono text-xs">
+                    <span class="text-blue-600">${sourceNode}</span>
+                    <span class="text-gray-400 mx-1">→</span>
+                    <span class="text-green-600">${targetNode}</span>
+                </td>
+                <td class="p-2 text-xs">
+                    <span class="text-gray-700">${row.start_road_hc2l || '--'}</span>
+                </td>
+                <td class="p-2 text-xs">
+                    <span class="text-gray-700">${row.end_road_hc2l || '--'}</span>
+                </td>
+                <td class="p-2 text-right font-mono text-xs">
+                    <div class="flex flex-col">
+                        <span class="text-gray-700">${this.formatNumber(row.distance_km_hc2l, 2)}</span>
+                        <span class="text-blue-600">${this.formatNumber(row.distance_km_here, 2)}</span>
+                    </div>
+                </td>
+                <td class="p-2 text-right font-mono text-xs">
+                    <div class="flex flex-col">
+                        <span class="text-gray-700">${this.formatNumber(row.travel_time_min_hc2l, 1)}</span>
+                        <span class="text-blue-600">${this.formatNumber(row.travel_time_min_here, 1)}</span>
+                    </div>
+                </td>
+                <td class="p-2 text-right font-mono text-xs">
+                    <div class="flex flex-col">
+                        <span class="text-gray-700">${this.formatNumber(row.query_time_ms_hc2l, 1)}</span>
+                        <span class="text-blue-600">${this.formatNumber(row.query_time_ms_here, 0)}</span>
+                    </div>
+                </td>
+                <td class="p-2 text-right font-mono">${this.formatNumber(row.frechet_distance_m, 0)}</td>
+                <td class="p-2 text-center">
+                    <span class="px-2 py-1 rounded text-xs font-medium ${fdRating.class}">${fdRating.label}</span>
+                </td>
+                <td class="p-2 text-right font-mono">${this.formatNumber(row.time_deviation_pct, 1)}%</td>
+                <td class="p-2 text-center">
+                    <span class="px-2 py-1 rounded text-xs font-medium ${ttdRating.class}">${ttdRating.label}</span>
+                </td>
             `;
-        }).join('');
+            tbody.appendChild(tr);
+        }
+        
+        this.similarityDisplayedCount = endIdx;
+        this.updateLoadMoreButton(endIdx < this.similarityData.length);
+    },
+    
+    updateLoadMoreButton(show) {
+        const loadMoreDiv = document.getElementById('similarity-load-more');
+        if (loadMoreDiv) {
+            loadMoreDiv.classList.toggle('hidden', !show);
+        }
+    },
+    
+    updateHereComparisonProgress(progress) {
+        const progressDiv = document.getElementById('here-comparison-progress');
+        const statusBadge = document.getElementById('similarity-status-badge');
+        
+        // Also update running tab display
+        const runningProgressDiv = document.getElementById('running-here-comparison-progress');
+        const runningStatusBadge = document.getElementById('running-here-status-badge');
+        
+        if (!progress) return;
+        
+        this.hereComparisonProgress = progress;
+        
+        // Update status badge (results tab)
+        if (statusBadge) {
+            if (progress.status === 'running') {
+                statusBadge.className = 'px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-700';
+                statusBadge.innerHTML = '<i data-lucide="loader-2" class="w-3 h-3 inline mr-1 animate-spin"></i>Running';
+            } else if (progress.status === 'completed') {
+                statusBadge.className = 'px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-700';
+                statusBadge.innerHTML = '<i data-lucide="check" class="w-3 h-3 inline mr-1"></i>Complete';
+            } else if (progress.status === 'error') {
+                statusBadge.className = 'px-2 py-1 rounded text-xs font-medium bg-red-100 text-red-700';
+                statusBadge.innerHTML = '<i data-lucide="alert-circle" class="w-3 h-3 inline mr-1"></i>Error';
+            } else {
+                statusBadge.className = 'px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-600';
+                statusBadge.innerHTML = '<i data-lucide="clock" class="w-3 h-3 inline mr-1"></i>Waiting';
+            }
+            // Refresh lucide icons
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+        
+        // Update running tab status badge
+        if (runningStatusBadge) {
+            if (progress.status === 'running') {
+                runningStatusBadge.className = 'px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-700';
+                runningStatusBadge.innerHTML = '<i data-lucide="loader-2" class="w-3 h-3 inline mr-1 animate-spin"></i>Running';
+            } else if (progress.status === 'completed') {
+                runningStatusBadge.className = 'px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-700';
+                runningStatusBadge.innerHTML = '<i data-lucide="check" class="w-3 h-3 inline mr-1"></i>Complete';
+            } else if (progress.status === 'error') {
+                runningStatusBadge.className = 'px-2 py-1 rounded text-xs font-medium bg-red-100 text-red-700';
+                runningStatusBadge.innerHTML = '<i data-lucide="alert-circle" class="w-3 h-3 inline mr-1"></i>Error';
+            } else {
+                runningStatusBadge.className = 'px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-600';
+                runningStatusBadge.innerHTML = '<i data-lucide="clock" class="w-3 h-3 inline mr-1"></i>Waiting';
+            }
+            // Refresh lucide icons
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+        
+        // Show/hide running tab progress section
+        if (runningProgressDiv) {
+            if (progress.status === 'running' || progress.status === 'completed') {
+                runningProgressDiv.classList.remove('hidden');
+            } else {
+                runningProgressDiv.classList.add('hidden');
+            }
+        }
+        
+        // Update progress bar (results tab)
+        if (progressDiv) {
+            if (progress.status === 'running') {
+                progressDiv.classList.remove('hidden');
+                
+                const progressBar = document.getElementById('here-progress-bar');
+                const progressText = document.getElementById('here-progress-text');
+                const progressPct = document.getElementById('here-progress-pct');
+                const progressEta = document.getElementById('here-progress-eta');
+                
+                const pct = progress.total > 0 ? (progress.completed / progress.total * 100) : 0;
+                
+                if (progressBar) progressBar.style.width = `${pct}%`;
+                if (progressText) progressText.textContent = `${progress.completed} / ${progress.total}`;
+                if (progressPct) progressPct.textContent = `${pct.toFixed(1)}%`;
+                if (progressEta) progressEta.textContent = progress.eta ? `ETA: ${progress.eta}` : 'ETA: --';
+            } else if (progress.status === 'completed') {
+                progressDiv.classList.add('hidden');
+            } else {
+                progressDiv.classList.add('hidden');
+            }
+        }
+        
+        // Update running tab progress bar
+        if (runningProgressDiv) {
+            const runningProgressBar = document.getElementById('running-here-progress-bar');
+            const runningProgressText = document.getElementById('running-here-progress-text');
+            const runningProgressPct = document.getElementById('running-here-progress-pct');
+            const runningProgressEta = document.getElementById('running-here-progress-eta');
+            
+            const pct = progress.total > 0 ? (progress.completed / progress.total * 100) : 0;
+            
+            if (runningProgressBar) runningProgressBar.style.width = `${pct}%`;
+            if (runningProgressText) runningProgressText.textContent = `${progress.completed} / ${progress.total}`;
+            if (runningProgressPct) runningProgressPct.textContent = `${pct.toFixed(1)}%`;
+            if (runningProgressEta) runningProgressEta.textContent = progress.eta ? `ETA: ${progress.eta}` : 'ETA: --';
+        }
     },
     
     getFrechetRating(distance) {
@@ -1702,14 +1905,18 @@ const ExperimentRunner = {
     },
     
     populateSimilarityExtra(data) {
-        // Update additional similarity metrics
-        const pathOverlapEl = document.getElementById('similarity-path-overlap');
-        const distDeviationEl = document.getElementById('similarity-distance-deviation');
-        const altRoutesEl = document.getElementById('similarity-alternative-routes');
+        // Update HERE vs HC2L comparison summary metrics
+        const avgFrechetEl = document.getElementById('similarity-avg-frechet');
+        const avgTimeDevEl = document.getElementById('similarity-avg-time-deviation');
+        const avgDistDevEl = document.getElementById('similarity-avg-distance-deviation');
+        const routesComparedEl = document.getElementById('similarity-routes-compared');
+        const hereErrorsEl = document.getElementById('similarity-here-errors');
         
-        if (pathOverlapEl) pathOverlapEl.textContent = data.path_overlap_pct ? `${data.path_overlap_pct}%` : '--';
-        if (distDeviationEl) distDeviationEl.textContent = data.distance_deviation_pct ? `${data.distance_deviation_pct}%` : '--';
-        if (altRoutesEl) altRoutesEl.textContent = data.alternative_route_count || '0';
+        if (avgFrechetEl) avgFrechetEl.textContent = data.avg_frechet_distance_m ? `${data.avg_frechet_distance_m.toFixed(0)}m` : '--';
+        if (avgTimeDevEl) avgTimeDevEl.textContent = data.avg_time_deviation_pct ? `${data.avg_time_deviation_pct.toFixed(1)}%` : '--';
+        if (avgDistDevEl) avgDistDevEl.textContent = data.avg_distance_deviation_pct ? `${data.avg_distance_deviation_pct.toFixed(1)}%` : '--';
+        if (routesComparedEl) routesComparedEl.textContent = data.total_routes_compared || '0';
+        if (hereErrorsEl) hereErrorsEl.textContent = data.errors_count || '0';
     },
     
     // =========================================================================

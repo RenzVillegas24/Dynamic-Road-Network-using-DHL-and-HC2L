@@ -354,6 +354,34 @@
           <p class="text-muted text-center py-4">Waiting for experiment to start...</p>
         </div>
       </div>
+
+      <!-- HERE Comparison Progress (Running Tab) -->
+      <div id="running-here-comparison-progress" class="section-card section-card--info hidden">
+        <div class="section-card__header">
+          <div class="section-card__icon section-card__icon--info">
+            <i data-lucide="git-compare" class="w-5 h-5"></i>
+          </div>
+          <h4 class="section-card__title">HERE vs HC2L Comparison</h4>
+          <span id="running-here-status-badge" class="px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-600">
+            <i data-lucide="clock" class="w-3 h-3 inline mr-1"></i>Waiting
+          </span>
+        </div>
+        <div class="section-card__body">
+          <div class="space-y-2">
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-600">Progress</span>
+              <span id="running-here-progress-text" class="font-mono font-medium">0 / 0</span>
+            </div>
+            <div class="w-full bg-blue-200 rounded-full h-2">
+              <div id="running-here-progress-bar" class="bg-blue-600 h-2 rounded-full transition-all" style="width: 0%"></div>
+            </div>
+            <div class="flex justify-between text-xs text-gray-500">
+              <span id="running-here-progress-pct">0%</span>
+              <span id="running-here-progress-eta">ETA: --</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Status Card - Fixed at Bottom -->
@@ -703,34 +731,68 @@
                 <i data-lucide="git-compare" class="w-5 h-5 text-amber-600"></i>
               </div>
               <div>
-                <h4 class="font-bold text-gray-800 text-sm">Route Similarity Evaluation</h4>
-                <p class="text-xs text-gray-500 mt-0.5">Appendix 1.4</p>
+                <h4 class="font-bold text-gray-800 text-sm">HERE vs HC2L Route Comparison</h4>
+                <p class="text-xs text-gray-500 mt-0.5">Appendix 1.4 - Real-time API validation</p>
               </div>
             </div>
-            <button onclick="ExperimentRunner.exportTab('similarity')"
-              class="btn btn--success btn--xs hover:shadow-md transition-all">
-              <i data-lucide="download" class="w-3 h-3"></i> Export CSV
-            </button>
+            <div class="flex items-center gap-2">
+              <button onclick="ExperimentRunner.exportTab('similarity')"
+                class="btn btn--success btn--xs hover:shadow-md transition-all">
+                <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+              </button>
+            </div>
           </div>
+          
+          <!-- HERE Comparison Progress -->
+          <div id="here-comparison-progress" class="bg-blue-50 rounded-xl p-4 border border-blue-200 hidden">
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center gap-2">
+                <i data-lucide="loader-2" class="w-4 h-4 text-blue-600 animate-spin"></i>
+                <span class="text-sm font-medium text-blue-700">Comparing routes with HERE API...</span>
+              </div>
+              <span id="here-progress-text" class="text-sm text-blue-600 font-mono">0 / 0</span>
+            </div>
+            <div class="w-full bg-blue-200 rounded-full h-2">
+              <div id="here-progress-bar" class="bg-blue-600 h-2 rounded-full transition-all" style="width: 0%"></div>
+            </div>
+            <div class="flex justify-between text-xs text-blue-500 mt-1">
+              <span id="here-progress-pct">0%</span>
+              <span id="here-progress-eta">ETA: --</span>
+            </div>
+          </div>
+          
           <div class="overflow-x-auto rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
             <table class="w-full text-sm">
               <thead class="bg-gradient-to-r from-amber-50 to-orange-50 border-b-2 border-amber-200">
                 <tr>
-                  <th class="text-left p-3 font-semibold text-amber-700">OD Pair</th>
-                  <th class="text-right p-3 font-semibold text-amber-700">Distance (km)</th>
-                  <th class="text-right p-3 font-semibold text-amber-700">Travel Time (min)</th>
-                  <th class="text-right p-3 font-semibold text-amber-700">Fréchet Distance (m)</th>
-                  <th class="text-center p-3 font-semibold text-amber-700">FD Rating</th>
-                  <th class="text-right p-3 font-semibold text-amber-700">Time Dev (%)</th>
-                  <th class="text-center p-3 font-semibold text-amber-700">TTD Rating</th>
+                  <th class="text-left p-2 font-semibold text-amber-700 whitespace-nowrap">#</th>
+                  <th class="text-left p-2 font-semibold text-amber-700 whitespace-nowrap">Source → Target</th>
+                  <th class="text-left p-2 font-semibold text-amber-700 whitespace-nowrap">Start Road</th>
+                  <th class="text-left p-2 font-semibold text-amber-700 whitespace-nowrap">End Road</th>
+                  <th class="text-right p-2 font-semibold text-amber-700 whitespace-nowrap">Distance (km)<br><span class="text-xs font-normal">(HC2L | HERE)</span></th>
+                  <th class="text-right p-2 font-semibold text-amber-700 whitespace-nowrap">Time (min)<br><span class="text-xs font-normal">(HC2L | HERE)</span></th>
+                  <th class="text-right p-2 font-semibold text-amber-700 whitespace-nowrap">Query (ms)<br><span class="text-xs font-normal">(HC2L | HERE)</span></th>
+                  <th class="text-right p-2 font-semibold text-amber-700 whitespace-nowrap">FD (m)</th>
+                  <th class="text-center p-2 font-semibold text-amber-700 whitespace-nowrap">FD Rating</th>
+                  <th class="text-right p-2 font-semibold text-amber-700 whitespace-nowrap">∆Time %</th>
+                  <th class="text-center p-2 font-semibold text-amber-700 whitespace-nowrap">TTD Rating</th>
                 </tr>
               </thead>
               <tbody id="result-similarity-tbody" class="divide-y divide-gray-200">
                 <tr class="hover:bg-gray-50 transition-colors">
-                  <td colspan="7" class="text-center text-gray-500 py-6 font-medium">No data yet</td>
+                  <td colspan="11" class="text-center text-gray-500 py-6 font-medium">No data yet</td>
                 </tr>
               </tbody>
             </table>
+          </div>
+          
+          <!-- Load More / Infinite Scroll -->
+          <div id="similarity-load-more" class="hidden">
+            <button onclick="ExperimentRunner.loadMoreSimilarityData()" 
+              class="w-full py-3 text-center text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors font-medium">
+              <i data-lucide="chevron-down" class="w-4 h-4 inline mr-1"></i>
+              Load More Routes
+            </button>
           </div>
 
           <!-- Rating Criteria -->
@@ -781,49 +843,47 @@
             </div>
           </div>
 
-          <!-- Additional Similarity Metrics -->
+          <!-- HERE vs HC2L Comparison Summary -->
           <div class="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-xl p-6 border border-indigo-200 shadow-sm">
             <div class="flex items-center gap-3 mb-4">
               <div class="w-8 h-8 bg-indigo-200 rounded-lg flex items-center justify-center">
                 <i data-lucide="git-merge" class="w-5 h-5 text-indigo-600"></i>
               </div>
-              <h4 class="font-bold text-gray-800">Additional Similarity Metrics</h4>
+              <h4 class="font-bold text-gray-800">HERE vs HC2L Comparison Summary</h4>
             </div>
-            <div class="grid grid-cols-3 gap-4" id="additional-similarity-metrics">
+            <div class="grid grid-cols-3 gap-4 mb-3" id="additional-similarity-metrics">
               <div
-                class="bg-white rounded-lg p-4 text-center border border-blue-100 shadow-xs hover:shadow-sm transition-shadow">
-                <div class="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-2">Path Overlap</div>
-                <div id="similarity-path-overlap" class="text-3xl font-black text-blue-700 leading-none mb-1">--</div>
-                <div class="text-xs text-gray-500">% of shared edges</div>
-              </div>
-              <div
-                class="bg-white rounded-lg p-4 text-center border border-emerald-100 shadow-xs hover:shadow-sm transition-shadow">
-                <div class="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-2">Distance Deviation
-                </div>
-                <div id="similarity-distance-deviation" class="text-3xl font-black text-emerald-700 leading-none mb-1">
-                  --</div>
-                <div class="text-xs text-gray-500">% difference</div>
+                class="bg-white rounded-lg p-5 text-center border border-amber-100 shadow-xs hover:shadow-md transition-shadow">
+                <div class="text-sm font-semibold text-amber-600 uppercase tracking-wide mb-2">Avg Fréchet Distance</div>
+                <div id="similarity-avg-frechet" class="text-3xl font-black text-amber-700 leading-none mb-1">--</div>
+                <div class="text-xs text-gray-500 mt-1">meters</div>
               </div>
               <div
-                class="bg-white rounded-lg p-4 text-center border border-purple-100 shadow-xs hover:shadow-sm transition-shadow">
-                <div class="text-xs font-semibold text-purple-600 uppercase tracking-wide mb-2">Alternative Routes</div>
-                <div id="similarity-alternative-routes" class="text-3xl font-black text-purple-700 leading-none mb-1">--
-                </div>
-                <div class="text-xs text-gray-500">different paths</div>
+                class="bg-white rounded-lg p-5 text-center border border-blue-100 shadow-xs hover:shadow-md transition-shadow">
+                <div class="text-sm font-semibold text-blue-600 uppercase tracking-wide mb-2">Avg Time Deviation</div>
+                <div id="similarity-avg-time-deviation" class="text-3xl font-black text-blue-700 leading-none mb-1">--</div>
+                <div class="text-xs text-gray-500 mt-1">% difference</div>
+              </div>
+              <div
+                class="bg-white rounded-lg p-5 text-center border border-emerald-100 shadow-xs hover:shadow-md transition-shadow">
+                <div class="text-sm font-semibold text-emerald-600 uppercase tracking-wide mb-2">Avg Dist Deviation</div>
+                <div id="similarity-avg-distance-deviation" class="text-3xl font-black text-emerald-700 leading-none mb-1">--</div>
+                <div class="text-xs text-gray-500 mt-1">% difference</div>
               </div>
             </div>
-          </div>
-
-          <!-- Similarity Distribution Chart -->
-          <div class="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-5">
-            <div class="flex items-center gap-3 mb-4">
-              <div class="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
-                <i data-lucide="bar-chart-2" class="w-5 h-5 text-purple-600"></i>
+            <div class="grid grid-cols-2 gap-4">
+              <div
+                class="bg-white rounded-lg p-5 text-center border border-green-100 shadow-xs hover:shadow-md transition-shadow">
+                <div class="text-sm font-semibold text-green-600 uppercase tracking-wide mb-2">Routes Compared</div>
+                <div id="similarity-routes-compared" class="text-3xl font-black text-green-700 leading-none mb-1">--</div>
+                <div class="text-xs text-gray-500 mt-1">total routes analyzed</div>
               </div>
-              <h4 class="font-bold text-gray-800">Similarity Distribution</h4>
-            </div>
-            <div style="position: relative; height: 200px; width: 100%;">
-              <canvas id="similarity-distribution-chart"></canvas>
+              <div
+                class="bg-white rounded-lg p-5 text-center border border-red-100 shadow-xs hover:shadow-md transition-shadow">
+                <div class="text-sm font-semibold text-red-600 uppercase tracking-wide mb-2">HERE API Errors</div>
+                <div id="similarity-here-errors" class="text-3xl font-black text-red-700 leading-none mb-1">--</div>
+                <div class="text-xs text-gray-500 mt-1">failed API calls</div>
+              </div>
             </div>
           </div>
         </div>
