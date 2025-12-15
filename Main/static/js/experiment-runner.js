@@ -429,10 +429,18 @@ const ExperimentRunner = {
         }
     },
     
-    async togglePause() {
+    async togglePause(mode='toggle') {
         if (!this.currentExperimentId) return;
         
-        const endpoint = this.isPaused ? 'resume' : 'pause';
+        if (mode === 'toggle') {
+            this.isPaused = !this.isPaused;
+        } else if (mode === 'pause') {
+            this.isPaused = true;
+        } else if (mode === 'resume') {
+            this.isPaused = false;
+        }
+        
+        const endpoint = this.isPaused ? 'pause' : 'resume';
         
         try {
             const response = await fetch(`/api/experiment/${this.currentExperimentId}/${endpoint}`, {
@@ -454,10 +462,44 @@ const ExperimentRunner = {
     async stopExperiment() {
         if (!this.currentExperimentId) return;
         
-        if (!confirm('Are you sure you want to stop the experiment?')) {
+        // First, pause the experiment to freeze progress
+        await this.togglePause('pause');
+        
+        // Now show confirmation modal with experiment paused
+        if (typeof UniversalModal === 'undefined') {
+            console.error('UniversalModal not available, falling back to browser confirm');
+            if (!confirm('Are you sure you want to stop the experiment?')) {
+                // User cancelled - resume the experiment
+                await this.togglePause('resume');
+                return;
+            }
+            this._performStopExperiment();
             return;
         }
         
+        UniversalModal.showModal({
+            icon: 'alert-circle',
+            variant: 'warning',
+            title: 'Stop Experiment?',
+            body: '<p class="text-sm text-slate-700 leading-relaxed">The experiment is now paused. Are you sure you want to stop it? This action cannot be undone and all current progress will be lost.</p>',
+            buttons: {
+                'Stop Experiment': (closeModal) => {
+                    closeModal();
+                    this._performStopExperiment();
+                }
+            },
+            closeBtn: {
+                'Cancel': async (closeModal) => {
+                    // User cancelled - resume the experiment
+                    await this.togglePause('resume');
+                }
+            },
+            backdropClose: false,
+            escapeClose: true
+        });
+    },
+    
+    async _performStopExperiment() {
         try {
             const response = await fetch(`/api/experiment/${this.currentExperimentId}/stop`, {
                 method: 'POST'
@@ -476,6 +518,7 @@ const ExperimentRunner = {
             }
         } catch (error) {
             console.error('Error stopping experiment:', error);
+            this.showNotification('Error stopping experiment', 'error');
         }
     },
     
@@ -1332,17 +1375,23 @@ const ExperimentRunner = {
                 const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
                 
                 return `
-                    <div class="card card--bordered hover:border-purple-300 hover:shadow-md transition-all cursor-pointer" 
-                         onclick="ExperimentRunner.viewResult('${result.id}')" data-id="${result.id}">
+                    <div class="card card--bordered hover:border-purple-300 hover:shadow-md transition-all" data-id="${result.id}">
                         <div class="p-4">
                             <div class="flex items-start justify-between mb-3">
-                                <div class="flex-1">
-                                    <h4 class="font-semibold text-gray-800 mb-1">${result.id}</h4>
+                                <div class="flex-1 cursor-pointer" onclick="ExperimentRunner.viewResult('${result.id}')">
+                                    <h4 class="font-semibold text-gray-800 mb-1 hover:text-purple-600">${result.id}</h4>
                                     <p class="text-xs text-gray-500">${dateStr}</p>
                                 </div>
-                                <span class="badge badge--success">${result.completed.toFixed(0)}% Complete</span>
+                                <div class="flex items-center gap-2">
+                                    <span class="badge badge--success">${result.completed.toFixed(0)}% Complete</span>
+                                    <button class="btn btn--ghost btn--sm text-red-600 hover:bg-red-50"
+                                        onclick="event.stopPropagation(); ExperimentRunner.confirmDeleteResult('${result.id}')"
+                                        title="Delete result">
+                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                    </button>
+                                </div>
                             </div>
-                            <div class="grid grid-cols-4 gap-3 text-xs">
+                            <div class="grid grid-cols-4 gap-3 text-xs cursor-pointer" onclick="ExperimentRunner.viewResult('${result.id}')">
                                 <div class="text-center bg-blue-50 rounded py-2">
                                     <div class="text-blue-600 font-medium">Trials</div>
                                     <div class="font-bold text-blue-700">${result.trials}</div>
@@ -1355,9 +1404,9 @@ const ExperimentRunner = {
                                     <div class="text-purple-600 font-medium">Routes</div>
                                     <div class="font-bold text-purple-700">${result.routes_per_batch}</div>
                                 </div>
-                                <div class="text-center bg-amber-50 rounded py-2">
-                                    <div class="text-amber-600 font-medium">Status</div>
-                                    <div class="font-bold text-amber-700 text-xs">Complete</div>
+                                <div class="text-center bg-yellow-50 rounded py-2">
+                                    <div class="text-yellow-600 font-medium">Status</div>
+                                    <div class="font-bold text-yellow-700 text-xs">Complete</div>
                                 </div>
                             </div>
                         </div>
@@ -1391,11 +1440,39 @@ const ExperimentRunner = {
         }
     },
     
-    async deleteResult(resultId) {
-        if (!confirm('Are you sure you want to delete this result?')) {
+    confirmDeleteResult(resultId) {
+        // Use modal for confirmation instead of browser confirm
+        if (typeof UniversalModal === 'undefined') {
+            console.error('UniversalModal not available, falling back to browser confirm');
+            if (!confirm('Are you sure you want to delete this result? This action cannot be undone.')) {
+                return;
+            }
+            this._performDeleteResult(resultId);
             return;
         }
         
+        UniversalModal.showModal({
+            icon: 'trash-2',
+            variant: 'error',
+            title: 'Delete Result?',
+            body: '<p class="text-sm text-slate-700 leading-relaxed">Are you sure you want to delete this result? This action cannot be undone and all data will be permanently lost.</p>',
+            buttons: {
+                'Delete Result': (closeModal) => {
+                    closeModal();
+                    this._performDeleteResult(resultId);
+                }
+            },
+            closeBtn: {
+                'Cancel': (closeModal) => {
+                    // Just close the modal
+                }
+            },
+            backdropClose: false,
+            escapeClose: true
+        });
+    },
+    
+    async _performDeleteResult(resultId) {
         try {
             const response = await fetch(`/api/experiment/results/${resultId}`, {
                 method: 'DELETE'
@@ -1412,6 +1489,10 @@ const ExperimentRunner = {
             console.error('Error deleting result:', error);
             this.showNotification('Error deleting result', 'error');
         }
+    },
+    
+    async deleteResult(resultId) {
+        this.confirmDeleteResult(resultId);
     },
     
     // =========================================================================

@@ -183,6 +183,7 @@
   border-bottom: none;
 }
 
+.modal__header--danger,
 .modal__header--error {
   background: var(--gradient-error);
   color: var(--color-text-inverse);
@@ -367,7 +368,7 @@
   background: var(--color-warning-light);
   color: var(--color-warning-dark);
 }
-
+.modal__icon--danger,
 .modal__icon--error {
   background: var(--color-error-light);
   color: var(--color-error);

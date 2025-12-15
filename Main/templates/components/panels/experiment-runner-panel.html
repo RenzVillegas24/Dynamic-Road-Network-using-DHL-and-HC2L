@@ -479,17 +479,23 @@
 
     <!-- Result Item Template -->
     <template id="template-result-item">
-      <div class="card card--bordered hover:border-purple-300 hover:shadow-md transition-all cursor-pointer"
-        onclick="ExperimentRunner.viewResult(this.dataset.id)" data-id="">
+      <div class="card card--bordered hover:border-purple-300 hover:shadow-md transition-all" data-id="">
         <div class="p-4">
           <div class="flex items-start justify-between mb-3">
-            <div class="flex-1">
-              <h4 class="font-semibold text-gray-800 mb-1"></h4>
+            <div class="flex-1 cursor-pointer" onclick="ExperimentRunner.viewResult(this.closest('[data-id]').dataset.id)">
+              <h4 class="font-semibold text-gray-800 mb-1 hover:text-purple-600"></h4>
               <p class="text-xs text-gray-500"></p>
             </div>
-            <span class="badge badge--success"></span>
+            <div class="flex items-center gap-2">
+              <span class="badge badge--success"></span>
+              <button class="btn btn--ghost btn--sm text-red-600 hover:bg-red-50"
+                onclick="event.stopPropagation(); ExperimentRunner.confirmDeleteResult(this.closest('[data-id]').dataset.id)"
+                title="Delete result">
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+              </button>
+            </div>
           </div>
-          <div class="grid grid-cols-4 gap-3 text-xs">
+          <div class="grid grid-cols-4 gap-3 text-xs cursor-pointer" onclick="ExperimentRunner.viewResult(this.closest('[data-id]').dataset.id)">
             <div class="text-center bg-blue-50 rounded py-2">
               <div class="text-blue-600 font-medium">Trials</div>
               <div class="font-bold text-blue-700"></div>
