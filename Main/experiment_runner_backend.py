@@ -602,7 +602,9 @@ class ExperimentMetricsCollector:
                 
                 if dhl_query_times:
                     dhl_avg_query = np.mean(dhl_query_times)
-                    dhl_min_query = np.min(dhl_query_times)
+                    # Filter out negative and zero values for min calculation
+                    positive_dhl_times = np.array(dhl_query_times)[np.array(dhl_query_times) > 0]
+                    dhl_min_query = np.min(positive_dhl_times) if len(positive_dhl_times) > 0 else 0
                     dhl_max_query = np.max(dhl_query_times)
                     dhl_avg_lazy = np.mean(dhl_lazy_times) if dhl_lazy_times else 0
                     dhl_peak_label = self.peak_label_size_dhl[trial, batch]
@@ -636,7 +638,9 @@ class ExperimentMetricsCollector:
                 
                 if hc2l_query_times:
                     hc2l_avg_query = np.mean(hc2l_query_times)
-                    hc2l_min_query = np.min(hc2l_query_times)
+                    # Filter out negative and zero values for min calculation
+                    positive_hc2l_times = np.array(hc2l_query_times)[np.array(hc2l_query_times) > 0]
+                    hc2l_min_query = np.min(positive_hc2l_times) if len(positive_hc2l_times) > 0 else 0
                     hc2l_max_query = np.max(hc2l_query_times)
                     hc2l_avg_lazy = np.mean(hc2l_lazy_times) if hc2l_lazy_times else 0
                     hc2l_peak_label = self.peak_label_size_hc2l[trial, batch]
