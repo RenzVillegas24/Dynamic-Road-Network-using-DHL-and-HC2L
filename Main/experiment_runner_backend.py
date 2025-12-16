@@ -2726,26 +2726,28 @@ class ExperimentRunner:
             # ================================================================
             # Step 4: Calculate Deviation Percentages
             # ================================================================
-            # Time deviation
-            avg_time = (result['travel_time_min_hc2l'] + result['travel_time_min_here']) / 2
-            if avg_time > 0:
-                result['time_deviation_pct'] = abs(
-                    result['travel_time_min_hc2l'] - result['travel_time_min_here']
-                ) / avg_time * 100
+            # Time deviation - Formula 15: TimeDeviation = ((T_DHC2L - T_ref) / T_ref) * 100
+            if result['travel_time_min_here'] > 0:
+                result['time_deviation_pct'] = (
+                    (result['travel_time_min_hc2l'] - result['travel_time_min_here'])
+                    / result['travel_time_min_here'] * 100
+                )
             
-            # TTD rating
-            if result['time_deviation_pct'] < 5:
+            # TTD rating - based on absolute deviation magnitude
+            ttd_magnitude = abs(result['time_deviation_pct'])
+            if ttd_magnitude < 5:
                 result['ttd_rating'] = 'Excellent'
-            elif result['time_deviation_pct'] < 15:
+            elif ttd_magnitude < 15:
                 result['ttd_rating'] = 'Good'
             else:
                 result['ttd_rating'] = 'Fair'
             
-            # Distance deviation
-            if result['distance_km_hc2l'] > 0:
-                result['distance_deviation_pct'] = abs(
-                    result['distance_km_hc2l'] - result['distance_km_here']
-                ) / result['distance_km_hc2l'] * 100
+            # Distance deviation - consistent with Travel Time Deviation formula using HERE as reference
+            if result['distance_km_here'] > 0:
+                result['distance_deviation_pct'] = (
+                    (result['distance_km_hc2l'] - result['distance_km_here'])
+                    / result['distance_km_here'] * 100
+                )
             
             return result
             
