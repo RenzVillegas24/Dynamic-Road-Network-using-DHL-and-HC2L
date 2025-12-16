@@ -1559,23 +1559,23 @@ const ExperimentRunner = {
     updateResultsSummary(data) {
         const trialsEl = document.getElementById('result-total-trials');
         const batchesEl = document.getElementById('result-total-batches');
-        const algorithmsEl = document.getElementById('result-algorithms');
+        const routesPerBatchEl = document.getElementById('result-routes-per-batch');
+        const avgMemoryDhlEl = document.getElementById('result-avg-memory-dhl');
+        const avgMemoryHc2lEl = document.getElementById('result-avg-memory-hc2l');
         
         if (trialsEl) trialsEl.textContent = data.total_trials || 3;
         if (batchesEl) batchesEl.textContent = data.total_batches || 3;
-        if (algorithmsEl) algorithmsEl.textContent = '2 (DHL vs HC2L)';
+        if (routesPerBatchEl) routesPerBatchEl.textContent = data.routes_per_batch || 1000;
         
-        // Display memory usage if available
+        // Display average memory usage in the summary card
         const summary = data.summary || {};
+        if (avgMemoryDhlEl) avgMemoryDhlEl.textContent = summary.avg_memory_dhl_mb?.toFixed(1) || '0';
+        if (avgMemoryHc2lEl) avgMemoryHc2lEl.textContent = summary.avg_memory_hc2l_mb?.toFixed(1) || '0';
+        
+        // Remove the old separate memory summary display since it's now in the grid
         const memoryContainer = document.getElementById('result-memory-summary');
-        if (memoryContainer && (summary.avg_memory_dhl_mb || summary.avg_memory_hc2l_mb)) {
-            memoryContainer.innerHTML = `
-                <div class="text-sm text-gray-600 dark:text-gray-300 mt-2">
-                    <strong>Average Memory Usage:</strong>
-                    DHL: ${summary.avg_memory_dhl_mb?.toFixed(2) || 'N/A'} MB (Peak: ${summary.peak_memory_dhl_mb?.toFixed(2) || 'N/A'} MB) | 
-                    HC2L: ${summary.avg_memory_hc2l_mb?.toFixed(2) || 'N/A'} MB (Peak: ${summary.peak_memory_hc2l_mb?.toFixed(2) || 'N/A'} MB)
-                </div>
-            `;
+        if (memoryContainer) {
+            memoryContainer.innerHTML = '';
         }
     },
     

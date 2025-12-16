@@ -146,17 +146,33 @@ struct MemoryUsageTracker {
     double get_initial_mb() const {
         return bytes_to_mb(initial_bytes);
     }
+
+    double get_initial_bytes() const {
+        return static_cast<double>(initial_bytes);
+    }
     
     double get_peak_mb() const {
         return bytes_to_mb(peak_bytes);
+    }
+
+    double get_peak_bytes() const {
+        return static_cast<double>(peak_bytes);
     }
     
     double get_current_mb() const {
         return bytes_to_mb(current_bytes);
     }
+
+    double get_current_bytes() const {
+        return static_cast<double>(current_bytes);
+    }
     
     double get_increase_mb() const {
         return bytes_to_mb(current_bytes - initial_bytes);
+    }
+
+    double get_increase_bytes() const {
+        return static_cast<double>(current_bytes - initial_bytes);
     }
 };
 

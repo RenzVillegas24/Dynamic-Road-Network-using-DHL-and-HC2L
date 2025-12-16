@@ -631,12 +631,12 @@ void output_json_response(bool success, const string& error_message = "",
             cout << "    \"labeling_info\": {" << endl;
             cout << "      \"total_labels\": " << label_count << "," << endl;
             cout << "      \"infinite_labels\": 0," << endl;  // DHL doesn't track infinite labels separately
-            cout << "      \"initial_index_size_bytes\": " << original_size << "," << endl;
-            cout << "      \"initial_index_size_mb\": " << fixed << setprecision(5) << (original_size / (1024.0 * 1024.0)) << "," << endl;
-            cout << "      \"index_size_bytes\": " << query_size << "," << endl;
-            cout << "      \"index_size_mb\": " << fixed << setprecision(5) << (query_size / (1024.0 * 1024.0)) << "," << endl;
-            cout << "      \"peak_label_size_mb\": " << fixed << setprecision(5) << (peak_index_size / (1024.0 * 1024.0)) << "," << endl;
-            cout << "      \"label_size_change_pct\": " << fixed << setprecision(2) << size_change_pct << "," << endl;
+            cout << "      \"initial_index_size_bytes\": " << original_size + memory_tracker->get_initial_bytes() << "," << endl;
+            cout << "      \"initial_index_size_mb\": " << fixed << setprecision(5) << (original_size / (1024.0 * 1024.0)) + memory_tracker->get_initial_mb() << "," << endl;
+            cout << "      \"index_size_bytes\": " << query_size + memory_tracker->get_current_bytes() << "," << endl;
+            cout << "      \"index_size_mb\": " << fixed << setprecision(5) << (query_size / (1024.0 * 1024.0)) + memory_tracker->get_current_mb() << "," << endl;
+            cout << "      \"peak_label_size_mb\": " << fixed << setprecision(5) << (peak_index_size / (1024.0 * 1024.0)) + memory_tracker->get_peak_mb() << "," << endl;
+            cout << "      \"label_size_change_pct\": " << fixed << setprecision(2) << size_change_pct + memory_tracker->get_increase_mb() << "," << endl;
             cout << "      \"index_was_rebuilt\": " << (index_was_rebuilt ? "true" : "false") << "," << endl;
             cout << "      \"hierarchy_height\": " << height << "," << endl;
             cout << "      \"max_label_count_per_node\": " << max_label_count << "," << endl;
