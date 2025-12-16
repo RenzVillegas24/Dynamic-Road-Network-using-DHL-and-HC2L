@@ -607,6 +607,7 @@ class DHLRouter:
             return {'error': route_data.get('error', 'Unknown error')}
         
         metrics = route_data.get('metrics', {})
+        labeling_info = metrics.get('labeling_info', {})
         
         summary = {
             'algorithm': 'DHL (Dual-Hierarchy Labelling)',
@@ -614,7 +615,7 @@ class DHLRouter:
             'query_time_ms': metrics.get('query_time_ms', 0),
             'query_time_microseconds': metrics.get('query_time_microseconds', 0),
             'labeling_time_ms': metrics.get('labeling_time_ms', 0),
-            'labeling_size_kb': metrics.get('labeling_size_bytes', 0) / 1024,
+            'labeling_size_bytes': labeling_info.get('index_size_bytes', 0.0) / 1024,
             'total_distance_units': metrics.get('total_distance_units', 0),
             'path_length': metrics.get('path_length', 0),
             'hoplinks_examined': metrics.get('hoplinks_examined', 0),

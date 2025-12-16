@@ -663,8 +663,8 @@ void output_json_response(bool success, const string& error_message = "",
             cout << "    \"labeling_info\": {" << endl;
             cout << "      \"total_labels\": 0," << endl;
             cout << "      \"infinite_labels\": 0," << endl;
-            cout << "      \"index_size_bytes\": " << fixed << setprecision(0) << index_size_bytes << "," << endl;
-            cout << "      \"index_size_mb\": " << fixed << setprecision(5) << index_size_mb << "," << endl;
+            cout << "      \"index_size_bytes\": " << fixed << setprecision(0) << index_size_bytes + memory_tracker->get_initial_bytes() << "," << endl;
+            cout << "      \"index_size_mb\": " << fixed << setprecision(5) << index_size_mb + memory_tracker->get_initial_mb() << "," << endl;
             cout << "      \"hierarchy_height\": 0," << endl;
             cout << "      \"max_label_count_per_node\": 0," << endl;
             cout << "      \"max_cut_size\": 0," << endl;
@@ -679,8 +679,8 @@ void output_json_response(bool success, const string& error_message = "",
         
         // Keep backward compatibility fields at top level
         cout << "    \"labeling_time_ms\": " << fixed << setprecision(3) << index_load_time_ms << "," << endl;
-        cout << "    \"labeling_size_mb\": " << fixed << setprecision(5) << index_size_mb << "," << endl;
-        cout << "    \"labeling_size_bytes\": " << fixed << setprecision(0) << index_size_bytes << endl;
+        cout << "    \"labeling_size_mb\": " << fixed << setprecision(5) << index_size_mb + memory_tracker->get_initial_mb() << "," << endl;
+        cout << "    \"labeling_size_bytes\": " << fixed << setprecision(0) << index_size_bytes + memory_tracker->get_initial_bytes() << endl;
         cout << "  }," << endl;
         
         // Disruption configuration section
