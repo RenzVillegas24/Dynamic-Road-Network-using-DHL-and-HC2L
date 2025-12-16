@@ -209,6 +209,16 @@ class ExperimentMetricsCollector:
         self.nodes_updated_dhl = np.zeros(shape, dtype=np.int32)
         self.nodes_updated_hc2l = np.zeros(shape, dtype=np.int32)
         
+        # Memory usage metrics (per trial, batch, route)
+        self.memory_initial_dhl = np.zeros(shape, dtype=np.float64)
+        self.memory_initial_hc2l = np.zeros(shape, dtype=np.float64)
+        self.memory_current_dhl = np.zeros(shape, dtype=np.float64)
+        self.memory_current_hc2l = np.zeros(shape, dtype=np.float64)
+        self.memory_peak_dhl = np.zeros(shape, dtype=np.float64)
+        self.memory_peak_hc2l = np.zeros(shape, dtype=np.float64)
+        self.memory_increase_dhl = np.zeros(shape, dtype=np.float64)
+        self.memory_increase_hc2l = np.zeros(shape, dtype=np.float64)
+        
         # Tau values per route
         self.tau_values = np.zeros(shape, dtype=np.float64)
         
@@ -265,6 +275,12 @@ class ExperimentMetricsCollector:
                 distance = summary.get("distance_km", 0)
                 tau = result.get("tau", 0.5)
                 
+                # Extract memory usage metrics
+                memory_initial = summary.get("memory_initial_mb", 0)
+                memory_current = summary.get("memory_current_mb", 0)
+                memory_peak = summary.get("memory_peak_mb", 0)
+                memory_increase = summary.get("memory_increase_mb", 0)
+                
                 # Extract travel time from ETA
                 eta_str = summary.get("actual_eta", "")
                 travel_time = self._parse_eta_to_seconds(eta_str)
@@ -304,6 +320,10 @@ class ExperimentMetricsCollector:
                     self.travel_time_dhl[trial, batch, route] = travel_time
                     self.impact_score_dhl[trial, batch, route] = impact_score
                     self.nodes_updated_dhl[trial, batch, route] = nodes_updated
+                    self.memory_initial_dhl[trial, batch, route] = memory_initial
+                    self.memory_current_dhl[trial, batch, route] = memory_current
+                    self.memory_peak_dhl[trial, batch, route] = memory_peak
+                    self.memory_increase_dhl[trial, batch, route] = memory_increase
                     self.filled_dhl[trial, batch, route] = True
                     
                     # Track batch-level metrics
@@ -331,6 +351,10 @@ class ExperimentMetricsCollector:
                     self.travel_time_hc2l[trial, batch, route] = travel_time
                     self.impact_score_hc2l[trial, batch, route] = impact_score
                     self.nodes_updated_hc2l[trial, batch, route] = nodes_updated
+                    self.memory_initial_hc2l[trial, batch, route] = memory_initial
+                    self.memory_current_hc2l[trial, batch, route] = memory_current
+                    self.memory_peak_hc2l[trial, batch, route] = memory_peak
+                    self.memory_increase_hc2l[trial, batch, route] = memory_increase
                     self.filled_hc2l[trial, batch, route] = True
                     
                     # Track batch-level metrics
@@ -915,6 +939,12 @@ class ExperimentMetricsCollector:
         total_dhl = np.sum(self.filled_dhl)
         total_hc2l = np.sum(self.filled_hc2l)
         
+        # Compute average memory usage
+        dhl_mem_avg = np.mean(self.memory_peak_dhl[self.filled_dhl]) if np.any(self.filled_dhl) else 0
+        hc2l_mem_avg = np.mean(self.memory_peak_hc2l[self.filled_hc2l]) if np.any(self.filled_hc2l) else 0
+        dhl_mem_peak = np.max(self.memory_peak_dhl[self.filled_dhl]) if np.any(self.filled_dhl) else 0
+        hc2l_mem_peak = np.max(self.memory_peak_hc2l[self.filled_hc2l]) if np.any(self.filled_hc2l) else 0
+        
         return {
             "total_trials": self.trials,
             "total_batches": self.batches,
@@ -922,7 +952,11 @@ class ExperimentMetricsCollector:
             "completed_dhl": int(total_dhl),
             "completed_hc2l": int(total_hc2l),
             "total_expected": self.trials * self.batches * self.routes_per_batch * 2,
-            "completion_pct": round((total_dhl + total_hc2l) / (self.trials * self.batches * self.routes_per_batch * 2) * 100, 2)
+            "completion_pct": round((total_dhl + total_hc2l) / (self.trials * self.batches * self.routes_per_batch * 2) * 100, 2),
+            "avg_memory_dhl_mb": round(dhl_mem_avg, 2),
+            "avg_memory_hc2l_mb": round(hc2l_mem_avg, 2),
+            "peak_memory_dhl_mb": round(dhl_mem_peak, 2),
+            "peak_memory_hc2l_mb": round(hc2l_mem_peak, 2)
         }
     
     def _compute_similarity_extra(self) -> Dict:
@@ -3198,6 +3232,13 @@ class ExperimentRunner:
         elif labeling_info.get("index_size_bytes"):
             label_size_mb = labeling_info.get("index_size_bytes") / (1024 * 1024)
         
+        # Extract memory usage information
+        memory_usage = metrics.get("memory_usage", {})
+        memory_initial_mb = memory_usage.get("initial_mb", 0)
+        memory_current_mb = memory_usage.get("current_mb", 0)
+        memory_peak_mb = memory_usage.get("peak_mb", 0)
+        memory_increase_mb = memory_usage.get("increase_mb", 0)
+        
         # Summary
         result["summary"] = {
             "route": "Start → End",
@@ -3213,7 +3254,11 @@ class ExperimentRunner:
             "non_empty_cuts": labeling_info.get("non_empty_cuts", 0),
             "label_size": round(label_size_mb, 2),  # In MB
             "tau": round(tau, 3),
-            "disrupted_edges": route_disruptions.get("total_disrupted_edges", 0)
+            "disrupted_edges": route_disruptions.get("total_disrupted_edges", 0),
+            "memory_initial_mb": round(memory_initial_mb, 2),
+            "memory_current_mb": round(memory_current_mb, 2),
+            "memory_peak_mb": round(memory_peak_mb, 2),
+            "memory_increase_mb": round(memory_increase_mb, 2)
         }
         
         # Update Phase - extract from lazy_hc2l or dhl_update_info

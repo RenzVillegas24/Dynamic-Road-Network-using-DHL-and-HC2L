@@ -533,7 +533,8 @@ void output_json_response(bool success, const string& error_message = "",
                          size_t peak_index_size = 0,
                          size_t initial_index_size = 0,
                          bool index_was_rebuilt = false,
-                         size_t current_index_size = 0) {
+                         size_t current_index_size = 0,
+                         const MemoryUsageTracker* memory_tracker = nullptr) {
     
     cout << "{" << endl;
     cout << "  \"success\": " << (success ? "true" : "false") << "," << endl;
@@ -644,6 +645,20 @@ void output_json_response(bool success, const string& error_message = "",
             cout << "      \"non_empty_cuts\": " << non_empty_cuts << "," << endl;
             cout << "      \"index_load_time_ms\": " << fixed << setprecision(3) << index_load_time_ms << endl;
             cout << "    }," << endl;
+            
+            // Add memory usage information
+            if (memory_tracker != nullptr) {
+                cout << "    \"memory_usage\": {" << endl;
+                cout << "      \"initial_mb\": " << fixed << setprecision(2) << memory_tracker->get_initial_mb() << "," << endl;
+                cout << "      \"current_mb\": " << fixed << setprecision(2) << memory_tracker->get_current_mb() << "," << endl;
+                cout << "      \"peak_mb\": " << fixed << setprecision(2) << memory_tracker->get_peak_mb() << "," << endl;
+                cout << "      \"increase_mb\": " << fixed << setprecision(2) << memory_tracker->get_increase_mb() << endl;
+                cout << "    }," << endl;
+            } else {
+                cout << "    \"memory_usage\": {" << endl;
+                cout << "      \"note\": \"Memory tracking unavailable\"" << endl;
+                cout << "    }," << endl;
+            }
         } else {
             cout << "    \"labeling_info\": {" << endl;
             cout << "      \"total_labels\": 0," << endl;
@@ -656,6 +671,9 @@ void output_json_response(bool success, const string& error_message = "",
             cout << "      \"average_cut_size\": 0.0," << endl;
             cout << "      \"non_empty_cuts\": 0," << endl;
             cout << "      \"index_load_time_ms\": " << fixed << setprecision(3) << index_load_time_ms << endl;
+            cout << "    }," << endl;
+            cout << "    \"memory_usage\": {" << endl;
+            cout << "      \"note\": \"Memory tracking unavailable\"" << endl;
             cout << "    }," << endl;
         }
         
@@ -1389,6 +1407,12 @@ int main(int argc, char* argv[]) {
     // Optimize I/O for large JSON output
     setup_fast_io();
     
+    // Initialize memory tracker at start
+    MemoryUsageTracker memory_tracker;
+    
+    cerr << "🚀 DHL Routing API with Performance Metrics" << endl;
+    cerr << "   - Initial memory: " << memory_tracker.get_initial_mb() << " MB" << endl;
+    
     // Accept 18 args (no disruption), 19 args (with disruption file), 20 args (with disruption + tau), or 21 args (with generate_alternatives)
     // Args: 14 routing params + 3 data files + optional disruption_file + optional tau_threshold + optional generate_alternatives
     // argc includes argv[0] (program name), so:
@@ -1985,6 +2009,15 @@ int main(int argc, char* argv[]) {
         auto end_time = chrono::high_resolution_clock::now();
         double query_time_ms = chrono::duration<double, milli>(end_time - start_time).count();
         
+        // Update memory tracker before output
+        memory_tracker.update();
+        
+        cerr << "💾 Memory Usage Summary:" << endl;
+        cerr << "   Initial:  " << fixed << setprecision(2) << memory_tracker.get_initial_mb() << " MB" << endl;
+        cerr << "   Current:  " << fixed << setprecision(2) << memory_tracker.get_current_mb() << " MB" << endl;
+        cerr << "   Peak:     " << fixed << setprecision(2) << memory_tracker.get_peak_mb() << " MB" << endl;
+        cerr << "   Increase: " << fixed << setprecision(2) << memory_tracker.get_increase_mb() << " MB" << endl;
+        
         // Output result
         output_json_response(true, "", best_start, best_dest,
                            start_pin_lat, start_pin_lng, start_snap_lat, start_snap_lng,
@@ -1999,7 +2032,7 @@ int main(int argc, char* argv[]) {
                            update_strategy, update_reason, nodes_updated, threshold_rebuild_time_ms,
                            flow_data, incident_data, &ci, adj_list, generate_alternatives,
                            peak_index_size, initial_index_size, index_was_rebuilt,
-                           current_index_size);
+                           current_index_size, &memory_tracker);
         
         return 0;
         

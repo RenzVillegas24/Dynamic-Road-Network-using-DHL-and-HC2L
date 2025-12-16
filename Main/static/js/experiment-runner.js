@@ -807,6 +807,14 @@ const ExperimentRunner = {
         // Disrupted Edges
         const edgesEl = section.querySelector('[data-metric="disrupted-edges"]');
         if (edgesEl) edgesEl.textContent = lastResult.disrupted_edges || '0';
+        
+        // Memory Usage (if available)
+        const memoryEl = section.querySelector('[data-metric="memory-peak"]');
+        if (memoryEl && lastResult.memory_peak_mb) {
+            memoryEl.textContent = `${lastResult.memory_peak_mb.toFixed(2)} MB`;
+        } else if (memoryEl) {
+            memoryEl.textContent = 'N/A';
+        }
     },
     
     updateThreadUpdatePhase(container, updatePhase) {
@@ -1062,6 +1070,7 @@ const ExperimentRunner = {
                         <div><span class="text-gray-500">Label Size:</span> <span data-metric="label-size" class="font-medium">--</span></div>
                         <div><span class="text-gray-500">Tau (τ):</span> <span data-metric="tau" class="font-medium">--</span></div>
                         <div><span class="text-gray-500">Disrupted Edges:</span> <span data-metric="disrupted-edges" class="font-medium">0</span></div>
+                        <div><span class="text-gray-500">Peak Memory:</span> <span data-metric="memory-peak" class="font-medium">--</span></div>
                     </div>
                 </div>
                 
@@ -1554,7 +1563,20 @@ const ExperimentRunner = {
         
         if (trialsEl) trialsEl.textContent = data.total_trials || 3;
         if (batchesEl) batchesEl.textContent = data.total_batches || 3;
-        if (algorithmsEl) algorithmsEl.textContent = '2 (DHL vs DHC2L)';
+        if (algorithmsEl) algorithmsEl.textContent = '2 (DHL vs HC2L)';
+        
+        // Display memory usage if available
+        const summary = data.summary || {};
+        const memoryContainer = document.getElementById('result-memory-summary');
+        if (memoryContainer && (summary.avg_memory_dhl_mb || summary.avg_memory_hc2l_mb)) {
+            memoryContainer.innerHTML = `
+                <div class="text-sm text-gray-600 dark:text-gray-300 mt-2">
+                    <strong>Average Memory Usage:</strong>
+                    DHL: ${summary.avg_memory_dhl_mb?.toFixed(2) || 'N/A'} MB (Peak: ${summary.peak_memory_dhl_mb?.toFixed(2) || 'N/A'} MB) | 
+                    HC2L: ${summary.avg_memory_hc2l_mb?.toFixed(2) || 'N/A'} MB (Peak: ${summary.peak_memory_hc2l_mb?.toFixed(2) || 'N/A'} MB)
+                </div>
+            `;
+        }
     },
     
     initResultTabNavigation() {

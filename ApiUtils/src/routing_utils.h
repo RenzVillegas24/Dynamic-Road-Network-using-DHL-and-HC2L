@@ -25,8 +25,140 @@
 #include "shared_routing_structures.h"
 #include "base_road_network.h"
 
+// Platform-specific includes for memory tracking
+#ifdef _WIN32
+    #include <windows.h>
+    #include <psapi.h>
+    #pragma comment(lib, "psapi.lib")
+#else
+    #include <unistd.h>
+    #include <fstream>
+#endif
+
 using namespace std;
 using namespace road_network;
+
+
+// ============================================================
+// MEMORY USAGE TRACKING (CROSS-PLATFORM)
+// ============================================================
+
+/**
+ * Get current memory usage in bytes (RSS - Resident Set Size)
+ * Works on both Linux and Windows
+ * @return Memory usage in bytes, or 0 if unable to determine
+ */
+inline size_t get_current_memory_usage_bytes() {
+#ifdef _WIN32
+    // Windows implementation using GetProcessMemoryInfo
+    PROCESS_MEMORY_COUNTERS_EX pmc;
+    if (GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc))) {
+        return pmc.WorkingSetSize;  // Current working set size (RSS equivalent)
+    }
+    return 0;
+#else
+    // Linux implementation using /proc/self/status
+    std::ifstream status_file("/proc/self/status");
+    std::string line;
+    
+    while (std::getline(status_file, line)) {
+        if (line.substr(0, 6) == "VmRSS:") {
+            // Format: "VmRSS:    12345 kB"
+            std::istringstream iss(line.substr(6));
+            size_t memory_kb;
+            if (iss >> memory_kb) {
+                return memory_kb * 1024;  // Convert kB to bytes
+            }
+        }
+    }
+    return 0;
+#endif
+}
+
+/**
+ * Get peak memory usage in bytes
+ * On Windows: returns peak working set size
+ * On Linux: returns VmHWM (High Water Mark - peak RSS)
+ * @return Peak memory usage in bytes, or 0 if unable to determine
+ */
+inline size_t get_peak_memory_usage_bytes() {
+#ifdef _WIN32
+    // Windows implementation
+    PROCESS_MEMORY_COUNTERS_EX pmc;
+    if (GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc))) {
+        return pmc.PeakWorkingSetSize;
+    }
+    return 0;
+#else
+    // Linux implementation using /proc/self/status
+    std::ifstream status_file("/proc/self/status");
+    std::string line;
+    
+    while (std::getline(status_file, line)) {
+        if (line.substr(0, 6) == "VmHWM:") {
+            // Format: "VmHWM:    12345 kB"
+            std::istringstream iss(line.substr(6));
+            size_t memory_kb;
+            if (iss >> memory_kb) {
+                return memory_kb * 1024;  // Convert kB to bytes
+            }
+        }
+    }
+    return 0;
+#endif
+}
+
+/**
+ * Convert bytes to megabytes (MB)
+ * @param bytes - Memory size in bytes
+ * @return Memory size in MB (floating point)
+ */
+inline double bytes_to_mb(size_t bytes) {
+    return static_cast<double>(bytes) / (1024.0 * 1024.0);
+}
+
+/**
+ * Memory usage tracker structure
+ * Tracks initial, peak, and current memory usage
+ */
+struct MemoryUsageTracker {
+    size_t initial_bytes;
+    size_t peak_bytes;
+    size_t current_bytes;
+    
+    MemoryUsageTracker() {
+        initial_bytes = get_current_memory_usage_bytes();
+        peak_bytes = initial_bytes;
+        current_bytes = initial_bytes;
+    }
+    
+    void update() {
+        current_bytes = get_current_memory_usage_bytes();
+        size_t system_peak = get_peak_memory_usage_bytes();
+        if (system_peak > peak_bytes) {
+            peak_bytes = system_peak;
+        }
+        if (current_bytes > peak_bytes) {
+            peak_bytes = current_bytes;
+        }
+    }
+    
+    double get_initial_mb() const {
+        return bytes_to_mb(initial_bytes);
+    }
+    
+    double get_peak_mb() const {
+        return bytes_to_mb(peak_bytes);
+    }
+    
+    double get_current_mb() const {
+        return bytes_to_mb(current_bytes);
+    }
+    
+    double get_increase_mb() const {
+        return bytes_to_mb(current_bytes - initial_bytes);
+    }
+};
 
 
 // ============================================================

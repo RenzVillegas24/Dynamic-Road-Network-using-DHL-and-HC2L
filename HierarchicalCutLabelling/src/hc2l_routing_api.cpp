@@ -644,7 +644,8 @@ void output_json_response(bool success, const string& error_message = "",
                          size_t peak_index_size = 0,
                          size_t initial_index_size = 0,
                          bool index_was_rebuilt = false,
-                         size_t current_index_size = 0) {
+                         size_t current_index_size = 0,
+                         const MemoryUsageTracker* memory_tracker = nullptr) {
     
     cout << "{" << endl;
     cout << "  \"success\": " << (success ? "true" : "false") << "," << endl;
@@ -755,10 +756,27 @@ void output_json_response(bool success, const string& error_message = "",
             cout << "      \"average_cut_size\": " << fixed << setprecision(2) << avg_cut_size << "," << endl;
             cout << "      \"non_empty_cuts\": " << non_empty_cuts << "," << endl;
             cout << "      \"index_load_time_ms\": " << fixed << setprecision(3) << index_load_time_ms << endl;
-            cout << "    }" << endl;
+            cout << "    }," << endl;
+            
+            // Add memory usage information
+            if (memory_tracker != nullptr) {
+                cout << "    \"memory_usage\": {" << endl;
+                cout << "      \"initial_mb\": " << fixed << setprecision(2) << memory_tracker->get_initial_mb() << "," << endl;
+                cout << "      \"current_mb\": " << fixed << setprecision(2) << memory_tracker->get_current_mb() << "," << endl;
+                cout << "      \"peak_mb\": " << fixed << setprecision(2) << memory_tracker->get_peak_mb() << "," << endl;
+                cout << "      \"increase_mb\": " << fixed << setprecision(2) << memory_tracker->get_increase_mb() << endl;
+                cout << "    }" << endl;
+            } else {
+                cout << "    \"memory_usage\": {" << endl;
+                cout << "      \"note\": \"Memory tracking unavailable\"" << endl;
+                cout << "    }" << endl;
+            }
         } else {
             cout << "    \"labeling_info\": {" << endl;
             cout << "      \"note\": \"Index data unavailable\"" << endl;
+            cout << "    }," << endl;
+            cout << "    \"memory_usage\": {" << endl;
+            cout << "      \"note\": \"Memory tracking unavailable\"" << endl;
             cout << "    }" << endl;
         }
         cout << "  }," << endl;
@@ -1499,6 +1517,9 @@ int main(int argc, char* argv[]) {
     // Optimize I/O for large JSON output
     setup_fast_io();
     
+    // Initialize memory tracker at start
+    MemoryUsageTracker memory_tracker;
+    
     // Initialize HC2L Optimizer with performance tracking
     auto& optimizer = get_hc2l_optimizer();
     auto& perf_collector = get_perf_collector();
@@ -1509,6 +1530,7 @@ int main(int argc, char* argv[]) {
     cerr << "   - O(1) dirty node tracking: ENABLED" << endl;
     cerr << "   - Bucket queue optimization: ENABLED" << endl;
     cerr << "   - Memory monitoring: ENABLED" << endl;
+    cerr << "   - Initial memory: " << memory_tracker.get_initial_mb() << " MB" << endl;
     
     // Accept 18 args (no disruption) or 19 args (with disruption file) or 20 args (with disruption + tau) or 21 args (with generate_alternatives)
     // Args: 14 routing params + 3 data files + optional disruption_file + optional tau_threshold + optional generate_alternatives
@@ -2302,6 +2324,15 @@ int main(int argc, char* argv[]) {
         perf_collector.record_memory(memory_monitor.get_current(), memory_monitor.get_peak());
         perf_collector.record_labels(ci.label_count(), ci.size());
         
+        // Update memory tracker before output
+        memory_tracker.update();
+        
+        cerr << "💾 Memory Usage Summary:" << endl;
+        cerr << "   Initial:  " << fixed << setprecision(2) << memory_tracker.get_initial_mb() << " MB" << endl;
+        cerr << "   Current:  " << fixed << setprecision(2) << memory_tracker.get_current_mb() << " MB" << endl;
+        cerr << "   Peak:     " << fixed << setprecision(2) << memory_tracker.get_peak_mb() << " MB" << endl;
+        cerr << "   Increase: " << fixed << setprecision(2) << memory_tracker.get_increase_mb() << " MB" << endl;
+        
         // Auto-calibrate optimizer based on query performance
         optimizer.auto_calibrate();
 
@@ -2322,7 +2353,7 @@ int main(int argc, char* argv[]) {
                            dirty_nodes_on_path, lazy_repair_time_ms, nodes_repaired,
                            cache_hit, flow_data, alternatives, incident_data,
                            peak_index_size, initial_index_size, index_was_rebuilt,
-                           current_index_size);
+                           current_index_size, &memory_tracker);
         
         // Print optimization statistics to stderr
         cerr << endl;
