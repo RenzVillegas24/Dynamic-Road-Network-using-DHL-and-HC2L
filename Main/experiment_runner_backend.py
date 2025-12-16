@@ -2407,18 +2407,15 @@ class ExperimentRunner:
     
     def _here_comparison_thread(self, experiment_id: str, config: Dict):
         """
-        Dedicated thread for HERE vs HC2L route similarity comparison.
+        Dedicated thread for HERE vs HC2L route similarity comparison with adaptive rate limiting.
         
         This thread:
         1. Uses the same routes as the experiment (from config)
         2. Computes HC2L routes WITHOUT disruptions
-        3. Fetches HERE API routes for the same OD pairs
+        3. Fetches HERE API routes for the same OD pairs with rate limiting
         4. Calculates Fréchet distance between routes
         5. Records all metrics for the Route Similarity tab
-        
-        Features:
-        - Rate limiting: Rest for 2 seconds after every 10 API calls
-        - Retry logic: Up to 3 attempts per route before giving up
+        6. Implements adaptive batching based on API response codes
         
         Args:
             experiment_id: Experiment identifier
@@ -2442,19 +2439,22 @@ class ExperimentRunner:
                 collector.update_here_comparison_status('completed', 0)
                 return
             
-            logger.info(f"Starting HERE comparison for {total_routes} routes...")
-            logger.info(f"Rate limiting: 2 second rest after every 10 API calls")
-            logger.info(f"Retry logic: 3 attempts per route")
+            logger.info(f"Starting HERE comparison for {total_routes} routes with rate limiting...")
             collector.update_here_comparison_status('running', total_routes)
             
-            # Initialize HERE routing service
-            here_service = HereRoutingService()
+            # Initialize HERE routing service with rate limiting
+            # Configure 10 req/s (HERE Routing API typically allows 10-20 QPS for most plans)
+            here_service = HereRoutingService(requests_per_second=10)
             
-            # Rate limiting configuration
-            batch_size = 10  # Number of API calls before taking a rest
-            rest_duration = 2.0  # Seconds to rest after batch_size calls
-            api_call_count = 0
+            # Adaptive batching: Start with batch_size of 10, adjust based on rate limit responses
+            batch_size = 10
             completed = 0
+            errors = 0
+            rate_limit_hits = 0
+            consecutive_failures = 0
+            max_consecutive_failures = 5
+            
+            logger.info(f"Using adaptive rate limiting: 10 req/s, batch size: {batch_size}")
             
             for route_idx, route_data in enumerate(routes_to_compare):
                 # Check if experiment is still running
@@ -2470,33 +2470,92 @@ class ExperimentRunner:
                     comparison_result = self._compare_single_route_here_vs_hc2l(
                         route_idx, route_data, here_service, config
                     )
+                    
+                    # Check if rate limiting occurred
+                    if comparison_result.get('error') and '429' in str(comparison_result.get('error', '')):
+                        rate_limit_hits += 1
+                        consecutive_failures += 1
+                        logger.warning(
+                            f"Rate limited on route {route_idx}. "
+                            f"Total rate limit hits: {rate_limit_hits}"
+                        )
+                    elif comparison_result.get('error'):
+                        errors += 1
+                        consecutive_failures += 1
+                        logger.warning(f"Route {route_idx} failed: {comparison_result.get('error')}")
+                    else:
+                        completed += 1
+                        consecutive_failures = 0
+                    
                     collector.record_here_comparison(route_idx, comparison_result)
                     
-                    # Track API calls for rate limiting
-                    # Each route makes at least 1 API call (to HERE), plus 1 to HC2L router
-                    api_call_count += 2
+                    # Adaptive batching: reduce batch size if too many failures
+                    if consecutive_failures >= max_consecutive_failures:
+                        batch_size = max(5, batch_size // 2)
+                        logger.warning(
+                            f"Too many consecutive failures ({consecutive_failures}). "
+                            f"Reducing batch size to {batch_size}."
+                        )
+                        consecutive_failures = 0
                     
-                    # If we've hit the batch size, take a rest
-                    if api_call_count >= batch_size:
-                        logger.info(f"Rate limit: Processed {api_call_count} API calls, resting for {rest_duration}s...")
-                        time.sleep(rest_duration)
-                        api_call_count = 0
+                    # Intelligent delay between requests
+                    if (route_idx + 1) % batch_size == 0:
+                        # Longer pause at batch boundaries to give API time to recover
+                        batch_pause = 1.0 if rate_limit_hits == 0 else 2.0
+                        logger.debug(
+                            f"Batch {(route_idx + 1) // batch_size} completed. "
+                            f"Pausing {batch_pause}s before next batch..."
+                        )
+                        time.sleep(batch_pause)
                         
                         # Broadcast progress update
                         if experiment_id in self.experiments:
                             self._broadcast_progress(experiment_id)
-                    
-                    completed += 1
+                        
+                        # Log rate limiter statistics
+                        limiter_stats = here_service.get_rate_limiter_stats()
+                        cache_stats = here_service.get_cache_stats()
+                        logger.info(
+                            f"HERE API Stats - "
+                            f"Successful: {limiter_stats['successful_requests']}, "
+                            f"Rate Limited: {limiter_stats['rate_limited']}, "
+                            f"Retried: {limiter_stats['retried']}, "
+                            f"Circuit Open: {limiter_stats['circuit_open']}, "
+                            f"Cache Usage: {cache_stats['cache_usage_pct']}%"
+                        )
                     
                 except Exception as e:
                     logger.error(f"Error comparing route {route_idx}: {e}")
+                    consecutive_failures += 1
+                    errors += 1
                     collector.record_here_comparison(route_idx, {
                         'route_idx': route_idx,
                         'error': str(e)
                     })
             
+            # Final statistics
+            limiter_stats = here_service.get_rate_limiter_stats()
+            cache_stats = here_service.get_cache_stats()
+            
+            logger.success(
+                f"HERE comparison completed: {completed}/{total_routes} routes compared, "
+                f"{errors} errors, {rate_limit_hits} rate limit hits"
+            )
+            logger.info(
+                f"Final Rate Limiter Stats - "
+                f"Total Requests: {limiter_stats['total_requests']}, "
+                f"Successful: {limiter_stats['successful_requests']}, "
+                f"Rate Limited (429): {limiter_stats['rate_limited']}, "
+                f"Retried: {limiter_stats['retried']}, "
+                f"Circuit Breaker Trips: {limiter_stats['circuit_breaker_trips']}"
+            )
+            logger.info(
+                f"Cache Stats - "
+                f"Entries: {cache_stats['cache_size']}/{cache_stats['cache_max_size']}, "
+                f"Usage: {cache_stats['cache_usage_pct']}%"
+            )
+            
             collector.update_here_comparison_status('completed', total_routes)
-            logger.success(f"HERE comparison completed: {completed}/{total_routes} routes compared")
             
         except Exception as e:
             logger.error(f"HERE comparison thread error: {e}")
@@ -2509,10 +2568,6 @@ class ExperimentRunner:
                                            config: Dict) -> Dict:
         """
         Compare a single route between HERE API and HC2L (no disruptions).
-        
-        Features:
-        - Retry logic: Up to 3 attempts for HERE API calls
-        - Exponential backoff: Increases delay between retries
         
         Args:
             route_idx: Route index
@@ -2543,8 +2598,7 @@ class ExperimentRunner:
             'time_deviation_pct': 0,
             'ttd_rating': 'N/A',
             'distance_deviation_pct': 0,
-            'error': None,
-            'retry_count': 0
+            'error': None
         }
         
         try:
@@ -2632,67 +2686,17 @@ class ExperimentRunner:
                 return result
             
             # ================================================================
-            # Step 2: Call HERE Routing API with Retry Logic
+            # Step 2: Call HERE Routing API
             # ================================================================
-            # Retry configuration
-            max_retries = 3
-            retry_count = 0
-            here_result = None
-            last_error = None
-            
-            while retry_count < max_retries:
-                try:
-                    here_start_time = time.time()
-                    here_result = here_service.get_directions(
-                        start_lat=start_lat,
-                        start_lng=start_lng,
-                        dest_lat=end_lat,
-                        dest_lng=end_lng,
-                        traffic_mode='disabled'  # No traffic to match baseline
-                    )
-                    here_query_time = (time.time() - here_start_time) * 1000
-                    
-                    # Check if the result is successful
-                    if here_result and here_result.get('success'):
-                        break  # Success, exit retry loop
-                    else:
-                        # API returned an error
-                        last_error = here_result.get('error', 'Unknown error') if here_result else 'No response'
-                        retry_count += 1
-                        
-                        if retry_count < max_retries:
-                            # Exponential backoff: 0.5s, 1s, 2s
-                            backoff_delay = 0.5 * (2 ** (retry_count - 1))
-                            logger.warning(f"Route {route_idx}: HERE API failed (attempt {retry_count}/{max_retries})")
-                            logger.warning(f"  Error: {last_error}")
-                            logger.warning(f"  Retrying in {backoff_delay}s...")
-                            time.sleep(backoff_delay)
-                        else:
-                            logger.error(f"Route {route_idx}: HERE API failed after {max_retries} attempts")
-                            logger.error(f"  Final error: {last_error}")
-                
-                except Exception as e:
-                    # Network or other error occurred
-                    last_error = str(e)
-                    retry_count += 1
-                    
-                    if retry_count < max_retries:
-                        # Exponential backoff: 0.5s, 1s, 2s
-                        backoff_delay = 0.5 * (2 ** (retry_count - 1))
-                        logger.warning(f"Route {route_idx}: HERE API exception (attempt {retry_count}/{max_retries})")
-                        logger.warning(f"  Exception: {last_error}")
-                        logger.warning(f"  Retrying in {backoff_delay}s...")
-                        time.sleep(backoff_delay)
-                    else:
-                        logger.error(f"Route {route_idx}: HERE API failed after {max_retries} attempts")
-                        logger.error(f"  Final exception: {last_error}")
-            
-            result['retry_count'] = retry_count
-            
-            # If all retries failed, return error result
-            if not here_result or not here_result.get('success'):
-                result['error'] = f"HERE API failed after {max_retries} retries: {last_error}"
-                return result
+            here_start_time = time.time()
+            here_result = here_service.get_directions(
+                start_lat=start_lat,
+                start_lng=start_lng,
+                dest_lat=end_lat,
+                dest_lng=end_lng,
+                traffic_mode='disabled'  # No traffic to match baseline
+            )
+            here_query_time = (time.time() - here_start_time) * 1000
             
             here_path = []
             
