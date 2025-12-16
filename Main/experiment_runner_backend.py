@@ -2416,6 +2416,10 @@ class ExperimentRunner:
         4. Calculates Fréchet distance between routes
         5. Records all metrics for the Route Similarity tab
         
+        Features:
+        - Rate limiting: Rest for 2 seconds after every 10 API calls
+        - Retry logic: Up to 3 attempts per route before giving up
+        
         Args:
             experiment_id: Experiment identifier
             config: Experiment configuration with routes
@@ -2439,13 +2443,17 @@ class ExperimentRunner:
                 return
             
             logger.info(f"Starting HERE comparison for {total_routes} routes...")
+            logger.info(f"Rate limiting: 2 second rest after every 10 API calls")
+            logger.info(f"Retry logic: 3 attempts per route")
             collector.update_here_comparison_status('running', total_routes)
             
             # Initialize HERE routing service
             here_service = HereRoutingService()
             
-            # Process routes in batches of 10 to respect API rate limits
-            batch_size = 10
+            # Rate limiting configuration
+            batch_size = 10  # Number of API calls before taking a rest
+            rest_duration = 2.0  # Seconds to rest after batch_size calls
+            api_call_count = 0
             completed = 0
             
             for route_idx, route_data in enumerate(routes_to_compare):
@@ -2463,15 +2471,22 @@ class ExperimentRunner:
                         route_idx, route_data, here_service, config
                     )
                     collector.record_here_comparison(route_idx, comparison_result)
-                    completed += 1
                     
-                    # Rate limiting: small delay between requests
-                    if (route_idx + 1) % batch_size == 0:
-                        time.sleep(0.5)  # 500ms delay every 10 requests
+                    # Track API calls for rate limiting
+                    # Each route makes at least 1 API call (to HERE), plus 1 to HC2L router
+                    api_call_count += 2
+                    
+                    # If we've hit the batch size, take a rest
+                    if api_call_count >= batch_size:
+                        logger.info(f"Rate limit: Processed {api_call_count} API calls, resting for {rest_duration}s...")
+                        time.sleep(rest_duration)
+                        api_call_count = 0
                         
                         # Broadcast progress update
                         if experiment_id in self.experiments:
                             self._broadcast_progress(experiment_id)
+                    
+                    completed += 1
                     
                 except Exception as e:
                     logger.error(f"Error comparing route {route_idx}: {e}")
@@ -2481,7 +2496,7 @@ class ExperimentRunner:
                     })
             
             collector.update_here_comparison_status('completed', total_routes)
-            logger.success(f"HERE comparison completed: {completed} routes compared")
+            logger.success(f"HERE comparison completed: {completed}/{total_routes} routes compared")
             
         except Exception as e:
             logger.error(f"HERE comparison thread error: {e}")
@@ -2494,6 +2509,10 @@ class ExperimentRunner:
                                            config: Dict) -> Dict:
         """
         Compare a single route between HERE API and HC2L (no disruptions).
+        
+        Features:
+        - Retry logic: Up to 3 attempts for HERE API calls
+        - Exponential backoff: Increases delay between retries
         
         Args:
             route_idx: Route index
@@ -2524,7 +2543,8 @@ class ExperimentRunner:
             'time_deviation_pct': 0,
             'ttd_rating': 'N/A',
             'distance_deviation_pct': 0,
-            'error': None
+            'error': None,
+            'retry_count': 0
         }
         
         try:
@@ -2612,17 +2632,67 @@ class ExperimentRunner:
                 return result
             
             # ================================================================
-            # Step 2: Call HERE Routing API
+            # Step 2: Call HERE Routing API with Retry Logic
             # ================================================================
-            here_start_time = time.time()
-            here_result = here_service.get_directions(
-                start_lat=start_lat,
-                start_lng=start_lng,
-                dest_lat=end_lat,
-                dest_lng=end_lng,
-                traffic_mode='disabled'  # No traffic to match baseline
-            )
-            here_query_time = (time.time() - here_start_time) * 1000
+            # Retry configuration
+            max_retries = 3
+            retry_count = 0
+            here_result = None
+            last_error = None
+            
+            while retry_count < max_retries:
+                try:
+                    here_start_time = time.time()
+                    here_result = here_service.get_directions(
+                        start_lat=start_lat,
+                        start_lng=start_lng,
+                        dest_lat=end_lat,
+                        dest_lng=end_lng,
+                        traffic_mode='disabled'  # No traffic to match baseline
+                    )
+                    here_query_time = (time.time() - here_start_time) * 1000
+                    
+                    # Check if the result is successful
+                    if here_result and here_result.get('success'):
+                        break  # Success, exit retry loop
+                    else:
+                        # API returned an error
+                        last_error = here_result.get('error', 'Unknown error') if here_result else 'No response'
+                        retry_count += 1
+                        
+                        if retry_count < max_retries:
+                            # Exponential backoff: 0.5s, 1s, 2s
+                            backoff_delay = 0.5 * (2 ** (retry_count - 1))
+                            logger.warning(f"Route {route_idx}: HERE API failed (attempt {retry_count}/{max_retries})")
+                            logger.warning(f"  Error: {last_error}")
+                            logger.warning(f"  Retrying in {backoff_delay}s...")
+                            time.sleep(backoff_delay)
+                        else:
+                            logger.error(f"Route {route_idx}: HERE API failed after {max_retries} attempts")
+                            logger.error(f"  Final error: {last_error}")
+                
+                except Exception as e:
+                    # Network or other error occurred
+                    last_error = str(e)
+                    retry_count += 1
+                    
+                    if retry_count < max_retries:
+                        # Exponential backoff: 0.5s, 1s, 2s
+                        backoff_delay = 0.5 * (2 ** (retry_count - 1))
+                        logger.warning(f"Route {route_idx}: HERE API exception (attempt {retry_count}/{max_retries})")
+                        logger.warning(f"  Exception: {last_error}")
+                        logger.warning(f"  Retrying in {backoff_delay}s...")
+                        time.sleep(backoff_delay)
+                    else:
+                        logger.error(f"Route {route_idx}: HERE API failed after {max_retries} attempts")
+                        logger.error(f"  Final exception: {last_error}")
+            
+            result['retry_count'] = retry_count
+            
+            # If all retries failed, return error result
+            if not here_result or not here_result.get('success'):
+                result['error'] = f"HERE API failed after {max_retries} retries: {last_error}"
+                return result
             
             here_path = []
             
