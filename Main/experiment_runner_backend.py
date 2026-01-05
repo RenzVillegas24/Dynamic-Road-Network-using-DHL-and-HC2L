@@ -1257,9 +1257,10 @@ class DisruptionCacheManager:
     PRELOAD_THRESHOLD = 0.8  # Preload next chunk at 80% completion
     GENERATION_BATCH_SIZE = 10  # Generate disruptions in batches of 10
     
-    def __init__(self, base_path: Path, is_preset: bool = True, disruption_settings: Dict = None):
+    def __init__(self, base_path: Path, is_preset: bool = True, disruption_mode: str = "preset", disruption_settings: Dict = None):
         self.base_path = base_path
         self.is_preset = is_preset
+        self.disruption_mode = disruption_mode  # "preset", "variety_preset", or "random"
         self.disruption_settings = disruption_settings or {
             "ratio_flow": 95,
             "ratio_incident": 5,
@@ -1293,10 +1294,70 @@ class DisruptionCacheManager:
         except Exception as e:
             logger.error(f"Failed to load matched edges: {e}")
             return []
+    
+    def _get_disruption_level_params(self, batch_idx: int) -> Dict:
+        """
+        Get disruption parameters based on variety_preset level.
+        
+        Disruption Levels:
+        - Light (batch 0): speed > 20 km/h, jam factor ≤ 3, open roads
+        - Medium (batch 1): speed 5-20 km/h, jam factor 4-6, open roads
+        - Heavy (batch 2): speed < 5 km/h OR jam factor > 6 OR closed roads
+        
+        Returns dict with speed_range, jam_factor_range, allow_closure, closure_prob
+        """
+        if self.disruption_mode != "variety_preset":
+            # Use standard severity range from settings
+            severity_min = self.disruption_settings.get("severity_min", 0.1)
+            severity_max = self.disruption_settings.get("severity_max", 0.9)
+            return {
+                "severity_range": (severity_min, severity_max),
+                "allow_closure": severity_max > 0.8,
+                "closure_prob": 0.1 if severity_max > 0.8 else 0
+            }
+        
+        # Variety preset mode - determine level by batch index
+        level = batch_idx % 3  # 0=light, 1=medium, 2=heavy
+        
+        if level == 0:  # Light
+            return {
+                "speed_min": 21,
+                "speed_max": 60,
+                "jam_factor_min": 0,
+                "jam_factor_max": 3,
+                "allow_closure": False,
+                "closure_prob": 0,
+                "severity_range": (0.0, 0.3)
+            }
+        elif level == 1:  # Medium
+            return {
+                "speed_min": 5,
+                "speed_max": 20,
+                "jam_factor_min": 4,
+                "jam_factor_max": 6,
+                "allow_closure": False,
+                "closure_prob": 0,
+                "severity_range": (0.3, 0.6)
+            }
+        else:  # Heavy (level == 2)
+            return {
+                "speed_min": 1,
+                "speed_max": 5,
+                "jam_factor_min": 6,
+                "jam_factor_max": 10,
+                "allow_closure": True,
+                "closure_prob": 0.3,  # 30% chance of road closure
+                "severity_range": (0.6, 1.0)
+            }
         
     def get_disruption_path(self, batch_idx: int, route_idx: int) -> Path:
-        """Get path to disruption set based on preset/temporary mode"""
-        if self.is_preset:
+        """Get path to disruption set based on preset/temporary mode and disruption_mode"""
+        if self.disruption_mode == "variety_preset":
+            # Variety preset: Use light/medium/heavy based on batch index
+            level_names = ["light", "medium", "heavy"]
+            level = level_names[batch_idx % 3]  # Cycle through levels for batches
+            set_name = f"set_{level}_route_{route_idx}"
+        elif self.is_preset:
             # Preset format: set_batch_X_route_Y
             set_name = f"set_batch_{batch_idx}_route_{route_idx}"
         else:
@@ -1374,11 +1435,12 @@ class DisruptionCacheManager:
             flow_dir.mkdir(parents=True, exist_ok=True)
             incident_dir.mkdir(parents=True, exist_ok=True)
             
+            # Get disruption level parameters (variety_preset or standard)
+            level_params = self._get_disruption_level_params(batch_idx)
+            
             # Get settings
             ratio_flow = self.disruption_settings.get("ratio_flow", 95)
             ratio_incident = self.disruption_settings.get("ratio_incident", 5)
-            severity_min = self.disruption_settings.get("severity_min", 0.1)
-            severity_max = self.disruption_settings.get("severity_max", 0.9)
             
             # Get edges for disruption generation
             edges = self._get_matched_edges()
@@ -1417,10 +1479,19 @@ class DisruptionCacheManager:
                     continue
                 used_edges.add(edge_key)
                 
-                severity = random.uniform(severity_min, severity_max)
-                jam_factor = severity * 10  # 0-10 scale
-                free_flow_kph = float(edge.get('free_flow_speed', 60))
-                flow_speed = max(5.0, free_flow_kph * (1.0 - (jam_factor / 10.0)))
+                # Use level_params for variety_preset mode
+                if self.disruption_mode == "variety_preset":
+                    # Generate speed and jam factor based on level
+                    flow_speed = random.uniform(level_params['speed_min'], level_params['speed_max'])
+                    jam_factor = random.uniform(level_params['jam_factor_min'], level_params['jam_factor_max'])
+                    free_flow_kph = float(edge.get('free_flow_speed', 60))
+                else:
+                    # Standard mode: use severity range
+                    severity_min, severity_max = level_params['severity_range']
+                    severity = random.uniform(severity_min, severity_max)
+                    jam_factor = severity * 10  # 0-10 scale
+                    free_flow_kph = float(edge.get('free_flow_speed', 60))
+                    flow_speed = max(5.0, free_flow_kph * (1.0 - (jam_factor / 10.0)))
                 
                 flow_rows.append({
                     'id_hash': edge.get('id_hash', f'exp_{batch_idx}_{route_idx}_{i}'),
@@ -1452,7 +1523,18 @@ class DisruptionCacheManager:
                     continue
                 used_edges.add(edge_key)
                 
-                severity = random.uniform(severity_min, severity_max)
+                # Determine incident properties based on level_params
+                if self.disruption_mode == "variety_preset":
+                    severity_min, severity_max = level_params['severity_range']
+                    severity = random.uniform(severity_min, severity_max)
+                    # Determine if road should be closed
+                    road_closed = level_params['allow_closure'] and random.random() < level_params['closure_prob']
+                else:
+                    severity_min, severity_max = level_params['severity_range']
+                    severity = random.uniform(severity_min, severity_max)
+                    road_closed = level_params['allow_closure'] and severity > 0.8
+                
+                # Determine criticality based on severity
                 if severity > 0.7:
                     criticality = 'critical'
                 elif severity > 0.4:
@@ -1471,7 +1553,7 @@ class DisruptionCacheManager:
                     'incident_type': random.choice(incident_types),
                     'incident_criticality': criticality,
                     'incident_description': f'Experiment incident on {edge.get("road_name", "Unknown Road")}',
-                    'incident_road_closed': severity > 0.8,
+                    'incident_road_closed': road_closed,
                     'incident_start_time': datetime.now().isoformat() + 'Z',
                     'incident_end_time': (datetime.now() + timedelta(hours=3)).isoformat() + 'Z',
                     'highway_type': edge.get('highway_type', 'primary'),
@@ -1677,7 +1759,14 @@ class ExperimentRunner:
         logger.info(f"Preset path: {self.preset_path}")
         logger.info(f"Temporary path: {self.temporary_path}")
     
-    def _ensure_preset_config(self, experiment_id: str = None):
+    def _ensure_preset_config(self, experiment_id: str = None, route_mode: str = "preset"):
+        """Ensure preset configuration exists based on route_mode"""
+        if route_mode == "same_batch_preset":
+            self._ensure_same_batch_preset_config(experiment_id)
+        else:
+            self._ensure_different_batch_preset_config(experiment_id)
+    
+    def _ensure_different_batch_preset_config(self, experiment_id: str = None):
         """Ensure ExperimentPreset.json exists with default configuration and pre-generated routes"""
         preset_file = self.preset_path / "ExperimentPreset.json"
         
@@ -1707,26 +1796,15 @@ class ExperimentRunner:
         # Create default preset configuration with routes
         default_preset = {
             "id": "default",
-            "name": "Default Experiment Preset",
-            "description": "Default experiment configuration with 3 trials, 3 batches, 1000 routes per batch",
+            "name": "Default Experiment Preset - Different Routes",
+            "description": "Default experiment configuration with 3 trials, 3 batches, 1000 routes per batch (3000 total, different routes)",
+            "generation_mode": "different_batch",
             "algorithms": ["DHL", "HC2L"],
             "trial_count": 3,
             "batch_count": 3,
             "routes_per_batch": 1000,
+            "total_routes": 3000,
             "routes": routes,  # Pre-generated routes with full snap data
-            "tau_settings": {
-                "mode": "random",
-                "scope": "per-trial-route",
-                "fixed": 0.5,
-                "random_min": 0.1,
-                "random_max": 0.9
-            },
-            "disruption_settings": {
-                "ratio_flow": 95,
-                "ratio_incident": 5,
-                "severity_min": 0.1,
-                "severity_max": 0.9
-            },
             "created_at": datetime.now().isoformat(),
             "last_modified": datetime.now().isoformat()
         }
@@ -1741,6 +1819,62 @@ class ExperimentRunner:
                 self._emit_preset_progress(experiment_id, "creating_complete", "Preset created successfully", 100)
         except Exception as e:
             logger.error(f"Failed to create ExperimentPreset.json: {e}")
+            if experiment_id:
+                self._emit_preset_progress(experiment_id, "error", f"Failed to save preset: {str(e)}", 0)
+    
+    def _ensure_same_batch_preset_config(self, experiment_id: str = None):
+        """Ensure ExperimentPresetSameBatch.json exists with 1000 routes to be reused across all batches"""
+        preset_file = self.preset_path / "ExperimentPresetSameBatch.json"
+        
+        if preset_file.exists():
+            logger.info("ExperimentPresetSameBatch.json already exists")
+            # Send loading progress
+            if experiment_id:
+                self._emit_preset_progress(experiment_id, "loading", "Loading same batch preset configuration...", 25)
+                self._emit_preset_progress(experiment_id, "loading_complete", "Preset loaded successfully", 100)
+            return
+        
+        logger.info("Creating ExperimentPresetSameBatch.json with 1000 pre-generated routes...")
+        
+        # Send creating progress
+        if experiment_id:
+            self._emit_preset_progress(experiment_id, "creating", "Generating same batch preset configuration...", 10)
+        
+        # Generate 1000 routes with full snap data (to be reused across all batches)
+        routes = self._generate_preset_routes(1000, experiment_id)
+        
+        if not routes:
+            logger.error("Failed to generate preset routes")
+            if experiment_id:
+                self._emit_preset_progress(experiment_id, "error", "Failed to generate preset routes", 0)
+            return
+        
+        # Create same batch preset configuration with routes
+        same_batch_preset = {
+            "id": "same_batch",
+            "name": "Same Batch Preset - Reusable Routes",
+            "description": "Experiment configuration with same 1000 routes reused across all batches and trials",
+            "generation_mode": "same_batch",
+            "algorithms": ["DHL", "HC2L"],
+            "trial_count": 3,
+            "batch_count": 3,
+            "routes_per_batch": 1000,
+            "total_routes": 1000,  # Only 1000 unique routes
+            "routes": routes,  # Pre-generated routes with full snap data
+            "created_at": datetime.now().isoformat(),
+            "last_modified": datetime.now().isoformat()
+        }
+        
+        try:
+            with open(preset_file, 'w') as f:
+                json.dump(same_batch_preset, f, indent=2)
+            logger.success(f"Created ExperimentPresetSameBatch.json with {len(routes)} pre-generated routes (reusable)")
+            
+            # Send completion progress
+            if experiment_id:
+                self._emit_preset_progress(experiment_id, "creating_complete", "Same batch preset created successfully", 100)
+        except Exception as e:
+            logger.error(f"Failed to create ExperimentPresetSameBatch.json: {e}")
             if experiment_id:
                 self._emit_preset_progress(experiment_id, "error", f"Failed to save preset: {str(e)}", 0)
     
@@ -1899,6 +2033,7 @@ class ExperimentRunner:
             base_path = self.preset_path if is_preset else self.temporary_path / experiment_id
             
             # Initialize disruption cache with settings from config
+            disruption_mode = config.get("disruption_mode", "preset")
             disruption_settings = config.get("disruption_settings", {
                 "ratio_flow": 95,
                 "ratio_incident": 5,
@@ -1908,6 +2043,7 @@ class ExperimentRunner:
             self.disruption_caches[experiment_id] = DisruptionCacheManager(
                 base_path, 
                 is_preset=is_preset,
+                disruption_mode=disruption_mode,
                 disruption_settings=disruption_settings
             )
             
@@ -1969,13 +2105,18 @@ class ExperimentRunner:
             
             config = progress._config
             is_preset = config.get("is_preset", True)
+            route_mode = config.get("route_mode", "preset")
             
             # Ensure preset configuration exists (with progress tracking)
             if is_preset:
-                self._ensure_preset_config(experiment_id)
+                self._ensure_preset_config(experiment_id, route_mode)
                 
-                # Load routes from ExperimentPreset.json
-                preset_file = self.preset_path / "ExperimentPreset.json"
+                # Load routes from appropriate preset file based on route_mode
+                if route_mode == "same_batch_preset":
+                    preset_file = self.preset_path / "ExperimentPresetSameBatch.json"
+                else:
+                    preset_file = self.preset_path / "ExperimentPreset.json"
+                
                 if preset_file.exists():
                     try:
                         with open(preset_file, 'r') as f:
@@ -1983,12 +2124,8 @@ class ExperimentRunner:
                             # Merge preset routes into config if not already present
                             if "routes" not in config or not config["routes"]:
                                 config["routes"] = preset_data.get("routes", [])
-                                logger.success(f"Loaded {len(config['routes'])} routes from preset")
-                            # Also merge other preset settings if not provided
-                            if "tau_settings" not in config:
-                                config["tau_settings"] = preset_data.get("tau_settings", {})
-                            if "disruption_settings" not in config:
-                                config["disruption_settings"] = preset_data.get("disruption_settings", {})
+                                config["generation_mode"] = preset_data.get("generation_mode", "different_batch")
+                                logger.success(f"Loaded {len(config['routes'])} routes from preset (mode: {config['generation_mode']})")
                     except Exception as e:
                         logger.error(f"Failed to load preset routes: {e}")
             
@@ -3670,9 +3807,17 @@ class ExperimentRunner:
     def _get_route_coordinates(self, config: Dict, route_idx: int) -> Dict:
         """Get route coordinates from preset or generate random"""
         routes = config.get("routes", [])
+        generation_mode = config.get("generation_mode", "different_batch")
         
-        if route_idx < len(routes):
-            route = routes[route_idx]
+        # For same_batch mode, reuse the same 1000 routes across all batches
+        # by wrapping the route index modulo the total available routes
+        if generation_mode == "same_batch" and len(routes) > 0:
+            actual_route_idx = route_idx % len(routes)
+        else:
+            actual_route_idx = route_idx
+        
+        if actual_route_idx < len(routes):
+            route = routes[actual_route_idx]
             start_data = route.get("start", {})
             end_data = route.get("end", {})
             
@@ -3683,10 +3828,10 @@ class ExperimentRunner:
             end_edge_target = end_data.get("edge_target", 0)
             
             # Log if edges are missing (only for first few routes to avoid spam)
-            if route_idx < 5 and (start_edge_source == 0 or end_edge_source == 0):
-                logger.warning(f"Route {route_idx}: Missing edge data - start_edge={start_edge_source}, end_edge={end_edge_source}")
-                logger.debug(f"Route {route_idx} start_data keys: {list(start_data.keys())}")
-                logger.debug(f"Route {route_idx} end_data keys: {list(end_data.keys())}")
+            if actual_route_idx < 5 and (start_edge_source == 0 or end_edge_source == 0):
+                logger.warning(f"Route {actual_route_idx}: Missing edge data - start_edge={start_edge_source}, end_edge={end_edge_source}")
+                logger.debug(f"Route {actual_route_idx} start_data keys: {list(start_data.keys())}")
+                logger.debug(f"Route {actual_route_idx} end_data keys: {list(end_data.keys())}")
             
             # Extract coordinates with proper fallbacks
             # Support both pin_lat/pin_lng and lat/lng formats

@@ -65,16 +65,24 @@
         <div class="section-card__body space-y-3">
           <div class="form-group">
             <label class="form-group__label">Route Generation Mode</label>
-            <div class="nav-select nav-select--grid">
+            <div class="nav-select">
               <label class="nav-select__option" data-color="blue">
                 <input type="radio" name="experiment-route-mode" value="preset" checked>
                 <div class="nav-select__icon"><i data-lucide="save" class="w-4 h-4"></i></div>
                 <div class="nav-select__content">
-                  <span class="nav-select__title">Preset</span>
-                  <span class="nav-select__description">Use saved or generate once</span>
+                  <span class="nav-select__title">DIFFERENT Routes Preset</span>
+                  <span class="nav-select__description">Different routes across all batches (3000 routes total)</span>
                 </div>
               </label>
-              <label class="nav-select__option" data-color="amber">
+              <label class="nav-select__option" data-color="purple">
+                <input type="radio" name="experiment-route-mode" value="same_batch_preset">
+                <div class="nav-select__icon"><i data-lucide="copy" class="w-4 h-4"></i></div>
+                <div class="nav-select__content">
+                  <span class="nav-select__title">SAME Routes per Batch Preset</span>
+                  <span class="nav-select__description">Same routes across all batches (1000 routes reused)</span>
+                </div>
+              </label>
+              <label class="nav-select__option" data-color="orange">
                 <input type="radio" name="experiment-route-mode" value="random">
                 <div class="nav-select__icon"><i data-lucide="shuffle" class="w-4 h-4"></i></div>
                 <div class="nav-select__content">
@@ -109,17 +117,28 @@
         <div class="section-card__body space-y-4">
           <div class="form-group">
             <label class="form-group__label">Disruption Generation Mode</label>
-            <div class="nav-select nav-select--grid">
+            <div class="nav-select">
               <label class="nav-select__option" data-color="amber">
-                <input type="radio" name="experiment-disruption-mode" value="preset" checked>
+                <input type="radio" name="experiment-disruption-mode" value="preset" checked 
+                  onchange="ExperimentRunner.updateDisruptionModeUI()">
                 <div class="nav-select__icon"><i data-lucide="save" class="w-4 h-4"></i></div>
                 <div class="nav-select__content">
-                  <span class="nav-select__title">Preset</span>
-                  <span class="nav-select__description">Use saved or generate once</span>
+                  <span class="nav-select__title">DIFFERENT Disruptions Preset</span>
+                  <span class="nav-select__description">Different disruptions across all batches</span>
+                </div>
+              </label>
+              <label class="nav-select__option" data-color="teal">
+                <input type="radio" name="experiment-disruption-mode" value="variety_preset"
+                  onchange="ExperimentRunner.updateDisruptionModeUI()">
+                <div class="nav-select__icon"><i data-lucide="layers" class="w-4 h-4"></i></div>
+                <div class="nav-select__content">
+                  <span class="nav-select__title">VARIETY Disruptions Preset</span>
+                  <span class="nav-select__description">Light, medium, and heavy presets for batches 1, 2, 3</span>
                 </div>
               </label>
               <label class="nav-select__option" data-color="orange">
-                <input type="radio" name="experiment-disruption-mode" value="random">
+                <input type="radio" name="experiment-disruption-mode" value="random"
+                  onchange="ExperimentRunner.updateDisruptionModeUI()">
                 <div class="nav-select__icon"><i data-lucide="shuffle" class="w-4 h-4"></i></div>
                 <div class="nav-select__content">
                   <span class="nav-select__title">Random</span>
@@ -130,7 +149,7 @@
           </div>
 
           <!-- Severity Range -->
-          <div class="border-t border-amber-200 pt-3">
+          <div id="experiment-severity-range-section" class="border-t border-amber-200 pt-3">
             <h5 class="form-group__label">Severity Range</h5>
             <div class="grid grid-cols-2 gap-3">
               <div class="form-group">

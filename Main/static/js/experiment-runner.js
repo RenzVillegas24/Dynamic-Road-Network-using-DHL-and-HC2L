@@ -529,6 +529,9 @@ const ExperimentRunner = {
         // Route mode
         const routeMode = document.querySelector('input[name="experiment-route-mode"]:checked')?.value || 'preset';
         
+        // Determine if preset mode (includes both preset types)
+        const isPreset = routeMode === 'preset' || routeMode === 'same_batch_preset';
+        
         // Routes per batch
         const routesPerBatch = parseInt(document.getElementById('experiment-routes-per-batch')?.value || 1000);
         
@@ -548,7 +551,7 @@ const ExperimentRunner = {
         const tauScope = document.querySelector('input[name="experiment-tau-scope"]:checked')?.value || 'per-trial-route';
         
         return {
-            is_preset: routeMode === 'preset',
+            is_preset: isPreset,
             thread_count: threadCount,
             trials: 3,
             batches_per_trial: 3,
@@ -1181,6 +1184,22 @@ const ExperimentRunner = {
         
         if (randomSettings) {
             randomSettings.classList.toggle('hidden', mode !== 'random');
+        }
+        
+        // Refresh icons
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    },
+    
+    updateDisruptionModeUI() {
+        const mode = document.querySelector('input[name="experiment-disruption-mode"]:checked')?.value || 'preset';
+        
+        const severityRangeSection = document.getElementById('experiment-severity-range-section');
+        
+        // Hide severity range when variety_preset is selected
+        if (severityRangeSection) {
+            severityRangeSection.classList.toggle('hidden', mode === 'variety_preset');
         }
         
         // Refresh icons
