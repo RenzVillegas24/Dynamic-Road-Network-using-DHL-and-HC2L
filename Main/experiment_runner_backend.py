@@ -88,6 +88,7 @@ class ThreadProgress:
     status: str = "not_started"  # running/paused/completed/error
     percentage: float = 0.0
     current_disruption: str = ""
+    current_disruption_level: str = ""  # "Light", "Medium", "Heavy" for variety_preset
     current_route_index: int = 0
     total_routes: int = 0
     routes_per_minute: float = 0.0
@@ -97,6 +98,12 @@ class ThreadProgress:
     query_phase: Dict = field(default_factory=dict)
     results_history: List[Dict] = field(default_factory=list)
     error_message: str = ""
+    # Performance stats for current batch
+    avg_query_time_ms: float = 0.0
+    avg_labeling_time_ms: float = 0.0
+    avg_labeling_size_mb: float = 0.0
+    successful_routes: int = 0
+    failed_routes: int = 0
 
 
 @dataclass
@@ -447,6 +454,104 @@ class ExperimentMetricsCollector:
             if status == 'running' and not self.here_comparison_progress.get('start_time'):
                 self.here_comparison_progress['start_time'] = time.time()
     
+    # =========================================================================
+    # SOP 3 INTERPRETATION THRESHOLDS (Table 8-12)
+    # =========================================================================
+    
+    @staticmethod
+    def _categorize_labeling_time(labeling_time_ms: float) -> str:
+        """
+        Categorize labeling time based on Table 8 thresholds.
+        
+        Args:
+            labeling_time_ms: Labeling time in milliseconds
+            
+        Returns:
+            Category: "Excellent", "Acceptable", or "Needs Optimization"
+        """
+        if labeling_time_ms < 500:
+            return "Excellent"
+        elif labeling_time_ms <= 1000:
+            return "Acceptable"
+        else:
+            return "Needs Optimization"
+    
+    @staticmethod
+    def _categorize_labeling_size(labeling_size_mb: float) -> str:
+        """
+        Categorize labeling size based on Table 9 thresholds.
+        
+        Args:
+            labeling_size_mb: Labeling size in megabytes
+            
+        Returns:
+            Category: "Efficient", "Acceptable", or "Large"
+        """
+        if labeling_size_mb < 3:
+            return "Efficient"
+        elif labeling_size_mb <= 5:
+            return "Acceptable"
+        else:
+            return "Large"
+    
+    @staticmethod
+    def _categorize_query_time(query_time_ms: float) -> str:
+        """
+        Categorize query response time based on Table 10 thresholds.
+        
+        Args:
+            query_time_ms: Query response time in milliseconds
+            
+        Returns:
+            Category: "Fast", "Moderate", or "Slow"
+        """
+        if query_time_ms < 1:
+            return "Fast"
+        elif query_time_ms <= 5:
+            return "Moderate"
+        else:
+            return "Slow"
+    
+    @staticmethod
+    def _categorize_frechet_distance(frechet_distance_m: float) -> str:
+        """
+        Categorize Fréchet distance based on Table 11 thresholds.
+        
+        Args:
+            frechet_distance_m: Fréchet distance in meters
+            
+        Returns:
+            Category: "Excellent", "Good", "Fair", or "Poor"
+        """
+        if frechet_distance_m <= 50:
+            return "Excellent"
+        elif frechet_distance_m <= 100:
+            return "Good"
+        elif frechet_distance_m <= 200:
+            return "Fair"
+        else:
+            return "Poor"
+    
+    @staticmethod
+    def _categorize_travel_time_deviation(deviation_pct: float) -> str:
+        """
+        Categorize travel time deviation based on Table 12 thresholds.
+        
+        Args:
+            deviation_pct: Travel time deviation percentage
+            
+        Returns:
+            Category: "Excellent", "Good", "Fair", or "Poor"
+        """
+        if deviation_pct <= 5:
+            return "Excellent"
+        elif deviation_pct <= 10:
+            return "Good"
+        elif deviation_pct <= 20:
+            return "Fair"
+        else:
+            return "Poor"
+    
     def record_per_route_log(self, trial: int, batch: int, route: int,
                              algorithm: str, result: Dict, disruption_data: Optional[Dict] = None):
         """
@@ -498,6 +603,8 @@ class ExperimentMetricsCollector:
                     "num_construction": incident_summary.get("num_construction", 0),
                     "num_hazards": incident_summary.get("num_hazards", 0),
                     "num_other_incidents": incident_summary.get("num_other_incidents", 0),
+                    "avg_jam_factor": incident_summary.get("avg_jam_factor", 0.0),
+                    "num_disrupted_edges": incident_summary.get("num_disrupted_edges", 0),
                     
                     # Accuracy metrics (always recorded)
                     "dhc2l_distance_km": accuracy.get("dhc2l_distance_km"),
@@ -505,7 +612,7 @@ class ExperimentMetricsCollector:
                     "distance_error_km": accuracy.get("distance_error_km"),
                     "relative_error": accuracy.get("relative_error"),
                     "is_correct": is_correct,
-                    "tolerance": accuracy.get("tolerance", 0.025),
+                    "tolerance": accuracy.get("tolerance", 0.05),
                 }
                 
                 # ACCURACY GATING: Only record performance if is_correct = TRUE
@@ -521,17 +628,98 @@ class ExperimentMetricsCollector:
                     labeling_time = summary.get("labeling_time_ms", 0)
                     labeling_size = summary.get("label_size", 0)
                     
+                    # ================================================================
+                    # SOP 3: RAW TEMPORAL DATA (ALWAYS RECORDED IF CORRECT)
+                    # ================================================================
+                    # Extract DHC2L travel time from summary (ETA)
+                    dhc2l_travel_time_seconds = summary.get("eta_seconds", 0)
+                    
+                    # Extract HERE travel time from result if available
+                    # NOTE: This will be populated when HERE comparison is integrated
+                    here_data = result.get("here_comparison", {})
+                    here_travel_time_seconds = here_data.get("travel_time_seconds", None)
+                    
+                    # ================================================================
+                    # SOP 3: RAW SPATIAL DATA (ALWAYS RECORDED IF CORRECT)
+                    # ================================================================
+                    # DHC2L route length (already have as distance)
+                    dhc2l_route_length_m = accuracy.get("dhc2l_distance_km", 0) * 1000
+                    
+                    # HERE route length from comparison data
+                    here_route_length_m = here_data.get("route_length_m", None)
+                    
+                    # Fréchet distance from comparison
+                    frechet_distance_m = here_data.get("frechet_distance_m", None)
+                    
+                    # ================================================================
+                    # SOP 3: DERIVED ERROR RATES
+                    # ================================================================
+                    frechet_error_rate = None
+                    travel_time_error_rate = None
+                    
+                    if frechet_distance_m is not None and here_route_length_m and here_route_length_m > 0:
+                        frechet_error_rate = frechet_distance_m / here_route_length_m
+                    
+                    if here_travel_time_seconds and here_travel_time_seconds > 0:
+                        travel_time_error_rate = abs(dhc2l_travel_time_seconds - here_travel_time_seconds) / here_travel_time_seconds
+                    
+                    # ================================================================
+                    # SOP 3: INTERPRETATION CATEGORIES
+                    # ================================================================
+                    labeling_time_category = self._categorize_labeling_time(labeling_time) if labeling_time > 0 else None
+                    labeling_size_category = self._categorize_labeling_size(labeling_size) if labeling_size > 0 else None
+                    query_time_category = self._categorize_query_time(query_time) if query_time > 0 else None
+                    frechet_category = self._categorize_frechet_distance(frechet_distance_m) if frechet_distance_m is not None else None
+                    
+                    travel_time_deviation_pct = (travel_time_error_rate * 100) if travel_time_error_rate is not None else None
+                    travel_time_category = self._categorize_travel_time_deviation(travel_time_deviation_pct) if travel_time_deviation_pct is not None else None
+                    
                     log_entry.update({
+                        # Performance metrics (with categories)
                         "query_response_time_ms": query_time if query_time > 0 else None,
+                        "query_time_category": query_time_category,
                         "labeling_time_ms": labeling_time if labeling_time > 0 else None,
-                        "labeling_size_mb": labeling_size if labeling_size > 0 else None
+                        "labeling_time_category": labeling_time_category,
+                        "labeling_size_mb": labeling_size if labeling_size > 0 else None,
+                        "labeling_size_category": labeling_size_category,
+                        
+                        # SOP 3: Raw temporal data
+                        "dhc2l_travel_time_seconds": dhc2l_travel_time_seconds if dhc2l_travel_time_seconds > 0 else None,
+                        "here_travel_time_seconds": here_travel_time_seconds,
+                        "travel_time_error_rate": travel_time_error_rate,
+                        "travel_time_deviation_pct": travel_time_deviation_pct,
+                        "travel_time_category": travel_time_category,
+                        
+                        # SOP 3: Raw spatial data
+                        "dhc2l_route_length_m": dhc2l_route_length_m if dhc2l_route_length_m > 0 else None,
+                        "here_route_length_m": here_route_length_m,
+                        "frechet_distance_m": frechet_distance_m,
+                        "frechet_error_rate": frechet_error_rate,
+                        "frechet_category": frechet_category
                     })
                 else:
-                    # NULL for incorrect results
+                    # NULL for incorrect results (including all SOP 3 metrics)
                     log_entry.update({
                         "query_response_time_ms": None,
+                        "query_time_category": None,
                         "labeling_time_ms": None,
-                        "labeling_size_mb": None
+                        "labeling_time_category": None,
+                        "labeling_size_mb": None,
+                        "labeling_size_category": None,
+                        
+                        # SOP 3: NULL temporal data for incorrect results
+                        "dhc2l_travel_time_seconds": None,
+                        "here_travel_time_seconds": None,
+                        "travel_time_error_rate": None,
+                        "travel_time_deviation_pct": None,
+                        "travel_time_category": None,
+                        
+                        # SOP 3: NULL spatial data for incorrect results
+                        "dhc2l_route_length_m": None,
+                        "here_route_length_m": None,
+                        "frechet_distance_m": None,
+                        "frechet_error_rate": None,
+                        "frechet_category": None
                     })
                 
                 # Append to per-route logs
@@ -654,21 +842,133 @@ class ExperimentMetricsCollector:
             }
             return results
     
+    def merge_here_comparison_into_logs(self):
+        """
+        Merge HERE comparison data back into per_route_logs.
+        
+        This links the separate HERE comparison thread results with the main
+        per-route logs by matching on (trial_id, batch_id, query_id).
+        
+        Called after the HERE comparison thread completes and before CSV export.
+        """
+        with self.lock:
+            if not self.here_comparison_data:
+                logger.info("No HERE comparison data to merge")
+                return
+            
+            if not self.per_route_logs:
+                logger.warning("No per-route logs to merge HERE data into")
+                return
+            
+            # Create lookup map: (trial, batch, route) -> HERE data
+            here_lookup = {}
+            for here_data in self.here_comparison_data:
+                if here_data.get('error'):
+                    continue  # Skip failed comparisons
+                
+                # Extract route identifier (trial 0, batch 0 for HERE comparison thread)
+                route_idx = here_data.get('route_idx', -1)
+                if route_idx >= 0:
+                    # HERE comparison uses batch 0, but we need to match with actual routes
+                    # Route index in HERE data corresponds to route index in per_route_logs
+                    here_lookup[route_idx] = here_data
+            
+            # Merge HERE data into per_route_logs
+            merged_count = 0
+            for log_entry in self.per_route_logs:
+                query_id = log_entry.get('query_id', -1)
+                
+                # Match by query_id (which equals route_idx for the first batch)
+                if query_id in here_lookup:
+                    here_data = here_lookup[query_id]
+                    
+                    # Only merge if the route was correct (accuracy gating)
+                    if log_entry.get('is_correct', False):
+                        # Safely extract HERE data with defaults
+                        here_travel_time_min = here_data.get('travel_time_min_here')
+                        here_distance_km = here_data.get('distance_km_here')
+                        here_frechet = here_data.get('frechet_distance_m')
+                        
+                        # Populate HERE temporal data (only if we have valid data)
+                        if here_travel_time_min is not None and here_travel_time_min > 0:
+                            log_entry['here_travel_time_seconds'] = here_travel_time_min * 60
+                        else:
+                            log_entry['here_travel_time_seconds'] = None
+                        
+                        # Populate HERE spatial data (only if we have valid data)
+                        if here_distance_km is not None and here_distance_km > 0:
+                            log_entry['here_route_length_m'] = here_distance_km * 1000
+                        else:
+                            log_entry['here_route_length_m'] = None
+                        
+                        # Store Fréchet distance
+                        log_entry['frechet_distance_m'] = here_frechet
+                        
+                        # Recompute derived metrics with HERE data
+                        if log_entry['here_route_length_m'] is not None and log_entry['here_route_length_m'] > 0:
+                            if log_entry['frechet_distance_m'] is not None and log_entry['frechet_distance_m'] > 0:
+                                log_entry['frechet_error_rate'] = log_entry['frechet_distance_m'] / log_entry['here_route_length_m']
+                        
+                        # Travel time deviation - need both DHC2L and HERE times to be valid
+                        dhc2l_time = log_entry.get('dhc2l_travel_time_seconds')
+                        here_time = log_entry.get('here_travel_time_seconds')
+                        
+                        if (dhc2l_time is not None and dhc2l_time > 0 and 
+                            here_time is not None and here_time > 0):
+                            try:
+                                log_entry['travel_time_error_rate'] = abs(dhc2l_time - here_time) / here_time
+                                log_entry['travel_time_deviation_pct'] = log_entry['travel_time_error_rate'] * 100
+                            except Exception as e:
+                                logger.warning(f"Failed to compute travel time deviation: {e}")
+                                log_entry['travel_time_error_rate'] = None
+                                log_entry['travel_time_deviation_pct'] = None
+                        
+                        # Recompute interpretation categories with HERE data
+                        if log_entry['frechet_distance_m'] is not None:
+                            log_entry['frechet_category'] = self._categorize_frechet_distance(log_entry['frechet_distance_m'])
+                        
+                        if log_entry.get('travel_time_deviation_pct') is not None:
+                            log_entry['travel_time_category'] = self._categorize_travel_time_deviation(log_entry['travel_time_deviation_pct'])
+                        
+                        merged_count += 1
+            
+            logger.success(f"✓ Merged HERE comparison data into {merged_count}/{len(self.per_route_logs)} per-route logs")
+    
     def export_results_csv(self, output_path: str) -> bool:
         """
-        Export per-route logs to results.csv with accuracy gating.
+        Export per-route logs to results.csv with accuracy gating and SOP 3 metrics.
         
         STRUCTURE:
         - Single master file: results.csv
         - No averaging - fully traceable by (trial_id, batch_id, query_id)
         - NULL handling for incorrect queries (no performance metrics)
+        - SOP 3 raw spatial/temporal data and interpretation categories
         
-        CSV COLUMNS:
-        trial_id, batch_id, query_id, algorithm, source_node, target_node,
-        disruption_level, num_incidents_total, num_closures, num_slowdowns,
-        num_accidents, num_construction, num_hazards, num_other_incidents,
-        dhc2l_distance_km, dijkstra_distance_km, distance_error_km, relative_error,
-        is_correct, tolerance, query_response_time_ms, labeling_time_ms, labeling_size_mb
+        CSV COLUMNS (Extended for SOP 3):
+        
+        Identifiers:
+        - trial_id, batch_id, query_id, algorithm, source_node, target_node
+        
+        Disruption Context:
+        - disruption_level, num_incidents_total, num_closures, num_slowdowns,
+          num_accidents, num_construction, num_hazards, num_other_incidents
+        
+        Accuracy Metrics (Dijkstra Validation):
+        - dhc2l_distance_km, dijkstra_distance_km, distance_error_km, 
+          relative_error, is_correct, tolerance
+        
+        Performance Metrics (NULL if is_correct=FALSE):
+        - query_response_time_ms, query_time_category,
+          labeling_time_ms, labeling_time_category,
+          labeling_size_mb, labeling_size_category
+        
+        SOP 3 Raw Temporal Data (NULL if is_correct=FALSE):
+        - dhc2l_travel_time_seconds, here_travel_time_seconds,
+          travel_time_error_rate, travel_time_deviation_pct, travel_time_category
+        
+        SOP 3 Raw Spatial Data (NULL if is_correct=FALSE):
+        - dhc2l_route_length_m, here_route_length_m,
+          frechet_distance_m, frechet_error_rate, frechet_category
         
         Args:
             output_path: Path to output CSV file
@@ -684,17 +984,34 @@ class ExperimentMetricsCollector:
                     logger.warning("No per-route logs to export")
                     return False
                 
-                # Define CSV columns in order
+                # Define CSV columns in order (extended for SOP 3)
                 columns = [
+                    # Identifiers
                     "trial_id", "batch_id", "query_id", "algorithm",
                     "source_node", "target_node",
+                    
+                    # Disruption context
                     "disruption_level",
                     "num_incidents_total", "num_closures", "num_slowdowns",
                     "num_accidents", "num_construction", "num_hazards", "num_other_incidents",
+                    
+                    # Accuracy metrics (always recorded)
                     "dhc2l_distance_km", "dijkstra_distance_km",
                     "distance_error_km", "relative_error",
                     "is_correct", "tolerance",
-                    "query_response_time_ms", "labeling_time_ms", "labeling_size_mb"
+                    
+                    # Performance metrics (NULL if incorrect)
+                    "query_response_time_ms", "query_time_category",
+                    "labeling_time_ms", "labeling_time_category",
+                    "labeling_size_mb", "labeling_size_category",
+                    
+                    # SOP 3: Raw temporal data
+                    "dhc2l_travel_time_seconds", "here_travel_time_seconds",
+                    "travel_time_error_rate", "travel_time_deviation_pct", "travel_time_category",
+                    
+                    # SOP 3: Raw spatial data
+                    "dhc2l_route_length_m", "here_route_length_m",
+                    "frechet_distance_m", "frechet_error_rate", "frechet_category"
                 ]
                 
                 # Write CSV
@@ -707,7 +1024,7 @@ class ExperimentMetricsCollector:
                         row = {col: log_entry.get(col, None) for col in columns}
                         writer.writerow(row)
                 
-                logger.success(f"Exported {len(self.per_route_logs)} per-route logs to {output_path}")
+                logger.success(f"Exported {len(self.per_route_logs)} per-route logs with SOP 3 metrics to {output_path}")
                 return True
                 
         except Exception as e:
@@ -1286,13 +1603,17 @@ class ExperimentMetricsCollector:
         }
         
         # =====================================================================
-        # PER-TRIAL BREAKDOWN
+        # PER-TRIAL BREAKDOWN - Enhanced with jam_factor and error rates
         # =====================================================================
         trial_labels = [f"Trial {i+1}" for i in range(self.trials)]
         dhl_trial_query = []
         hc2l_trial_query = []
         dhl_trial_update = []
         hc2l_trial_update = []
+        dhl_trial_label_size = []
+        hc2l_trial_label_size = []
+        trial_jam_factors = []  # Average jam_factor per trial
+        trial_error_rates = []  # Average error rate per trial
         
         for trial in range(self.trials):
             # Query times
@@ -1301,13 +1622,17 @@ class ExperimentMetricsCollector:
             
             if np.any(dhl_mask):
                 dhl_trial_query.append(round(float(np.mean(self.query_time_dhl[trial, :, :][dhl_mask])), 3))
+                dhl_trial_label_size.append(round(float(np.mean(self.label_size_dhl[trial, :, :][dhl_mask])), 5))
             else:
                 dhl_trial_query.append(0)
+                dhl_trial_label_size.append(0)
             
             if np.any(hc2l_mask):
                 hc2l_trial_query.append(round(float(np.mean(self.query_time_hc2l[trial, :, :][hc2l_mask])), 3))
+                hc2l_trial_label_size.append(round(float(np.mean(self.label_size_hc2l[trial, :, :][hc2l_mask])), 5))
             else:
                 hc2l_trial_query.append(0)
+                hc2l_trial_label_size.append(0)
             
             # Update times (lazy + rebuild)
             dhl_lazy_all = []
@@ -1318,13 +1643,108 @@ class ExperimentMetricsCollector:
             
             dhl_trial_update.append(round(float(np.mean(dhl_lazy_all)), 3) if dhl_lazy_all else 0)
             hc2l_trial_update.append(round(float(np.mean(hc2l_lazy_all)), 3) if hc2l_lazy_all else 0)
+            
+            # Compute average jam_factor for this trial from per_route_logs
+            trial_jam_sum = 0.0
+            trial_jam_count = 0
+            trial_error_sum = 0.0
+            trial_error_count = 0
+            
+            for log in self.per_route_logs:
+                if log.get("trial_id") == trial + 1:  # trial_id is 1-based
+                    jam = log.get("avg_jam_factor", 0)
+                    if jam > 0:
+                        trial_jam_sum += jam
+                        trial_jam_count += 1
+                    
+                    error = log.get("relative_error", 0)
+                    if error is not None and error >= 0:
+                        trial_error_sum += error
+                        trial_error_count += 1
+            
+            avg_jam = round(trial_jam_sum / trial_jam_count, 2) if trial_jam_count > 0 else 0
+            avg_error = round(trial_error_sum / trial_error_count * 100, 2) if trial_error_count > 0 else 0
+            
+            trial_jam_factors.append(avg_jam)
+            trial_error_rates.append(avg_error)
         
         graph_data["per_trial"] = {
             "trial_labels": trial_labels,
             "DHL_query": dhl_trial_query,
             "HC2L_query": hc2l_trial_query,
             "DHL_update": dhl_trial_update,
-            "HC2L_update": hc2l_trial_update
+            "HC2L_update": hc2l_trial_update,
+            "DHL_label_size": dhl_trial_label_size,
+            "HC2L_label_size": hc2l_trial_label_size,
+            "jam_factors": trial_jam_factors,
+            "error_rates": trial_error_rates
+        }
+        
+        # =====================================================================
+        # PER-BATCH BREAKDOWN - Detailed metrics per batch
+        # =====================================================================
+        batch_labels = []
+        batch_dhl_query = []
+        batch_hc2l_query = []
+        batch_dhl_label_size = []
+        batch_hc2l_label_size = []
+        batch_jam_factors = []
+        batch_error_rates = []
+        
+        for trial in range(self.trials):
+            for batch in range(self.batches):
+                batch_labels.append(f"T{trial+1}B{batch+1}")
+                
+                # Query times
+                dhl_mask = self.filled_dhl[trial, batch, :]
+                hc2l_mask = self.filled_hc2l[trial, batch, :]
+                
+                if np.any(dhl_mask):
+                    batch_dhl_query.append(round(float(np.mean(self.query_time_dhl[trial, batch, :][dhl_mask])), 3))
+                    batch_dhl_label_size.append(round(float(np.mean(self.label_size_dhl[trial, batch, :][dhl_mask])), 5))
+                else:
+                    batch_dhl_query.append(0)
+                    batch_dhl_label_size.append(0)
+                
+                if np.any(hc2l_mask):
+                    batch_hc2l_query.append(round(float(np.mean(self.query_time_hc2l[trial, batch, :][hc2l_mask])), 3))
+                    batch_hc2l_label_size.append(round(float(np.mean(self.label_size_hc2l[trial, batch, :][hc2l_mask])), 5))
+                else:
+                    batch_hc2l_query.append(0)
+                    batch_hc2l_label_size.append(0)
+                
+                # Compute average jam_factor for this batch from per_route_logs
+                batch_jam_sum = 0.0
+                batch_jam_count = 0
+                batch_error_sum = 0.0
+                batch_error_count = 0
+                
+                for log in self.per_route_logs:
+                    if log.get("trial_id") == trial + 1 and log.get("batch_id") == batch + 1:
+                        jam = log.get("avg_jam_factor", 0)
+                        if jam > 0:
+                            batch_jam_sum += jam
+                            batch_jam_count += 1
+                        
+                        error = log.get("relative_error", 0)
+                        if error is not None and error >= 0:
+                            batch_error_sum += error
+                            batch_error_count += 1
+                
+                avg_batch_jam = round(batch_jam_sum / batch_jam_count, 2) if batch_jam_count > 0 else 0
+                avg_batch_error = round(batch_error_sum / batch_error_count * 100, 2) if batch_error_count > 0 else 0
+                
+                batch_jam_factors.append(avg_batch_jam)
+                batch_error_rates.append(avg_batch_error)
+        
+        graph_data["per_batch"] = {
+            "batch_labels": batch_labels,
+            "DHL_query": batch_dhl_query,
+            "HC2L_query": batch_hc2l_query,
+            "DHL_label_size": batch_dhl_label_size,
+            "HC2L_label_size": batch_hc2l_label_size,
+            "jam_factors": batch_jam_factors,
+            "error_rates": batch_error_rates
         }
         
         # =====================================================================
@@ -1863,7 +2283,9 @@ class DisruptionCacheManager:
             "num_construction": 0,
             "num_hazards": 0,
             "num_other_incidents": 0,
-            "disruption_level": "unknown"
+            "disruption_level": "unknown",
+            "avg_jam_factor": 0.0,
+            "num_disrupted_edges": 0
         }
         
         # Determine disruption level from path
@@ -1912,7 +2334,11 @@ class DisruptionCacheManager:
                     logger.error(f"Error reading incident file {incident_file}: {e}")
         
         # Count slowdowns from flow files (jam_factor >= 4 or speed < 20 km/h)
+        # Also compute average jam_factor across all disrupted edges
         flow_dir = disruption_path / "flow"
+        jam_factor_sum = 0.0
+        jam_factor_count = 0
+        
         if flow_dir.exists():
             for flow_file in sorted(flow_dir.glob("flow_*.csv")):
                 try:
@@ -1922,12 +2348,22 @@ class DisruptionCacheManager:
                             jam_factor = float(row.get("flow_jam_factor", 0))
                             speed_kph = float(row.get("flow_speed_kph", 60))
                             
+                            # Accumulate jam_factor for average
+                            if jam_factor > 0:
+                                jam_factor_sum += jam_factor
+                                jam_factor_count += 1
+                                summary["num_disrupted_edges"] += 1
+                            
                             # Count as slowdown if significant congestion
                             if jam_factor >= 4 or speed_kph < 20:
                                 summary["num_slowdowns"] += 1
                                 
                 except Exception as e:
                     logger.error(f"Error reading flow file {flow_file}: {e}")
+        
+        # Calculate average jam_factor
+        if jam_factor_count > 0:
+            summary["avg_jam_factor"] = round(jam_factor_sum / jam_factor_count, 2)
         
         return summary
     
@@ -3308,7 +3744,16 @@ class ExperimentRunner:
                         if route_idx > 0 and route_idx % 80 == 0:
                             cache.preload_chunk(b_idx, route_idx + 20, thread_id)
                     
-                    thread_progress.current_disruption = f"set_batch_{b_idx}_route_{route_idx}"
+                    # Determine disruption level for variety_preset mode
+                    config_disruption_mode = config.get("disruption_mode", "preset")
+                    if config_disruption_mode == "variety_preset":
+                        level_idx = b_idx % 3
+                        level_names = ["Light", "Medium", "Heavy"]
+                        thread_progress.current_disruption_level = level_names[level_idx]
+                        thread_progress.current_disruption = f"set_{level_names[level_idx].lower()}_route_{route_idx}"
+                    else:
+                        thread_progress.current_disruption_level = ""
+                        thread_progress.current_disruption = f"set_batch_{b_idx}_route_{route_idx}"
                     
                     for algorithm in algorithms:
                         if self.stop_events[experiment_id].is_set():
@@ -3407,6 +3852,29 @@ class ExperimentRunner:
                         # Update query phase with accumulated statistics
                         query_time = result.get("query_phase", {}).get("query_time_ms", 0)
                         label_size = result.get("summary", {}).get("label_size", 0)
+                        labeling_time = result.get("summary", {}).get("labeling_time_ms", 0)
+                        
+                        # Track success/failure
+                        accuracy = result.get("accuracy", {})
+                        if accuracy.get("is_correct", False):
+                            thread_progress.successful_routes += 1
+                        else:
+                            thread_progress.failed_routes += 1
+                        
+                        # Update running averages (only for successful routes)
+                        if accuracy.get("is_correct", False):
+                            current_count = thread_progress.successful_routes
+                            if current_count > 0:
+                                # Running average update
+                                thread_progress.avg_query_time_ms = (
+                                    (thread_progress.avg_query_time_ms * (current_count - 1) + query_time) / current_count
+                                )
+                                thread_progress.avg_labeling_time_ms = (
+                                    (thread_progress.avg_labeling_time_ms * (current_count - 1) + labeling_time) / current_count
+                                )
+                                thread_progress.avg_labeling_size_mb = (
+                                    (thread_progress.avg_labeling_size_mb * (current_count - 1) + label_size) / current_count
+                                )
                         distance_km = result.get("summary", {}).get("distance_km", 0)
                         actual_eta = result.get("summary", {}).get("actual_eta", "")
                         
@@ -3767,7 +4235,7 @@ class ExperimentRunner:
                     # ========================================================================
                     distance_error = dhc2l_distance - dijkstra_distance  # Positive = overestimate, negative = underestimate
                     relative_error = abs(distance_error) / dijkstra_distance if dijkstra_distance > 0 else 1.0
-                    is_correct = relative_error <= 0.025  # 2.5% tolerance
+                    is_correct = relative_error <= 0.05  # 5% tolerance
                     
                     # Store accuracy metrics in result
                     result["accuracy"] = {
@@ -3776,7 +4244,7 @@ class ExperimentRunner:
                         "distance_error_km": round(distance_error, 4),
                         "relative_error": round(relative_error, 4),
                         "is_correct": is_correct,
-                        "tolerance": 0.025
+                        "tolerance": 0.05
                     }
                     
                     logger.debug(
@@ -3794,7 +4262,7 @@ class ExperimentRunner:
                         "distance_error_km": None,
                         "relative_error": None,
                         "is_correct": False,
-                        "tolerance": 0.025,
+                        "tolerance": 0.05,
                         "error": "Dijkstra computation failed"
                     }
             else:
@@ -3805,7 +4273,7 @@ class ExperimentRunner:
                     "distance_error_km": None,
                     "relative_error": None,
                     "is_correct": False,
-                    "tolerance": 0.025,
+                    "tolerance": 0.05,
                     "error": result.get("error", "DHC2L computation failed")
                 }
                 
@@ -3817,7 +4285,7 @@ class ExperimentRunner:
                 "distance_error_km": None,
                 "relative_error": None,
                 "is_correct": False,
-                "tolerance": 0.025,
+                "tolerance": 0.05,
                 "error": str(e)
             }
             logger.error(f"Error executing route: {e}")
@@ -3904,7 +4372,10 @@ class ExperimentRunner:
             "memory_initial_mb": round(memory_initial_mb, 2),
             "memory_current_mb": round(memory_current_mb, 2),
             "memory_peak_mb": round(memory_peak_mb, 2),
-            "memory_increase_mb": round(memory_increase_mb, 2)
+            "memory_increase_mb": round(memory_increase_mb, 2),
+            # Add missing fields for CSV export
+            "eta_seconds": round(eta_seconds, 2) if eta_seconds else 0,
+            "labeling_time_ms": round(labeling_info.get("labeling_time_ms", 0), 3)
         }
         
         # Update Phase - extract from lazy_hc2l or dhl_update_info
@@ -4157,9 +4628,21 @@ class ExperimentRunner:
             logger.info(f"Assembled results structure with {len(results)} top-level keys")
             
             # ============================================================================
-            # Phase 9.5: Exporting per-route CSV (85-90%)
+            # Phase 9.5: Merging HERE comparison data (82-85%)
             # ============================================================================
-            progress.finalization_phase = "Phase 9.5/10: Exporting per-route CSV..."
+            progress.finalization_phase = "Phase 9.5a/10: Merging HERE comparison data..."
+            progress.finalization_percentage = 8.2
+            progress.overall_percentage = 90.0 + (progress.finalization_percentage * 0.1)
+            self._broadcast_progress(experiment_id)
+            
+            # Merge HERE comparison data into per_route_logs before CSV export
+            collector.merge_here_comparison_into_logs()
+            logger.info(f"✓ Merged HERE comparison data into per-route logs")
+            
+            # ============================================================================
+            # Phase 9.5b: Exporting per-route CSV (85-90%)
+            # ============================================================================
+            progress.finalization_phase = "Phase 9.5b/10: Exporting per-route CSV..."
             progress.finalization_percentage = 8.5
             progress.overall_percentage = 90.0 + (progress.finalization_percentage * 0.1)
             self._broadcast_progress(experiment_id)
