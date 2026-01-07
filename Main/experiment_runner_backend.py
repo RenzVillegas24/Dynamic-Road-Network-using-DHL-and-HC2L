@@ -560,7 +560,17 @@ class DisruptionCacheManager:
             
             # Generate incident disruptions
             incident_rows = []
-            incident_types = ['accident', 'construction', 'roadClosure', 'hazard']
+            base_incident_types = [
+                "accident", 
+                "construction", 
+                "disabledVehicle", 
+                "massTransit", 
+                "plannedEvent", 
+                "roadHazard", 
+                "weather", 
+                "laneRestriction", 
+                "other",
+            ]
             
             for edge in edges:
                 if len(incident_rows) >= incident_count:
@@ -582,6 +592,9 @@ class DisruptionCacheManager:
                     severity = random.uniform(severity_min, severity_max)
                     road_closed = level_params['allow_closure'] and severity > 0.8
                 
+                # Convert severity to jam_factor (0-10 scale)
+                jam_factor = severity * 10
+                
                 # Determine criticality based on severity
                 if severity > 0.7:
                     criticality = 'critical'
@@ -589,6 +602,12 @@ class DisruptionCacheManager:
                     criticality = 'major'
                 else:
                     criticality = 'minor'
+                
+                # Select incident type: roadClosure only for jam_factor >= 9.5 AND criticality == 'major'
+                if jam_factor >= 9.5 and criticality == 'major':
+                    incident_type = 'roadClosure'
+                else:
+                    incident_type = random.choice(base_incident_types)
                 
                 incident_rows.append({
                     'source': edge.get('source'),
@@ -598,7 +617,7 @@ class DisruptionCacheManager:
                     'target_lat': edge.get('target_lat'),
                     'target_lon': edge.get('target_lon'),
                     'incident_id': edge.get('id_hash', f'exp_{batch_idx}_{route_idx}_{len(incident_rows)}'),
-                    'incident_type': random.choice(incident_types),
+                    'incident_type': incident_type,
                     'incident_criticality': criticality,
                     'incident_description': f'Experiment incident on {edge.get("road_name", "Unknown Road")}',
                     'incident_road_closed': road_closed,

@@ -177,11 +177,15 @@ class IncidentSummary:
     """
     Batch-level incident summary for traceability.
     All incident counts are aggregated at the batch level.
+    
+    Valid incident types:
+    - accident, construction, disabledVehicle, massTransit, plannedEvent
+    - roadHazard, weather, laneRestriction, roadClosure, other
+    - congestion (from flow disruptions)
     """
     num_incidents_total: int = 0
     num_accident: int = 0
     num_construction: int = 0
-    num_congestion: int = 0
     num_disabled_vehicle: int = 0
     num_mass_transit_event: int = 0
     num_planned_event: int = 0
@@ -189,6 +193,7 @@ class IncidentSummary:
     num_road_closure: int = 0
     num_weather: int = 0
     num_lane_restriction: int = 0
+    num_congestion: int = 0
     num_other: int = 0
     
     def to_dict(self) -> Dict:
@@ -200,32 +205,40 @@ class IncidentSummary:
         if not disruption_data:
             return cls()
         
-        incidents = disruption_data.get("incidents", [])
         summary = cls()
         
+        # Count flow disruptions as congestion incidents
+        # Flow disruptions represent traffic slowdowns/congestion
+        flow_disruptions = disruption_data.get("flow", [])
+        summary.num_congestion = len(flow_disruptions)
+        summary.num_incidents_total += summary.num_congestion
+        
+        # Count explicit incident types
+        # Valid incident types:
+        # - accident, construction, disabledVehicle, massTransit, plannedEvent
+        # - roadHazard, weather, laneRestriction, other, roadClosure
+        incidents = disruption_data.get("incidents", [])
         for incident in incidents:
-            incident_type = incident.get("type", "").lower()
+            incident_type = incident.get("incident_type", "").lower()
             summary.num_incidents_total += 1
             
-            if "closure" in incident_type or "closed" in incident_type:
+            if "roadclosure" in incident_type or "closure" in incident_type:
                 summary.num_road_closure += 1
             elif "accident" in incident_type:
                 summary.num_accident += 1
             elif "construction" in incident_type:
                 summary.num_construction += 1
-            elif "congestion" in incident_type:
-                summary.num_congestion += 1
-            elif "disabled" in incident_type:
+            elif "disabledvehicle" in incident_type or "disabled" in incident_type:
                 summary.num_disabled_vehicle += 1
-            elif "mass transit" in incident_type:
+            elif "masstransit" in incident_type or "transit" in incident_type:
                 summary.num_mass_transit_event += 1
-            elif "planned" in incident_type:
+            elif "plannedevent" in incident_type or "planned" in incident_type or "event" in incident_type:
                 summary.num_planned_event += 1
-            elif "hazard" in incident_type:
+            elif "roadhazard" in incident_type or "hazard" in incident_type:
                 summary.num_road_hazard += 1
             elif "weather" in incident_type:
                 summary.num_weather += 1
-            elif "lane" in incident_type and "restriction" in incident_type:
+            elif "lanerestriction" in incident_type or ("lane" in incident_type and "restriction" in incident_type):
                 summary.num_lane_restriction += 1
             else:
                 summary.num_other += 1
