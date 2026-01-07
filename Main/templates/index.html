@@ -687,7 +687,7 @@
     }
 
 
-    // NOTE: displayDHC2LRoute() is now defined in static/js/functions.js
+    // NOTE: displayHC2LRoute() is now defined in static/js/functions.js
     // The version below has been removed to use the centralized function with full interactive features
 
 
@@ -1235,9 +1235,9 @@
       try {
         if (selections.algorithm === 'hc2l') {
           // HC2L only
-          const hc2lResult = await computeDHC2LRoute(useDisruptions, selections.threshold, isPreview);
+          const hc2lResult = await computeHC2LRoute(useDisruptions, selections.threshold, isPreview);
           if (hc2lResult && hc2lResult.success) {
-            displayDHC2LRoute(hc2lResult);
+            displayHC2LRoute(hc2lResult);
             updateMetricsDisplay(hc2lResult.metrics);
           }
           return hc2lResult;
@@ -1377,7 +1377,7 @@
 
     // Function to compute D-HC2L route
     // isPreview: true during pinning (don't generate alternatives), false on confirmation (generate alternatives)
-    async function computeDHC2LRoute(useDisruptions = false, threshold = undefined, isPreview = true) {
+    async function computeHC2LRoute(useDisruptions = false, threshold = undefined, isPreview = true) {
       if (!window.startLocation || !window.destLocation) {
         showUpdateToast("Please pin both starting location and destination", 'warning');
         return null;

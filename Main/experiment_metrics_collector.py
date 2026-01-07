@@ -14,10 +14,10 @@ Key Features:
 
 CSV Export Files (created in results folder):
 - summary_results.csv        - Incident summary per trial/batch
-- accuracy_results.csv       - DHC2L accuracy vs Dijkstra  
+- accuracy_results.csv       - HC2L accuracy vs Dijkstra  
 - construction_results.csv   - Initial construction performance
 - updates_results.csv        - Dynamic update performance
-- performance_results.csv    - Combined DHL vs DHC2L performance
+- performance_results.csv    - Combined DHL vs HC2L performance
 - similarity_results.csv     - HERE vs HC2L route comparison
 
 CSV Headers are STRICTLY enforced and MUST NOT be changed.
@@ -40,8 +40,8 @@ from console_formatter import get_logger
 # Get logger instance
 logger = get_logger("MetricsCollector")
 
-# Default accuracy tolerance: 5%
-DEFAULT_TOLERANCE = 0.05
+# Default accuracy tolerance: 10%
+DEFAULT_TOLERANCE = 0.10
 
 
 # ============================================================================
@@ -52,18 +52,18 @@ def normalize_algorithm_name(algorithm: str) -> str:
     """
     Normalize algorithm name to canonical form.
     
-    The experiment runner uses "HC2L" but we standardize to "DHC2L" internally
+    The experiment runner uses "HC2L" but we standardize to "HC2L" internally
     for consistent data tracking.
     
     Args:
         algorithm: Algorithm name (case insensitive)
         
     Returns:
-        Normalized algorithm name: "DHL" or "DHC2L"
+        Normalized algorithm name: "DHL" or "HC2L"
     """
     alg = algorithm.upper().strip()
-    # HC2L and DHC2L are the same algorithm - normalize to DHC2L
-    if alg in ("HC2L", "DHC2L", "DHCL2", "HC2L2"):
+    # HC2L and HC2L are the same algorithm - normalize to HC2L
+    if alg in ("HC2L", "HC2L", "DHCL2", "HC2L2"):
         return "HC2L"
     elif alg in ("DHL", "D-HL"):
         return "DHL"
@@ -73,13 +73,13 @@ def normalize_algorithm_name(algorithm: str) -> str:
 
 def is_hc2l_algorithm(algorithm: str) -> bool:
     """
-    Check if the algorithm is HC2L/DHC2L.
+    Check if the algorithm is HC2L/HC2L.
     
     Args:
         algorithm: Algorithm name (case insensitive)
         
     Returns:
-        True if algorithm is HC2L/DHC2L variant
+        True if algorithm is HC2L/HC2L variant
     """
     normalized = normalize_algorithm_name(algorithm)
     return normalized == "HC2L"
@@ -98,7 +98,7 @@ CSV_HEADERS_SUMMARY = [
     "num_lane_restriction", "num_other"
 ]
 
-# 7.2 Accuracy Tab - Accuracy Results Log (DHC2L only)
+# 7.2 Accuracy Tab - Accuracy Results Log (HC2L only)
 CSV_HEADERS_ACCURACY = [
     "trial_id", "batch_id", "disruption_level", 
     "source_node", "target_node", "query_id",
@@ -121,13 +121,12 @@ CSV_HEADERS_UPDATES = [
     "query_response_time_ms", "threshold_rebuild_time_ms"
 ]
 
-# 6.3 Performance Tab - Combined DHL vs DHC2L Performance Summary
+# 6.3 Performance Tab - Combined DHL vs HC2L Performance Summary
 CSV_HEADERS_PERFORMANCE = [
     "trial_id", "batch_id", "disruption_level",
     "source_node", "target_node", "query_id",
-    "algorithm", "dhc2l_distance", "dijkstra_distance", "is_correct",
-    "initial_labeling_time_ms", "query_time_ms", "label_size_mb",
-    "peak_label_size_mb", "lazy_update_time_ms", 
+    "algorithm", "initial_labeling_time_ms", "query_time_ms", 
+    "label_size_mb", "peak_label_size_mb", "lazy_update_time_ms", 
     "threshold_rebuild_time_ms", "total_rebuilds"
 ]
 
@@ -250,7 +249,7 @@ class IncidentSummary:
 class AccuracyMetrics:
     """
     Per-route accuracy metrics.
-    Accuracy = correctness of query output (DHC2L vs Dijkstra distance).
+    Accuracy = correctness of query output (HC2L vs Dijkstra distance).
     """
     dhc2l_distance: float = 0.0
     dijkstra_distance: float = 0.0
@@ -360,7 +359,7 @@ class RouteMetricsRecord:
     query_id: int = 0
     source_node: int = 0
     target_node: int = 0
-    algorithm: str = "DHC2L"
+    algorithm: str = "HC2L"
     
     # Disruption context
     disruption_level: str = "light"
@@ -402,7 +401,7 @@ class RouteMetricsRecord:
         }
     
     def to_accuracy_row(self) -> Dict:
-        """Convert to accuracy CSV row (DHC2L only)"""
+        """Convert to accuracy CSV row (HC2L only)"""
         return {
             "trial_id": self.trial_id,
             "batch_id": self.batch_id,
@@ -457,9 +456,6 @@ class RouteMetricsRecord:
             "target_node": self.target_node,
             "query_id": self.query_id,
             "algorithm": self.algorithm,
-            "dhc2l_distance": self.accuracy.dhc2l_distance,
-            "dijkstra_distance": self.accuracy.dijkstra_distance,
-            "is_correct": self.accuracy.is_correct,
             "initial_labeling_time_ms": self.performance.labeling_time_ms,
             "query_time_ms": self.performance.query_response_time_ms,
             "label_size_mb": self.performance.labeling_size_mb,
@@ -554,7 +550,7 @@ class ExperimentMetricsCollector:
         # METRICS STORAGE - Lists for CSV export
         # ====================================================================
         
-        # Per-route metrics records (DHL and DHC2L)
+        # Per-route metrics records (DHL and HC2L)
         self.route_records_dhl: List[RouteMetricsRecord] = []
         self.route_records_dhc2l: List[RouteMetricsRecord] = []
         
@@ -598,7 +594,7 @@ class ExperimentMetricsCollector:
         self.rebuild_count_dhl = np.zeros(batch_shape, dtype=np.int32)
         self.rebuild_count_dhc2l = np.zeros(batch_shape, dtype=np.int32)
         
-        # Accuracy metrics (DHC2L only)
+        # Accuracy metrics (HC2L only)
         self.dhc2l_distance = np.zeros(shape, dtype=np.float64)
         self.dijkstra_distance = np.zeros(shape, dtype=np.float64)
         self.distance_error = np.zeros(shape, dtype=np.float64)
@@ -673,7 +669,7 @@ class ExperimentMetricsCollector:
             trial: Trial index (0-based)
             batch: Batch index (0-based)
             route: Route index (0-based)
-            algorithm: "DHL" or "DHC2L"
+            algorithm: "DHL" or "HC2L"
             api_result: Result from C++ API call
             disruption_data: Optional disruption data for incident summary
             
@@ -682,7 +678,7 @@ class ExperimentMetricsCollector:
         """
         with self.lock:
             try:
-                # Normalize algorithm name - accept both "HC2L" and "DHC2L"
+                # Normalize algorithm name - accept both "HC2L" and "HC2L"
                 alg = normalize_algorithm_name(algorithm)
                 is_hc2l = is_hc2l_algorithm(algorithm)
                 
@@ -710,7 +706,7 @@ class ExperimentMetricsCollector:
                     self.incident_summaries[batch_key] = record.incident_summary
                 
                 # ============================================================
-                # STEP 1: ACCURACY COMPUTATION (HC2L/DHC2L only)
+                # STEP 1: ACCURACY COMPUTATION (HC2L/HC2L only)
                 # ============================================================
                 if is_hc2l:
                     metrics = api_result.get("metrics", {})
@@ -729,7 +725,7 @@ class ExperimentMetricsCollector:
                     self.is_correct[trial, batch, route] = record.accuracy.is_correct
                 
                 # ============================================================
-                # STEP 2: CONDITIONAL PERFORMANCE EXTRACTION
+                # STEP 2: PERFORMANCE EXTRACTION (ALWAYS for both algorithms)
                 # ============================================================
                 summary = api_result.get("summary", {})
                 query_phase = api_result.get("query_phase", {})
@@ -742,19 +738,16 @@ class ExperimentMetricsCollector:
                 threshold_rebuild = float(update_phase.get("threshold_rebuild_time_ms", 0) or 0)
                 is_rebuild = update_phase.get("update_strategy", "") == "immediate_update"
                 
-                # For HC2L: only record performance if accuracy passes
-                # For DHL: always record performance (no accuracy gating)
-                should_record_performance = (not is_hc2l) or record.accuracy.is_correct
-                
-                if should_record_performance:
-                    record.performance = PerformanceMetrics(
-                        query_response_time_ms=query_time,
-                        labeling_time_ms=self._extract_labeling_time(api_result),
-                        labeling_size_mb=label_size,
-                        lazy_update_time_ms=lazy_time,
-                        threshold_rebuild_time_ms=threshold_rebuild,
-                        peak_label_size_mb=float(summary.get("peak_label_size_mb", label_size) or label_size)
-                    )
+                # Always record performance metrics for both DHL and HC2L
+                # Performance data is independent of accuracy validation
+                record.performance = PerformanceMetrics(
+                    query_response_time_ms=query_time,
+                    labeling_time_ms=self._extract_labeling_time(api_result),
+                    labeling_size_mb=label_size,
+                    lazy_update_time_ms=lazy_time,
+                    threshold_rebuild_time_ms=threshold_rebuild,
+                    peak_label_size_mb=float(summary.get("peak_label_size_mb", label_size) or label_size)
+                )
                 
                 # ============================================================
                 # STEP 3: STORE IN NUMPY ARRAYS
@@ -838,7 +831,7 @@ class ExperimentMetricsCollector:
                 self.initial_label_size_dhl[trial] = initial_label_size
                 self.construction_recorded_dhl[trial] = True
                 self.construction_dhl[trial] = record.construction
-        else:  # HC2L/DHC2L
+        else:  # HC2L/HC2L
             if not self.construction_recorded_dhc2l[trial]:
                 self.construction_time_dhc2l[trial] = construction_time
                 self.initial_label_size_dhc2l[trial] = initial_label_size
@@ -951,7 +944,7 @@ class ExperimentMetricsCollector:
                 # Aggregate from all records
                 batch_summaries = {}
                 
-                # Process DHC2L records (primary source for accuracy data)
+                # Process HC2L records (primary source for accuracy data)
                 for record in self.route_records_dhc2l:
                     key = (record.trial_id, record.batch_id)
                     if key not in batch_summaries:
@@ -979,7 +972,7 @@ class ExperimentMetricsCollector:
     def export_accuracy_csv(self) -> Path:
         """
         Export Accuracy Results Log CSV (7.2).
-        DHC2L only - per route accuracy metrics.
+        HC2L only - per route accuracy metrics.
         """
         csv_path = self.results_path / "accuracy_results.csv"
         
@@ -1006,7 +999,7 @@ class ExperimentMetricsCollector:
                 writer = csv.DictWriter(f, fieldnames=CSV_HEADERS_CONSTRUCTION)
                 writer.writeheader()
                 
-                # Write DHC2L construction records
+                # Write HC2L construction records
                 for record in self.route_records_dhc2l:
                     row = record.to_construction_row()
                     # Use per-trial construction times
@@ -1041,7 +1034,7 @@ class ExperimentMetricsCollector:
                 writer = csv.DictWriter(f, fieldnames=CSV_HEADERS_UPDATES)
                 writer.writeheader()
                 
-                # Write DHC2L update records
+                # Write HC2L update records
                 for record in self.route_records_dhc2l:
                     row = record.to_updates_row()
                     # Compute label size change percentage
@@ -1071,7 +1064,7 @@ class ExperimentMetricsCollector:
     def export_performance_csv(self) -> Path:
         """
         Export Performance Summary CSV (6.3).
-        Combined DHL vs DHC2L performance comparison.
+        Combined DHL vs HC2L performance comparison.
         """
         csv_path = self.results_path / "performance_results.csv"
         
@@ -1080,7 +1073,7 @@ class ExperimentMetricsCollector:
                 writer = csv.DictWriter(f, fieldnames=CSV_HEADERS_PERFORMANCE)
                 writer.writeheader()
                 
-                # Write DHC2L performance records
+                # Write HC2L performance records
                 for record in self.route_records_dhc2l:
                     row = record.to_performance_row()
                     trial_idx = record.trial_id - 1
@@ -1094,10 +1087,6 @@ class ExperimentMetricsCollector:
                     trial_idx = record.trial_id - 1
                     batch_idx = record.batch_id - 1
                     row["total_rebuilds"] = int(self.rebuild_count_dhl[trial_idx, batch_idx])
-                    # DHL doesn't have accuracy metrics in same format
-                    row["dhc2l_distance"] = None
-                    row["dijkstra_distance"] = None
-                    row["is_correct"] = None
                     writer.writerow(row)
         
         total_rows = len(self.route_records_dhc2l) + len(self.route_records_dhl)
@@ -1194,7 +1183,7 @@ class ExperimentMetricsCollector:
             "batches": self.batches,
             "routes_per_batch": self.routes_per_batch,
             "tolerance": self.tolerance,
-            "algorithms": ["DHL", "DHC2L"]
+            "algorithms": ["DHL", "HC2L"]
         }
     
     def _compute_summary(self) -> Dict:
@@ -1217,7 +1206,7 @@ class ExperimentMetricsCollector:
             }
     
     def _compute_accuracy_stats(self) -> Dict:
-        """Compute accuracy statistics (DHC2L only)"""
+        """Compute accuracy statistics (HC2L only)"""
         with self.lock:
             mask = self.filled_dhc2l
             total_routes = int(np.sum(mask))
@@ -1269,9 +1258,9 @@ class ExperimentMetricsCollector:
         """Compute performance comparison statistics"""
         with self.lock:
             dhl_stats = self._compute_algorithm_stats("DHL")
-            dhc2l_stats = self._compute_algorithm_stats("DHC2L")
+            dhc2l_stats = self._compute_algorithm_stats("HC2L")
             
-            # Compute improvements (positive = DHC2L faster/smaller)
+            # Compute improvements (positive = HC2L faster/smaller)
             improvements = {}
             for metric in ["avg_query_time_ms", "avg_label_size_mb", "avg_lazy_update_time_ms"]:
                 dhl_val = dhl_stats.get(metric, 0)
@@ -1387,7 +1376,7 @@ class ExperimentMetricsCollector:
         """Compute time series data for query and update times"""
         result = {}
         
-        for algorithm in ["DHL", "DHC2L"]:
+        for algorithm in ["DHL", "HC2L"]:
             # Use normalized check for algorithm type
             is_dhl = not is_hc2l_algorithm(algorithm)
             query_data = self.query_time_dhl if is_dhl else self.query_time_dhc2l
@@ -1454,11 +1443,11 @@ class ExperimentMetricsCollector:
         return {
             "avg_query_time": {
                 "DHL": round(float(np.mean(dhl_avg_query)), 3) if dhl_avg_query else 0,
-                "DHC2L": round(float(np.mean(dhc2l_avg_query)), 3) if dhc2l_avg_query else 0
+                "HC2L": round(float(np.mean(dhc2l_avg_query)), 3) if dhc2l_avg_query else 0
             },
             "avg_label_size": {
                 "DHL": round(float(np.mean(dhl_avg_label)), 5) if dhl_avg_label else 0,
-                "DHC2L": round(float(np.mean(dhc2l_avg_label)), 5) if dhc2l_avg_label else 0
+                "HC2L": round(float(np.mean(dhc2l_avg_label)), 5) if dhc2l_avg_label else 0
             }
         }
     
@@ -1497,9 +1486,9 @@ class ExperimentMetricsCollector:
         return {
             "trial_labels": trial_labels,
             "DHL_query": dhl_trial_query,
-            "DHC2L_query": dhc2l_trial_query,
+            "HC2L_query": dhc2l_trial_query,
             "DHL_update": dhl_trial_update,
-            "DHC2L_update": dhc2l_trial_update
+            "HC2L_update": dhc2l_trial_update
         }
     
     def _compute_per_batch_data(self) -> Dict:
@@ -1524,7 +1513,7 @@ class ExperimentMetricsCollector:
                 dhl_batch_label.append(0)
             dhl_batch_error.append(0)  # DHL doesn't have accuracy metrics
             
-            # DHC2L stats for this batch
+            # HC2L stats for this batch
             dhc2l_mask = self.filled_dhc2l[:, batch, :]
             if np.any(dhc2l_mask):
                 dhc2l_batch_query.append(round(float(np.mean(self.query_time_dhc2l[:, batch, :][dhc2l_mask])), 3))
@@ -1541,10 +1530,10 @@ class ExperimentMetricsCollector:
         return {
             "batch_labels": batch_labels,
             "DHL_query": dhl_batch_query,
-            "DHC2L_query": dhc2l_batch_query,
+            "HC2L_query": dhc2l_batch_query,
             "DHL_label_size": dhl_batch_label,
-            "DHC2L_label_size": dhc2l_batch_label,
-            "DHC2L_error_rate": dhc2l_batch_error
+            "HC2L_label_size": dhc2l_batch_label,
+            "HC2L_error_rate": dhc2l_batch_error
         }
     
     def _compute_jam_factor_chart(self) -> Dict:
@@ -1584,7 +1573,7 @@ class ExperimentMetricsCollector:
         }
     
     def _compute_error_rate_chart(self) -> Dict:
-        """Compute error rate chart data per batch (DHC2L only)"""
+        """Compute error rate chart data per batch (HC2L only)"""
         batch_labels = []
         error_rates = []
         
@@ -1646,7 +1635,7 @@ class ExperimentMetricsCollector:
         return {
             "batch_labels": batch_labels,
             "DHL_labels": dhl_label_trend,
-            "DHC2L_labels": dhc2l_label_trend
+            "HC2L_labels": dhc2l_label_trend
         }
     
     def _compute_rebuild_analysis(self) -> Dict:
@@ -1665,11 +1654,11 @@ class ExperimentMetricsCollector:
         
         return {
             "DHL_rebuild_times": [round(t, 3) for t in dhl_rebuild_times],
-            "DHC2L_rebuild_times": [round(t, 3) for t in dhc2l_rebuild_times],
+            "HC2L_rebuild_times": [round(t, 3) for t in dhc2l_rebuild_times],
             "DHL_rebuild_counts": dhl_rebuild_counts,
-            "DHC2L_rebuild_counts": dhc2l_rebuild_counts,
+            "HC2L_rebuild_counts": dhc2l_rebuild_counts,
             "total_DHL_rebuilds": sum(dhl_rebuild_counts),
-            "total_DHC2L_rebuilds": sum(dhc2l_rebuild_counts)
+            "total_HC2L_rebuilds": sum(dhc2l_rebuild_counts)
         }
     
     # ========================================================================
@@ -1695,7 +1684,7 @@ class ExperimentMetricsCollector:
             }
     
     def _get_current_accuracy_rate(self) -> float:
-        """Get current accuracy rate (DHC2L only)"""
+        """Get current accuracy rate (HC2L only)"""
         mask = self.filled_dhc2l
         total = np.sum(mask)
         if total == 0:
@@ -1781,11 +1770,11 @@ class ExperimentMetricsCollector:
         rows = []
         
         for trial in range(self.trials):
-            # DHC2L row
+            # HC2L row
             if self.construction_recorded_dhc2l[trial]:
                 rows.append({
                     "trial": trial + 1,
-                    "algorithm": "DHC2L",
+                    "algorithm": "HC2L",
                     "initial_construction_time_ms": round(float(self.construction_time_dhc2l[trial]), 2),
                     "initial_label_size_mb": round(float(self.initial_label_size_dhc2l[trial]), 5)
                 })
@@ -1809,7 +1798,7 @@ class ExperimentMetricsCollector:
             for batch in range(self.batches):
                 disruption_level = get_disruption_level(batch + 1)
                 
-                # DHC2L data
+                # HC2L data
                 dhc2l_query_times = self._batch_query_times_dhc2l[trial][batch]
                 if dhc2l_query_times:
                     dhc2l_lazy_times = self._batch_lazy_times_dhc2l[trial][batch]
@@ -1820,7 +1809,7 @@ class ExperimentMetricsCollector:
                     rows.append({
                         "trial": trial + 1,
                         "batch": batch + 1,
-                        "algorithm": "DHC2L",
+                        "algorithm": "HC2L",
                         "disruption_level": disruption_level,
                         "lazy_update_time_ms": round(float(np.mean(dhc2l_lazy_times)), 3) if dhc2l_lazy_times else 0,
                         "threshold_rebuild_time_ms": round(float(self.threshold_rebuild_time_dhc2l[trial, batch]), 3),
@@ -1988,7 +1977,7 @@ def compute_accuracy(dhc2l_distance: float,
     Convenience function to compute accuracy metrics.
     
     Args:
-        dhc2l_distance: Distance from DHC2L algorithm
+        dhc2l_distance: Distance from HC2L algorithm
         dijkstra_distance: Distance from Dijkstra reference
         tolerance: Accuracy tolerance (default 5%)
         

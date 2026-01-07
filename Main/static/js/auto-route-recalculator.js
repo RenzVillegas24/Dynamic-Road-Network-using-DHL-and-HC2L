@@ -153,8 +153,8 @@ async function triggerAutoRouteRecalculation() {
     if (algorithm === 'dhl' && typeof displayDHLRoute === 'function') {
       displayDHLRoute(newRouteData);
       console.log('[AutoRouteRecalculator] DHL route displayed');
-    } else if (algorithm === 'hc2l' && typeof displayDHC2LRoute === 'function') {
-      displayDHC2LRoute(newRouteData);
+    } else if (algorithm === 'hc2l' && typeof displayHC2LRoute === 'function') {
+      displayHC2LRoute(newRouteData);
       console.log('[AutoRouteRecalculator] HC2L route displayed');
     }
     

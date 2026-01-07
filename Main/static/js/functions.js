@@ -1047,7 +1047,7 @@ function displayDHLRoute(routeData) {
 }
 
 // HC2L Route Display Function (same features as DHL)
-function displayDHC2LRoute(routeData) {
+function displayHC2LRoute(routeData) {
   console.log('🔵 Displaying HC2L route:', routeData);
 
   // Clear only route polylines, keep location markers
@@ -1750,7 +1750,7 @@ function computeDiscreteFrechetDistance(dhc2lRouteData, googleMapsRouteData) {
     console.log('Google Maps Route Data:', googleMapsRouteData);
 
     // Extract coordinate arrays from both routes
-    const dhc2lCoords = extractDHC2LCoordinates(dhc2lRouteData);
+    const dhc2lCoords = extractHC2LCoordinates(dhc2lRouteData);
     const googleCoords = extractGoogleMapsCoordinates(googleMapsRouteData);
 
     if (!dhc2lCoords || dhc2lCoords.length === 0) {
@@ -1826,7 +1826,7 @@ function computeDiscreteFrechetDistance(dhc2lRouteData, googleMapsRouteData) {
 }
 
 // Helper function to extract coordinates from D-HC2L route data
-function extractDHC2LCoordinates(dhc2lRouteData) {
+function extractHC2LCoordinates(dhc2lRouteData) {
   console.log('🔍 Extracting D-HC2L coordinates from:', dhc2lRouteData);
 
   if (!dhc2lRouteData || !dhc2lRouteData.route) {
@@ -2866,15 +2866,15 @@ async function handleGoButtonClick(showPanel = true) {
         } else {
           clearDisruptionMarkers();
         }
-        routeData = await computeDHC2LRoute(useDisruptions, currentThreshold, false);
-        if (routeData) displayDHC2LRoute(routeData);
+        routeData = await computeHC2LRoute(useDisruptions, currentThreshold, false);
+        if (routeData) displayHC2LRoute(routeData);
         break;
 
       default:
         console.warn('Unknown algorithm selected:', selectedAlgorithm);
         // Fallback to HC2L with isPreview=false (confirmation with alternatives)
-        routeData = await computeDHC2LRoute(useDisruptions, currentThreshold, false);
-        if (routeData) displayDHC2LRoute(routeData);
+        routeData = await computeHC2LRoute(useDisruptions, currentThreshold, false);
+        if (routeData) displayHC2LRoute(routeData);
     }
 
     if (routeData) {

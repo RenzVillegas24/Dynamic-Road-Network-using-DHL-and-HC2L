@@ -579,7 +579,7 @@
           <div id="appendix-tab-query" class="appendix-tab-content hidden">
             <div class="section-card">
               <div class="section-card__header">
-                <h4 class="section-card__title">Appendix 1.3: Combined DHL vs DHC2L Performance Summary</h4>
+                <h4 class="section-card__title">Appendix 1.3: Combined DHL vs HC2L Performance Summary</h4>
                 <button onclick="DemoRunner.exportAppendixCSV('query')" class="btn btn--success btn--sm">
                   <i data-lucide="download" class="w-4 h-4"></i> Export CSV
                 </button>

@@ -1833,7 +1833,7 @@ const ExperimentRunner = {
     },
     
     // =========================================================================
-    // NEW: Accuracy Tab Data Population (DHC2L Only)
+    // NEW: Accuracy Tab Data Population (HC2L Only)
     // =========================================================================
     
     populateAccuracyTab(data, summary = null) {
@@ -2481,7 +2481,7 @@ const ExperimentRunner = {
             </tr>
             <tr class="hover:bg-gray-50 bg-purple-50">
                 <td class="p-3 text-gray-700">Average (3 trials)</td>
-                <td class="p-3 text-purple-600 font-medium">DHC2L</td>
+                <td class="p-3 text-purple-600 font-medium">HC2L</td>
                 <td class="p-3 text-right font-mono">${dhc2lStats.avg_construction_time_ms?.toFixed(2) || '0.00'}</td>
                 <td class="p-3 text-right font-mono">${dhc2lStats.avg_initial_label_size_mb?.toFixed(5) || '0.00000'}</td>
             </tr>
@@ -3606,7 +3606,7 @@ const ExperimentRunner = {
                 plugins: {
                     title: {
                         display: true,
-                        text: 'DHC2L Accuracy Error Rate per Batch'
+                        text: 'HC2L Accuracy Error Rate per Batch'
                     },
                     legend: {
                         position: 'top'

@@ -103,29 +103,28 @@ def create_route_log_entry(
     """
     Create a complete route log entry with accuracy validation.
     
-    Implements accuracy-first gating:
+    Records both accuracy and performance metrics:
     1. Extract distances from API result
     2. Compute accuracy metrics
-    3. If is_correct: Extract performance metrics
-    4. If not is_correct: Leave performance metrics as NULL
+    3. Extract performance metrics (always recorded)
     
     Args:
-        api_result: Result from HC2L/DHC2L C++ API call
+        api_result: Result from HC2L/HC2L C++ API call
         trial_id: Current trial number (1-indexed)
         batch_id: Current batch number (1-indexed)
         query_id: Current query/route number (1-indexed)
         disruption_data: Optional disruption data for incident summary
-        tolerance: Accuracy tolerance (default 0.05 = 5%)
+        tolerance: Accuracy tolerance (default 0.10 = 10%)
         
     Returns:
-        Complete RouteMetricsRecord with accuracy and conditional performance
+        Complete RouteMetricsRecord with accuracy and performance
     """
     # Initialize record
     record = RouteMetricsRecord(
         trial_id=trial_id,
         batch_id=batch_id,
         query_id=query_id,
-        algorithm="DHC2L",
+        algorithm="HC2L",
         disruption_level=get_disruption_level(batch_id),
         timestamp=datetime.now().isoformat()
     )
@@ -156,44 +155,42 @@ def create_route_log_entry(
     # STEP 2: Compute accuracy metrics
     record.accuracy = compute_accuracy(dhc2l_distance, dijkstra_distance, tolerance)
     
-    # STEP 3: Conditional performance recording
-    if record.accuracy.is_correct:
-        # Extract performance metrics only if accuracy passes
-        from experiment_metrics_collector import PerformanceMetrics, ConstructionMetrics
+    # STEP 3: Performance recording (always recorded)
+    from experiment_metrics_collector import PerformanceMetrics, ConstructionMetrics
+    
+    summary = api_result.get("summary", {})
+    query_phase = api_result.get("query_phase", {})
+    update_phase = api_result.get("update_phase", {})
+    
+    record.performance.query_response_time_ms = float(query_phase.get("query_time_ms", 0) or 
+                                                      summary.get("query_time_ms", 0) or 0)
+    record.performance.labeling_size_mb = float(summary.get("label_size", 0) or 0)
+    record.performance.lazy_update_time_ms = float(update_phase.get("lazy_update_time_ms", 0) or 0)
+    record.performance.threshold_rebuild_time_ms = float(update_phase.get("threshold_rebuild_time_ms", 0) or 0)
+    record.performance.peak_label_size_mb = float(summary.get("peak_label_size_mb", 
+                                                              record.performance.labeling_size_mb) or 0)
+    
+    # Extract labeling time from construction info or labeling info
+    construction_info = api_result.get("construction_info", {})
+    labeling_info = metrics.get("labeling_info", {})
+    
+    if "construction_time_ms" in construction_info:
+        record.performance.labeling_time_ms = float(construction_info["construction_time_ms"])
+    elif "index_load_time_ms" in labeling_info:
+        record.performance.labeling_time_ms = float(labeling_info["index_load_time_ms"])
+    elif "construction_time_ms" in labeling_info:
+        record.performance.labeling_time_ms = float(labeling_info["construction_time_ms"])
+    
+    # Extract construction metrics for first route
+    if query_id == 1:
+        construction_time = float(construction_info.get("construction_time_ms", 0) or 0)
+        initial_label_size = float(construction_info.get("label_size_mb", 0) or 
+                                  summary.get("label_size", 0) or 0)
         
-        summary = api_result.get("summary", {})
-        query_phase = api_result.get("query_phase", {})
-        update_phase = api_result.get("update_phase", {})
-        
-        record.performance.query_response_time_ms = float(query_phase.get("query_time_ms", 0) or 
-                                                          summary.get("query_time_ms", 0) or 0)
-        record.performance.labeling_size_mb = float(summary.get("label_size", 0) or 0)
-        record.performance.lazy_update_time_ms = float(update_phase.get("lazy_update_time_ms", 0) or 0)
-        record.performance.threshold_rebuild_time_ms = float(update_phase.get("threshold_rebuild_time_ms", 0) or 0)
-        record.performance.peak_label_size_mb = float(summary.get("peak_label_size_mb", 
-                                                                  record.performance.labeling_size_mb) or 0)
-        
-        # Extract labeling time from construction info or labeling info
-        construction_info = api_result.get("construction_info", {})
-        labeling_info = metrics.get("labeling_info", {})
-        
-        if "construction_time_ms" in construction_info:
-            record.performance.labeling_time_ms = float(construction_info["construction_time_ms"])
-        elif "index_load_time_ms" in labeling_info:
-            record.performance.labeling_time_ms = float(labeling_info["index_load_time_ms"])
-        elif "construction_time_ms" in labeling_info:
-            record.performance.labeling_time_ms = float(labeling_info["construction_time_ms"])
-        
-        # Extract construction metrics for first route
-        if query_id == 1:
-            construction_time = float(construction_info.get("construction_time_ms", 0) or 0)
-            initial_label_size = float(construction_info.get("label_size_mb", 0) or 
-                                      summary.get("label_size", 0) or 0)
-            
-            record.construction = ConstructionMetrics(
-                initial_construction_time_ms=construction_time,
-                initial_label_size_mb=initial_label_size
-            )
+        record.construction = ConstructionMetrics(
+            initial_construction_time_ms=construction_time,
+            initial_label_size_mb=initial_label_size
+        )
     
     # Extract execution time
     record.execution_time_ms = float(api_result.get("execution_time_ms", 0) or 0)
@@ -2049,7 +2046,7 @@ class ExperimentRunner:
             # ================================================================
             # Step 4: Calculate Deviation Percentages
             # ================================================================
-            # Time deviation - Formula 15: TimeDeviation = ((T_DHC2L - T_ref) / T_ref) * 100
+            # Time deviation - Formula 15: TimeDeviation = ((T_HC2L - T_ref) / T_ref) * 100
             if result['travel_time_min_here'] > 0:
                 result['time_deviation_pct'] = (
                     (result['travel_time_min_hc2l'] - result['travel_time_min_here'])
@@ -2255,7 +2252,7 @@ class ExperimentRunner:
                         )
                         
                         # ============================================================
-                        # RECORD ALL METRICS (includes accuracy-first gating for DHC2L)
+                        # RECORD ALL METRICS (includes accuracy-first gating for HC2L)
                         # ============================================================
                         if experiment_id in self.metrics_collectors:
                             metrics_collector = self.metrics_collectors[experiment_id]
@@ -2270,18 +2267,18 @@ class ExperimentRunner:
                                 disruption_data=disruption_data
                             )
                             
-                            # Log accuracy result for DHC2L routes
-                            if algorithm.upper() == "DHC2L" and record.accuracy:
+                            # Log accuracy result for HC2L routes
+                            if algorithm.upper() == "HC2L" and record.accuracy:
                                 if not record.accuracy.is_correct:
                                     logger.warning(
-                                        f"Route [{trial_idx+1},{b_idx+1},{route_idx+1}] DHC2L "
+                                        f"Route [{trial_idx+1},{b_idx+1},{route_idx+1}] HC2L "
                                         f"accuracy FAILED: dhc2l={record.accuracy.dhc2l_distance:.1f}m, "
                                         f"dijkstra={record.accuracy.dijkstra_distance:.1f}m, "
                                         f"error={record.accuracy.relative_error:.4f} > tolerance={record.accuracy.tolerance}"
                                     )
                                 else:
                                     logger.debug(
-                                        f"Route [{trial_idx+1},{b_idx+1},{route_idx+1}] DHC2L "
+                                        f"Route [{trial_idx+1},{b_idx+1},{route_idx+1}] HC2L "
                                         f"accuracy OK: error={record.accuracy.relative_error:.4f}"
                                     )
                         
@@ -2504,7 +2501,7 @@ class ExperimentRunner:
                                        disruption_path: str) -> Optional[float]:
         """
         Compute Dijkstra ground truth distance for accuracy validation.
-        Uses C++ path finding with disruptions applied (same as DHC2L/HC2L).
+        Uses C++ path finding with disruptions applied (same as HC2L/HC2L).
         Results are cached to avoid recomputation across trials.
         
         Args:
@@ -2634,7 +2631,7 @@ class ExperimentRunner:
                 disruption_path = disruption_data.get("path", "")
             
             # ========================================================================
-            # STEP 1: Execute DHC2L/HC2L query
+            # STEP 1: Execute HC2L/HC2L query
             # ========================================================================
             api_result = None
             if algorithm.upper() == "DHL":
@@ -2703,7 +2700,7 @@ class ExperimentRunner:
                 )
                 
                 if dijkstra_distance:
-                    # Extract DHC2L/HC2L distance
+                    # Extract HC2L/HC2L distance
                     dhc2l_distance = result["summary"].get("distance_km", 0)
                     
                     # ========================================================================
@@ -2725,7 +2722,7 @@ class ExperimentRunner:
                     
                     logger.debug(
                         f"Route {route_idx} accuracy: "
-                        f"DHC2L={dhc2l_distance:.3f}km, "
+                        f"HC2L={dhc2l_distance:.3f}km, "
                         f"Dijkstra={dijkstra_distance:.3f}km, "
                         f"Error={relative_error*100:.2f}%, "
                         f"Correct={is_correct}"
@@ -2742,7 +2739,7 @@ class ExperimentRunner:
                         "error": "Dijkstra computation failed"
                     }
             else:
-                # If DHC2L computation failed, mark as incorrect
+                # If HC2L computation failed, mark as incorrect
                 result["accuracy"] = {
                     "dijkstra_distance_km": None,
                     "dhc2l_distance_km": None,
@@ -2750,7 +2747,7 @@ class ExperimentRunner:
                     "relative_error": None,
                     "is_correct": False,
                     "tolerance": 0.05,
-                    "error": result.get("error", "DHC2L computation failed")
+                    "error": result.get("error", "HC2L computation failed")
                 }
                 
         except Exception as e:

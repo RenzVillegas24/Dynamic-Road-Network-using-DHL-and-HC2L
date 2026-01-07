@@ -224,7 +224,7 @@ async function runComparison() {
 
     if (compareHC2L) {
         promises.push(
-            computeDHC2LRoute(useDisruptions, selections.threshold, true) // true = is_comparison_mode
+            computeHC2LRoute(useDisruptions, selections.threshold, true) // true = is_comparison_mode
                 .then(result => {
                     window.comparisonResults.hc2l = result;
                     console.log('✅ HC2L route computed');

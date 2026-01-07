@@ -150,7 +150,7 @@ function updateAlgorithmComparisonModal(dhlRouteData, dhc2lRouteData) {
         updateDHLComparisonMetrics(dhlMetrics);
         
         // Update D-HC2L metrics in the modal
-        updateDHC2LComparisonMetrics(dhc2lMetrics, dhlMetrics);
+        updateHC2LComparisonMetrics(dhc2lMetrics, dhlMetrics);
         
         console.log('✅ Algorithm comparison modal updated successfully');
         
@@ -191,7 +191,7 @@ function updateDHLComparisonMetrics(dhlMetrics) {
 }
 
 // Helper function to update D-HC2L metrics in comparison modal with percentage improvements
-function updateDHC2LComparisonMetrics(dhc2lMetrics, dhlMetrics) {
+function updateHC2LComparisonMetrics(dhc2lMetrics, dhlMetrics) {
     console.log('Updating D-HC2L metrics:', dhc2lMetrics);
     console.log('Comparing against DHL metrics:', dhlMetrics);
     

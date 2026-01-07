@@ -6198,7 +6198,7 @@ const DemoRunner = {
         summary.innerHTML = `
             <h5>📊 Performance Comparison Summary</h5>
             <ul>
-                <li>Comparing <strong>DHL</strong> vs <strong>DHC2L</strong> across ${(data.trials || []).length} trials</li>
+                <li>Comparing <strong>DHL</strong> vs <strong>HC2L</strong> across ${(data.trials || []).length} trials</li>
                 <li>Average of 3,000 queries per trial</li>
             </ul>
         `;
@@ -6211,7 +6211,7 @@ const DemoRunner = {
                 <tr>
                     <th>Metric</th>
                     <th>DHL (Avg)</th>
-                    <th>DHC2L (Avg)</th>
+                    <th>HC2L (Avg)</th>
                     <th>% Improvement</th>
                 </tr>
             </thead>

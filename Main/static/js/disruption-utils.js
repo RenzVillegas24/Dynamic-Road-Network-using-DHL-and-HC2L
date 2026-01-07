@@ -272,7 +272,7 @@ const TrafficUtils = {
 
     /**
      * Get color for a route segment considering traffic flow
-     * Used by displayDHLRoute and displayDHC2LRoute
+     * Used by displayDHLRoute and displayHC2LRoute
      * 
      * @param {Object} segment - Route segment with flow data
      * @param {string} routeType - 'DHL' or 'HC2L'

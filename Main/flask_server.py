@@ -5467,7 +5467,7 @@ def compare_with_google_maps():
     
     Frontend sends:
     - start_lat, start_lng, dest_lat, dest_lng: Origin/destination coordinates
-    - algorithm: Algorithm name used (HC2L, DHC2L, DHL, etc)
+    - algorithm: Algorithm name used (HC2L, HC2L, DHL, etc)
     - existing_route_geometry: Current route geometry from the calculated route
     
     Steps:
