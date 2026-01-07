@@ -640,6 +640,18 @@
   color: rgba(20, 184, 166, 0.8);
 }
 
+.nav-select__option[data-color="green"] {
+  --color-option-rgb: 34, 197, 94;
+  background: rgba(34, 197, 94, 0.08);
+  color: rgba(34, 197, 94, 0.8);
+}
+
+.nav-select__option[data-color="cyan"] {
+  --color-option-rgb: 6, 182, 212;
+  background: rgba(6, 182, 212, 0.08);
+  color: rgba(6, 182, 212, 0.8);
+}
+
 .nav-select__option[data-color="indigo"] {
   --color-option-rgb: 99, 102, 241;
   background: rgba(99, 102, 241, 0.08);

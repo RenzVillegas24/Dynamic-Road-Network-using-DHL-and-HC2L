@@ -194,20 +194,20 @@
   --color-cyan-900: #164e63;
 
   /* SLATE COLORS */
-  --color-slate: #64748b;
-  --color-slate-hover: #475569;
-  --color-slate-dark: #334155;
-  --color-slate-light: #f1f5f9;
-  --color-slate-50: #f8fafc;
-  --color-slate-100: #f1f5f9;
-  --color-slate-200: #e2e8f0;
-  --color-slate-300: #cbd5e1;
-  --color-slate-400: #94a3b8;
-  --color-slate-500: #64748b;
-  --color-slate-600: #475569;
-  --color-slate-700: #334155;
-  --color-slate-800: #1e293b;
-  --color-slate-900: #0f172a;
+  --color-slate: #94a3b8;
+  --color-slate-hover: #8595ad;
+  --color-slate-dark: #6e7b89;
+  --color-slate-light: #eef3f8;
+  --color-slate-50: #fbfdff;
+  --color-slate-100: #f7f9fb;
+  --color-slate-200: #eef3f7;
+  --color-slate-300: #e0e7ee;
+  --color-slate-400: #c9d4df;
+  --color-slate-500: #94a3b8;
+  --color-slate-600: #6f8495;
+  --color-slate-700: #596775;
+  --color-slate-800: #40505f;
+  --color-slate-900: #2b3944;
 
   /* ZINC COLORS */
   --color-zinc: #71717a;

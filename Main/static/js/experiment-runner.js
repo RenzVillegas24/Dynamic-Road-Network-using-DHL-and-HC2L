@@ -2394,25 +2394,125 @@ const ExperimentRunner = {
     // =========================================================================
     
     populateSummaryTabFromGraphData(graphData) {
-        // Summary tab shows batch-level incident aggregates
-        // For now, show message that data is in CSV
+        // Summary tab shows batch-level incident aggregates from CSV
         const tbody = document.getElementById('result-summary-tbody');
         if (!tbody) return;
         
+        // Load summary data from CSV endpoint
+        this.loadAndDisplaySummaryData();
+    },
+    
+    async loadAndDisplaySummaryData() {
+        const tbody = document.getElementById('result-summary-tbody');
+        if (!tbody) return;
+        
+        if (!this.currentResultId) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="14" class="text-center py-8">
+                        <div class="text-gray-600">
+                            <i data-lucide="alert-circle" class="w-12 h-12 mx-auto mb-2 text-gray-400"></i>
+                            <p class="font-semibold mb-2">No experiment results loaded</p>
+                        </div>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+        
+        // Show loading state
         tbody.innerHTML = `
             <tr>
-                <td colspan="8" class="text-center py-8">
-                    <div class="text-gray-600">
-                        <i data-lucide="file-spreadsheet" class="w-12 h-12 mx-auto mb-2 text-gray-400"></i>
-                        <p class="font-semibold mb-2">Detailed per-batch incident data available in CSV</p>
-                        <p class="text-sm text-gray-500 mb-4">Click "Export CSV" above to download the complete summary results</p>
-                        <button onclick="ExperimentRunner.exportTab('summary')" class="btn btn--primary btn--sm">
-                            <i data-lucide="download" class="w-4 h-4"></i> Download Summary CSV
-                        </button>
-                    </div>
+                <td colspan="14" class="text-center py-8">
+                    <div class="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-2"></div>
+                    <p class="text-gray-500">Loading incident summary data...</p>
                 </td>
             </tr>
         `;
+        
+        try {
+            const url = `/api/experiment/results/${this.currentResultId}/csv/summary/data?page=1&limit=100`;
+            const response = await fetch(url);
+            const result = await response.json();
+            
+            if (!result.success || !result.data || result.data.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="14" class="text-center py-8">
+                            <div class="text-gray-600">
+                                <i data-lucide="file-spreadsheet" class="w-12 h-12 mx-auto mb-2 text-gray-400"></i>
+                                <p class="font-semibold mb-2">Detailed per-batch incident data available in CSV</p>
+                                <button onclick="ExperimentRunner.exportTab('summary')" class="btn btn--primary btn--sm mt-2">
+                                    <i data-lucide="download" class="w-4 h-4"></i> Download Summary CSV
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            // Render summary table
+            tbody.innerHTML = result.data.map((row, idx) => {
+                const totalIncidents = 
+                    (parseInt(row.num_accident || 0) +
+                    parseInt(row.num_construction || 0) +
+                    parseInt(row.num_congestion || 0) +
+                    parseInt(row.num_disabled_vehicle || 0) +
+                    parseInt(row.num_mass_transit_event || 0) +
+                    parseInt(row.num_planned_event || 0) +
+                    parseInt(row.num_road_hazard || 0) +
+                    parseInt(row.num_road_closure || 0) +
+                    parseInt(row.num_weather || 0) +
+                    parseInt(row.num_lane_restriction || 0) +
+                    parseInt(row.num_other || 0));
+                
+                return `
+                    <tr class="hover:bg-gray-50 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}">
+                        <td class="p-2 text-center font-semibold text-gray-700">T${row.trial_id}</td>
+                        <td class="p-2 text-center font-semibold text-gray-700">B${row.batch_id}</td>
+                        <td class="p-2 text-center">
+                            <span class="px-2 py-1 rounded text-xs font-medium ${
+                                row.disruption_level === 'light' ? 'bg-green-100 text-green-700' :
+                                row.disruption_level === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                                'bg-red-100 text-red-700'
+                            }">
+                                ${row.disruption_level || 'unknown'}
+                            </span>
+                        </td>
+                        <td class="p-2 text-right font-mono text-sm">${row.num_accident || 0}</td>
+                        <td class="p-2 text-right font-mono text-sm">${row.num_construction || 0}</td>
+                        <td class="p-2 text-right font-mono text-sm font-bold text-blue-600">${row.num_congestion || 0}</td>
+                        <td class="p-2 text-right font-mono text-sm">${row.num_disabled_vehicle || 0}</td>
+                        <td class="p-2 text-right font-mono text-sm">${row.num_mass_transit_event || 0}</td>
+                        <td class="p-2 text-right font-mono text-sm">${row.num_planned_event || 0}</td>
+                        <td class="p-2 text-right font-mono text-sm">${row.num_road_hazard || 0}</td>
+                        <td class="p-2 text-right font-mono text-sm">${row.num_road_closure || 0}</td>
+                        <td class="p-2 text-right font-mono text-sm">${row.num_weather || 0}</td>
+                        <td class="p-2 text-right font-mono text-sm">${row.num_lane_restriction || 0}</td>
+                        <td class="p-2 text-right font-mono text-sm">${row.num_other || 0}</td>
+                        <td class="p-2 text-right font-mono font-bold text-gray-800">${totalIncidents}</td>
+                    </tr>
+                `;
+            }).join('');
+            
+            // Refresh Lucide icons
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+            
+        } catch (error) {
+            console.error('Error loading summary data:', error);
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="14" class="text-center py-8 text-red-600">
+                        <i data-lucide="alert-circle" class="w-12 h-12 mx-auto mb-2"></i>
+                        <p class="font-semibold mb-2">Error loading summary data</p>
+                        <p class="text-sm">${error.message}</p>
+                    </td>
+                </tr>
+            `;
+        }
     },
     
     populateAccuracyTabFromStats(accuracyStats) {
@@ -4465,14 +4565,14 @@ const ExperimentRunner = {
             <div class="flex items-center gap-2">
                 <button 
                     onclick="ExperimentRunner.loadPerRoutePage('${csvType}', ${pagination.page - 1})"
-                    class="btn btn--sm btn--outline ${!pagination.has_prev ? 'opacity-50 cursor-not-allowed' : ''}"
+                    class="btn btn--sm btn--zinc flex-1 hover:shadow-lg transition-all duration-200${!pagination.has_prev ? 'opacity-50 cursor-not-allowed' : ''}"
                     ${!pagination.has_prev ? 'disabled' : ''}>
                     <i data-lucide="chevron-left" class="w-4 h-4"></i>
                 </button>
                 <span class="text-sm">Page ${pagination.page} of ${pagination.total_pages}</span>
                 <button 
                     onclick="ExperimentRunner.loadPerRoutePage('${csvType}', ${pagination.page + 1})"
-                    class="btn btn--sm btn--outline ${!pagination.has_next ? 'opacity-50 cursor-not-allowed' : ''}"
+                    class="btn btn--sm btn--zinc flex-1 hover:shadow-lg transition-all duration-200 ${!pagination.has_next ? 'opacity-50 cursor-not-allowed' : ''}"
                     ${!pagination.has_next ? 'disabled' : ''}>
                     <i data-lucide="chevron-right" class="w-4 h-4"></i>
                 </button>
