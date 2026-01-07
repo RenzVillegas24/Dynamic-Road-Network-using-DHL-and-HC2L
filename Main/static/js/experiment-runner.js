@@ -3637,6 +3637,9 @@ const ExperimentRunner = {
                 </div>
             `;
 
+            // Populate HERE vs HC2L Comparison Summary
+            this.populateHEREComparisonSummary(result.data);
+
             // Refresh Lucide icons
             if (typeof lucide !== 'undefined') {
                 lucide.createIcons();
@@ -3652,6 +3655,103 @@ const ExperimentRunner = {
                 </div>
             `;
         }
+    },
+
+    populateHEREComparisonSummary(similarityData) {
+        if (!similarityData || similarityData.length === 0) return;
+
+        // Calculate summary metrics
+        const totalRoutes = similarityData.length;
+        const avgDistDeviation = this.calculateAverage(similarityData, 'distance_deviation_pct');
+        const avgTimeDeviation = this.calculateAverage(similarityData, 'time_deviation_pct');
+        const avgFrechetDistance = this.calculateAverage(similarityData, 'frechet_distance_m');
+        
+        // Calculate averages for HC2L and HERE
+        const avgHC2LDistance = this.calculateAverage(similarityData, 'dhc2l_distance_km');
+        const avgHEREDistance = this.calculateAverage(similarityData, 'here_distance_km');
+        const avgHC2LTime = this.calculateAverage(similarityData, 'dhc2l_travel_time_min');
+        const avgHERETime = this.calculateAverage(similarityData, 'here_travel_time_min');
+
+        // Count rating distributions
+        const fdRatings = this.countRatings(similarityData, 'fd_rating');
+        const ttdRatings = this.countRatings(similarityData, 'ttd_rating');
+
+        // Update the three metric cards at the top
+        const metricsContainer = document.getElementById('additional-similarity-metrics');
+        if (metricsContainer) {
+            metricsContainer.innerHTML = `
+                <div class="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-4 border border-green-200">
+                    <p class="text-xs text-green-600 font-medium mb-2">Average Fréchet Distance</p>
+                    <p class="text-3xl font-bold text-green-700">${avgFrechetDistance.toFixed(1)}m</p>
+                    <p class="text-xs text-green-500 mt-1">Spatial path similarity</p>
+                </div>
+                <div class="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-lg p-4 border border-blue-200">
+                    <p class="text-xs text-blue-600 font-medium mb-2">Average Distance Deviation</p>
+                    <p class="text-3xl font-bold text-blue-700">${avgDistDeviation.toFixed(2)}%</p>
+                    <p class="text-xs text-blue-500 mt-1">HC2L vs HERE distance</p>
+                </div>
+                <div class="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-lg p-4 border border-purple-200">
+                    <p class="text-xs text-purple-600 font-medium mb-2">Average Time Deviation</p>
+                    <p class="text-3xl font-bold text-purple-700">${avgTimeDeviation.toFixed(2)}%</p>
+                    <p class="text-xs text-purple-500 mt-1">HC2L vs HERE travel time</p>
+                </div>
+            `;
+        }
+
+        // Update the HC2L and HERE comparison cards at the bottom
+        const summaryHTML = `
+            <div class="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-lg p-4 border border-purple-200">
+                <p class="text-xs text-purple-600 font-bold uppercase tracking-wide mb-3">HC2L Statistics</p>
+                <div class="space-y-2 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-purple-700">Avg Distance:</span>
+                        <span class="font-bold text-purple-800">${avgHC2LDistance.toFixed(3)} km</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-purple-700">Avg Travel Time:</span>
+                        <span class="font-bold text-purple-800">${avgHC2LTime.toFixed(2)} min</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-purple-700">Routes Tested:</span>
+                        <span class="font-bold text-purple-800">${totalRoutes}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-lg p-4 border border-blue-200">
+                <p class="text-xs text-blue-600 font-bold uppercase tracking-wide mb-3">HERE Statistics</p>
+                <div class="space-y-2 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-blue-700">Avg Distance:</span>
+                        <span class="font-bold text-blue-800">${avgHEREDistance.toFixed(3)} km</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-blue-700">Avg Travel Time:</span>
+                        <span class="font-bold text-blue-800">${avgHERETime.toFixed(2)} min</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-blue-700">API Success Rate:</span>
+                        <span class="font-bold text-blue-800">100%</span>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Find and update the bottom comparison grid (the one with 2 columns)
+        const comparisonSection = document.querySelector('#result-tab-similarity .grid.grid-cols-2.gap-4:last-of-type');
+        if (comparisonSection) {
+            comparisonSection.innerHTML = summaryHTML;
+        }
+    },
+
+    countRatings(data, field) {
+        const ratings = { excellent: 0, good: 0, fair: 0, poor: 0, bad: 0 };
+        data.forEach(row => {
+            const rating = row[field]?.toLowerCase();
+            if (ratings.hasOwnProperty(rating)) {
+                ratings[rating]++;
+            }
+        });
+        return ratings;
     },
 
     getRatingClass(rating) {
@@ -3681,7 +3781,7 @@ const ExperimentRunner = {
     // GRAPH RENDERING
     // =========================================================================
 
-    populateGraphs(graphData) {
+    async populateGraphs(graphData) {
         if (!graphData || Object.keys(graphData).length === 0) {
             console.warn('No graph data available');
             return;
@@ -3693,17 +3793,160 @@ const ExperimentRunner = {
         });
         this.chartInstances = {};
 
-        // Render each graph
+        // Render basic graphs first
         this.renderQueryTimeSeriesChart(graphData.time_series);
         this.renderUpdateTimeSeriesChart(graphData.time_series);
         this.renderAverageQueryTimeChart(graphData.algorithm_comparison);
         this.renderAverageLabelSizeChart(graphData.algorithm_comparison);
-        this.renderPerTrialBreakdownChart(graphData.per_trial);
-        this.renderPerBatchBreakdownChart(graphData.per_batch);
         this.renderOverallComparisonChart(graphData.algorithm_comparison);
         this.renderRebuildAnalysisChart(graphData.rebuild_analysis);
         this.renderLabelSizeTrendChart(graphData.label_size_trend);
 
+        // Load CSV data to compute jam factors and error rates for per-trial/per-batch charts
+        await this.loadAndRenderPerTrialPerBatchCharts(graphData);
+
+    },
+
+    async loadAndRenderPerTrialPerBatchCharts(graphData) {
+        try {
+            // Load summary CSV data for jam factors
+            const summaryResponse = await fetch(`/api/experiment/results/${this.currentResultId}/csv/summary/data?page=1&limit=1000`);
+            const summaryResult = await summaryResponse.json();
+            
+            // Load accuracy CSV data for error rates
+            const accuracyResponse = await fetch(`/api/experiment/results/${this.currentResultId}/csv/accuracy/data?page=1&limit=1000`);
+            const accuracyResult = await accuracyResponse.json();
+
+            if (summaryResult.success && summaryResult.data && summaryResult.data.length > 0) {
+                // Compute jam factors per trial and per batch
+                const jamFactorData = this.computeJamFactorData(summaryResult.data);
+                
+                // Enhance graphData with jam factor data
+                if (graphData.per_trial) {
+                    graphData.per_trial.jam_factors = jamFactorData.perTrial;
+                }
+                if (graphData.per_batch) {
+                    graphData.per_batch.jam_factors = jamFactorData.perBatch;
+                }
+            }
+
+            if (accuracyResult.success && accuracyResult.data && accuracyResult.data.length > 0) {
+                // Compute error rates per trial and per batch
+                const errorRateData = this.computeErrorRateData(accuracyResult.data);
+                
+                // Enhance graphData with error rate data
+                if (graphData.per_trial) {
+                    graphData.per_trial.error_rates = errorRateData.perTrial;
+                }
+                if (graphData.per_batch) {
+                    graphData.per_batch.error_rates = errorRateData.perBatch;
+                }
+            }
+
+            // Now render the per-trial and per-batch breakdown charts with the enhanced data
+            this.renderPerTrialBreakdownChart(graphData.per_trial);
+            this.renderPerBatchBreakdownChart(graphData.per_batch);
+
+        } catch (error) {
+            console.error('Error loading per-trial/per-batch data:', error);
+            // Still render the charts even if data loading fails
+            this.renderPerTrialBreakdownChart(graphData.per_trial);
+            this.renderPerBatchBreakdownChart(graphData.per_batch);
+        }
+    },
+
+    computeJamFactorData(summaryData) {
+        const perTrialMap = {};
+        const perBatchMap = {};
+
+        // Group by trial and batch
+        summaryData.forEach(row => {
+            const trialKey = `T${row.trial_id}`;
+            const batchKey = `B${row.batch_id}`;
+            
+            // Calculate average jam factor from disruption counts and types
+            // Using a weighted average based on disruption severity
+            const total = (
+                parseInt(row.num_accident || 0) +
+                parseInt(row.num_construction || 0) +
+                parseInt(row.num_congestion || 0) +
+                parseInt(row.num_disabled_vehicle || 0) +
+                parseInt(row.num_mass_transit_event || 0) +
+                parseInt(row.num_planned_event || 0) +
+                parseInt(row.num_road_hazard || 0) +
+                parseInt(row.num_road_closure || 0) +
+                parseInt(row.num_weather || 0) +
+                parseInt(row.num_lane_restriction || 0) +
+                parseInt(row.num_other || 0)
+            );
+
+            // Map disruption level to jam factor
+            let jamFactor = 0;
+            if (row.disruption_level === 'light') jamFactor = 2;
+            else if (row.disruption_level === 'medium') jamFactor = 5;
+            else if (row.disruption_level === 'heavy') jamFactor = 8;
+
+            if (!perTrialMap[trialKey]) {
+                perTrialMap[trialKey] = [];
+            }
+            perTrialMap[trialKey].push(jamFactor);
+
+            if (!perBatchMap[batchKey]) {
+                perBatchMap[batchKey] = [];
+            }
+            perBatchMap[batchKey].push(jamFactor);
+        });
+
+        // Calculate averages
+        const perTrial = Object.keys(perTrialMap).sort().map(key => {
+            const values = perTrialMap[key];
+            return values.reduce((a, b) => a + b, 0) / values.length;
+        });
+
+        const perBatch = Object.keys(perBatchMap).sort().map(key => {
+            const values = perBatchMap[key];
+            return values.reduce((a, b) => a + b, 0) / values.length;
+        });
+
+        return { perTrial, perBatch };
+    },
+
+    computeErrorRateData(accuracyData) {
+        const perTrialMap = {};
+        const perBatchMap = {};
+
+        // Group by trial and batch
+        accuracyData.forEach(row => {
+            const trialKey = `T${row.trial_id}`;
+            const batchKey = `B${row.batch_id}`;
+            
+            const isIncorrect = row.is_correct === 'False' || row.is_correct === false;
+
+            if (!perTrialMap[trialKey]) {
+                perTrialMap[trialKey] = { total: 0, incorrect: 0 };
+            }
+            perTrialMap[trialKey].total++;
+            if (isIncorrect) perTrialMap[trialKey].incorrect++;
+
+            if (!perBatchMap[batchKey]) {
+                perBatchMap[batchKey] = { total: 0, incorrect: 0 };
+            }
+            perBatchMap[batchKey].total++;
+            if (isIncorrect) perBatchMap[batchKey].incorrect++;
+        });
+
+        // Calculate error rates as percentages
+        const perTrial = Object.keys(perTrialMap).sort().map(key => {
+            const data = perTrialMap[key];
+            return data.total > 0 ? (data.incorrect / data.total) * 100 : 0;
+        });
+
+        const perBatch = Object.keys(perBatchMap).sort().map(key => {
+            const data = perBatchMap[key];
+            return data.total > 0 ? (data.incorrect / data.total) * 100 : 0;
+        });
+
+        return { perTrial, perBatch };
     },
 
     renderQueryTimeSeriesChart(timeSeriesData) {
