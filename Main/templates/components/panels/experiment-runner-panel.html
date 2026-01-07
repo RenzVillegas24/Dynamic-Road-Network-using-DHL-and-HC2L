@@ -798,33 +798,50 @@
               <i data-lucide="download" class="w-3 h-3"></i> Export CSV
             </button>
           </div>
-          <div class="overflow-x-auto rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-            <table class="w-full text-sm">
-              <thead class="bg-gradient-to-r from-green-50 to-teal-50 border-b-2 border-green-200 sticky top-0">
-                <tr>
-                  <th class="text-center p-2 font-semibold text-green-700 whitespace-nowrap">Trial</th>
-                  <th class="text-center p-2 font-semibold text-green-700 whitespace-nowrap">Batch</th>
-                  <th class="text-center p-2 font-semibold text-green-700 whitespace-nowrap">Level</th>
-                  <th class="text-right p-2 font-semibold text-green-700 whitespace-nowrap text-xs">Accident</th>
-                  <th class="text-right p-2 font-semibold text-green-700 whitespace-nowrap text-xs">Construction</th>
-                  <th class="text-right p-2 font-semibold text-green-700 whitespace-nowrap text-xs">Congestion</th>
-                  <th class="text-right p-2 font-semibold text-green-700 whitespace-nowrap text-xs">Disabled Vehicle</th>
-                  <th class="text-right p-2 font-semibold text-green-700 whitespace-nowrap text-xs">Mass Transit</th>
-                  <th class="text-right p-2 font-semibold text-green-700 whitespace-nowrap text-xs">Planned Event</th>
-                  <th class="text-right p-2 font-semibold text-green-700 whitespace-nowrap text-xs">Road Hazard</th>
-                  <th class="text-right p-2 font-semibold text-green-700 whitespace-nowrap text-xs">Road Closure</th>
-                  <th class="text-right p-2 font-semibold text-green-700 whitespace-nowrap text-xs">Weather</th>
-                  <th class="text-right p-2 font-semibold text-green-700 whitespace-nowrap text-xs">Lane Restriction</th>
-                  <th class="text-right p-2 font-semibold text-green-700 whitespace-nowrap text-xs">Other</th>
-                  <th class="text-right p-2 font-semibold text-green-700 whitespace-nowrap font-bold">Total</th>
-                </tr>
-              </thead>
-              <tbody id="result-summary-tbody" class="divide-y divide-gray-200 max-h-96 overflow-y-auto">
-                <tr class="hover:bg-gray-50 transition-colors">
-                  <td colspan="15" class="text-center text-gray-500 py-6 font-medium">No data yet</td>
-                </tr>
-              </tbody>
-            </table>
+          
+          <!-- Aggregated Summary Data -->
+          <div id="result-summary-container" class="space-y-3">
+            <p class="text-center text-gray-500 py-8 font-medium">No data yet</p>
+          </div>
+          
+          <!-- Per-Route Summary Data (Expandable) -->
+          <div class="border border-green-200 rounded-xl overflow-hidden">
+            <button onclick="ExperimentRunner.togglePerRouteTable('summary')" 
+              class="w-full flex items-center justify-between px-4 py-3 bg-gradient-to-r from-green-50 to-teal-50 hover:from-green-100 hover:to-teal-100 transition-colors">
+              <span class="flex items-center gap-2 text-sm font-medium text-green-700">
+                <i data-lucide="table" class="w-4 h-4"></i>
+                View Per-Route Summary Data
+              </span>
+              <i data-lucide="chevron-down" class="w-4 h-4 text-green-600"></i>
+            </button>
+            <div id="summary-per-route-container" class="hidden">
+              <div class="overflow-x-auto max-h-96">
+                <table class="w-full text-xs">
+                  <thead class="bg-green-50 border-b border-green-200 sticky top-0">
+                    <tr>
+                      <th class="text-center p-2 font-semibold text-green-700">Trial</th>
+                      <th class="text-center p-2 font-semibold text-green-700">Batch</th>
+                      <th class="text-center p-2 font-semibold text-green-700">Level</th>
+                      <th class="text-right p-2 font-semibold text-green-700 text-xs">Accident</th>
+                      <th class="text-right p-2 font-semibold text-green-700 text-xs">Construction</th>
+                      <th class="text-right p-2 font-semibold text-green-700 text-xs">Congestion</th>
+                      <th class="text-right p-2 font-semibold text-green-700 text-xs">Disabled Vehicle</th>
+                      <th class="text-right p-2 font-semibold text-green-700 text-xs">Mass Transit</th>
+                      <th class="text-right p-2 font-semibold text-green-700 text-xs">Planned Event</th>
+                      <th class="text-right p-2 font-semibold text-green-700 text-xs">Road Hazard</th>
+                      <th class="text-right p-2 font-semibold text-green-700 text-xs">Road Closure</th>
+                      <th class="text-right p-2 font-semibold text-green-700 text-xs">Weather</th>
+                      <th class="text-right p-2 font-semibold text-green-700 text-xs">Lane Restriction</th>
+                      <th class="text-right p-2 font-semibold text-green-700 text-xs">Other</th>
+                      <th class="text-right p-2 font-semibold text-green-700 font-bold">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody id="summary-per-route-tbody" class="divide-y divide-gray-100">
+                    <tr><td colspan="15" class="text-center py-4 text-gray-500">Click to load data</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -862,26 +879,9 @@
             </div>
           </div>
           
-          <div class="overflow-x-auto rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-            <table class="w-full text-sm">
-              <thead class="bg-gradient-to-r from-cyan-50 to-blue-50 border-b-2 border-cyan-200">
-                <tr>
-                  <th class="text-left p-3 font-semibold text-cyan-700">Trial</th>
-                  <th class="text-left p-3 font-semibold text-cyan-700">Batch</th>
-                  <th class="text-left p-3 font-semibold text-cyan-700">Level</th>
-                  <th class="text-left p-3 font-semibold text-cyan-700">Source → Target</th>
-                  <th class="text-right p-3 font-semibold text-cyan-700">HC2L Dist</th>
-                  <th class="text-right p-3 font-semibold text-cyan-700">Dijkstra Dist</th>
-                  <th class="text-right p-3 font-semibold text-cyan-700">Rel. Error</th>
-                  <th class="text-center p-3 font-semibold text-cyan-700">Correct</th>
-                </tr>
-              </thead>
-              <tbody id="result-accuracy-tbody" class="divide-y divide-gray-200">
-                <tr class="hover:bg-gray-50 transition-colors">
-                  <td colspan="8" class="text-center text-gray-500 py-6 font-medium">No data yet</td>
-                </tr>
-              </tbody>
-            </table>
+          <!-- Aggregated Accuracy Data -->
+          <div id="result-accuracy-container" class="space-y-3">
+            <p class="text-center text-gray-500 py-8 font-medium">No data yet</p>
           </div>
           
           <!-- Per-Route Accuracy Data (Expandable) -->
@@ -936,22 +936,10 @@
               <i data-lucide="download" class="w-3 h-3"></i> Export CSV
             </button>
           </div>
-          <div class="overflow-x-auto rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-            <table class="w-full text-sm">
-              <thead class="bg-gradient-to-r from-purple-50 to-indigo-50 border-b-2 border-purple-200">
-                <tr>
-                  <th class="text-left p-3 font-semibold text-purple-700">Trial</th>
-                  <th class="text-left p-3 font-semibold text-purple-700">Algorithm</th>
-                  <th class="text-right p-3 font-semibold text-purple-700">Construction Time (ms)</th>
-                  <th class="text-right p-3 font-semibold text-purple-700">Label Size (MB)</th>
-                </tr>
-              </thead>
-              <tbody id="result-construction-tbody" class="divide-y divide-gray-200">
-                <tr class="hover:bg-gray-50 transition-colors">
-                  <td colspan="4" class="text-center text-gray-500 py-6 font-medium">No data yet</td>
-                </tr>
-              </tbody>
-            </table>
+          
+          <!-- Aggregated Construction Data -->
+          <div id="result-construction-container" class="space-y-3">
+            <p class="text-center text-gray-500 py-8 font-medium">No data yet</p>
           </div>
           
           <!-- Per-Route Construction Data (Expandable) -->
@@ -1063,22 +1051,10 @@
               <i data-lucide="download" class="w-3 h-3"></i> Export CSV
             </button>
           </div>
-          <div class="overflow-x-auto rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-            <table class="w-full text-sm">
-              <thead class="bg-gradient-to-r from-green-50 to-emerald-50 border-b-2 border-green-200">
-                <tr>
-                  <th class="text-left p-3 font-semibold text-green-700">Metric</th>
-                  <th class="text-right p-3 font-semibold text-blue-600">DHL (Avg of 3)</th>
-                  <th class="text-right p-3 font-semibold text-emerald-600">HC2L (Avg of 3)</th>
-                  <th class="text-right p-3 font-semibold text-purple-600">% Improvement</th>
-                </tr>
-              </thead>
-              <tbody id="result-performance-tbody" class="divide-y divide-gray-200">
-                <tr class="hover:bg-gray-50 transition-colors">
-                  <td colspan="4" class="text-center text-gray-500 py-6 font-medium">No data yet</td>
-                </tr>
-              </tbody>
-            </table>
+          
+          <!-- Aggregated Performance Data -->
+          <div id="result-performance-container" class="space-y-3">
+            <p class="text-center text-gray-500 py-8 font-medium">No data yet</p>
           </div>
           
           <!-- Per-Route Performance Data (Expandable) -->
@@ -1100,9 +1076,9 @@
                       <th class="text-left p-2 font-semibold text-emerald-700">Batch</th>
                       <th class="text-left p-2 font-semibold text-emerald-700">Level</th>
                       <th class="text-left p-2 font-semibold text-emerald-700">Route</th>
-                      <th class="text-left p-2 font-semibold text-emerald-700">Algo</th>
+                      <th class="text-left p-2 font-semibold text-emerald-700">Algorithm</th>
                       <th class="text-right p-2 font-semibold text-emerald-700">Query (ms)</th>
-                      <th class="text-right p-2 font-semibold text-emerald-700">Size (MB)</th>
+                      <th class="text-right p-2 font-semibold text-emerald-700">Label (MB)</th>
                       <th class="text-right p-2 font-semibold text-emerald-700">Lazy (ms)</th>
                       <th class="text-right p-2 font-semibold text-emerald-700">Rebuilds</th>
                     </tr>
@@ -1128,12 +1104,6 @@
                 <h4 class="font-bold text-gray-800 text-sm mb-1">HERE vs HC2L Route Comparison</h4>
                 <p class="text-xs text-gray-500 mt-0.5">Appendix 1.4 - Real-time API validation</p>
               </div>
-            </div>
-            <div class="flex items-center gap-2">
-              <button onclick="ExperimentRunner.exportTab('similarity')"
-                class="btn btn--success btn--xs hover:shadow-md transition-all">
-                <i data-lucide="download" class="w-3 h-3"></i> Export CSV
-              </button>
             </div>
           </div>
           
