@@ -2449,7 +2449,7 @@ const ExperimentRunner = {
                             <i data-lucide="layers" class="w-4 h-4"></i>
                             Averages Per Trial
                         </h5>
-                        <button onclick="ExperimentRunner.exportAggregatedCSV('summary', 'per-trial')"
+                        <button onclick="ExperimentRunner.exportCSV('summary', 'per-trial')"
                             class="btn btn--success btn--xs hover:shadow-md transition-all">
                             <i data-lucide="download" class="w-3 h-3"></i> Export CSV
                         </button>
@@ -2494,7 +2494,7 @@ const ExperimentRunner = {
                             <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
                             Averages Per Batch
                         </h5>
-                        <button onclick="ExperimentRunner.exportAggregatedCSV('summary', 'per-batch')"
+                        <button onclick="ExperimentRunner.exportCSV('summary', 'per-batch')"
                             class="btn btn--success btn--xs hover:shadow-md transition-all">
                             <i data-lucide="download" class="w-3 h-3"></i> Export CSV
                         </button>
@@ -2667,7 +2667,7 @@ const ExperimentRunner = {
                             <i data-lucide="layers" class="w-4 h-4"></i>
                             Averages Per Trial (All Trials Included)
                         </h5>
-                        <button onclick="ExperimentRunner.exportAggregatedCSV('accuracy', 'per-trial')"
+                        <button onclick="ExperimentRunner.exportCSV('accuracy', 'per-trial')"
                             class="btn btn--success btn--xs hover:shadow-md transition-all">
                             <i data-lucide="download" class="w-3 h-3"></i> Export CSV
                         </button>
@@ -2717,7 +2717,7 @@ const ExperimentRunner = {
                             <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
                             Averages Per Batch
                         </h5>
-                        <button onclick="ExperimentRunner.exportAggregatedCSV('accuracy', 'per-batch')"
+                        <button onclick="ExperimentRunner.exportCSV('accuracy', 'per-batch')"
                             class="btn btn--success btn--xs hover:shadow-md transition-all">
                             <i data-lucide="download" class="w-3 h-3"></i> Export CSV
                         </button>
@@ -2902,7 +2902,7 @@ const ExperimentRunner = {
                             <i data-lucide="layers" class="w-4 h-4"></i>
                             Averages Per Trial
                         </h5>
-                        <button onclick="ExperimentRunner.exportAggregatedCSV('construction', 'per-trial')"
+                        <button onclick="ExperimentRunner.exportCSV('construction', 'per-trial')"
                             class="btn btn--success btn--xs hover:shadow-md transition-all">
                             <i data-lucide="download" class="w-3 h-3"></i> Export CSV
                         </button>
@@ -2938,7 +2938,7 @@ const ExperimentRunner = {
                             <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
                             Averages Per Batch (Across All Trials)
                         </h5>
-                        <button onclick="ExperimentRunner.exportAggregatedCSV('construction', 'per-batch')"
+                        <button onclick="ExperimentRunner.exportCSV('construction', 'per-batch')"
                             class="btn btn--success btn--xs hover:shadow-md transition-all">
                             <i data-lucide="download" class="w-3 h-3"></i> Export CSV
                         </button>
@@ -3054,7 +3054,7 @@ const ExperimentRunner = {
                 <div class="text-center py-8 text-gray-600">
                     <i data-lucide="file-spreadsheet" class="w-12 h-12 mx-auto mb-2 text-gray-400"></i>
                     <p class="font-semibold mb-2">Per-route update performance data available in CSV</p>
-                    <button onclick="ExperimentRunner.exportTab('updates')" class="btn btn--primary btn--sm">
+                    <button onclick="ExperimentRunner.exportCSV('updates', 'all')" class="btn btn--primary btn--sm">
                         <i data-lucide="download" class="w-4 h-4"></i> Download Updates CSV
                     </button>
                 </div>
@@ -3078,7 +3078,7 @@ const ExperimentRunner = {
                             <i data-lucide="layers" class="w-4 h-4"></i>
                             Averages Per Trial
                         </h5>
-                        <button onclick="ExperimentRunner.exportAggregatedCSV('updates', 'per-trial')"
+                        <button onclick="ExperimentRunner.exportCSV('updates', 'per-trial')"
                             class="btn btn--success btn--xs hover:shadow-md transition-all">
                             <i data-lucide="download" class="w-3 h-3"></i> Export CSV
                         </button>
@@ -3124,7 +3124,7 @@ const ExperimentRunner = {
                             <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
                             Averages Per Batch
                         </h5>
-                        <button onclick="ExperimentRunner.exportAggregatedCSV('updates', 'per-batch')"
+                        <button onclick="ExperimentRunner.exportCSV('updates', 'per-batch')"
                             class="btn btn--success btn--xs hover:shadow-md transition-all">
                             <i data-lucide="download" class="w-3 h-3"></i> Export CSV
                         </button>
@@ -3321,7 +3321,7 @@ const ExperimentRunner = {
                             <i data-lucide="layers" class="w-4 h-4"></i>
                             Averages Per Trial
                         </h5>
-                        <button onclick="ExperimentRunner.exportAggregatedCSV('performance', 'per-trial')"
+                        <button onclick="ExperimentRunner.exportCSV('performance', 'per-trial')"
                             class="btn btn--success btn--xs hover:shadow-md transition-all">
                             <i data-lucide="download" class="w-3 h-3"></i> Export CSV
                         </button>
@@ -3368,7 +3368,7 @@ const ExperimentRunner = {
                             <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
                             Averages Per Batch
                         </h5>
-                        <button onclick="ExperimentRunner.exportAggregatedCSV('performance', 'per-batch')"
+                        <button onclick="ExperimentRunner.exportCSV('performance', 'per-batch')"
                             class="btn btn--success btn--xs hover:shadow-md transition-all">
                             <i data-lucide="download" class="w-3 h-3"></i> Export CSV
                         </button>
@@ -3539,7 +3539,7 @@ const ExperimentRunner = {
                         <i data-lucide="file-spreadsheet" class="w-16 h-16 mx-auto mb-3 text-gray-400"></i>
                         <p class="font-semibold text-lg mb-2">HERE vs HC2L Route Comparison Data</p>
                         <p class="text-sm text-gray-500 mb-4">Complete route similarity metrics available in CSV export</p>
-                        <button onclick="ExperimentRunner.exportTab('similarity')" class="btn btn--primary">
+                        <button onclick="ExperimentRunner.exportCSV('similarity', 'all')" class="btn btn--primary">
                             <i data-lucide="download" class="w-4 h-4"></i> Download Similarity CSV
                         </button>
                     </div>
@@ -3556,7 +3556,7 @@ const ExperimentRunner = {
                                 <i data-lucide="git-compare" class="w-4 h-4"></i>
                                 Route Similarity Analysis (${result.data.length} routes compared)
                             </h5>
-                            <button onclick="ExperimentRunner.exportTab('similarity')" class="btn btn--success btn--xs">
+                            <button onclick="ExperimentRunner.exportCSV('similarity', 'all')" class="btn btn--success btn--xs">
                                 <i data-lucide="download" class="w-3 h-3"></i> Export CSV
                             </button>
                         </div>
@@ -4774,30 +4774,34 @@ const ExperimentRunner = {
         }
     },
 
-    exportTab(tabName) {
+    /**
+     * Universal CSV export function
+     * @param {string} tabType - Type of tab (summary, accuracy, construction, updates, performance, similarity)
+     * @param {string} tableType - Type of table ('per-trial', 'per-batch', 'per-route', 'all')
+     */
+    async exportCSV(tabType, tableType = 'all') {
         if (!this.currentResultId) {
             this.showNotification('No result selected', 'warning');
             return;
         }
 
-        // Direct CSV download from backend (per-route data)
-        const csvTypes = ['summary', 'accuracy', 'construction', 'updates', 'performance', 'similarity'];
-
-        if (csvTypes.includes(tabName)) {
-            // Direct download per-route CSV from backend
-            const downloadUrl = `/api/experiment/results/${this.currentResultId}/csv/${tabName}`;
-
+        try {
+            // Use API endpoint for export
+            const url = `/api/experiment/results/${this.currentResultId}/csv/${tabType}/export?table_type=${tableType}`;
+            
             // Create hidden link and trigger download
             const link = document.createElement('a');
-            link.href = downloadUrl;
+            link.href = url;
             link.style.display = 'none';
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
 
-            this.showNotification(`Downloading ${tabName} CSV...`, 'success');
-        } else {
-            this.showNotification('Unknown tab', 'error');
+            const typeLabel = tableType === 'all' ? 'all tables' : tableType.replace('-', ' ');
+            this.showNotification(`Downloading ${tabType} ${typeLabel} CSV...`, 'success');
+        } catch (error) {
+            console.error(`Error exporting ${tabType} ${tableType}:`, error);
+            this.showNotification('Export failed', 'error');
         }
     },
 
@@ -4855,7 +4859,7 @@ const ExperimentRunner = {
 
         csvTypes.forEach(csvType => {
             setTimeout(() => {
-                this.exportTab(csvType);
+                this.exportCSV(csvType, 'all');
             }, 100 * csvTypes.indexOf(csvType)); // Stagger downloads
         });
 
@@ -5201,7 +5205,7 @@ const ExperimentRunner = {
             <div class="grid grid-cols-3 w-full items-center">
                 <!-- Left: Export button (anchored left) -->
                 <div>
-                    <button onclick="event.stopPropagation(); ExperimentRunner.exportAggregatedCSV('${csvType}', 'per-route')"
+                    <button onclick="event.stopPropagation(); ExperimentRunner.exportCSV('${csvType}', 'per-route')"
                     class="btn btn--success btn--xs hover:shadow-md transition-all">
                     <i data-lucide="download" class="w-3 h-3"></i> Export CSV
                     </button>
@@ -5267,102 +5271,6 @@ const ExperimentRunner = {
         document.querySelectorAll('[id$="-per-route-container"]').forEach(el => {
             el.classList.add('hidden');
         });
-    },
-
-    /**
-     * Export aggregated data as CSV
-     * @param {string} tabType - Type of tab (summary, accuracy, construction, updates, performance)
-     * @param {string} tableType - Type of table (per-trial, per-batch, per-route)
-     */
-    async exportAggregatedCSV(tabType, tableType) {
-        try {
-            const experimentId = this.state.selectedExperimentId;
-            if (!experimentId) {
-                console.error('No experiment selected');
-                return;
-            }
-
-            // For per-route, use the existing export functionality
-            if (tableType === 'per-route') {
-                this.exportTab(tabType);
-                return;
-            }
-
-            // Get the aggregated data from the page
-            const containerId = `result-${tabType}-container`;
-            const container = document.getElementById(containerId);
-            if (!container) {
-                console.error(`Container ${containerId} not found`);
-                return;
-            }
-
-            // Find the specific table
-            const tables = container.querySelectorAll('table');
-            let targetTable = null;
-
-            if (tableType === 'per-trial') {
-                targetTable = tables[0]; // First table is per-trial
-            } else if (tableType === 'per-batch') {
-                targetTable = tables[1]; // Second table is per-batch
-            }
-
-            if (!targetTable) {
-                console.error(`Table not found for ${tabType} - ${tableType}`);
-                return;
-            }
-
-            // Extract data from table
-            const headers = [];
-            const rows = [];
-
-            // Get headers
-            const headerRow = targetTable.querySelector('thead tr');
-            if (headerRow) {
-                headerRow.querySelectorAll('th').forEach(th => {
-                    headers.push(th.textContent.trim());
-                });
-            }
-
-            // Get data rows
-            const dataRows = targetTable.querySelectorAll('tbody tr');
-            dataRows.forEach(tr => {
-                const row = [];
-                tr.querySelectorAll('td').forEach(td => {
-                    // Get text content, handling badges and nested elements
-                    let text = td.textContent.trim();
-                    row.push(text);
-                });
-                if (row.length > 0) {
-                    rows.push(row);
-                }
-            });
-
-            // Generate CSV
-            let csvContent = headers.join(',') + '\n';
-            rows.forEach(row => {
-                csvContent += row.map(cell => {
-                    // Escape cells containing commas or quotes
-                    if (cell.includes(',') || cell.includes('"')) {
-                        return `"${cell.replace(/"/g, '""')}"`;
-                    }
-                    return cell;
-                }).join(',') + '\n';
-            });
-
-            // Download file
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            const url = URL.createObjectURL(blob);
-            link.setAttribute('href', url);
-            link.setAttribute('download', `${tabType}_${tableType}_exp${experimentId}.csv`);
-            link.style.visibility = 'hidden';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-
-        } catch (error) {
-            console.error(`Error exporting ${tabType} ${tableType}:`, error);
-        }
     }
 };
 

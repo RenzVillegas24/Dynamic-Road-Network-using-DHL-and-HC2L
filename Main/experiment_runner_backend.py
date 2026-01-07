@@ -3641,6 +3641,195 @@ def download_result_csv(result_id, csv_type):
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@experiment_bp.route('/results/<result_id>/csv/<csv_type>/export', methods=['GET'])
+def export_result_csv(result_id, csv_type):
+    """
+    Export a specific CSV file or aggregated subset from saved experiment results.
+    
+    Args:
+        result_id: Result folder name (timestamp-based)
+        csv_type: One of 'summary', 'accuracy', 'construction', 'updates', 'performance', 'similarity'
+    
+    Query params:
+        table_type: Type of export - 'all', 'per-trial', 'per-batch', 'per-route' (default: 'all')
+    
+    Returns:
+        CSV file download or error
+    """
+    import csv as csv_module
+    import io
+    
+    if not experiment_runner:
+        return jsonify({"success": False, "error": "Experiment runner not initialized"}), 500
+    
+    # Get table_type from query parameter
+    table_type = request.args.get('table_type', 'all')
+    
+    # Validate table_type
+    valid_table_types = ['all', 'per-trial', 'per-batch', 'per-route']
+    if table_type not in valid_table_types:
+        return jsonify({"success": False, "error": f"Invalid table_type: {table_type}. Must be one of: {', '.join(valid_table_types)}"}), 400
+    
+    # Map CSV types to filenames
+    csv_files = {
+        'summary': 'summary_results.csv',
+        'accuracy': 'accuracy_results.csv',
+        'construction': 'construction_results.csv',
+        'updates': 'updates_results.csv',
+        'performance': 'performance_results.csv',
+        'similarity': 'similarity_results.csv'
+    }
+    
+    if csv_type not in csv_files:
+        return jsonify({"success": False, "error": f"Invalid CSV type: {csv_type}"}), 400
+    
+    try:
+        results_dir = Path(Config.EXPERIMENT_DATA_DIR) / "preset" / "results"
+        
+        # Try direct result_id as folder name first
+        csv_path = results_dir / result_id / csv_files[csv_type]
+        
+        # If not found, try with .json extension (result_id might be JSON filename)
+        if not csv_path.exists():
+            result_folder = result_id.replace('.json', '').replace('experiment_', '')
+            csv_path = results_dir / result_folder / csv_files[csv_type]
+        
+        if not csv_path.exists():
+            return jsonify({"success": False, "error": f"CSV file not found: {csv_files[csv_type]}"}), 404
+        
+        # For 'all' or 'per-route', return the complete CSV file as-is
+        if table_type in ['all', 'per-route']:
+            return send_file(
+                csv_path,
+                mimetype='text/csv',
+                as_attachment=True,
+                download_name=f"{result_id}_{csv_type}_{table_type}.csv"
+            )
+        
+        # For per-trial or per-batch, aggregate the data
+        aggregated_rows = []
+        headers = []
+        
+        with open(csv_path, 'r', newline='', encoding='utf-8') as f:
+            reader = csv_module.DictReader(f)
+            headers = reader.fieldnames or []
+            all_rows = list(reader)
+        
+        if table_type == 'per-trial':
+            # Aggregate by trial_id
+            trial_groups = {}
+            for row in all_rows:
+                trial_id = row.get('trial_id', 'unknown')
+                if trial_id not in trial_groups:
+                    trial_groups[trial_id] = []
+                trial_groups[trial_id].append(row)
+            
+            # Calculate averages for each trial
+            for trial_id, trial_rows in sorted(trial_groups.items(), key=lambda x: str(x[0])):
+                aggregated_row = {'trial_id': trial_id}
+                
+                # Get non-numeric fields from first row
+                first_row = trial_rows[0]
+                for key in ['algorithm', 'disruption_level', 'disruption_type']:
+                    if key in first_row:
+                        aggregated_row[key] = first_row[key]
+                
+                # Average numeric fields
+                numeric_keys = [k for k in headers if k not in ['trial_id', 'batch_id', 'query_id', 'route_id', 
+                                                                  'algorithm', 'disruption_level', 'disruption_type',
+                                                                  'route_index', 'source', 'target']]
+                for key in numeric_keys:
+                    values = []
+                    for row in trial_rows:
+                        try:
+                            val = float(row.get(key, 0))
+                            values.append(val)
+                        except (ValueError, TypeError):
+                            pass
+                    if values:
+                        aggregated_row[key] = f"{np.mean(values):.4f}"
+                    else:
+                        aggregated_row[key] = 'N/A'
+                
+                # Add count
+                aggregated_row['count'] = len(trial_rows)
+                aggregated_rows.append(aggregated_row)
+            
+            # Update headers for per-trial
+            headers = ['trial_id', 'algorithm', 'disruption_level', 'disruption_type'] + \
+                     [k for k in numeric_keys if k in aggregated_rows[0]] + ['count']
+        
+        elif table_type == 'per-batch':
+            # Aggregate by batch_id (within each trial)
+            batch_groups = {}
+            for row in all_rows:
+                trial_id = row.get('trial_id', 'unknown')
+                batch_id = row.get('batch_id', 'unknown')
+                key = f"{trial_id}_{batch_id}"
+                if key not in batch_groups:
+                    batch_groups[key] = []
+                batch_groups[key].append(row)
+            
+            # Calculate averages for each batch
+            for key, batch_rows in sorted(batch_groups.items()):
+                aggregated_row = {
+                    'trial_id': batch_rows[0].get('trial_id', 'unknown'),
+                    'batch_id': batch_rows[0].get('batch_id', 'unknown')
+                }
+                
+                # Get non-numeric fields from first row
+                first_row = batch_rows[0]
+                for field in ['algorithm', 'disruption_level', 'disruption_type']:
+                    if field in first_row:
+                        aggregated_row[field] = first_row[field]
+                
+                # Average numeric fields
+                numeric_keys = [k for k in headers if k not in ['trial_id', 'batch_id', 'query_id', 'route_id',
+                                                                  'algorithm', 'disruption_level', 'disruption_type',
+                                                                  'route_index', 'source', 'target']]
+                for key in numeric_keys:
+                    values = []
+                    for row in batch_rows:
+                        try:
+                            val = float(row.get(key, 0))
+                            values.append(val)
+                        except (ValueError, TypeError):
+                            pass
+                    if values:
+                        aggregated_row[key] = f"{np.mean(values):.4f}"
+                    else:
+                        aggregated_row[key] = 'N/A'
+                
+                # Add count
+                aggregated_row['count'] = len(batch_rows)
+                aggregated_rows.append(aggregated_row)
+            
+            # Update headers for per-batch
+            headers = ['trial_id', 'batch_id', 'algorithm', 'disruption_level', 'disruption_type'] + \
+                     [k for k in numeric_keys if k in aggregated_rows[0]] + ['count']
+        
+        # Generate CSV from aggregated data
+        output = io.StringIO()
+        writer = csv_module.DictWriter(output, fieldnames=headers)
+        writer.writeheader()
+        writer.writerows(aggregated_rows)
+        
+        # Create BytesIO for send_file
+        csv_bytes = io.BytesIO(output.getvalue().encode('utf-8'))
+        csv_bytes.seek(0)
+        
+        return send_file(
+            csv_bytes,
+            mimetype='text/csv',
+            as_attachment=True,
+            download_name=f"{result_id}_{csv_type}_{table_type}.csv"
+        )
+        
+    except Exception as e:
+        logger.error(f"Error exporting CSV {csv_type} ({table_type}) for result {result_id}: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @experiment_bp.route('/results/<result_id>/csv/<csv_type>/data', methods=['GET'])
 def get_result_csv_data(result_id, csv_type):
     """
