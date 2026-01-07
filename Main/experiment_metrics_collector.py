@@ -110,6 +110,7 @@ CSV_HEADERS_ACCURACY = [
 CSV_HEADERS_CONSTRUCTION = [
     "trial_id", "batch_id", "disruption_level",
     "source_node", "target_node", "query_id", "is_correct",
+    "algorithm",
     "initial_construction_time_ms", "initial_label_size_mb"
 ]
 
@@ -1020,6 +1021,7 @@ class ExperimentMetricsCollector:
                 # Write HC2L construction records
                 for record in self.route_records_dhc2l:
                     row = record.to_construction_row()
+                    row["algorithm"] = "HC2L"
                     # Use per-trial construction times
                     trial_idx = record.trial_id - 1
                     if trial_idx in self.construction_dhc2l:
@@ -1030,6 +1032,7 @@ class ExperimentMetricsCollector:
                 # Write DHL construction records  
                 for record in self.route_records_dhl:
                     row = record.to_construction_row()
+                    row["algorithm"] = "DHL"
                     trial_idx = record.trial_id - 1
                     if trial_idx in self.construction_dhl:
                         row["initial_construction_time_ms"] = self.construction_dhl[trial_idx].initial_construction_time_ms

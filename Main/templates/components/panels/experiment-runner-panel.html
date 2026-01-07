@@ -779,7 +779,7 @@
                 title="Scroll right">
           <i data-lucide="chevron-right" class="w-4 h-4 text-gray-600"></i>
         </button>
-      </div>
+    
 
         <!-- Summary Tab Content (NEW) -->
         <div id="result-tab-summary" data-result-tab-content class="hidden space-y-4">
@@ -795,7 +795,7 @@
             </div>
             <button onclick="ExperimentRunner.exportTab('summary')"
               class="btn btn--success btn--xs hover:shadow-md transition-all">
-              <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+              <i data-lucide="download" class="w-3 h-3"></i> Export All CSV
             </button>
           </div>
           
@@ -812,7 +812,9 @@
                 <i data-lucide="table" class="w-4 h-4"></i>
                 View Per-Route Summary Data
               </span>
-              <i data-lucide="chevron-down" class="w-4 h-4 text-green-600"></i>
+              <div class="flex items-center gap-2">
+                <i data-lucide="chevron-down" class="w-4 h-4 text-green-600"></i>
+              </div>
             </button>
             <div id="summary-per-route-container" class="hidden">
               <div class="overflow-x-auto max-h-96">
@@ -859,7 +861,7 @@
             </div>
             <button onclick="ExperimentRunner.exportTab('accuracy')"
               class="btn btn--success btn--xs hover:shadow-md transition-all">
-              <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+              <i data-lucide="download" class="w-3 h-3"></i> Export All CSV
             </button>
           </div>
           
@@ -892,7 +894,9 @@
                 <i data-lucide="table" class="w-4 h-4"></i>
                 View Per-Route Accuracy Data
               </span>
-              <i data-lucide="chevron-down" class="w-4 h-4 text-cyan-600"></i>
+              <div class="flex items-center gap-2">
+                <i data-lucide="chevron-down" class="w-4 h-4 text-cyan-600"></i>
+              </div>
             </button>
             <div id="accuracy-per-route-container" class="hidden">
               <div class="overflow-x-auto max-h-96">
@@ -933,7 +937,7 @@
             </div>
             <button onclick="ExperimentRunner.exportTab('construction')"
               class="btn btn--success btn--xs hover:shadow-md transition-all">
-              <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+              <i data-lucide="download" class="w-3 h-3"></i> Export All CSV
             </button>
           </div>
           
@@ -950,7 +954,9 @@
                 <i data-lucide="table" class="w-4 h-4"></i>
                 View Per-Route Construction Data
               </span>
-              <i data-lucide="chevron-down" class="w-4 h-4 text-purple-600"></i>
+              <div class="flex items-center gap-2">
+                <i data-lucide="chevron-down" class="w-4 h-4 text-purple-600"></i>
+              </div>
             </button>
             <div id="construction-per-route-container" class="hidden">
               <div class="overflow-x-auto max-h-96">
@@ -991,7 +997,7 @@
             </div>
             <button onclick="ExperimentRunner.exportTab('updates')"
               class="btn btn--success btn--xs hover:shadow-md transition-all">
-              <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+              <i data-lucide="download" class="w-3 h-3"></i> Export All CSV
             </button>
           </div>
           <div id="result-updates-container" class="space-y-3">
@@ -1006,7 +1012,9 @@
                 <i data-lucide="table" class="w-4 h-4"></i>
                 View Per-Route Update Data
               </span>
-              <i data-lucide="chevron-down" class="w-4 h-4 text-indigo-600"></i>
+              <div class="flex items-center gap-2">
+                <i data-lucide="chevron-down" class="w-4 h-4 text-indigo-600"></i>
+              </div>
             </button>
             <div id="updates-per-route-container" class="hidden">
               <div class="overflow-x-auto max-h-96">
@@ -1048,7 +1056,7 @@
             </div>
             <button onclick="ExperimentRunner.exportTab('performance')"
               class="btn btn--success btn--xs hover:shadow-md transition-all">
-              <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+              <i data-lucide="download" class="w-3 h-3"></i> Export All CSV
             </button>
           </div>
           
@@ -1065,7 +1073,13 @@
                 <i data-lucide="table" class="w-4 h-4"></i>
                 View Per-Route Performance Data
               </span>
-              <i data-lucide="chevron-down" class="w-4 h-4 text-emerald-600"></i>
+              <div class="flex items-center gap-2">
+                <button onclick="event.stopPropagation(); ExperimentRunner.exportAggregatedCSV('performance', 'per-route')"
+                  class="btn btn--success btn--xs hover:shadow-md transition-all">
+                  <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+                </button>
+                <i data-lucide="chevron-down" class="w-4 h-4 text-emerald-600"></i>
+              </div>
             </button>
             <div id="performance-per-route-container" class="hidden">
               <div class="overflow-x-auto max-h-96">
@@ -1485,18 +1499,6 @@
         </div>
       </div>
 
-      <!-- Footer -->
-      <div
-        class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-white to-gray-50 p-4 border-t border-gray-200 flex gap-3 shadow-lg">
-        <button onclick="ExperimentRunner.exportResults('json')"
-          class="btn btn--primary flex-1 hover:shadow-lg transition-all duration-200">
-          <i data-lucide="file-json" class="w-4 h-4"></i> Export Full JSON
-        </button>
-        <button onclick="ExperimentRunner.exportResults('csv')"
-          class="btn btn--success flex-1 hover:shadow-lg transition-all duration-200">
-          <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Export All CSV
-        </button>
-      </div>
     </div>
   </div>
 
