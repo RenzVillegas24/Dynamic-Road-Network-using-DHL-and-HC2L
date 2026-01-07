@@ -365,11 +365,8 @@ class APIConsole {
     if (route.distance) {
       this.log('INFO', `${indent}[Distance] ${(route.distance / 1000).toFixed(2)} km`);
     }
-    if (route.total_distance_meters) {
-      this.log('INFO', `${indent}[Distance] ${(route.total_distance_meters / 1000).toFixed(2)} km`);
-    }
-    if (route.calculated_distance_km) {
-      this.log('INFO', `${indent}[Calculated Distance] ${route.calculated_distance_km.toFixed(2)} km`);
+    if (route.calculated_distance_meters) {
+      this.log('INFO', `${indent}[Calculated Distance] ${(route.calculated_distance_meters / 1000).toFixed(2)} km`);
     }
     if (route.duration) {
       const mins = Math.round(route.duration / 60);
@@ -433,7 +430,7 @@ class APIConsole {
       }
 
       // Skip already logged properties
-      if (['distance', 'total_distance_meters', 'calculated_distance_km', 'duration', 'eta_seconds', 'road_segments', 'turn_by_turn_directions', 'complete_trace', 'route_summary', 'path_nodes'].includes(key)) {
+      if (['distance', 'calculated_distance_meters', 'duration', 'eta_seconds', 'road_segments', 'turn_by_turn_directions', 'complete_trace', 'route_summary', 'path_nodes'].includes(key)) {
         return;
       }
 

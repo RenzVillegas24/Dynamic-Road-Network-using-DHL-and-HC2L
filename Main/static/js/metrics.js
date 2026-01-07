@@ -624,10 +624,10 @@ function updateRouteMetrics(routeData) {
     let distanceSource = 'unknown';
     
     // Try to get distance from multiple sources (same order as Route Panel)
-    // 0. First try C++ calculated distance (direct from haversine path calculation)
-    if (metrics.calculated_distance_km && metrics.calculated_distance_km > 0) {
-      distanceM = metrics.calculated_distance_km * 1000;
-      distanceSource = 'metrics.calculated_distance_km (C++ haversine)';
+    // 0. First try C++ calculated distance (direct from path calculation)
+    if (metrics.calculated_distance_meters && metrics.calculated_distance_meters > 0) {
+      distanceM = metrics.calculated_distance_meters;
+      distanceSource = 'metrics.calculated_distance_meters (C++ path-based)';
       console.log('📊 Bottom info using C++ calculated distance:', distanceM, 'meters');
     }
     

@@ -149,7 +149,8 @@ vector<string> parse_csv_line(const string& line);
 
 // ENHANCED PATH FINDING: Dijkstra with highway, flow, and incident awareness
 // This version considers: GPS distance, highway type, traffic flow, and incidents
-vector<NodeID> find_shortest_path(
+// RETURNS: pair<path, dijkstra_distance> where distance is the actual Dijkstra cost
+pair<vector<NodeID>, distance_t> find_shortest_path(
     NodeID start, NodeID dest, 
     const map<NodeID, vector<Neighbor>>& adj_list,
     const map<NodeID, GPSCoordinate>& coordinates,
@@ -160,7 +161,7 @@ vector<NodeID> find_shortest_path(
     
     if (start == dest) {
         path.push_back(start);
-        return path;
+        return make_pair(path, 0);
     }
     
     map<NodeID, distance_t> dist;
@@ -262,7 +263,10 @@ vector<NodeID> find_shortest_path(
         }
     }
     
-    return path;
+    // Get final Dijkstra distance (handle unreachable case)
+    distance_t dijkstra_distance = dist.count(dest) ? dist[dest] : infinity;
+    
+    return make_pair(path, dijkstra_distance);
 }
 
 
@@ -513,7 +517,7 @@ void output_json_response(bool success, const string& error_message = "",
                          double dest_snap_lat = 0, double dest_snap_lng = 0,
                          NodeID start_edge_source = 0, NodeID start_edge_target = 0, int start_edge_oneway = 0,
                          NodeID dest_edge_source = 0, NodeID dest_edge_target = 0, int dest_edge_oneway = 0,
-                         distance_t distance = 0, double query_time_ms = 0, double index_load_time_ms = 0,
+                         distance_t distance = 0, distance_t dijkstra_distance = 0, double query_time_ms = 0, double index_load_time_ms = 0,
                          double index_size_mb = 0.0, double index_size_bytes = 0.0,
                          const vector<NodeID>& path = vector<NodeID>(),
                          const map<NodeID, GPSCoordinate>& coordinates = map<NodeID, GPSCoordinate>(),
@@ -588,12 +592,27 @@ void output_json_response(bool success, const string& error_message = "",
         cout << "  }," << endl;
         
         cout << "  \"metrics\": {" << endl;
-        cout << "    \"total_distance_units\": " << distance << "," << endl;
-        cout << "    \"query_time_ms\": " << fixed << setprecision(3) << query_time_ms << "," << endl;
-        cout << "    \"path_length\": " << path.size() << "," << endl;
-        cout << "    \"uses_disruptions\": " << (use_disruptions ? "true" : "false") << "," << endl;
-        cout << "    \"tau_threshold\": " << fixed << setprecision(2) << tau_threshold << "," << endl;
-        cout << "    \"interpolation_used\": false," << endl;
+        
+        // Handle INT_MAX case for best_distance (DHL label query)
+        // If distance is INT_MAX (2147483647), it means no path found
+        double best_distance_meter = 0.0;
+        if (distance >= 2147483647 || distance >= numeric_limits<distance_t>::max()) {
+            best_distance_meter = 0.0;  // Unreachable: return 0
+            cerr << "⚠️  WARNING: best_distance is INT_MAX (unreachable), setting to 0" << endl;
+        } else {
+            best_distance_meter = static_cast<double>(distance);
+        }
+        
+        // Handle INT_MAX case for dijkstra_distance
+        double dijkstra_distance_meter = 0.0;
+        if (dijkstra_distance >= 2147483647 || dijkstra_distance >= numeric_limits<distance_t>::max()) {
+            dijkstra_distance_meter = 0.0;  // Unreachable: return 0
+            cerr << "⚠️  WARNING: dijkstra_distance is INT_MAX (unreachable), setting to 0" << endl;
+        } else {
+            dijkstra_distance_meter = static_cast<double>(dijkstra_distance);
+        }
+        
+        cout << "    \"best_distance_meter\": " << fixed << setprecision(1) << best_distance_meter << "," << endl;
         
         // Calculate and add distance and ETA metrics using ACTUAL traffic data
         double calculated_distance = calculate_route_distance(path, coordinates);
@@ -603,7 +622,12 @@ void output_json_response(bool success, const string& error_message = "",
         string eta_formatted = format_eta_time(eta_seconds);
         
         cout << "    \"calculated_distance_meters\": " << fixed << setprecision(1) << calculated_distance << "," << endl;
-        cout << "    \"calculated_distance_km\": " << fixed << setprecision(2) << (calculated_distance / 1000.0) << "," << endl;
+        cout << "    \"dijkstra_distance_meter\": " << fixed << setprecision(1) << dijkstra_distance_meter << "," << endl;
+        cout << "    \"query_time_ms\": " << fixed << setprecision(3) << query_time_ms << "," << endl;
+        cout << "    \"path_length\": " << path.size() << "," << endl;
+        cout << "    \"uses_disruptions\": " << (use_disruptions ? "true" : "false") << "," << endl;
+        cout << "    \"tau_threshold\": " << fixed << setprecision(2) << tau_threshold << "," << endl;
+        cout << "    \"interpolation_used\": false," << endl;
         cout << "    \"eta_seconds\": " << fixed << setprecision(0) << eta_seconds << "," << endl;
         cout << "    \"eta_formatted\": \"" << eta_formatted << "\"," << endl;
         
@@ -1869,8 +1893,10 @@ int main(int argc, char* argv[]) {
         
         // Find actual path using Dijkstra with comprehensive cost calculation
         // *** USES ENHANCED VERSION WITH HIGHWAY, FLOW, AND INCIDENT DATA ***
-        vector<NodeID> path = find_shortest_path(best_start, best_dest, adj_list, 
-                                                  coordinates, flow_data, incident_data);
+        pair<vector<NodeID>, distance_t> path_result = find_shortest_path(best_start, best_dest, adj_list, 
+                                                                            coordinates, flow_data, incident_data);
+        vector<NodeID> path = path_result.first;
+        distance_t dijkstra_distance = path_result.second;
         
         // VALIDATION: Check for missing edges between path nodes
         // This helps detect if intermediate nodes are being missed at sharp turns
@@ -2024,7 +2050,7 @@ int main(int argc, char* argv[]) {
                            dest_pin_lat, dest_pin_lng, dest_snap_lat, dest_snap_lng,
                            start_edge_source, start_edge_target, start_edge_oneway,
                            dest_edge_source, dest_edge_target, dest_edge_oneway,
-                           best_distance, query_time_ms, index_load_time_ms,
+                           best_distance, dijkstra_distance, query_time_ms, index_load_time_ms,
                            index_size_mb, index_size_bytes,
                            path, coordinates,
                            edge_geometries, use_disruptions, tau_threshold,

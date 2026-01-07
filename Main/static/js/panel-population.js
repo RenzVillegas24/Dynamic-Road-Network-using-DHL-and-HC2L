@@ -117,8 +117,8 @@ window.populateRouteMetricsPanel = function(routeData) {
   // Detailed Metrics
   const distanceEl = document.getElementById('metrics-distance');
   if (distanceEl) {
-    const distance = metrics.total_distance_units || metrics.total_distance_meters;
-    distanceEl.textContent = distance !== undefined ? distance : '--';
+    const distanceM = metrics.calculated_distance_meters;
+    distanceEl.textContent = distanceM !== undefined ? distanceM : '--';
   }
   
   const pathLengthEl = document.getElementById('metrics-path-length');
@@ -353,7 +353,7 @@ window.populateRouteMetricsPanel = function(routeData) {
   if (calculatedDistanceEl) {
     const calcDist = metrics.calculated_distance_meters;
     if (calcDist !== undefined) {
-      const calcDistKm = metrics.calculated_distance_km || (calcDist / 1000);
+      const calcDistKm = calcDist / 1000;
       calculatedDistanceEl.textContent = `${calcDistKm.toFixed(2)} km (${calcDist.toFixed(0)} m)`;
     } else {
       calculatedDistanceEl.textContent = '--';

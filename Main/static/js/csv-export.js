@@ -34,8 +34,8 @@ function addRouteToExport(routeData) {
         query_time_ms: metrics.query_time_ms || 0,
         path_length: metrics.path_length || 0,
         edge_count: metrics.edge_count || 0,
-        distance_km: metrics.total_distance_meters ? (metrics.total_distance_meters / 1000).toFixed(2) : 0,
-        calculated_distance_km: metrics.calculated_distance_km || 0,
+        distance_km: metrics.calculated_distance_meters ? (metrics.calculated_distance_meters / 1000).toFixed(2) : 0,
+        dijkstra_distance_meter: metrics.dijkstra_distance_meter || 0,
         eta_seconds: metrics.eta_seconds || 0,
         eta_formatted: metrics.eta_formatted || '--'
     };

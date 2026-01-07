@@ -51,7 +51,7 @@ from dataclasses import dataclass, field, asdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from queue import Queue, Empty as QueueEmpty
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, send_file
 from flask_socketio import SocketIO, emit, join_room, leave_room, Namespace
 
 from config import Config
@@ -70,8 +70,136 @@ from road_name_mapper import RoadNameMapper
 # Import HERE routing service for route similarity
 from here_routing_service import HereRoutingService
 
+# Import experiment metrics collector for centralized metrics gathering
+from experiment_metrics_collector import (
+    ExperimentMetricsCollector,
+    create_metrics_collector,
+    IncidentSummary,
+    AccuracyMetrics,
+    RouteMetricsRecord,
+    SimilarityRecord,
+    get_disruption_level,
+    compute_accuracy,
+    DEFAULT_TOLERANCE
+)
+
+
 # Get logger instance
 logger = get_logger("ExperimentRunner")
+
+
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
+
+def create_route_log_entry(
+    api_result: Dict,
+    trial_id: int,
+    batch_id: int,
+    query_id: int,
+    disruption_data: Optional[Dict] = None,
+    tolerance: float = DEFAULT_TOLERANCE
+) -> RouteMetricsRecord:
+    """
+    Create a complete route log entry with accuracy validation.
+    
+    Implements accuracy-first gating:
+    1. Extract distances from API result
+    2. Compute accuracy metrics
+    3. If is_correct: Extract performance metrics
+    4. If not is_correct: Leave performance metrics as NULL
+    
+    Args:
+        api_result: Result from HC2L/DHC2L C++ API call
+        trial_id: Current trial number (1-indexed)
+        batch_id: Current batch number (1-indexed)
+        query_id: Current query/route number (1-indexed)
+        disruption_data: Optional disruption data for incident summary
+        tolerance: Accuracy tolerance (default 0.05 = 5%)
+        
+    Returns:
+        Complete RouteMetricsRecord with accuracy and conditional performance
+    """
+    # Initialize record
+    record = RouteMetricsRecord(
+        trial_id=trial_id,
+        batch_id=batch_id,
+        query_id=query_id,
+        algorithm="DHC2L",
+        disruption_level=get_disruption_level(batch_id),
+        timestamp=datetime.now().isoformat()
+    )
+    
+    # Check for API errors
+    if not api_result.get("success", False):
+        record.error = api_result.get("error", "Unknown API error")
+        return record
+    
+    # Extract node information
+    gps_mapping = api_result.get("gps_mapping", {})
+    record.source_node = gps_mapping.get("start_node", 0)
+    record.target_node = gps_mapping.get("dest_node", 0)
+    
+    # Get incident summary
+    if disruption_data:
+        record.incident_summary = IncidentSummary.from_disruption_data(disruption_data)
+    
+    # STEP 1: Extract distances for accuracy computation
+    metrics = api_result.get("metrics", {})
+    
+    # HC2L distance: Use calculated_distance_meters (path-based distance)
+    dhc2l_distance = float(metrics.get("calculated_distance_meters", 0))
+    
+    # Dijkstra distance: Use dijkstra_distance_meter (actual Dijkstra shortest path)
+    dijkstra_distance = float(metrics.get("dijkstra_distance_meter", 0))
+    
+    # STEP 2: Compute accuracy metrics
+    record.accuracy = compute_accuracy(dhc2l_distance, dijkstra_distance, tolerance)
+    
+    # STEP 3: Conditional performance recording
+    if record.accuracy.is_correct:
+        # Extract performance metrics only if accuracy passes
+        from experiment_metrics_collector import PerformanceMetrics, ConstructionMetrics
+        
+        summary = api_result.get("summary", {})
+        query_phase = api_result.get("query_phase", {})
+        update_phase = api_result.get("update_phase", {})
+        
+        record.performance.query_response_time_ms = float(query_phase.get("query_time_ms", 0) or 
+                                                          summary.get("query_time_ms", 0) or 0)
+        record.performance.labeling_size_mb = float(summary.get("label_size", 0) or 0)
+        record.performance.lazy_update_time_ms = float(update_phase.get("lazy_update_time_ms", 0) or 0)
+        record.performance.threshold_rebuild_time_ms = float(update_phase.get("threshold_rebuild_time_ms", 0) or 0)
+        record.performance.peak_label_size_mb = float(summary.get("peak_label_size_mb", 
+                                                                  record.performance.labeling_size_mb) or 0)
+        
+        # Extract labeling time from construction info or labeling info
+        construction_info = api_result.get("construction_info", {})
+        labeling_info = metrics.get("labeling_info", {})
+        
+        if "construction_time_ms" in construction_info:
+            record.performance.labeling_time_ms = float(construction_info["construction_time_ms"])
+        elif "index_load_time_ms" in labeling_info:
+            record.performance.labeling_time_ms = float(labeling_info["index_load_time_ms"])
+        elif "construction_time_ms" in labeling_info:
+            record.performance.labeling_time_ms = float(labeling_info["construction_time_ms"])
+        
+        # Extract construction metrics for first route
+        if query_id == 1:
+            construction_time = float(construction_info.get("construction_time_ms", 0) or 0)
+            initial_label_size = float(construction_info.get("label_size_mb", 0) or 
+                                      summary.get("label_size", 0) or 0)
+            
+            record.construction = ConstructionMetrics(
+                initial_construction_time_ms=construction_time,
+                initial_label_size_mb=initial_label_size
+            )
+    
+    # Extract execution time
+    record.execution_time_ms = float(api_result.get("execution_time_ms", 0) or 0)
+    
+    return record
+
 
 # ============================================================================
 # DATA CLASSES FOR EXPERIMENT STATE
@@ -142,1097 +270,6 @@ class ExperimentProgress:
         data.pop('results_path', None)
         return data
 
-
-# ============================================================================
-# EXPERIMENT METRICS COLLECTOR (NUMPY-BASED)
-# ============================================================================
-
-class ExperimentMetricsCollector:
-    """
-    High-performance numpy-based metrics collector for experiment data.
-    
-    Collects all metrics in memory using numpy arrays for efficient computation.
-    Metrics are organized by: trial, batch, route, algorithm
-    """
-    
-    def __init__(self, trials: int = 3, batches: int = 3, routes_per_batch: int = 1000):
-        self.trials = trials
-        self.batches = batches
-        self.routes_per_batch = routes_per_batch
-        self.lock = threading.Lock()
-        
-        # Pre-allocate numpy arrays for each algorithm
-        # Shape: (trials, batches, routes_per_batch)
-        shape = (trials, batches, routes_per_batch)
-        
-        # Construction Phase Metrics (per trial per algorithm)
-        # Shape: (trials,)
-        self.construction_time_dhl = np.zeros(trials, dtype=np.float64)
-        self.construction_time_hc2l = np.zeros(trials, dtype=np.float64)
-        self.initial_label_size_dhl = np.zeros(trials, dtype=np.float64)
-        self.initial_label_size_hc2l = np.zeros(trials, dtype=np.float64)
-        
-        # Dynamic Update Metrics (per trial, batch) - separate for DHL and HC2L
-        # Shape: (trials, batches)
-        batch_shape = (trials, batches)
-        self.lazy_update_time_dhl = np.zeros(batch_shape, dtype=np.float64)
-        self.lazy_update_time_hc2l = np.zeros(batch_shape, dtype=np.float64)
-        self.threshold_rebuild_time_dhl = np.zeros(batch_shape, dtype=np.float64)
-        self.threshold_rebuild_time_hc2l = np.zeros(batch_shape, dtype=np.float64)
-        self.peak_label_size_dhl = np.zeros(batch_shape, dtype=np.float64)
-        self.peak_label_size_hc2l = np.zeros(batch_shape, dtype=np.float64)
-        self.rebuild_count_dhl = np.zeros(batch_shape, dtype=np.int32)
-        self.rebuild_count_hc2l = np.zeros(batch_shape, dtype=np.int32)
-        
-        # Query Phase Metrics (per trial, batch, route) - separate for DHL and HC2L
-        self.query_time_dhl = np.zeros(shape, dtype=np.float64)
-        self.query_time_hc2l = np.zeros(shape, dtype=np.float64)
-        self.label_size_dhl = np.zeros(shape, dtype=np.float64)
-        self.label_size_hc2l = np.zeros(shape, dtype=np.float64)
-        
-        # Route Similarity Metrics (per trial, batch, route)
-        self.distance_km_dhl = np.zeros(shape, dtype=np.float64)
-        self.distance_km_hc2l = np.zeros(shape, dtype=np.float64)
-        self.travel_time_dhl = np.zeros(shape, dtype=np.float64)  # In seconds
-        self.travel_time_hc2l = np.zeros(shape, dtype=np.float64)
-        
-        # Pre-computed Frechet distances (computed during route execution)
-        self.frechet_distances = np.zeros(shape, dtype=np.float64)
-        
-        # Temporary path storage for computing Frechet distance (per route, cleared after computation)
-        self.temp_path_dhl = {}  # Key: (trial, batch, route), Value: list of coords
-        self.temp_path_hc2l = {}  # Key: (trial, batch, route), Value: list of coords
-        
-        # Disruption impact metrics
-        self.impact_score_dhl = np.zeros(shape, dtype=np.float64)
-        self.impact_score_hc2l = np.zeros(shape, dtype=np.float64)
-        self.nodes_updated_dhl = np.zeros(shape, dtype=np.int32)
-        self.nodes_updated_hc2l = np.zeros(shape, dtype=np.int32)
-        
-        # Memory usage metrics (per trial, batch, route)
-        self.memory_initial_dhl = np.zeros(shape, dtype=np.float64)
-        self.memory_initial_hc2l = np.zeros(shape, dtype=np.float64)
-        self.memory_current_dhl = np.zeros(shape, dtype=np.float64)
-        self.memory_current_hc2l = np.zeros(shape, dtype=np.float64)
-        self.memory_peak_dhl = np.zeros(shape, dtype=np.float64)
-        self.memory_peak_hc2l = np.zeros(shape, dtype=np.float64)
-        self.memory_increase_dhl = np.zeros(shape, dtype=np.float64)
-        self.memory_increase_hc2l = np.zeros(shape, dtype=np.float64)
-        
-        # Tau values per route
-        self.tau_values = np.zeros(shape, dtype=np.float64)
-        
-        # Tracking arrays to know what's filled
-        self.filled_dhl = np.zeros(shape, dtype=np.bool_)
-        self.filled_hc2l = np.zeros(shape, dtype=np.bool_)
-        
-        # Track initial construction (per trial)
-        self.construction_recorded_dhl = np.zeros(trials, dtype=np.bool_)
-        self.construction_recorded_hc2l = np.zeros(trials, dtype=np.bool_)
-        
-        # Accumulation buffers for per-batch statistics
-        self._batch_query_times_dhl = [[[] for _ in range(batches)] for _ in range(trials)]
-        self._batch_query_times_hc2l = [[[] for _ in range(batches)] for _ in range(trials)]
-        self._batch_label_sizes_dhl = [[[] for _ in range(batches)] for _ in range(trials)]
-        self._batch_label_sizes_hc2l = [[[] for _ in range(batches)] for _ in range(trials)]
-        self._batch_lazy_times_dhl = [[[] for _ in range(batches)] for _ in range(trials)]
-        self._batch_lazy_times_hc2l = [[[] for _ in range(batches)] for _ in range(trials)]
-        
-        # ====================================================================
-        # HERE vs HC2L COMPARISON DATA (for Route Similarity Analysis)
-        # ====================================================================
-        # This stores the comparison between HERE API routes and HC2L baseline (no disruptions)
-        # Shape: (routes_per_batch,) - only one batch of routes is compared
-        self.here_comparison_data = []  # List of dicts with all comparison metrics
-        self.here_comparison_progress = {
-            'completed': 0,
-            'total': routes_per_batch,
-            'status': 'not_started',
-            'current_route': 0,
-            'errors': 0,
-            'start_time': None,
-            'eta': ''
-        }
-        
-        logger.info(f"ExperimentMetricsCollector initialized: {trials} trials × {batches} batches × {routes_per_batch} routes")
-    
-    def record_metric(self, trial: int, batch: int, route: int, algorithm: str, 
-                      result: Dict):
-        """Record a single route result metrics"""
-        with self.lock:
-            try:
-                alg = algorithm.upper()
-                summary = result.get("summary", {})
-                update_phase = result.get("update_phase", {})
-                query_phase = result.get("query_phase", {})
-                
-                query_time = query_phase.get("query_time_ms", 0)
-                # Also try to get query_time from summary if not in query_phase
-                if not query_time:
-                    query_time = summary.get("query_time_ms", 0)
-                
-                label_size = summary.get("label_size", 0)
-                distance = summary.get("distance_km", 0)
-                tau = result.get("tau", 0.5)
-                
-                # Extract memory usage metrics
-                memory_initial = summary.get("memory_initial_mb", 0)
-                memory_current = summary.get("memory_current_mb", 0)
-                memory_peak = summary.get("memory_peak_mb", 0)
-                memory_increase = summary.get("memory_increase_mb", 0)
-                
-                # Extract travel time from ETA
-                eta_str = summary.get("actual_eta", "")
-                travel_time = self._parse_eta_to_seconds(eta_str)
-                
-                # Update phase metrics
-                lazy_time = update_phase.get("lazy_update_time_ms", 0)
-                nodes_updated = update_phase.get("nodes_repaired", 0)
-                impact_score = update_phase.get("impact_score", 0)
-                threshold_rebuild_time = update_phase.get("threshold_rebuild_time_ms", 0)  # Extract threshold rebuild time
-                is_rebuild = update_phase.get("update_strategy", "") == "immediate_update"
-                
-                # Record construction time from first route of each trial (batch 0, route 0)
-                if batch == 0 and route == 0:
-                    construction_info = result.get("construction_info", {})
-                    construction_time = construction_info.get("construction_time_ms", 0)
-                    initial_label_size = construction_info.get("label_size_mb", label_size)
-                    
-                    # Fall back to update_phase for initial label size if not in construction_info
-                    if not initial_label_size:
-                        initial_label_size = label_size
-                    
-                    if alg == "DHL":
-                        if not self.construction_recorded_dhl[trial]:
-                            self.construction_time_dhl[trial] = construction_time
-                            self.initial_label_size_dhl[trial] = initial_label_size
-                            self.construction_recorded_dhl[trial] = True
-                    else:
-                        if not self.construction_recorded_hc2l[trial]:
-                            self.construction_time_hc2l[trial] = construction_time
-                            self.initial_label_size_hc2l[trial] = initial_label_size
-                            self.construction_recorded_hc2l[trial] = True
-                
-                if alg == "DHL":
-                    self.query_time_dhl[trial, batch, route] = query_time
-                    self.label_size_dhl[trial, batch, route] = label_size
-                    self.distance_km_dhl[trial, batch, route] = distance
-                    self.travel_time_dhl[trial, batch, route] = travel_time
-                    self.impact_score_dhl[trial, batch, route] = impact_score
-                    self.nodes_updated_dhl[trial, batch, route] = nodes_updated
-                    self.memory_initial_dhl[trial, batch, route] = memory_initial
-                    self.memory_current_dhl[trial, batch, route] = memory_current
-                    self.memory_peak_dhl[trial, batch, route] = memory_peak
-                    self.memory_increase_dhl[trial, batch, route] = memory_increase
-                    self.filled_dhl[trial, batch, route] = True
-                    
-                    # Track batch-level metrics
-                    self._batch_query_times_dhl[trial][batch].append(query_time)
-                    self._batch_label_sizes_dhl[trial][batch].append(label_size)
-                    self._batch_lazy_times_dhl[trial][batch].append(lazy_time)
-                    
-                    # Peak label size tracking
-                    if label_size > self.peak_label_size_dhl[trial, batch]:
-                        self.peak_label_size_dhl[trial, batch] = label_size
-                    
-                    # Threshold rebuild time tracking (Equation 7: sum and average per batch)
-                    # Record only on first route of batch to avoid double-counting
-                    if route == 0 and threshold_rebuild_time > 0:
-                        self.threshold_rebuild_time_dhl[trial, batch] = threshold_rebuild_time
-                    
-                    # Rebuild tracking
-                    if is_rebuild:
-                        self.rebuild_count_dhl[trial, batch] += 1
-                        
-                else:  # HC2L
-                    self.query_time_hc2l[trial, batch, route] = query_time
-                    self.label_size_hc2l[trial, batch, route] = label_size
-                    self.distance_km_hc2l[trial, batch, route] = distance
-                    self.travel_time_hc2l[trial, batch, route] = travel_time
-                    self.impact_score_hc2l[trial, batch, route] = impact_score
-                    self.nodes_updated_hc2l[trial, batch, route] = nodes_updated
-                    self.memory_initial_hc2l[trial, batch, route] = memory_initial
-                    self.memory_current_hc2l[trial, batch, route] = memory_current
-                    self.memory_peak_hc2l[trial, batch, route] = memory_peak
-                    self.memory_increase_hc2l[trial, batch, route] = memory_increase
-                    self.filled_hc2l[trial, batch, route] = True
-                    
-                    # Track batch-level metrics
-                    self._batch_query_times_hc2l[trial][batch].append(query_time)
-                    self._batch_label_sizes_hc2l[trial][batch].append(label_size)
-                    self._batch_lazy_times_hc2l[trial][batch].append(lazy_time)
-                    
-                    # Peak label size tracking
-                    if label_size > self.peak_label_size_hc2l[trial, batch]:
-                        self.peak_label_size_hc2l[trial, batch] = label_size
-                    
-                    # Threshold rebuild time tracking (Equation 7: sum and average per batch)
-                    # Record only on first route of batch to avoid double-counting
-                    if route == 0 and threshold_rebuild_time > 0:
-                        self.threshold_rebuild_time_hc2l[trial, batch] = threshold_rebuild_time
-                    
-                    # Rebuild tracking
-                    if is_rebuild:
-                        self.rebuild_count_hc2l[trial, batch] += 1
-                
-                # Record tau (same for both algorithms)
-                self.tau_values[trial, batch, route] = tau
-                
-            except Exception as e:
-                logger.error(f"Error recording metric: {e}")
-    
-    def record_construction(self, trial: int, algorithm: str, 
-                           construction_time_ms: float, label_size_mb: float):
-        """Record initial construction phase metrics"""
-        with self.lock:
-            alg = algorithm.upper()
-            if alg == "DHL":
-                if not self.construction_recorded_dhl[trial]:
-                    self.construction_time_dhl[trial] = construction_time_ms
-                    self.initial_label_size_dhl[trial] = label_size_mb
-                    self.construction_recorded_dhl[trial] = True
-            else:
-                if not self.construction_recorded_hc2l[trial]:
-                    self.construction_time_hc2l[trial] = construction_time_ms
-                    self.initial_label_size_hc2l[trial] = label_size_mb
-                    self.construction_recorded_hc2l[trial] = True
-    
-    def record_here_comparison(self, route_idx: int, comparison_data: Dict):
-        """
-        Record HERE vs HC2L comparison data for a single route.
-        
-        Args:
-            route_idx: Route index (0-based)
-            comparison_data: Dict containing:
-                - route_idx: Route number
-                - source_node: HC2L source node ID
-                - target_node: HC2L target node ID
-                - start_road_hc2l: Road name at origin (from HC2L/road mapper)
-                - end_road_hc2l: Road name at destination (from HC2L/road mapper)
-                - start_road_here: Road name at origin (from HERE API)
-                - end_road_here: Road name at destination (from HERE API)
-                - distance_km_hc2l: HC2L distance in km
-                - distance_km_here: HERE distance in km
-                - travel_time_min_hc2l: HC2L travel time in minutes
-                - travel_time_min_here: HERE travel time in minutes
-                - query_time_ms_hc2l: HC2L query time in ms
-                - query_time_ms_here: HERE API response time in ms
-                - frechet_distance_m: Fréchet distance in meters
-                - fd_rating: Quality rating (Excellent/Good/Fair)
-                - time_deviation_pct: % deviation between HERE and HC2L times
-                - ttd_rating: Time deviation rating
-                - distance_deviation_pct: % deviation in distances
-                - error: Error message if any
-        """
-        with self.lock:
-            self.here_comparison_data.append(comparison_data)
-            self.here_comparison_progress['completed'] = len(self.here_comparison_data)
-            self.here_comparison_progress['current_route'] = route_idx
-            if comparison_data.get('error'):
-                self.here_comparison_progress['errors'] += 1
-    
-    def update_here_comparison_status(self, status: str, total: int = None):
-        """Update the HERE comparison thread status"""
-        with self.lock:
-            self.here_comparison_progress['status'] = status
-            if total is not None:
-                self.here_comparison_progress['total'] = total
-            if status == 'running' and not self.here_comparison_progress.get('start_time'):
-                self.here_comparison_progress['start_time'] = time.time()
-    
-    def get_here_comparison_progress(self) -> Dict:
-        """Get current HERE comparison progress with computed ETA and running metrics"""
-        with self.lock:
-            progress = self.here_comparison_progress.copy()
-            
-            # Compute ETA based on current progress
-            if progress['status'] == 'running' and progress.get('start_time'):
-                completed = progress['completed']
-                total = progress['total']
-                elapsed = time.time() - progress['start_time']
-                
-                if completed > 0 and total > completed:
-                    rate = completed / elapsed  # routes per second
-                    remaining = total - completed
-                    eta_seconds = remaining / rate
-                    
-                    # Format ETA
-                    if eta_seconds >= 3600:
-                        hours = int(eta_seconds // 3600)
-                        mins = int((eta_seconds % 3600) // 60)
-                        progress['eta'] = f"{hours}h {mins}m"
-                    elif eta_seconds >= 60:
-                        mins = int(eta_seconds // 60)
-                        secs = int(eta_seconds % 60)
-                        progress['eta'] = f"{mins}m {secs}s"
-                    else:
-                        progress['eta'] = f"{int(eta_seconds)}s"
-                else:
-                    progress['eta'] = 'Calculating...'
-            
-            # Add running statistics from comparison data
-            if self.here_comparison_data:
-                valid_data = [d for d in self.here_comparison_data if not d.get('error')]
-                
-                if valid_data:
-                    # Calculate averages for HC2L
-                    progress['hc2l_avg_query_ms'] = sum(d.get('query_time_ms_hc2l', 0) for d in valid_data) / len(valid_data)
-                    progress['hc2l_avg_distance_km'] = sum(d.get('distance_km_hc2l', 0) for d in valid_data) / len(valid_data)
-                    progress['hc2l_avg_time_min'] = sum(d.get('travel_time_min_hc2l', 0) for d in valid_data) / len(valid_data)
-                    
-                    # Calculate averages for HERE
-                    progress['here_avg_query_ms'] = sum(d.get('query_time_ms_here', 0) for d in valid_data) / len(valid_data)
-                    progress['here_avg_distance_km'] = sum(d.get('distance_km_here', 0) for d in valid_data) / len(valid_data)
-                    progress['here_avg_time_min'] = sum(d.get('travel_time_min_here', 0) for d in valid_data) / len(valid_data)
-                    
-                    # Quality metrics
-                    progress['avg_frechet_m'] = sum(d.get('frechet_distance_m', 0) for d in valid_data) / len(valid_data)
-                    progress['avg_time_deviation_pct'] = sum(d.get('time_deviation_pct', 0) for d in valid_data) / len(valid_data)
-                    
-                    # Last route data
-                    last_route = valid_data[-1]
-                    progress['last_frechet_m'] = last_route.get('frechet_distance_m', 0)
-            
-            return progress
-    
-    def record_route_path(self, trial: int, batch: int, route: int, 
-                          algorithm: str, path_coords: List):
-        """
-        Record route path temporarily and compute Frechet distance when both algorithms complete.
-        This optimizes memory by computing Frechet distance immediately and discarding path data.
-        
-        NOTE: This method is now deprecated for DHL/HC2L worker threads.
-        Fréchet distance is only computed in the HERE comparison thread.
-        """
-        # DEPRECATED: Fréchet distance is now computed only in HERE comparison thread
-        # Keeping method for backward compatibility but not storing paths
-        pass
-    
-    def _parse_eta_to_seconds(self, eta_str: str) -> float:
-        """Parse ETA string like '5m 30s' to seconds"""
-        if not eta_str:
-            return 0
-        
-        try:
-            seconds = 0
-            parts = eta_str.replace('h', ' h ').replace('m', ' m ').replace('s', ' s ').split()
-            
-            i = 0
-            while i < len(parts):
-                if i + 1 < len(parts):
-                    val = float(parts[i])
-                    unit = parts[i + 1]
-                    if unit == 'h':
-                        seconds += val * 3600
-                    elif unit == 'm':
-                        seconds += val * 60
-                    elif unit == 's':
-                        seconds += val
-                    i += 2
-                else:
-                    break
-            return seconds
-        except:
-            return 0
-    
-    def compute_results(self) -> Dict:
-        """
-        Compute all aggregated results for the dashboard.
-        Returns a comprehensive dictionary with all metrics organized by section.
-        """
-        with self.lock:
-            results = {
-                "total_trials": self.trials,
-                "total_batches": self.batches,
-                "construction_phase": self._compute_construction_phase(),
-                "dynamic_updates": self._compute_dynamic_updates(),
-                "query_performance": self._compute_query_performance(),
-                "route_similarity": self._compute_route_similarity(),
-                "similarity_extra": self._compute_similarity_extra(),
-                "graph_data": self._compute_graph_data(),
-                "summary": self._compute_summary()
-            }
-            return results
-    
-    def _compute_construction_phase(self) -> List[Dict]:
-        """Compute Construction Phase (Appendix 1.1) metrics - returns list for frontend"""
-        rows = []
-        
-        for trial in range(self.trials):
-            # DHC2L row
-            if self.construction_recorded_hc2l[trial]:
-                rows.append({
-                    "trial": trial + 1,
-                    "algorithm": "DHC2L",
-                    "initial_construction_time_ms": round(self.construction_time_hc2l[trial], 2),
-                    "initial_label_size_mb": round(self.initial_label_size_hc2l[trial], 5)
-                })
-            
-            # DHL row
-            if self.construction_recorded_dhl[trial]:
-                rows.append({
-                    "trial": trial + 1,
-                    "algorithm": "DHL",
-                    "initial_construction_time_ms": round(self.construction_time_dhl[trial], 2),
-                    "initial_label_size_mb": round(self.initial_label_size_dhl[trial], 5)
-                })
-        
-        return rows
-    
-    def _compute_dynamic_updates(self) -> List[Dict]:
-        """Compute Dynamic Updates (Appendix 1.2) metrics - returns flat list for frontend"""
-        rows = []
-        
-        # Track metrics for computing averages
-        trial_averages = {}  # trial -> {algorithm -> metrics}
-        batch_averages = {}  # batch -> {algorithm -> metrics}
-        overall_averages = {"DHL": [], "DHC2L": []}
-        
-        for trial in range(self.trials):
-            if trial not in trial_averages:
-                trial_averages[trial] = {"DHL": [], "DHC2L": []}
-                
-            for batch in range(self.batches):
-                if batch not in batch_averages:
-                    batch_averages[batch] = {"DHL": [], "DHC2L": []}
-                
-                # Get per-batch data for DHL
-                dhl_query_times = self._batch_query_times_dhl[trial][batch]
-                dhl_lazy_times = self._batch_lazy_times_dhl[trial][batch]
-                
-                if dhl_query_times:
-                    dhl_avg_query = np.mean(dhl_query_times)
-                    # Filter out negative and zero values for min calculation
-                    positive_dhl_times = np.array(dhl_query_times)[np.array(dhl_query_times) > 0]
-                    dhl_min_query = np.min(positive_dhl_times) if len(positive_dhl_times) > 0 else 0
-                    dhl_max_query = np.max(dhl_query_times)
-                    dhl_avg_lazy = np.mean(dhl_lazy_times) if dhl_lazy_times else 0
-                    dhl_peak_label = self.peak_label_size_dhl[trial, batch]
-                    dhl_rebuild_time = self.threshold_rebuild_time_dhl[trial, batch]
-                    
-                    initial_label = self.initial_label_size_dhl[trial] if self.construction_recorded_dhl[trial] else 1
-                    label_change_pct = ((dhl_peak_label - initial_label) / initial_label * 100) if initial_label > 0 else 0
-                    
-                    row_data = {
-                        "batch": batch + 1,
-                        "trial": trial + 1,
-                        "algorithm": "DHL",
-                        "disruption_level": round(len(dhl_query_times) / self.routes_per_batch, 2) if self.routes_per_batch > 0 else 0,
-                        "lazy_update_time_ms": round(dhl_avg_lazy, 3),
-                        "threshold_rebuild_time_ms": round(dhl_rebuild_time, 3),
-                        "peak_label_size_mb": round(dhl_peak_label, 5),
-                        "label_size_change_pct": round(label_change_pct, 1),
-                        "query_avg_ms": round(dhl_avg_query, 3),
-                        "query_min_ms": round(dhl_min_query, 3),
-                        "query_max_ms": round(dhl_max_query, 3)
-                    }
-                    
-                    rows.append(row_data)
-                    trial_averages[trial]["DHL"].append(row_data)
-                    batch_averages[batch]["DHL"].append(row_data)
-                    overall_averages["DHL"].append(row_data)
-                
-                # Get per-batch data for HC2L
-                hc2l_query_times = self._batch_query_times_hc2l[trial][batch]
-                hc2l_lazy_times = self._batch_lazy_times_hc2l[trial][batch]
-                
-                if hc2l_query_times:
-                    hc2l_avg_query = np.mean(hc2l_query_times)
-                    # Filter out negative and zero values for min calculation
-                    positive_hc2l_times = np.array(hc2l_query_times)[np.array(hc2l_query_times) > 0]
-                    hc2l_min_query = np.min(positive_hc2l_times) if len(positive_hc2l_times) > 0 else 0
-                    hc2l_max_query = np.max(hc2l_query_times)
-                    hc2l_avg_lazy = np.mean(hc2l_lazy_times) if hc2l_lazy_times else 0
-                    hc2l_peak_label = self.peak_label_size_hc2l[trial, batch]
-                    hc2l_rebuild_time = self.threshold_rebuild_time_hc2l[trial, batch]
-                    
-                    initial_label = self.initial_label_size_hc2l[trial] if self.construction_recorded_hc2l[trial] else 1
-                    label_change_pct = ((hc2l_peak_label - initial_label) / initial_label * 100) if initial_label > 0 else 0
-                    
-                    row_data = {
-                        "batch": batch + 1,
-                        "trial": trial + 1,
-                        "algorithm": "DHC2L",
-                        "disruption_level": round(len(hc2l_query_times) / self.routes_per_batch, 2) if self.routes_per_batch > 0 else 0,
-                        "lazy_update_time_ms": round(hc2l_avg_lazy, 3),
-                        "threshold_rebuild_time_ms": round(hc2l_rebuild_time, 3),
-                        "peak_label_size_mb": round(hc2l_peak_label, 5),
-                        "label_size_change_pct": round(label_change_pct, 1),
-                        "query_avg_ms": round(hc2l_avg_query, 3),
-                        "query_min_ms": round(hc2l_min_query, 3),
-                        "query_max_ms": round(hc2l_max_query, 3)
-                    }
-                    
-                    rows.append(row_data)
-                    trial_averages[trial]["DHC2L"].append(row_data)
-                    batch_averages[batch]["DHC2L"].append(row_data)
-                    overall_averages["DHC2L"].append(row_data)
-        
-        # Compute and append averages
-        def compute_avg(data_list):
-            if not data_list:
-                return None
-            return {
-                "lazy_update_time_ms": round(float(np.mean([d["lazy_update_time_ms"] for d in data_list])), 3),
-                "threshold_rebuild_time_ms": round(float(np.mean([d["threshold_rebuild_time_ms"] for d in data_list])), 3),
-                "peak_label_size_mb": round(float(np.mean([d["peak_label_size_mb"] for d in data_list])), 5),
-                "label_size_change_pct": round(float(np.mean([d["label_size_change_pct"] for d in data_list])), 1),
-                "query_avg_ms": round(float(np.mean([d["query_avg_ms"] for d in data_list])), 3),
-                "query_min_ms": round(float(np.mean([d["query_min_ms"] for d in data_list])), 3),
-                "query_max_ms": round(float(np.mean([d["query_max_ms"] for d in data_list])), 3)
-            }
-        
-        # Add per-batch averages
-        for batch in range(self.batches):
-            for algorithm in ["DHL", "DHC2L"]:
-                avg_data = compute_avg(batch_averages[batch][algorithm])
-                if avg_data:
-                    rows.append({
-                        "batch": batch + 1,
-                        "trial": "Average",
-                        "algorithm": algorithm,
-                        "disruption_level": "-",
-                        **avg_data
-                    })
-        
-        # Add per-trial averages
-        for trial in range(self.trials):
-            for algorithm in ["DHL", "DHC2L"]:
-                avg_data = compute_avg(trial_averages[trial][algorithm])
-                if avg_data:
-                    rows.append({
-                        "batch": "Average",
-                        "trial": trial + 1,
-                        "algorithm": algorithm,
-                        "disruption_level": "-",
-                        **avg_data
-                    })
-        
-        # Add overall averages
-        for algorithm in ["DHL", "DHC2L"]:
-            avg_data = compute_avg(overall_averages[algorithm])
-            if avg_data:
-                rows.append({
-                    "batch": "Average",
-                    "trial": "Overall",
-                    "algorithm": algorithm,
-                    "disruption_level": "-",
-                    **avg_data
-                })
-        
-        return rows
-    
-    def _compute_query_performance(self) -> List[Dict]:
-        """Compute Query Performance (Appendix 1.3) comparison metrics - returns list for frontend"""
-        # Aggregate across all trials
-        dhl_metrics = {
-            "initial_labeling_time_ms": [],
-            "avg_query_time_ms": [],
-            "label_size_mb": [],
-            "peak_label_size_mb": [],
-            "lazy_update_time_ms": [],
-            "threshold_rebuild_time_ms": [],
-            "total_rebuilds": 0
-        }
-        
-        hc2l_metrics = {
-            "initial_labeling_time_ms": [],
-            "avg_query_time_ms": [],
-            "label_size_mb": [],
-            "peak_label_size_mb": [],
-            "lazy_update_time_ms": [],
-            "threshold_rebuild_time_ms": [],
-            "total_rebuilds": 0
-        }
-        
-        for trial in range(self.trials):
-            # Construction time
-            if self.construction_recorded_dhl[trial]:
-                dhl_metrics["initial_labeling_time_ms"].append(self.construction_time_dhl[trial])
-            if self.construction_recorded_hc2l[trial]:
-                hc2l_metrics["initial_labeling_time_ms"].append(self.construction_time_hc2l[trial])
-            
-            # Per-trial query times (flatten all batches/routes)
-            dhl_mask = self.filled_dhl[trial, :, :]
-            hc2l_mask = self.filled_hc2l[trial, :, :]
-            
-            if np.any(dhl_mask):
-                dhl_metrics["avg_query_time_ms"].append(np.mean(self.query_time_dhl[trial, :, :][dhl_mask]))
-                dhl_metrics["label_size_mb"].append(np.mean(self.label_size_dhl[trial, :, :][dhl_mask]))
-                dhl_metrics["peak_label_size_mb"].append(np.max(self.peak_label_size_dhl[trial, :]))
-                
-                # Lazy update times
-                all_lazy = []
-                for b in range(self.batches):
-                    all_lazy.extend(self._batch_lazy_times_dhl[trial][b])
-                if all_lazy:
-                    dhl_metrics["lazy_update_time_ms"].append(np.mean(all_lazy))
-                
-                dhl_metrics["threshold_rebuild_time_ms"].append(np.mean(self.threshold_rebuild_time_dhl[trial, :]))
-                dhl_metrics["total_rebuilds"] += int(np.sum(self.rebuild_count_dhl[trial, :]))
-            
-            if np.any(hc2l_mask):
-                hc2l_metrics["avg_query_time_ms"].append(np.mean(self.query_time_hc2l[trial, :, :][hc2l_mask]))
-                hc2l_metrics["label_size_mb"].append(np.mean(self.label_size_hc2l[trial, :, :][hc2l_mask]))
-                hc2l_metrics["peak_label_size_mb"].append(np.max(self.peak_label_size_hc2l[trial, :]))
-                
-                # Lazy update times
-                all_lazy = []
-                for b in range(self.batches):
-                    all_lazy.extend(self._batch_lazy_times_hc2l[trial][b])
-                if all_lazy:
-                    hc2l_metrics["lazy_update_time_ms"].append(np.mean(all_lazy))
-                
-                hc2l_metrics["threshold_rebuild_time_ms"].append(np.mean(self.threshold_rebuild_time_hc2l[trial, :]))
-                hc2l_metrics["total_rebuilds"] += int(np.sum(self.rebuild_count_hc2l[trial, :]))
-        
-        # Calculate averages
-        def safe_mean(arr):
-            return round(float(np.mean(arr)), 3) if arr else 0.0
-        
-        dhl_avg = {k: safe_mean(v) if isinstance(v, list) else v for k, v in dhl_metrics.items()}
-        hc2l_avg = {k: safe_mean(v) if isinstance(v, list) else v for k, v in hc2l_metrics.items()}
-        
-        # Build comparison list with metric name mapping for display
-        metric_display_names = {
-            "initial_labeling_time_ms": "Initial Labeling Time",
-            "avg_query_time_ms": "Avg Query Time",
-            "label_size_mb": "Avg Label Size",
-            "peak_label_size_mb": "Peak Label Size",
-            "lazy_update_time_ms": "Lazy Update Time",
-            "threshold_rebuild_time_ms": "Threshold Rebuild Time",
-            "total_rebuilds": "Total Rebuilds"
-        }
-        
-        metric_units = {
-            "initial_labeling_time_ms": "ms",
-            "avg_query_time_ms": "ms",
-            "label_size_mb": "MB",
-            "peak_label_size_mb": "MB",
-            "lazy_update_time_ms": "ms",
-            "threshold_rebuild_time_ms": "ms",
-            "total_rebuilds": ""
-        }
-        
-        comparison = []
-        for metric in ["initial_labeling_time_ms", "avg_query_time_ms", "label_size_mb", 
-                       "peak_label_size_mb", "lazy_update_time_ms", "threshold_rebuild_time_ms", "total_rebuilds"]:
-            dhl_val = dhl_avg[metric]
-            hc2l_val = hc2l_avg[metric]
-            
-            improvement = 0
-            if dhl_val > 0:
-                improvement = round((dhl_val - hc2l_val) / dhl_val * 100, 1)
-            
-            comparison.append({
-                "metric": metric_display_names.get(metric, metric),
-                "dhl_value": dhl_val,
-                "dhc2l_value": hc2l_val,
-                "improvement_pct": improvement,
-                "unit": metric_units.get(metric, "")
-            })
-        
-        return comparison
-    
-    def _compute_route_similarity(self) -> List[Dict]:
-        """
-        Compute Route Similarity (Appendix 1.4) metrics using HERE vs HC2L comparison data.
-        
-        Returns list of route similarity records with:
-        - Route index, OD pair, road names
-        - Distance and travel time (HC2L / HERE)
-        - Fréchet distance and rating
-        - Time and distance deviation percentages
-        - Query time comparison
-        """
-        with self.lock:
-            # Return the HERE comparison data directly
-            # This data is collected by the HERE comparison thread
-            if not self.here_comparison_data:
-                logger.info("✓ Route similarity computed from HERE comparison: 0 routes")
-                return []
-            
-            # Format data for frontend display
-            rows = []
-            for data in self.here_comparison_data:
-                if data.get('error'):
-                    continue  # Skip routes with errors
-                
-                rows.append({
-                    "route_idx": data.get('route_idx', 0) + 1,  # 1-based for display
-                    "batch": data.get('batch', 0),
-                    "od_pair": f"{data.get('source_node', 'S')} → {data.get('target_node', 'D')}",
-                    "start_road_hc2l": data.get('start_road_hc2l', 'Unknown'),
-                    "end_road_hc2l": data.get('end_road_hc2l', 'Unknown'),
-                    "start_road_here": data.get('start_road_here', 'Unknown'),
-                    "end_road_here": data.get('end_road_here', 'Unknown'),
-                    "distance_km_hc2l": round(data.get('distance_km_hc2l', 0), 2),
-                    "distance_km_here": round(data.get('distance_km_here', 0), 2),
-                    "travel_time_min_hc2l": round(data.get('travel_time_min_hc2l', 0), 1),
-                    "travel_time_min_here": round(data.get('travel_time_min_here', 0), 1),
-                    "query_time_ms_hc2l": round(data.get('query_time_ms_hc2l', 0), 3),
-                    "query_time_ms_here": round(data.get('query_time_ms_here', 0), 3),
-                    "frechet_distance_m": round(data.get('frechet_distance_m', 0), 0),
-                    "fd_rating": data.get('fd_rating', 'N/A'),
-                    "time_deviation_pct": round(data.get('time_deviation_pct', 0), 1),
-                    "ttd_rating": data.get('ttd_rating', 'N/A'),
-                    "distance_deviation_pct": round(data.get('distance_deviation_pct', 0), 1)
-                })
-            
-            logger.info(f"✓ Route similarity computed from HERE comparison: {len(rows)} routes")
-            return rows
-        
-        return rows
-    
-    def _compute_frechet_distance_optimized(self, path1: List, path2: List) -> float:
-        """
-        Compute discrete Frechet distance between two paths in meters using optimized iterative DP.
-        This is 10-100x faster than the recursive version.
-        """
-        if not path1 or not path2:
-            return 0
-        
-        try:
-            # Convert to numpy arrays for vectorized operations
-            p1 = np.array(path1, dtype=np.float64)
-            p2 = np.array(path2, dtype=np.float64)
-            
-            n, m = len(p1), len(p2)
-            
-            # Vectorized Haversine distance calculation for entire grid
-            # Broadcast to create all pairwise combinations
-            lon1 = p1[:, 0][:, np.newaxis]  # Shape: (n, 1)
-            lat1 = p1[:, 1][:, np.newaxis]  # Shape: (n, 1)
-            lon2 = p2[:, 0][np.newaxis, :]  # Shape: (1, m)
-            lat2 = p2[:, 1][np.newaxis, :]  # Shape: (1, m)
-            
-            # Haversine formula (vectorized for all pairs at once)
-            R = 6371000  # Earth radius in meters
-            phi1 = np.radians(lat1)
-            phi2 = np.radians(lat2)
-            dphi = np.radians(lat2 - lat1)
-            dlambda = np.radians(lon2 - lon1)
-            
-            a = np.sin(dphi/2)**2 + np.cos(phi1) * np.cos(phi2) * np.sin(dlambda/2)**2
-            distances = 2 * R * np.arcsin(np.sqrt(np.clip(a, 0, 1)))  # Shape: (n, m)
-            
-            # Iterative DP computation (much faster than recursion)
-            ca = np.full((n, m), np.inf, dtype=np.float64)
-            ca[0, 0] = distances[0, 0]
-            
-            # Fill first column
-            for i in range(1, n):
-                ca[i, 0] = max(ca[i-1, 0], distances[i, 0])
-            
-            # Fill first row
-            for j in range(1, m):
-                ca[0, j] = max(ca[0, j-1], distances[0, j])
-            
-            # Fill the rest of the matrix using vectorized operations where possible
-            for i in range(1, n):
-                for j in range(1, m):
-                    ca[i, j] = max(min(ca[i-1, j], ca[i-1, j-1], ca[i, j-1]), distances[i, j])
-            
-            return float(ca[n-1, m-1])
-        except Exception as e:
-            logger.warning(f"Frechet distance calculation failed: {e}")
-            return 0
-    
-    def _compute_summary(self) -> Dict:
-        """Compute overall summary statistics"""
-        total_dhl = np.sum(self.filled_dhl)
-        total_hc2l = np.sum(self.filled_hc2l)
-        
-        # Compute average memory usage
-        dhl_mem_avg = np.mean(self.memory_peak_dhl[self.filled_dhl]) if np.any(self.filled_dhl) else 0
-        hc2l_mem_avg = np.mean(self.memory_peak_hc2l[self.filled_hc2l]) if np.any(self.filled_hc2l) else 0
-        dhl_mem_peak = np.max(self.memory_peak_dhl[self.filled_dhl]) if np.any(self.filled_dhl) else 0
-        hc2l_mem_peak = np.max(self.memory_peak_hc2l[self.filled_hc2l]) if np.any(self.filled_hc2l) else 0
-        
-        return {
-            "total_trials": self.trials,
-            "total_batches": self.batches,
-            "routes_per_batch": self.routes_per_batch,
-            "completed_dhl": int(total_dhl),
-            "completed_hc2l": int(total_hc2l),
-            "total_expected": self.trials * self.batches * self.routes_per_batch * 2,
-            "completion_pct": round((total_dhl + total_hc2l) / (self.trials * self.batches * self.routes_per_batch * 2) * 100, 2),
-            "avg_memory_dhl_mb": round(dhl_mem_avg, 2),
-            "avg_memory_hc2l_mb": round(hc2l_mem_avg, 2),
-            "peak_memory_dhl_mb": round(dhl_mem_peak, 2),
-            "peak_memory_hc2l_mb": round(hc2l_mem_peak, 2)
-        }
-    
-    def _compute_similarity_extra(self) -> Dict:
-        """
-        Compute additional similarity metrics from HERE comparison data.
-        
-        Returns summary statistics:
-        - Average Fréchet distance
-        - Percentage of routes rated "Excellent"
-        - Average time deviation
-        - Average distance deviation
-        - Average query time comparison
-        """
-        with self.lock:
-            if not self.here_comparison_data:
-                return {
-                    "avg_frechet_distance_m": 0,
-                    "excellent_pct": 0,
-                    "good_pct": 0,
-                    "fair_pct": 0,
-                    "avg_time_deviation_pct": 0,
-                    "avg_distance_deviation_pct": 0,
-                    "avg_query_time_hc2l_ms": 0,
-                    "avg_query_time_here_ms": 0,
-                    "total_routes_compared": 0,
-                    "errors_count": self.here_comparison_progress.get('errors', 0)
-                }
-            
-            # Filter out errors
-            valid_data = [d for d in self.here_comparison_data if not d.get('error')]
-            
-            if not valid_data:
-                return {
-                    "avg_frechet_distance_m": 0,
-                    "excellent_pct": 0,
-                    "good_pct": 0,
-                    "fair_pct": 0,
-                    "avg_time_deviation_pct": 0,
-                    "avg_distance_deviation_pct": 0,
-                    "avg_query_time_hc2l_ms": 0,
-                    "avg_query_time_here_ms": 0,
-                    "total_routes_compared": 0,
-                    "errors_count": self.here_comparison_progress.get('errors', 0)
-                }
-            
-            # Extract metrics
-            frechet_distances = [d.get('frechet_distance_m', 0) for d in valid_data]
-            time_deviations = [d.get('time_deviation_pct', 0) for d in valid_data]
-            distance_deviations = [d.get('distance_deviation_pct', 0) for d in valid_data]
-            query_times_hc2l = [d.get('query_time_ms_hc2l', 0) for d in valid_data]
-            query_times_here = [d.get('query_time_ms_here', 0) for d in valid_data]
-            fd_ratings = [d.get('fd_rating', 'N/A') for d in valid_data]
-            
-            # Count ratings
-            excellent_count = sum(1 for r in fd_ratings if r == 'Excellent')
-            good_count = sum(1 for r in fd_ratings if r == 'Good')
-            fair_count = sum(1 for r in fd_ratings if r == 'Fair')
-            total = len(valid_data)
-            
-            logger.info(f"✓ Similarity extra computed: {len(valid_data)} metrics")
-            
-            return {
-                "avg_frechet_distance_m": round(np.mean(frechet_distances), 1) if frechet_distances else 0,
-                "excellent_pct": round(excellent_count / total * 100, 1) if total > 0 else 0,
-                "good_pct": round(good_count / total * 100, 1) if total > 0 else 0,
-                "fair_pct": round(fair_count / total * 100, 1) if total > 0 else 0,
-                "avg_time_deviation_pct": round(np.mean(time_deviations), 1) if time_deviations else 0,
-                "avg_distance_deviation_pct": round(np.mean(distance_deviations), 1) if distance_deviations else 0,
-                "avg_query_time_hc2l_ms": round(np.mean(query_times_hc2l), 3) if query_times_hc2l else 0,
-                "avg_query_time_here_ms": round(np.mean(query_times_here), 3) if query_times_here else 0,
-                "total_routes_compared": total,
-                "errors_count": self.here_comparison_progress.get('errors', 0)
-            }
-    
-    def _compute_graph_data(self) -> Dict:
-        """Compute comprehensive data for graph visualizations"""
-        graph_data = {
-            "time_series": {},
-            "algorithm_comparison": {},
-            "per_trial": {},
-            "rebuild_analysis": {},
-            "label_size_trend": {}
-        }
-        
-        # =====================================================================
-        # TIME SERIES DATA - Query time and update time over batches
-        # =====================================================================
-        for algorithm in ["DHL", "HC2L"]:
-            is_dhl = (algorithm == "DHL")
-            query_data = self.query_time_dhl if is_dhl else self.query_time_hc2l
-            lazy_data = self.lazy_update_time_dhl if is_dhl else self.lazy_update_time_hc2l
-            rebuild_data = self.threshold_rebuild_time_dhl if is_dhl else self.threshold_rebuild_time_hc2l
-            filled = self.filled_dhl if is_dhl else self.filled_hc2l
-            
-            batch_labels = []
-            query_times = []
-            update_times = []
-            rebuild_times = []
-            
-            for trial in range(self.trials):
-                for batch in range(self.batches):
-                    batch_label = f"T{trial+1}B{batch+1}"
-                    batch_labels.append(batch_label)
-                    
-                    # Average query time for this batch
-                    mask = filled[trial, batch, :]
-                    if np.any(mask):
-                        avg_query = float(np.mean(query_data[trial, batch, :][mask]))
-                        query_times.append(round(avg_query, 3))
-                    else:
-                        query_times.append(0)
-                    
-                    # Average lazy update time
-                    key = "lazy_times_dhl" if is_dhl else "lazy_times_hc2l"
-                    if trial < len(self._batch_lazy_times_dhl if is_dhl else self._batch_lazy_times_hc2l):
-                        batch_lazy = (self._batch_lazy_times_dhl if is_dhl else self._batch_lazy_times_hc2l)[trial][batch]
-                        if batch_lazy:
-                            update_times.append(round(float(np.mean(batch_lazy)), 3))
-                        else:
-                            update_times.append(0)
-                    else:
-                        update_times.append(0)
-                    
-                    # Threshold rebuild time
-                    rebuild_times.append(round(float(rebuild_data[trial, batch]), 3))
-            
-            graph_data["time_series"][algorithm] = {
-                "batch_labels": batch_labels,
-                "query_times": query_times,
-                "update_times": update_times,
-                "rebuild_times": rebuild_times
-            }
-        
-        # =====================================================================
-        # ALGORITHM COMPARISON - Average metrics across all trials
-        # =====================================================================
-        dhl_avg_query = []
-        hc2l_avg_query = []
-        dhl_avg_label = []
-        hc2l_avg_label = []
-        
-        for trial in range(self.trials):
-            dhl_mask = self.filled_dhl[trial, :, :]
-            hc2l_mask = self.filled_hc2l[trial, :, :]
-            
-            if np.any(dhl_mask):
-                dhl_avg_query.append(float(np.mean(self.query_time_dhl[trial, :, :][dhl_mask])))
-                dhl_avg_label.append(float(np.mean(self.label_size_dhl[trial, :, :][dhl_mask])))
-            
-            if np.any(hc2l_mask):
-                hc2l_avg_query.append(float(np.mean(self.query_time_hc2l[trial, :, :][hc2l_mask])))
-                hc2l_avg_label.append(float(np.mean(self.label_size_hc2l[trial, :, :][hc2l_mask])))
-        
-        graph_data["algorithm_comparison"] = {
-            "avg_query_time": {
-                "DHL": round(float(np.mean(dhl_avg_query)), 3) if dhl_avg_query else 0,
-                "HC2L": round(float(np.mean(hc2l_avg_query)), 3) if hc2l_avg_query else 0
-            },
-            "avg_label_size": {
-                "DHL": round(float(np.mean(dhl_avg_label)), 3) if dhl_avg_label else 0,
-                "HC2L": round(float(np.mean(hc2l_avg_label)), 3) if hc2l_avg_label else 0
-            }
-        }
-        
-        # =====================================================================
-        # PER-TRIAL BREAKDOWN
-        # =====================================================================
-        trial_labels = [f"Trial {i+1}" for i in range(self.trials)]
-        dhl_trial_query = []
-        hc2l_trial_query = []
-        dhl_trial_update = []
-        hc2l_trial_update = []
-        
-        for trial in range(self.trials):
-            # Query times
-            dhl_mask = self.filled_dhl[trial, :, :]
-            hc2l_mask = self.filled_hc2l[trial, :, :]
-            
-            if np.any(dhl_mask):
-                dhl_trial_query.append(round(float(np.mean(self.query_time_dhl[trial, :, :][dhl_mask])), 3))
-            else:
-                dhl_trial_query.append(0)
-            
-            if np.any(hc2l_mask):
-                hc2l_trial_query.append(round(float(np.mean(self.query_time_hc2l[trial, :, :][hc2l_mask])), 3))
-            else:
-                hc2l_trial_query.append(0)
-            
-            # Update times (lazy + rebuild)
-            dhl_lazy_all = []
-            hc2l_lazy_all = []
-            for batch in range(self.batches):
-                dhl_lazy_all.extend(self._batch_lazy_times_dhl[trial][batch])
-                hc2l_lazy_all.extend(self._batch_lazy_times_hc2l[trial][batch])
-            
-            dhl_trial_update.append(round(float(np.mean(dhl_lazy_all)), 3) if dhl_lazy_all else 0)
-            hc2l_trial_update.append(round(float(np.mean(hc2l_lazy_all)), 3) if hc2l_lazy_all else 0)
-        
-        graph_data["per_trial"] = {
-            "trial_labels": trial_labels,
-            "DHL_query": dhl_trial_query,
-            "HC2L_query": hc2l_trial_query,
-            "DHL_update": dhl_trial_update,
-            "HC2L_update": hc2l_trial_update
-        }
-        
-        # =====================================================================
-        # REBUILD ANALYSIS - Threshold rebuild times and counts
-        # =====================================================================
-        dhl_rebuild_times = []
-        hc2l_rebuild_times = []
-        dhl_rebuild_counts = []
-        hc2l_rebuild_counts = []
-        
-        for trial in range(self.trials):
-            for batch in range(self.batches):
-                dhl_rebuild_times.append(float(self.threshold_rebuild_time_dhl[trial, batch]))
-                hc2l_rebuild_times.append(float(self.threshold_rebuild_time_hc2l[trial, batch]))
-                dhl_rebuild_counts.append(int(self.rebuild_count_dhl[trial, batch]))
-                hc2l_rebuild_counts.append(int(self.rebuild_count_hc2l[trial, batch]))
-        
-        graph_data["rebuild_analysis"] = {
-            "DHL_rebuild_times": [round(t, 3) for t in dhl_rebuild_times],
-            "HC2L_rebuild_times": [round(t, 3) for t in hc2l_rebuild_times],
-            "DHL_rebuild_counts": dhl_rebuild_counts,
-            "HC2L_rebuild_counts": hc2l_rebuild_counts,
-            "total_DHL_rebuilds": sum(dhl_rebuild_counts),
-            "total_HC2L_rebuilds": sum(hc2l_rebuild_counts)
-        }
-        
-        # =====================================================================
-        # LABEL SIZE TREND - How label sizes change over batches
-        # =====================================================================
-        dhl_label_trend = []
-        hc2l_label_trend = []
-        batch_labels = []
-        
-        for trial in range(self.trials):
-            for batch in range(self.batches):
-                batch_labels.append(f"T{trial+1}B{batch+1}")
-                
-                # Average label size for this batch
-                dhl_mask = self.filled_dhl[trial, batch, :]
-                hc2l_mask = self.filled_hc2l[trial, batch, :]
-                
-                if np.any(dhl_mask):
-                    dhl_label_trend.append(round(float(np.mean(self.label_size_dhl[trial, batch, :][dhl_mask])), 3))
-                else:
-                    dhl_label_trend.append(0)
-                
-                if np.any(hc2l_mask):
-                    hc2l_label_trend.append(round(float(np.mean(self.label_size_hc2l[trial, batch, :][hc2l_mask])), 3))
-                else:
-                    hc2l_label_trend.append(0)
-        
-        graph_data["label_size_trend"] = {
-            "batch_labels": batch_labels,
-            "DHL_labels": dhl_label_trend,
-            "HC2L_labels": hc2l_label_trend
-        }
-        
-        return graph_data
-    
-    def get_progress_stats(self) -> Dict:
-        """Get current progress statistics for real-time display"""
-        with self.lock:
-            return {
-                "completed_dhl": int(np.sum(self.filled_dhl)),
-                "completed_hc2l": int(np.sum(self.filled_hc2l)),
-                "latest_query_time_dhl": float(np.max(self.query_time_dhl[self.filled_dhl])) if np.any(self.filled_dhl) else 0,
-                "latest_query_time_hc2l": float(np.max(self.query_time_hc2l[self.filled_hc2l])) if np.any(self.filled_hc2l) else 0
-            }
 
 
 # ============================================================================
@@ -2056,16 +1093,8 @@ class ExperimentRunner:
             self.completion_locks[experiment_id] = threading.Lock()
             self.completed_threads[experiment_id] = set()
             
-            # Initialize metrics collector (numpy-based)
-            trials = config.get("trials", 3)
-            batches = config.get("batches_per_trial", 3)
-            routes_per_batch = config.get("routes_per_batch", 1000)
-            self.metrics_collectors[experiment_id] = ExperimentMetricsCollector(
-                trials=trials,
-                batches=batches,
-                routes_per_batch=routes_per_batch
-            )
-            logger.info(f"Metrics collector initialized for {experiment_id}: {trials}×{batches}×{routes_per_batch}")
+            # Note: Metrics collector will be initialized in _start_experiment_work
+            # after results_path is determined
             
             logger.success(f"Experiment {experiment_id} initialized, waiting for WebSocket connection")
             
@@ -2142,6 +1171,18 @@ class ExperimentRunner:
             
             # Store results_path in progress for later access
             progress.results_path = results_path
+            
+            # Initialize metrics collector with results_path
+            trials = config.get("trials", 3)
+            batches = config.get("batches_per_trial", 3)
+            routes_per_batch = config.get("routes_per_batch", 1000)
+            self.metrics_collectors[experiment_id] = ExperimentMetricsCollector(
+                results_path=results_path,
+                trials=trials,
+                batches=batches,
+                routes_per_batch=routes_per_batch
+            )
+            logger.info(f"Metrics collector initialized for {experiment_id}: {trials}×{batches}×{routes_per_batch} → {results_path}")
             
             # # Save initial progress
             # self._save_progress(experiment_id, results_path)
@@ -2277,49 +1318,43 @@ class ExperimentRunner:
         try:
             results_dir = Path(Config.EXPERIMENT_DATA_DIR) / "preset" / "results"
             
-            # Find the most recent results file for this experiment
-            # (files are named with timestamps, so we search for files and check their content)
-            for result_file in sorted(results_dir.glob("*.json"), reverse=True):
+            # Look for experiment_results.json in the experiment's folder
+            experiment_folder = results_dir / experiment_id
+            result_file = experiment_folder / "experiment_results.json"
+            
+            if result_file.exists():
                 try:
                     with open(result_file, 'r') as f:
                         result_data = json.load(f)
-                        if result_data.get("experiment_id") == experiment_id:
-                            # Found the results file for this experiment
-                            logger.success(f"Loaded results from saved file: {result_file}")
-                            return {
-                                "success": True,
-                                "experiment_id": experiment_id,
-                                "status": "completed",
-                                "total_routes": result_data.get("total_routes", 0),
-                                "completed_routes": result_data.get("completed_routes", 0),
-                                "start_time": result_data.get("start_time", 0),
-                                "end_time": result_data.get("end_time", 0),
-                                "duration_seconds": result_data.get("duration_seconds", 0),
-                                "result": result_data  # Return the full saved results object
-                            }
+                    
+                    # Extract metadata for response structure
+                    metadata = result_data.get("metadata", {})
+                    logger.success(f"Loaded results from saved file: {result_file}")
+                    
+                    return {
+                        "success": True,
+                        "experiment_id": experiment_id,
+                        "status": "completed",
+                        "total_routes": metadata.get("total_routes", 0),
+                        "completed_routes": metadata.get("total_routes", 0),
+                        "start_time": metadata.get("start_time", 0),
+                        "end_time": metadata.get("end_time", 0),
+                        "duration_seconds": metadata.get("duration_seconds", 0),
+                        "result": result_data  # Return the full saved results object with new structure
+                    }
                 except Exception as e:
-                    logger.debug(f"Failed to read result file {result_file}: {e}")
-                    continue
+                    logger.error(f"Failed to read result file {result_file}: {e}")
         except Exception as e:
             logger.debug(f"Error searching for saved results: {e}")
         
         # ========================================================================
-        # Step 2: Compute results from metrics collector (fallback)
+        # Step 2: Return in-progress status (no compute_results - removed)
         # ========================================================================
-        computed_results = {}
-        if experiment_id in self.metrics_collectors:
-            try:
-                computed_results = self.metrics_collectors[experiment_id].compute_results()
-                logger.info(f"Computed results for {experiment_id}: {computed_results.get('summary', {})}")
-            except Exception as e:
-                logger.error(f"Error computing results: {e}")
-                logger.error(traceback.format_exc())
-        
-        # Only return success if we have some results
-        has_results = bool(computed_results) or progress.status == "completed"
+        # For in-progress experiments, just return the current status
+        # Results will only be available after finalize() is called
         
         return {
-            "success": has_results,
+            "success": progress.status == "completed",
             "experiment_id": experiment_id,
             "status": progress.status,
             "total_routes": progress.total_routes,
@@ -2327,8 +1362,8 @@ class ExperimentRunner:
             "start_time": progress.start_time,
             "end_time": progress.end_time,
             "duration_seconds": progress.end_time - progress.start_time if progress.end_time > 0 else 0,
-            "result": computed_results,
-            "error": "Results not ready yet" if not has_results else None
+            "result": {},  # Empty for in-progress, full data when loaded from JSON
+            "error": "Results not ready yet" if progress.status != "completed" else "Results file not found"
         }
     
     def get_metrics_summary(self, experiment_id: str) -> Dict:
@@ -2624,7 +1659,8 @@ class ExperimentRunner:
                         completed += 1
                         consecutive_failures = 0
                     
-                    collector.record_here_comparison(route_idx, comparison_result)
+                    # Record similarity data (batch=0 for baseline comparison, route_idx is the route)
+                    collector.record_similarity(batch=0, route=route_idx, comparison_data=comparison_result)
                     
                     # Adaptive batching: reduce batch size if too many failures
                     if consecutive_failures >= max_consecutive_failures:
@@ -2665,8 +1701,11 @@ class ExperimentRunner:
                     logger.error(f"Error comparing route {route_idx}: {e}")
                     consecutive_failures += 1
                     errors += 1
-                    collector.record_here_comparison(route_idx, {
+                    # Record error case with similarity method
+                    collector.record_similarity(batch=0, route=route_idx, comparison_data={
                         'route_idx': route_idx,
+                        'source_node': 0,
+                        'target_node': 0,
                         'error': str(e)
                     })
             
@@ -2803,9 +1842,9 @@ class ExperimentRunner:
                 metrics = hc2l_result.get('metrics', {})
                 route_info = hc2l_result.get('route', {})
                 
-                result['distance_km_hc2l'] = metrics.get('calculated_distance_km', 0)
-                if not result['distance_km_hc2l'] and metrics.get('calculated_distance_meters'):
-                    result['distance_km_hc2l'] = metrics.get('calculated_distance_meters') / 1000
+                # Get distance in meters and convert to km
+                calculated_dist_m = metrics.get('calculated_distance_meters', 0)
+                result['distance_km_hc2l'] = calculated_dist_m / 1000 if calculated_dist_m else 0
                 
                 # Extract travel time
                 eta_seconds = metrics.get('eta_seconds', 0)
@@ -3063,40 +2102,36 @@ class ExperimentRunner:
                             algorithm, tau_settings, disruption_data, config
                         )
                         
-                        # Record metrics to numpy collector (instead of saving file)
+                        # ============================================================
+                        # RECORD ALL METRICS (includes accuracy-first gating for DHC2L)
+                        # ============================================================
                         if experiment_id in self.metrics_collectors:
                             metrics_collector = self.metrics_collectors[experiment_id]
                             
-                            # Record construction time on first route of each trial/algorithm
-                            construction_info = result.get("construction_info", {})
-                            if construction_info.get("construction_time_ms", 0) > 0:
-                                if algorithm.upper() == "DHL":
-                                    if not metrics_collector.construction_recorded_dhl[trial_idx]:
-                                        metrics_collector.record_construction(
-                                            trial_idx,
-                                            algorithm,
-                                            construction_info.get("construction_time_ms", 0),
-                                            construction_info.get("label_size_mb", 0)
-                                        )
-                                elif algorithm.upper() == "HC2L":
-                                    if not metrics_collector.construction_recorded_hc2l[trial_idx]:
-                                        metrics_collector.record_construction(
-                                            trial_idx,
-                                            algorithm,
-                                            construction_info.get("construction_time_ms", 0),
-                                            construction_info.get("label_size_mb", 0)
-                                        )
-                            
-                            metrics_collector.record_metric(
-                                trial_idx, b_idx, route_idx, algorithm, result
+                            # Record route metrics (handles accuracy, performance, construction all in one)
+                            record = metrics_collector.record_route_metric(
+                                trial=trial_idx,
+                                batch=b_idx,
+                                route=route_idx,
+                                algorithm=algorithm,
+                                api_result=result,
+                                disruption_data=disruption_data
                             )
                             
-                            # Record route path coordinates for Frechet distance calculation
-                            path_coords = result.get("path_coordinates", [])
-                            if path_coords:
-                                metrics_collector.record_route_path(
-                                    trial_idx, b_idx, route_idx, algorithm, path_coords
-                                )
+                            # Log accuracy result for DHC2L routes
+                            if algorithm.upper() == "DHC2L" and record.accuracy:
+                                if not record.accuracy.is_correct:
+                                    logger.warning(
+                                        f"Route [{trial_idx+1},{b_idx+1},{route_idx+1}] DHC2L "
+                                        f"accuracy FAILED: dhc2l={record.accuracy.dhc2l_distance:.1f}m, "
+                                        f"dijkstra={record.accuracy.dijkstra_distance:.1f}m, "
+                                        f"error={record.accuracy.relative_error:.4f} > tolerance={record.accuracy.tolerance}"
+                                    )
+                                else:
+                                    logger.debug(
+                                        f"Route [{trial_idx+1},{b_idx+1},{route_idx+1}] DHC2L "
+                                        f"accuracy OK: error={record.accuracy.relative_error:.4f}"
+                                    )
                         
                         # Update progress
                         completed += 1
@@ -3419,10 +2454,9 @@ class ExperimentRunner:
         lazy_hc2l = api_result.get("lazy_hc2l", {})
         dhl_update_info = api_result.get("dhl_update_info", {})
         
-        # Calculate distance in km
-        distance_km = metrics.get("calculated_distance_km", 0)
-        if not distance_km and metrics.get("calculated_distance_meters"):
-            distance_km = metrics.get("calculated_distance_meters") / 1000
+        # Calculate distance in km from meters
+        calculated_dist_m = metrics.get("calculated_distance_meters", 0)
+        distance_km = calculated_dist_m / 1000 if calculated_dist_m else 0
         
         # Extract ETA information
         eta_seconds = metrics.get("eta_seconds", 0)
@@ -3554,6 +2588,22 @@ class ExperimentRunner:
         
         result["path_coordinates"] = path_coords
         
+        # Store metrics for accuracy computation
+        # Extract distance fields needed by metrics collector
+        result["metrics"] = {
+            "calculated_distance_meters": metrics.get("calculated_distance_meters", 0),
+            "dijkstra_distance_meter": metrics.get("dijkstra_distance_meter", 0),
+            "path_length": metrics.get("path_length", 0),
+            "query_time_ms": metrics.get("query_time_ms", 0),
+            "eta_seconds": metrics.get("eta_seconds", 0),
+            "labeling_info": labeling_info
+        }
+        
+        # Store GPS mapping for source/target nodes
+        result["gps_mapping"] = api_result.get("gps_mapping", {})
+        
+        # Store success flag
+        result["success"] = True
 
         return result
     
@@ -3575,196 +2625,138 @@ class ExperimentRunner:
     
     def _save_final_results(self, experiment_id: str, progress: ExperimentProgress = None) -> Optional[Path]:
         """
-        Save final results to preset/results directory when experiment completes.
+        Save final results using the new metrics collector finalize() method.
+        Exports all CSVs and generates minimal JSON configuration file.
         
-        Reports progress through 10 phases (10% each):
-        1. Collecting metrics (0-10%)
-        2. Computing construction phase (10-20%)
-        3. Computing dynamic updates (20-30%)
-        4. Computing query performance (30-40%)
-        5. Computing route similarity (40-50%)
-        6. Computing similarity extra (50-60%)
-        7. Computing graph data (60-70%)
-        8. Computing summary (70-80%)
-        9. Preparing output data (80-90%)
-        10. Writing to file (90-100%)
+        Reports progress through simplified phases:
+        1. Exporting CSV files (0-60%)
+        2. Generating JSON results (60-90%)
+        3. Finalizing (90-100%)
         
         Returns:
-            Path to the saved results file if successful, None otherwise.
+            Path to the saved results folder if successful, None otherwise.
         """
         try:
             logger.info(f"Starting to save final results for {experiment_id}...")
             
             if experiment_id not in self.experiments:
                 logger.warning(f"Experiment {experiment_id} not found in experiments dict")
-                return
+                return None
             
             if progress is None:
                 progress = self.experiments[experiment_id]
             
-            # ============================================================================
-            # Phase 1: Collecting metrics (0-10%)
-            # ============================================================================
-            progress.finalization_phase = "Phase 1/10: Collecting metrics..."
-            progress.finalization_percentage = 0.0
-            progress.overall_percentage = 90.0 + (progress.finalization_percentage * 0.1)
-            self._broadcast_progress(experiment_id)
-            
             # Get metrics collector
             if experiment_id not in self.metrics_collectors:
                 logger.warning(f"No metrics collector found for {experiment_id}")
-                return
+                return None
             
             collector = self.metrics_collectors[experiment_id]
             logger.info(f"Metrics collector ready with {collector.trials} trials, {collector.batches} batches")
             
             # ============================================================================
-            # Phase 2: Computing construction phase (10-20%)
+            # Phase 1: Exporting CSV files (0-60%)
             # ============================================================================
-            progress.finalization_phase = "Phase 2/10: Computing construction phase..."
-            progress.finalization_percentage = 1.0
-            progress.overall_percentage = 90.0 + (progress.finalization_percentage * 0.1)
+            progress.finalization_phase = "Phase 1/3: Exporting CSV files..."
+            progress.finalization_percentage = 0.0
+            progress.overall_percentage = 90.0
             self._broadcast_progress(experiment_id)
             
-            construction_phase = collector._compute_construction_phase()
-            logger.info(f"✓ Construction phase computed: {len(construction_phase)} rows")
+            logger.info("Exporting all CSV files...")
+            
+            # Export each CSV file individually with progress updates
+            csv_files = {}
+            csv_exports = [
+                ("summary", "summary_results.csv", 10),
+                ("accuracy", "accuracy_results.csv", 20),
+                ("construction", "construction_results.csv", 30),
+                ("updates", "updates_results.csv", 40),
+                ("performance", "performance_results.csv", 50),
+                ("similarity", "similarity_results.csv", 60)
+            ]
+            
+            for csv_name, csv_filename, percent in csv_exports:
+                progress.finalization_phase = f"Phase 1/3: Exporting {csv_filename}..."
+                progress.finalization_percentage = percent / 10.0  # Scale to 0-10%
+                progress.overall_percentage = 90.0 + (progress.finalization_percentage * 0.6)  # 0-60% of 10%
+                self._broadcast_progress(experiment_id)
+                
+                if csv_name == "summary":
+                    csv_files[csv_name] = collector.export_summary_csv()
+                elif csv_name == "accuracy":
+                    csv_files[csv_name] = collector.export_accuracy_csv()
+                elif csv_name == "construction":
+                    csv_files[csv_name] = collector.export_construction_csv()
+                elif csv_name == "updates":
+                    csv_files[csv_name] = collector.export_updates_csv()
+                elif csv_name == "performance":
+                    csv_files[csv_name] = collector.export_performance_csv()
+                elif csv_name == "similarity":
+                    csv_files[csv_name] = collector.export_similarity_csv()
+                
+                logger.info(f"✓ Exported {csv_filename}")
             
             # ============================================================================
-            # Phase 3: Computing dynamic updates (20-30%)
+            # Phase 2: Generating JSON results (60-90%)
             # ============================================================================
-            progress.finalization_phase = "Phase 3/10: Computing dynamic updates..."
-            progress.finalization_percentage = 2.0
-            progress.overall_percentage = 90.0 + (progress.finalization_percentage * 0.1)
-            self._broadcast_progress(experiment_id)
-            
-            dynamic_updates = collector._compute_dynamic_updates()
-            logger.info(f"✓ Dynamic updates computed: {len(dynamic_updates)} rows")
-            
-            # ============================================================================
-            # Phase 4: Computing query performance (30-40%)
-            # ============================================================================
-            progress.finalization_phase = "Phase 4/10: Computing query performance..."
-            progress.finalization_percentage = 3.0
-            progress.overall_percentage = 90.0 + (progress.finalization_percentage * 0.1)
-            self._broadcast_progress(experiment_id)
-            
-            query_performance = collector._compute_query_performance()
-            logger.info(f"✓ Query performance computed: {len(query_performance)} metrics")
-            
-            # ============================================================================
-            # Phase 5: Computing route similarity (40-50%)
-            # ============================================================================
-            progress.finalization_phase = "Phase 5/10: Computing route similarity..."
-            progress.finalization_percentage = 4.0
-            progress.overall_percentage = 90.0 + (progress.finalization_percentage * 0.1)
-            self._broadcast_progress(experiment_id)
-            
-            route_similarity = collector._compute_route_similarity()
-            logger.info(f"✓ Route similarity computed: {len(route_similarity)} routes")
-            
-            # ============================================================================
-            # Phase 6: Computing similarity extra (50-60%)
-            # ============================================================================
-            progress.finalization_phase = "Phase 6/10: Computing additional similarity metrics..."
-            progress.finalization_percentage = 5.0
-            progress.overall_percentage = 90.0 + (progress.finalization_percentage * 0.1)
-            self._broadcast_progress(experiment_id)
-            
-            similarity_extra = collector._compute_similarity_extra()
-            logger.info(f"✓ Similarity extra computed: {len(similarity_extra)} metrics")
-            
-            # ============================================================================
-            # Phase 7: Computing graph data (60-70%)
-            # ============================================================================
-            progress.finalization_phase = "Phase 7/10: Computing visualization graphs..."
+            progress.finalization_phase = "Phase 2/3: Generating JSON results..."
             progress.finalization_percentage = 6.0
-            progress.overall_percentage = 90.0 + (progress.finalization_percentage * 0.1)
+            progress.overall_percentage = 90.0 + (progress.finalization_percentage * 0.1)  # 60% of 10%
             self._broadcast_progress(experiment_id)
             
-            graph_data = collector._compute_graph_data()
-            logger.info(f"✓ Graph data computed: {len(graph_data)} datasets")
-            
-            # ============================================================================
-            # Phase 8: Computing summary (70-80%)
-            # ============================================================================
-            progress.finalization_phase = "Phase 8/10: Computing summary statistics..."
-            progress.finalization_percentage = 7.0
-            progress.overall_percentage = 90.0 + (progress.finalization_percentage * 0.1)
-            self._broadcast_progress(experiment_id)
-            
-            summary = collector._compute_summary()
-            logger.info(f"✓ Summary computed: {summary['completion_pct']}% complete")
-            
-            # ============================================================================
-            # Phase 9: Preparing output data (80-90%)
-            # ============================================================================
-            progress.finalization_phase = "Phase 9/10: Preparing output data..."
-            progress.finalization_percentage = 8.0
-            progress.overall_percentage = 90.0 + (progress.finalization_percentage * 0.1)
-            self._broadcast_progress(experiment_id)
-            
-            results = {
-                "total_trials": collector.trials,
-                "total_batches": collector.batches,
-                "construction_phase": construction_phase,
-                "dynamic_updates": dynamic_updates,
-                "query_performance": query_performance,
-                "route_similarity": route_similarity,
-                "similarity_extra": similarity_extra,
-                "graph_data": graph_data,
-                "summary": summary
+            # Prepare experiment configuration for JSON
+            experiment_config = {
+                "experiment_id": experiment_id,
+                "experiment_name": progress.experiment_name,
+                "trials": collector.trials,
+                "batches": collector.batches,
+                "routes_per_batch": collector.routes_per_batch,
+                "start_time": progress.start_time,
+                "end_time": progress.end_time,
+                "duration_seconds": progress.end_time - progress.start_time if progress.end_time > 0 else 0,
+                "thread_count": progress.thread_count
             }
             
-            # Add experiment metadata
-            results["experiment_id"] = experiment_id
-            results["timestamp"] = datetime.now().isoformat()
-            results["start_time"] = progress.start_time if progress.start_time else time.time()
-            results["end_time"] = progress.end_time if progress.end_time else time.time()
-            results["duration_seconds"] = (progress.end_time - progress.start_time) if (progress.end_time and progress.start_time) else 0
-            results["status"] = progress.status
-            results["total_routes"] = progress.total_routes
-            results["completed_routes"] = progress.completed_routes
-            
-            logger.info(f"Assembled results structure with {len(results)} top-level keys")
+            logger.info("Generating JSON results file...")
+            json_path = collector.generate_results_json(experiment_config)
+            logger.info(f"✓ Generated JSON results: {json_path}")
             
             # ============================================================================
-            # Phase 10: Writing to file (90-100%)
+            # Phase 3: Finalizing (90-100%)
             # ============================================================================
-            progress.finalization_phase = "Phase 10/10: Writing results to disk..."
+            progress.finalization_phase = "Phase 3/3: Finalizing..."
             progress.finalization_percentage = 9.0
-            progress.overall_percentage = 90.0 + (progress.finalization_percentage * 0.1)
+            progress.overall_percentage = 90.0 + (progress.finalization_percentage * 0.1)  # 90% of 10%
             self._broadcast_progress(experiment_id)
             
-            # Save to preset/results directory
-            results_dir = Path(Config.EXPERIMENT_DATA_DIR) / "preset" / "results"
-            results_dir.mkdir(parents=True, exist_ok=True)
-            
-            # Generate filename with timestamp
-            timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-            result_file = results_dir / f"experiment_{timestamp_str}.json"
-            
-            logger.info(f"Writing {len(json.dumps(results))} bytes to {result_file}...")
-            with open(result_file, 'w') as f:
-                json.dump(results, f, indent=2)
-            
-            # Verify file was written successfully
-            if not result_file.exists():
-                logger.error(f"Result file does not exist after write: {result_file}")
+            # Verify all files were created
+            results_folder = collector.results_path
+            if not results_folder.exists():
+                logger.error(f"Results folder does not exist: {results_folder}")
                 return None
             
-            # Verify file is readable by attempting to load it
+            # Verify JSON file exists and is readable
+            if not json_path.exists():
+                logger.error(f"JSON results file does not exist: {json_path}")
+                return None
+            
             try:
-                with open(result_file, 'r') as f:
+                with open(json_path, 'r') as f:
                     test_data = json.load(f)
-                    if not test_data.get("experiment_id"):
-                        logger.error(f"Result file is invalid or incomplete: {result_file}")
+                    if not test_data.get("metadata"):
+                        logger.error(f"JSON results file is invalid or incomplete: {json_path}")
                         return None
             except Exception as verify_error:
-                logger.error(f"Failed to verify result file: {verify_error}")
+                logger.error(f"Failed to verify JSON results file: {verify_error}")
                 return None
             
-            logger.success(f"✓ Saved and verified final results to {result_file}")
-            return result_file
+            # Log summary
+            logger.success(f"✓ Saved final results to {results_folder}")
+            logger.success(f"  - JSON: {json_path.name}")
+            for csv_name, csv_path in csv_files.items():
+                logger.success(f"  - CSV ({csv_name}): {csv_path.name}")
+            
+            return json_path
             
         except Exception as e:
             logger.error(f"Failed to save final results for {experiment_id}: {e}")
@@ -4170,7 +3162,7 @@ def cleanup_temporary():
 
 @experiment_bp.route('/results/list', methods=['GET'])
 def list_saved_results():
-    """List all saved experiment results"""
+    """List all saved experiment results from new folder structure"""
     if not experiment_runner:
         return jsonify({"success": False, "error": "Experiment runner not initialized"}), 500
     
@@ -4179,23 +3171,39 @@ def list_saved_results():
         results_dir.mkdir(parents=True, exist_ok=True)
         
         results_list = []
-        for result_file in results_dir.glob("*.json"):
+        
+        # NEW: Iterate through experiment folders (e.g., exp_1767755097_234648b9/)
+        for exp_folder in results_dir.iterdir():
+            if not exp_folder.is_dir():
+                continue
+                
+            # Look for experiment_results.json inside each folder
+            result_file = exp_folder / "experiment_results.json"
+            
+            if not result_file.exists():
+                continue
+                
             try:
                 with open(result_file, 'r') as f:
                     result_data = json.load(f)
                     
-                    # Extract summary info
-                    summary = result_data.get("summary", {})
-                    
-                    results_list.append({
-                        "id": result_file.stem,
-                        "filename": result_file.name,
-                        "timestamp": result_file.stat().st_mtime,
-                        "trials": summary.get("total_trials", 0),
-                        "batches": summary.get("total_batches", 0),
-                        "routes_per_batch": summary.get("routes_per_batch", 0),
-                        "completed": summary.get("completion_pct", 0)
-                    })
+                # Extract metadata and summary info from NEW JSON structure
+                metadata = result_data.get("metadata", {})
+                summary = result_data.get("summary", {})
+                config = result_data.get("configuration", {})
+                
+                results_list.append({
+                    "id": exp_folder.name,  # Use folder name as ID (e.g., exp_1767755097_234648b9)
+                    "filename": result_file.name,
+                    "timestamp": metadata.get("end_time", result_file.stat().st_mtime),
+                    "date": metadata.get("end_time_iso", ""),
+                    "trials": config.get("trials", 0),
+                    "batches": config.get("batches_per_trial", 0),
+                    "routes_per_batch": config.get("routes_per_batch", 0),
+                    "total_routes": metadata.get("total_routes", 0),
+                    "duration_seconds": metadata.get("duration_seconds", 0),
+                    "completed": 100.0  # All saved results are completed
+                })
             except Exception as e:
                 logger.error(f"Error reading result file {result_file}: {e}")
                 continue
@@ -4215,16 +3223,19 @@ def list_saved_results():
 
 @experiment_bp.route('/results/<result_id>', methods=['GET'])
 def get_saved_result(result_id):
-    """Get a specific saved experiment result"""
+    """Get a specific saved experiment result from new folder structure"""
     if not experiment_runner:
         return jsonify({"success": False, "error": "Experiment runner not initialized"}), 500
     
     try:
         results_dir = Path(Config.EXPERIMENT_DATA_DIR) / "preset" / "results"
-        result_file = results_dir / f"{result_id}.json"
+        
+        # NEW: Look for experiment_results.json inside the experiment folder
+        exp_folder = results_dir / result_id
+        result_file = exp_folder / "experiment_results.json"
         
         if not result_file.exists():
-            return jsonify({"success": False, "error": "Result not found"}), 404
+            return jsonify({"success": False, "error": f"Result not found: {result_file}"}), 404
         
         with open(result_file, 'r') as f:
             result_data = json.load(f)
@@ -4238,24 +3249,180 @@ def get_saved_result(result_id):
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@experiment_bp.route('/results/<result_id>/csv/<csv_type>', methods=['GET'])
+def download_result_csv(result_id, csv_type):
+    """
+    Download a specific CSV file from saved experiment results.
+    
+    Args:
+        result_id: Result folder name (timestamp-based)
+        csv_type: One of 'summary', 'accuracy', 'construction', 'updates', 'performance', 'similarity'
+    
+    Returns:
+        CSV file download or error
+    """
+    if not experiment_runner:
+        return jsonify({"success": False, "error": "Experiment runner not initialized"}), 500
+    
+    # Map CSV types to filenames
+    csv_files = {
+        'summary': 'summary_results.csv',
+        'accuracy': 'accuracy_results.csv',
+        'construction': 'construction_results.csv',
+        'updates': 'updates_results.csv',
+        'performance': 'performance_results.csv',
+        'similarity': 'similarity_results.csv'
+    }
+    
+    if csv_type not in csv_files:
+        return jsonify({"success": False, "error": f"Invalid CSV type: {csv_type}"}), 400
+    
+    try:
+        results_dir = Path(Config.EXPERIMENT_DATA_DIR) / "preset" / "results"
+        
+        # Try direct result_id as folder name first
+        csv_path = results_dir / result_id / csv_files[csv_type]
+        
+        # If not found, try with .json extension (result_id might be JSON filename)
+        if not csv_path.exists():
+            # Extract timestamp from result_id if it has .json extension
+            result_folder = result_id.replace('.json', '').replace('experiment_', '')
+            csv_path = results_dir / result_folder / csv_files[csv_type]
+        
+        if not csv_path.exists():
+            return jsonify({"success": False, "error": f"CSV file not found: {csv_files[csv_type]}"}), 404
+        
+        return send_file(
+            csv_path,
+            mimetype='text/csv',
+            as_attachment=True,
+            download_name=f"{result_id}_{csv_files[csv_type]}"
+        )
+    except Exception as e:
+        logger.error(f"Error downloading CSV {csv_type} for result {result_id}: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@experiment_bp.route('/results/<result_id>/csv/<csv_type>/data', methods=['GET'])
+def get_result_csv_data(result_id, csv_type):
+    """
+    Get CSV data as JSON for displaying in tables.
+    Supports pagination for large datasets.
+    
+    Args:
+        result_id: Result folder name
+        csv_type: One of 'summary', 'accuracy', 'construction', 'updates', 'performance', 'similarity'
+    
+    Query params:
+        page: Page number (1-indexed, default 1)
+        limit: Records per page (default 50, max 500)
+        filter_trial: Filter by trial_id
+        filter_batch: Filter by batch_id
+        filter_algorithm: Filter by algorithm
+    
+    Returns:
+        JSON with headers, data rows, and pagination info
+    """
+    import csv as csv_module
+    
+    if not experiment_runner:
+        return jsonify({"success": False, "error": "Experiment runner not initialized"}), 500
+    
+    # Map CSV types to filenames
+    csv_files = {
+        'summary': 'summary_results.csv',
+        'accuracy': 'accuracy_results.csv',
+        'construction': 'construction_results.csv',
+        'updates': 'updates_results.csv',
+        'performance': 'performance_results.csv',
+        'similarity': 'similarity_results.csv'
+    }
+    
+    if csv_type not in csv_files:
+        return jsonify({"success": False, "error": f"Invalid CSV type: {csv_type}"}), 400
+    
+    try:
+        results_dir = Path(Config.EXPERIMENT_DATA_DIR) / "preset" / "results"
+        csv_path = results_dir / result_id / csv_files[csv_type]
+        
+        if not csv_path.exists():
+            return jsonify({"success": False, "error": f"CSV file not found: {csv_files[csv_type]}"}), 404
+        
+        # Parse query parameters
+        page = max(1, int(request.args.get('page', 1)))
+        limit = min(500, max(1, int(request.args.get('limit', 50))))
+        filter_trial = request.args.get('filter_trial')
+        filter_batch = request.args.get('filter_batch')
+        filter_algorithm = request.args.get('filter_algorithm')
+        
+        # Read CSV file
+        all_rows = []
+        headers = []
+        with open(csv_path, 'r', newline='') as f:
+            reader = csv_module.DictReader(f)
+            headers = reader.fieldnames or []
+            for row in reader:
+                # Apply filters if specified
+                if filter_trial and str(row.get('trial_id', '')) != filter_trial:
+                    continue
+                if filter_batch and str(row.get('batch_id', '')) != filter_batch:
+                    continue
+                if filter_algorithm and row.get('algorithm', '').upper() != filter_algorithm.upper():
+                    continue
+                all_rows.append(row)
+        
+        # Calculate pagination
+        total_rows = len(all_rows)
+        total_pages = max(1, (total_rows + limit - 1) // limit)
+        start_idx = (page - 1) * limit
+        end_idx = min(start_idx + limit, total_rows)
+        
+        # Get page data
+        page_data = all_rows[start_idx:end_idx]
+        
+        return jsonify({
+            "success": True,
+            "csv_type": csv_type,
+            "headers": headers,
+            "data": page_data,
+            "pagination": {
+                "page": page,
+                "limit": limit,
+                "total_rows": total_rows,
+                "total_pages": total_pages,
+                "has_next": page < total_pages,
+                "has_prev": page > 1
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting CSV data {csv_type} for result {result_id}: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @experiment_bp.route('/results/<result_id>', methods=['DELETE'])
 def delete_saved_result(result_id):
-    """Delete a saved experiment result"""
+    """Delete a saved experiment result folder and all its contents"""
     if not experiment_runner:
         return jsonify({"success": False, "error": "Experiment runner not initialized"}), 500
     
     try:
         results_dir = Path(Config.EXPERIMENT_DATA_DIR) / "preset" / "results"
-        result_file = results_dir / f"{result_id}.json"
         
-        if not result_file.exists():
-            return jsonify({"success": False, "error": "Result not found"}), 404
+        # NEW: Delete the entire experiment folder (includes JSON + all 6 CSVs)
+        exp_folder = results_dir / result_id
         
-        result_file.unlink()
+        if not exp_folder.exists():
+            return jsonify({"success": False, "error": f"Result folder not found: {result_id}"}), 404
+        
+        # Delete folder and all contents recursively (shutil already imported at top)
+        shutil.rmtree(exp_folder)
+        
+        logger.info(f"Deleted experiment result folder: {exp_folder}")
         
         return jsonify({
             "success": True,
-            "message": "Result deleted successfully"
+            "message": f"Result {result_id} deleted successfully (JSON + 6 CSVs)"
         })
     except Exception as e:
         logger.error(f"Error deleting saved result {result_id}: {e}")

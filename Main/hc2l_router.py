@@ -250,9 +250,11 @@ class HC2LRouter:
                 # Debug: Print the metrics received from C++ API
                 if route_data.get('success', False):
                     metrics = route_data.get('metrics', {})
+                    calculated_dist_m = metrics.get('calculated_distance_meters', 0)
+                    calculated_dist_km = calculated_dist_m / 1000 if calculated_dist_m else 0
                     logger.data(f"Received metrics from C++ API:")
                     logger.info(f"Query time: {metrics.get('query_time_ms', 'N/A')} ms")
-                    logger.info(f"Distance: {metrics.get('calculated_distance_km', 'N/A')} km")
+                    logger.info(f"Distance: {calculated_dist_km:.2f} km")
                     logger.info(f"ETA: {metrics.get('eta_formatted', 'N/A')}")
                     logger.info(f"Labeling size: {metrics.get('labeling_size_kb', 'N/A')} KB")
                     logger.info(f"Labeling time: {metrics.get('labeling_time_ms', 'N/A')} s")
@@ -334,8 +336,10 @@ class HC2LRouter:
                 if path_nodes and self.geometry_loader:
                     path_summary = self.geometry_loader.get_path_summary(path_nodes)
                 else:
+                    metrics = route_data.get('metrics', {})
+                    calculated_dist_m = metrics.get('calculated_distance_meters', 0)
                     path_summary = {
-                        'total_distance_m': route_data.get('metrics', {}).get('total_distance_units', 0),
+                        'total_distance_m': calculated_dist_m,
                         'num_segments': len(api_geometry),
                         'num_nodes': len(path_nodes) if path_nodes else 0
                     }

@@ -452,15 +452,11 @@ function buildComparisonTable() {
                 // Handle different metric structures for different algorithms
                 if (metric.key === 'distance') {
                     // Google Maps: result.route.distance
-                    // DHL/HC2L: result.metrics.calculated_distance_km (preferred) or total_distance_meters
+                    // DHL/HC2L: result.metrics.calculated_distance_meters (convert to km)
                     if (result.route?.distance) {
                         rawValue = result.route.distance;
-                    } else if (result.metrics?.calculated_distance_km) {
-                        rawValue = result.metrics.calculated_distance_km; // Already in km
-                    } else if (result.metrics?.total_distance_meters) {
-                        rawValue = result.metrics.total_distance_meters / 1000; // Convert meters to km
-                    } else if (result.metrics?.total_distance_units) {
-                        rawValue = result.metrics.total_distance_units / 1000; // Convert to km
+                    } else if (result.metrics?.calculated_distance_meters) {
+                        rawValue = result.metrics.calculated_distance_meters / 1000; // Convert meters to km
                     }
                 } else if (metric.key === 'duration') {
                     // Google Maps: result.route.duration (seconds)
@@ -611,12 +607,8 @@ function displayComparisonRoutesOnMap() {
         // Extract distance
         if (route.distance) {
             distance = route.distance;
-        } else if (result.metrics?.calculated_distance_km) {
-            distance = result.metrics.calculated_distance_km; // Already in km
-        } else if (result.metrics?.total_distance_meters) {
-            distance = result.metrics.total_distance_meters / 1000; // Convert to km
-        } else if (result.metrics?.total_distance_units) {
-            distance = result.metrics.total_distance_units / 1000; // Convert to km
+        } else if (result.metrics?.calculated_distance_meters) {
+            distance = result.metrics.calculated_distance_meters / 1000; // Convert meters to km
         }
 
         // Extract duration
@@ -680,9 +672,7 @@ function buildRouteDetails() {
                         <span class="text-slate-600">Total Distance:</span>
                         <span class="font-bold">${(() => {
                 if (result.route?.distance) return result.route.distance.toFixed(2);
-                if (result.metrics?.calculated_distance_km) return result.metrics.calculated_distance_km.toFixed(2);
-                if (result.metrics?.total_distance_meters) return (result.metrics.total_distance_meters / 1000).toFixed(2);
-                if (result.metrics?.total_distance_units) return (result.metrics.total_distance_units / 1000).toFixed(2);
+                if (result.metrics?.calculated_distance_meters) return (result.metrics.calculated_distance_meters / 1000).toFixed(2);
                 return '0.00';
             })()
             } km</span>

@@ -1551,23 +1551,56 @@ const ExperimentRunner = {
     },
     
     populateResultsDashboard(data) {
-        // Update summary cards
-        this.updateResultsSummary(data);
+        // New format: data contains metadata, configuration, summary, accuracy_stats, 
+        // performance_stats, and graph_data. CSV files are separate.
         
-        // Populate each tab
-        this.populateConstructionPhase(data.construction_phase || []);
-        this.populateDynamicUpdates(data.dynamic_updates || []);
-        this.populateQueryPerformance(data.query_performance || []);
-        this.populateRouteSimilarity(data.route_similarity || []);
+        // Extract from new format
+        const config = data.configuration || {};
+        const summary = data.summary || {};
+        const accuracyStats = data.accuracy_stats || {};
+        const performanceStats = data.performance_stats || {};
+        const graphData = data.graph_data || {};
         
-        // Populate additional similarity metrics
-        this.populateSimilarityExtra(data.similarity_extra || {});
+        // Update summary cards with new format
+        this.updateResultsSummary({
+            total_trials: config.trials || summary.total_trials || 3,
+            total_batches: config.batches || summary.total_batches || 3,
+            routes_per_batch: config.routes_per_batch || summary.routes_per_batch || 1000,
+            summary: {
+                avg_memory_dhl_mb: performanceStats.dhl?.avg_label_size_mb || 0,
+                avg_memory_hc2l_mb: performanceStats.dhc2l?.avg_label_size_mb || 0
+            }
+        });
         
-        // Populate graphs
-        this.populateGraphs(data.graph_data || {});
+        // Populate tabs with computed data from graph_data and stats
+        // Note: Detailed per-route data is in CSV files, here we show aggregated summaries
+        
+        // Summary tab: Show batch-level aggregates from graph_data
+        this.populateSummaryTabFromGraphData(graphData);
+        
+        // Accuracy tab: Show accuracy statistics
+        this.populateAccuracyTabFromStats(accuracyStats);
+        
+        // Construction tab: Show construction summary
+        this.populateConstructionFromStats(performanceStats);
+        
+        // Updates tab: Show update performance from graph_data
+        this.populateUpdatesFromGraphData(graphData);
+        
+        // Performance tab: Show algorithm comparison
+        this.populatePerformanceComparison(performanceStats);
+        
+        // Similarity tab: Note that detailed data is in CSV
+        this.populateSimilarityPlaceholder();
+        
+        // Populate graphs with graph_data
+        this.populateGraphs(graphData);
         
         // Initialize result tab navigation
         this.initResultTabNavigation();
+        
+        // Initialize tab scroll buttons
+        setTimeout(() => this.updateTabScrollButtons(), 100);
         
         // Refresh icons
         if (typeof lucide !== 'undefined') {
@@ -1618,11 +1651,179 @@ const ExperimentRunner = {
         const radioBtn = document.querySelector(`input[name="result-main-tab"][value="${tabId}"]`);
         if (radioBtn) {
             radioBtn.checked = true;
+            // Scroll the tab into view if needed
+            this.scrollTabIntoView(radioBtn);
         }
         
         // Refresh icons
         if (typeof lucide !== 'undefined') {
             lucide.createIcons();
+        }
+        
+        // Update scroll buttons visibility
+        this.updateTabScrollButtons();
+    },
+    
+    // =========================================================================
+    // SCROLLABLE TABS (Section 7.4-7.6)
+    // =========================================================================
+    
+    scrollResultTabs(direction) {
+        const container = document.getElementById('result-tabs-container');
+        if (!container) return;
+        
+        const scrollAmount = 150; // Pixels to scroll per click
+        
+        if (direction === 'left') {
+            container.scrollBy({ left: -scrollAmount, behavior: 'smooth' });
+        } else if (direction === 'right') {
+            container.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+        }
+        
+        // Update button visibility after scroll
+        setTimeout(() => this.updateTabScrollButtons(), 300);
+    },
+    
+    scrollTabIntoView(tabElement) {
+        const container = document.getElementById('result-tabs-container');
+        if (!container || !tabElement) return;
+        
+        const tabLabel = tabElement.closest('.nav-select__option');
+        if (!tabLabel) return;
+        
+        const containerRect = container.getBoundingClientRect();
+        const tabRect = tabLabel.getBoundingClientRect();
+        
+        // Check if tab is outside visible area
+        if (tabRect.left < containerRect.left) {
+            container.scrollBy({ left: tabRect.left - containerRect.left - 10, behavior: 'smooth' });
+        } else if (tabRect.right > containerRect.right) {
+            container.scrollBy({ left: tabRect.right - containerRect.right + 10, behavior: 'smooth' });
+        }
+        
+        setTimeout(() => this.updateTabScrollButtons(), 300);
+    },
+    
+    updateTabScrollButtons() {
+        const container = document.getElementById('result-tabs-container');
+        const leftBtn = document.getElementById('result-tabs-scroll-left');
+        const rightBtn = document.getElementById('result-tabs-scroll-right');
+        
+        if (!container || !leftBtn || !rightBtn) return;
+        
+        // Check scroll position
+        const canScrollLeft = container.scrollLeft > 10;
+        const canScrollRight = container.scrollLeft < (container.scrollWidth - container.clientWidth - 10);
+        
+        // Show/hide scroll buttons
+        if (canScrollLeft) {
+            leftBtn.classList.remove('hidden');
+        } else {
+            leftBtn.classList.add('hidden');
+        }
+        
+        if (canScrollRight) {
+            rightBtn.classList.remove('hidden');
+        } else {
+            rightBtn.classList.add('hidden');
+        }
+    },
+    
+    // =========================================================================
+    // NEW: Summary Tab Data Population
+    // =========================================================================
+    
+    populateSummaryTab(data) {
+        const tbody = document.getElementById('result-summary-tbody');
+        if (!tbody) return;
+        
+        if (!data || data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-gray-500 py-4">No summary data available</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = data.map(row => `
+            <tr class="hover:bg-gray-50">
+                <td class="p-2 text-gray-700">${row.trial_id || '--'}</td>
+                <td class="p-2 text-gray-700">${row.batch_id || '--'}</td>
+                <td class="p-2">
+                    <span class="px-2 py-1 rounded text-xs font-medium ${
+                        row.disruption_level === 'heavy' ? 'bg-red-100 text-red-700' : 
+                        row.disruption_level === 'medium' ? 'bg-orange-100 text-orange-700' : 
+                        'bg-green-100 text-green-700'
+                    }">
+                        ${row.disruption_level || 'light'}
+                    </span>
+                </td>
+                <td class="p-2 text-right font-mono">${row.num_Accident || row.num_accidents || 0}</td>
+                <td class="p-2 text-right font-mono">${row.num_Road_Closure || row.num_closures || 0}</td>
+                <td class="p-2 text-right font-mono">${row.num_Congestion || row.num_congestion || 0}</td>
+                <td class="p-2 text-right font-mono">${row.num_other || 0}</td>
+                <td class="p-2 text-right font-mono font-bold">${row.num_incidents_total || row.total || 0}</td>
+            </tr>
+        `).join('');
+    },
+    
+    // =========================================================================
+    // NEW: Accuracy Tab Data Population (DHC2L Only)
+    // =========================================================================
+    
+    populateAccuracyTab(data, summary = null) {
+        const tbody = document.getElementById('result-accuracy-tbody');
+        if (!tbody) return;
+        
+        // Update summary cards if available
+        if (summary) {
+            const rateEl = document.getElementById('accuracy-rate-value');
+            const correctEl = document.getElementById('accuracy-correct-value');
+            const errorEl = document.getElementById('accuracy-error-value');
+            
+            if (rateEl) rateEl.textContent = `${summary.accuracy_rate_percent || 0}%`;
+            if (correctEl) correctEl.textContent = `${summary.correct_routes || 0} / ${summary.total_routes || 0}`;
+            if (errorEl) errorEl.textContent = `${(summary.avg_relative_error * 100).toFixed(2) || 0}%`;
+        }
+        
+        if (!data || data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-gray-500 py-4">No accuracy data available</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = data.slice(0, 100).map(row => `
+            <tr class="hover:bg-gray-50 ${row.is_correct ? '' : 'bg-red-50'}">
+                <td class="p-2 text-gray-700">${row.trial_id || '--'}</td>
+                <td class="p-2 text-gray-700">${row.batch_id || '--'}</td>
+                <td class="p-2">
+                    <span class="px-2 py-1 rounded text-xs font-medium ${
+                        row.disruption_level === 'heavy' ? 'bg-red-100 text-red-700' : 
+                        row.disruption_level === 'medium' ? 'bg-orange-100 text-orange-700' : 
+                        'bg-green-100 text-green-700'
+                    }">
+                        ${row.disruption_level || 'light'}
+                    </span>
+                </td>
+                <td class="p-2 text-gray-600 text-xs">${row.source_node || '--'} → ${row.target_node || '--'}</td>
+                <td class="p-2 text-right font-mono text-sm">${this.formatNumber(row.dhc2l_distance, 1)}</td>
+                <td class="p-2 text-right font-mono text-sm">${this.formatNumber(row.dijkstra_distance, 1)}</td>
+                <td class="p-2 text-right font-mono text-sm ${parseFloat(row.relative_error) > 0.05 ? 'text-red-600' : 'text-green-600'}">
+                    ${(parseFloat(row.relative_error) * 100).toFixed(2)}%
+                </td>
+                <td class="p-2 text-center">
+                    ${row.is_correct ? 
+                        '<span class="text-green-600">✓</span>' : 
+                        '<span class="text-red-600">✗</span>'}
+                </td>
+            </tr>
+        `).join('');
+        
+        // Add "showing X of Y" notice if truncated
+        if (data.length > 100) {
+            tbody.innerHTML += `
+                <tr>
+                    <td colspan="8" class="text-center text-gray-500 py-3 bg-gray-50 text-sm">
+                        Showing 100 of ${data.length} rows. Export CSV for full data.
+                    </td>
+                </tr>
+            `;
         }
     },
     
@@ -2115,6 +2316,220 @@ const ExperimentRunner = {
     },
     
     // =========================================================================
+    // NEW FORMAT: Populate tabs from graph_data and stats (not raw CSV data)
+    // =========================================================================
+    
+    populateSummaryTabFromGraphData(graphData) {
+        // Summary tab shows batch-level incident aggregates
+        // For now, show message that data is in CSV
+        const tbody = document.getElementById('result-summary-tbody');
+        if (!tbody) return;
+        
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="8" class="text-center py-8">
+                    <div class="text-gray-600">
+                        <i data-lucide="file-spreadsheet" class="w-12 h-12 mx-auto mb-2 text-gray-400"></i>
+                        <p class="font-semibold mb-2">Detailed per-batch incident data available in CSV</p>
+                        <p class="text-sm text-gray-500 mb-4">Click "Export CSV" above to download the complete summary results</p>
+                        <button onclick="ExperimentRunner.exportTab('summary')" class="btn btn--primary btn--sm">
+                            <i data-lucide="download" class="w-4 h-4"></i> Download Summary CSV
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    },
+    
+    populateAccuracyTabFromStats(accuracyStats) {
+        // Update accuracy summary cards
+        const rateEl = document.getElementById('accuracy-rate-value');
+        const correctEl = document.getElementById('accuracy-correct-value');
+        const errorEl = document.getElementById('accuracy-error-value');
+        
+        if (rateEl) rateEl.textContent = `${(accuracyStats.accuracy_rate * 100).toFixed(1)}%`;
+        if (correctEl) correctEl.textContent = `${accuracyStats.correct_routes || 0} / ${accuracyStats.total_routes || 0}`;
+        if (errorEl) errorEl.textContent = `${(accuracyStats.avg_relative_error * 100).toFixed(2)}%`;
+        
+        // Show per-batch accuracy in table
+        const tbody = document.getElementById('result-accuracy-tbody');
+        if (!tbody) return;
+        
+        if (accuracyStats.per_batch && accuracyStats.per_batch.length > 0) {
+            tbody.innerHTML = accuracyStats.per_batch.map(batch => `
+                <tr class="hover:bg-gray-50">
+                    <td colspan="3" class="p-3 text-gray-700">Batch ${batch.batch_id} (${batch.disruption_level})</td>
+                    <td class="p-3 text-right font-mono">${batch.total_routes}</td>
+                    <td class="p-3 text-right font-mono text-green-600">${batch.correct_routes}</td>
+                    <td class="p-3 text-right font-mono text-red-600">${batch.total_routes - batch.correct_routes}</td>
+                    <td class="p-3 text-right">
+                        <span class="px-2 py-1 rounded text-xs font-bold ${
+                            batch.accuracy_rate >= 0.95 ? 'bg-green-100 text-green-700' : 
+                            batch.accuracy_rate >= 0.90 ? 'bg-yellow-100 text-yellow-700' : 
+                            'bg-red-100 text-red-700'
+                        }">
+                            ${(batch.accuracy_rate * 100).toFixed(1)}%
+                        </span>
+                    </td>
+                    <td class="p-3 text-right font-mono text-gray-600">${(batch.avg_relative_error * 100).toFixed(2)}%</td>
+                </tr>
+            `).join('');
+        } else {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="8" class="text-center py-8">
+                        <div class="text-gray-600">
+                            <i data-lucide="file-spreadsheet" class="w-12 h-12 mx-auto mb-2 text-gray-400"></i>
+                            <p class="font-semibold mb-2">Detailed per-route accuracy data available in CSV</p>
+                            <button onclick="ExperimentRunner.exportTab('accuracy')" class="btn btn--primary btn--sm">
+                                <i data-lucide="download" class="w-4 h-4"></i> Download Accuracy CSV
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }
+    },
+    
+    populateConstructionFromStats(performanceStats) {
+        const tbody = document.getElementById('result-construction-tbody');
+        if (!tbody) return;
+        
+        const dhlStats = performanceStats.dhl || {};
+        const dhc2lStats = performanceStats.dhc2l || {};
+        
+        tbody.innerHTML = `
+            <tr class="hover:bg-gray-50">
+                <td class="p-3 text-gray-700">Average (3 trials)</td>
+                <td class="p-3 text-blue-600 font-medium">DHL</td>
+                <td class="p-3 text-right font-mono">${dhlStats.avg_construction_time_ms?.toFixed(2) || '0.00'}</td>
+                <td class="p-3 text-right font-mono">${dhlStats.avg_initial_label_size_mb?.toFixed(5) || '0.00000'}</td>
+            </tr>
+            <tr class="hover:bg-gray-50 bg-purple-50">
+                <td class="p-3 text-gray-700">Average (3 trials)</td>
+                <td class="p-3 text-purple-600 font-medium">DHC2L</td>
+                <td class="p-3 text-right font-mono">${dhc2lStats.avg_construction_time_ms?.toFixed(2) || '0.00'}</td>
+                <td class="p-3 text-right font-mono">${dhc2lStats.avg_initial_label_size_mb?.toFixed(5) || '0.00000'}</td>
+            </tr>
+            <tr>
+                <td colspan="4" class="text-center py-4 text-sm text-gray-500">
+                    <i data-lucide="info" class="w-4 h-4 inline mr-1"></i>
+                    Per-trial details available in <button onclick="ExperimentRunner.exportTab('construction')" class="text-blue-600 hover:underline">Construction CSV</button>
+                </td>
+            </tr>
+        `;
+    },
+    
+    populateUpdatesFromGraphData(graphData) {
+        const container = document.getElementById('result-updates-container');
+        if (!container) return;
+        
+        container.innerHTML = `
+            <div class="text-center py-8 text-gray-600">
+                <i data-lucide="file-spreadsheet" class="w-12 h-12 mx-auto mb-2 text-gray-400"></i>
+                <p class="font-semibold mb-2">Per-route update performance data available in CSV</p>
+                <p class="text-sm text-gray-500 mb-4">Includes lazy update times, peak label sizes, and rebuild counts</p>
+                <button onclick="ExperimentRunner.exportTab('updates')" class="btn btn--primary btn--sm">
+                    <i data-lucide="download" class="w-4 h-4"></i> Download Updates CSV
+                </button>
+            </div>
+        `;
+    },
+    
+    populatePerformanceComparison(performanceStats) {
+        const tbody = document.getElementById('result-performance-tbody');
+        if (!tbody) return;
+        
+        const dhlStats = performanceStats.dhl || {};
+        const dhc2lStats = performanceStats.dhc2l || {};
+        const improvements = performanceStats.improvements_pct || {};
+        
+        const metrics = [
+            {
+                name: 'Avg Query Time',
+                dhl: dhlStats.avg_query_time_ms?.toFixed(3) || '0',
+                dhc2l: dhc2lStats.avg_query_time_ms?.toFixed(3) || '0',
+                improvement: improvements.avg_query_time_ms || 0
+            },
+            {
+                name: 'Avg Label Size',
+                dhl: dhlStats.avg_label_size_mb?.toFixed(5) || '0',
+                dhc2l: dhc2lStats.avg_label_size_mb?.toFixed(5) || '0',
+                improvement: improvements.avg_label_size_mb || 0
+            },
+            {
+                name: 'Avg Lazy Update Time',
+                dhl: dhlStats.avg_lazy_update_time_ms?.toFixed(3) || '0',
+                dhc2l: dhc2lStats.avg_lazy_update_time_ms?.toFixed(3) || '0',
+                improvement: improvements.avg_lazy_update_time_ms || 0
+            },
+            {
+                name: 'Total Routes',
+                dhl: dhlStats.total_routes || '0',
+                dhc2l: dhc2lStats.total_routes || '0',
+                improvement: null
+            },
+            {
+                name: 'Total Rebuilds',
+                dhl: dhlStats.total_rebuilds || '0',
+                dhc2l: dhc2lStats.total_rebuilds || '0',
+                improvement: null
+            }
+        ];
+        
+        tbody.innerHTML = metrics.map(metric => `
+            <tr class="hover:bg-gray-50">
+                <td class="p-3 text-gray-700 font-medium">${metric.name}</td>
+                <td class="p-3 text-right font-mono text-blue-600">${metric.dhl}</td>
+                <td class="p-3 text-right font-mono text-purple-600">${metric.dhc2l}</td>
+                <td class="p-3 text-right">
+                    ${metric.improvement !== null ? `
+                        <span class="px-2 py-1 rounded text-xs font-bold ${
+                            metric.improvement > 0 ? 'bg-green-100 text-green-700' : 
+                            metric.improvement < 0 ? 'bg-red-100 text-red-700' : 
+                            'bg-gray-100 text-gray-700'
+                        }">
+                            ${metric.improvement > 0 ? '+' : ''}${metric.improvement.toFixed(2)}%
+                        </span>
+                    ` : '<span class="text-gray-400">N/A</span>'}
+                </td>
+            </tr>
+        `).join('');
+        
+        tbody.innerHTML += `
+            <tr>
+                <td colspan="4" class="text-center py-4 text-sm text-gray-500">
+                    <i data-lucide="info" class="w-4 h-4 inline mr-1"></i>
+                    Per-route performance details available in <button onclick="ExperimentRunner.exportTab('performance')" class="text-blue-600 hover:underline">Performance CSV</button>
+                </td>
+            </tr>
+        `;
+    },
+    
+    populateSimilarityPlaceholder() {
+        const tbody = document.getElementById('result-similarity-tbody');
+        if (!tbody) return;
+        
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="11" class="text-center py-12">
+                    <div class="text-gray-600">
+                        <i data-lucide="file-spreadsheet" class="w-16 h-16 mx-auto mb-3 text-gray-400"></i>
+                        <p class="font-semibold text-lg mb-2">HERE vs HC2L Route Comparison Data</p>
+                        <p class="text-sm text-gray-500 mb-4">
+                            Complete route similarity metrics with Fréchet distance, travel time deviations,<br>
+                            and quality ratings are available in the CSV export
+                        </p>
+                        <button onclick="ExperimentRunner.exportTab('similarity')" class="btn btn--primary">
+                            <i data-lucide="download" class="w-4 h-4"></i> Download Similarity CSV
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    },
+    
+    // =========================================================================
     // GRAPH RENDERING
     // =========================================================================
     
@@ -2139,6 +2554,7 @@ const ExperimentRunner = {
         this.renderOverallComparisonChart(graphData.algorithm_comparison);
         this.renderRebuildAnalysisChart(graphData.rebuild_analysis);
         this.renderLabelSizeTrendChart(graphData.label_size_trend);
+        
     },
     
     renderQueryTimeSeriesChart(timeSeriesData) {
@@ -2579,6 +2995,167 @@ const ExperimentRunner = {
         });
     },
     
+    renderJamFactorChart() {
+        const summaryData = this.currentResults?.summary_data;
+        if (!summaryData?.batches) return;
+        
+        const ctx = document.getElementById('chart-jam-factor');
+        if (!ctx) return;
+        
+        const batches = summaryData.batches;
+        const labels = batches.map((_, i) => `Batch ${i + 1}`);
+        const jamFactors = batches.map(b => b.average_jam_factor || 0);
+        
+        this.chartInstances['jam-factor'] = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Average Jam Factor',
+                    data: jamFactors,
+                    backgroundColor: jamFactors.map(jf => {
+                        if (jf >= 8) return 'rgba(220, 38, 38, 0.7)';  // Red - severe
+                        if (jf >= 6) return 'rgba(234, 88, 12, 0.7)'; // Orange - heavy
+                        if (jf >= 4) return 'rgba(234, 179, 8, 0.7)'; // Yellow - moderate
+                        return 'rgba(34, 197, 94, 0.7)';              // Green - light
+                    }),
+                    borderColor: jamFactors.map(jf => {
+                        if (jf >= 8) return '#DC2626';
+                        if (jf >= 6) return '#EA580C';
+                        if (jf >= 4) return '#EAB308';
+                        return '#22C55E';
+                    }),
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Average Jam Factor per Batch'
+                    },
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            afterLabel: (context) => {
+                                const jf = context.parsed.y;
+                                if (jf >= 8) return 'Severity: Severe Traffic';
+                                if (jf >= 6) return 'Severity: Heavy Traffic';
+                                if (jf >= 4) return 'Severity: Moderate Traffic';
+                                return 'Severity: Light Traffic';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 10,
+                        title: {
+                            display: true,
+                            text: 'Jam Factor (0-10)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Batch'
+                        }
+                    }
+                }
+            }
+        });
+    },
+    
+    renderErrorRateChart() {
+        const accuracyData = this.currentResults?.accuracy_data;
+        if (!accuracyData?.batches) return;
+        
+        const ctx = document.getElementById('chart-error-rate');
+        if (!ctx) return;
+        
+        const batches = accuracyData.batches;
+        const labels = batches.map((_, i) => `Batch ${i + 1}`);
+        const errorRates = batches.map(b => (b.error_rate || 0) * 100); // Convert to percentage
+        const tolerance = (accuracyData.tolerance || 0.05) * 100;
+        
+        this.chartInstances['error-rate'] = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Error Rate (%)',
+                        data: errorRates,
+                        borderColor: '#EF4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 5,
+                        pointHoverRadius: 7
+                    },
+                    {
+                        label: `Tolerance Threshold (${tolerance}%)`,
+                        data: labels.map(() => tolerance),
+                        borderColor: '#6B7280',
+                        backgroundColor: 'transparent',
+                        borderDash: [5, 5],
+                        fill: false,
+                        pointRadius: 0
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'DHC2L Accuracy Error Rate per Batch'
+                    },
+                    legend: {
+                        position: 'top'
+                    },
+                    annotation: {
+                        annotations: {
+                            threshold: {
+                                type: 'line',
+                                yMin: tolerance,
+                                yMax: tolerance,
+                                borderColor: '#6B7280',
+                                borderWidth: 2,
+                                borderDash: [5, 5],
+                                label: {
+                                    content: `Tolerance: ${tolerance}%`,
+                                    enabled: true
+                                }
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Error Rate (%)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Batch'
+                        }
+                    }
+                }
+            }
+        });
+    },
+    
     formatNumber(value, decimals = 2) {
         if (value === null || value === undefined || isNaN(value)) {
             return '--';
@@ -2633,79 +3210,91 @@ const ExperimentRunner = {
     },
     
     exportTab(tabName) {
-        if (!this.resultsData) {
-            this.showNotification('No results data available', 'warning');
+        if (!this.currentResultId) {
+            this.showNotification('No result selected', 'warning');
             return;
         }
         
-        let data;
-        let filename;
+        // Direct CSV download from backend (per-route data)
+        const csvTypes = ['summary', 'accuracy', 'construction', 'updates', 'performance', 'similarity'];
         
-        switch (tabName) {
-            case 'construction':
-                data = this.resultsData.construction_phase || [];
-                filename = `appendix_1_1_construction_phase_${this.currentExperimentId}.csv`;
-                break;
-            case 'updates':
-                data = this.resultsData.dynamic_updates || [];
-                filename = `appendix_1_2_dynamic_updates_${this.currentExperimentId}.csv`;
-                break;
-            case 'performance':
-                data = this.resultsData.query_performance || [];
-                filename = `appendix_1_3_query_performance_${this.currentExperimentId}.csv`;
-                break;
-            case 'similarity':
-                data = this.resultsData.route_similarity || [];
-                filename = `appendix_1_4_route_similarity_${this.currentExperimentId}.csv`;
-                break;
-            default:
-                this.showNotification('Unknown tab', 'error');
-                return;
+        if (csvTypes.includes(tabName)) {
+            // Direct download per-route CSV from backend
+            const downloadUrl = `/api/experiment/results/${this.currentResultId}/csv/${tabName}`;
+            
+            // Create hidden link and trigger download
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            this.showNotification(`Downloading ${tabName} CSV...`, 'success');
+        } else {
+            this.showNotification('Unknown tab', 'error');
         }
-        
-        if (!data || data.length === 0) {
-            this.showNotification('No data available for this tab', 'warning');
+    },
+    
+    exportAggregatedTable(tableId, filename) {
+        /**
+         * Export aggregated summary tables displayed in frontend.
+         * These are NOT the per-route CSVs, but computed summary tables.
+         * 
+         * @param {string} tableId - ID of the HTML table to export
+         * @param {string} filename - Filename for the CSV
+         */
+        const table = document.getElementById(tableId);
+        if (!table) {
+            this.showNotification('Table not found', 'error');
             return;
         }
         
-        const csv = this.convertToCSV(data);
+        // Extract table headers
+        const headers = [];
+        const headerCells = table.querySelectorAll('thead th');
+        headerCells.forEach(th => headers.push(th.textContent.trim()));
+        
+        // Extract table rows
+        const rows = [];
+        const bodyRows = table.querySelectorAll('tbody tr');
+        bodyRows.forEach(tr => {
+            const row = [];
+            const cells = tr.querySelectorAll('td');
+            cells.forEach(td => {
+                let value = td.textContent.trim();
+                // Escape quotes and wrap in quotes if contains comma
+                if (value.includes(',') || value.includes('"')) {
+                    value = `"${value.replace(/"/g, '""')}"`;
+                }
+                row.push(value);
+            });
+            if (row.length > 0) {
+                rows.push(row.join(','));
+            }
+        });
+        
+        if (rows.length === 0) {
+            this.showNotification('No data to export', 'warning');
+            return;
+        }
+        
+        const csv = [headers.join(','), ...rows].join('\n');
         this.downloadFile(csv, filename, 'text/csv');
-        this.showNotification(`Exported ${tabName} data to CSV`, 'success');
+        this.showNotification(`Exported ${filename}`, 'success');
     },
     
     exportAllCSV(data) {
-        // Export each section
-        if (data.construction_phase && data.construction_phase.length > 0) {
-            this.downloadFile(
-                this.convertToCSV(data.construction_phase),
-                `appendix_1_1_construction_phase_${this.currentExperimentId}.csv`,
-                'text/csv'
-            );
-        }
+        // Download all 6 per-route CSVs directly from backend
+        const csvTypes = ['summary', 'accuracy', 'construction', 'updates', 'performance', 'similarity'];
         
-        if (data.dynamic_updates && data.dynamic_updates.length > 0) {
-            this.downloadFile(
-                this.convertToCSV(data.dynamic_updates),
-                `appendix_1_2_dynamic_updates_${this.currentExperimentId}.csv`,
-                'text/csv'
-            );
-        }
+        csvTypes.forEach(csvType => {
+            setTimeout(() => {
+                this.exportTab(csvType);
+            }, 100 * csvTypes.indexOf(csvType)); // Stagger downloads
+        });
         
-        if (data.query_performance && data.query_performance.length > 0) {
-            this.downloadFile(
-                this.convertToCSV(data.query_performance),
-                `appendix_1_3_query_performance_${this.currentExperimentId}.csv`,
-                'text/csv'
-            );
-        }
-        
-        if (data.route_similarity && data.route_similarity.length > 0) {
-            this.downloadFile(
-                this.convertToCSV(data.route_similarity),
-                `appendix_1_4_route_similarity_${this.currentExperimentId}.csv`,
-                'text/csv'
-            );
-        }
+        this.showNotification('Downloading all CSV files...', 'success');
     },
     
     convertToCSV(data) {
@@ -2752,6 +3341,329 @@ const ExperimentRunner = {
         } else {
             console.log(`[${type.toUpperCase()}] ${message}`);
         }
+    },
+    
+    // =========================================================================
+    // PER-ROUTE DATA LOADING (Section 6.1-6.4)
+    // =========================================================================
+    
+    /**
+     * Per-route data loading state
+     */
+    perRouteDataState: {
+        summary: { page: 1, loaded: false, loading: false },
+        accuracy: { page: 1, loaded: false, loading: false },
+        construction: { page: 1, loaded: false, loading: false },
+        updates: { page: 1, loaded: false, loading: false },
+        performance: { page: 1, loaded: false, loading: false },
+        similarity: { page: 1, loaded: false, loading: false }
+    },
+    
+    /**
+     * Load per-route data from CSV endpoint
+     * @param {string} csvType - Type of CSV data (summary, accuracy, etc.)
+     * @param {number} page - Page number to load
+     * @param {boolean} append - Whether to append to existing data
+     */
+    async loadPerRouteData(csvType, page = 1, append = false) {
+        if (!this.currentResultId) {
+            console.warn('No result selected');
+            return null;
+        }
+        
+        const state = this.perRouteDataState[csvType];
+        if (state.loading) return null;
+        
+        state.loading = true;
+        
+        try {
+            const url = `/api/experiment/results/${this.currentResultId}/csv/${csvType}/data?page=${page}&limit=50`;
+            const response = await fetch(url);
+            const result = await response.json();
+            
+            if (!result.success) {
+                console.error(`Failed to load ${csvType} data:`, result.error);
+                return null;
+            }
+            
+            state.page = page;
+            state.loaded = true;
+            
+            return result;
+        } catch (error) {
+            console.error(`Error loading ${csvType} data:`, error);
+            return null;
+        } finally {
+            state.loading = false;
+        }
+    },
+    
+    /**
+     * Toggle per-route data table visibility
+     * @param {string} csvType - Type of CSV data
+     */
+    async togglePerRouteTable(csvType) {
+        const containerId = `${csvType}-per-route-container`;
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        
+        const isVisible = !container.classList.contains('hidden');
+        
+        if (isVisible) {
+            container.classList.add('hidden');
+        } else {
+            container.classList.remove('hidden');
+            
+            // Load data if not already loaded
+            if (!this.perRouteDataState[csvType].loaded) {
+                await this.loadAndRenderPerRouteTable(csvType);
+            }
+        }
+    },
+    
+    /**
+     * Load and render per-route table
+     * @param {string} csvType - Type of CSV data
+     */
+    async loadAndRenderPerRouteTable(csvType) {
+        const tbodyId = `${csvType}-per-route-tbody`;
+        const tbody = document.getElementById(tbodyId);
+        if (!tbody) return;
+        
+        // Show loading
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="12" class="text-center py-6">
+                    <div class="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-2"></div>
+                    <p class="text-gray-500 text-sm">Loading per-route data...</p>
+                </td>
+            </tr>
+        `;
+        
+        const result = await this.loadPerRouteData(csvType, 1);
+        
+        if (!result || !result.data || result.data.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="12" class="text-center py-6 text-gray-500">
+                        No per-route data available
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+        
+        // Render table rows based on CSV type
+        this.renderPerRouteRows(csvType, tbody, result.data, result.headers);
+        
+        // Add pagination controls
+        this.renderPaginationControls(csvType, result.pagination);
+    },
+    
+    /**
+     * Render per-route table rows
+     * @param {string} csvType - Type of CSV
+     * @param {HTMLElement} tbody - Table body element
+     * @param {Array} data - Row data
+     * @param {Array} headers - Column headers
+     */
+    renderPerRouteRows(csvType, tbody, data, headers) {
+        switch (csvType) {
+            case 'accuracy':
+                tbody.innerHTML = data.map(row => `
+                    <tr class="hover:bg-gray-50 text-xs">
+                        <td class="p-2">${row.trial_id || ''}</td>
+                        <td class="p-2">${row.batch_id || ''}</td>
+                        <td class="p-2">${row.disruption_level || ''}</td>
+                        <td class="p-2 font-mono">${row.source_node || ''} → ${row.target_node || ''}</td>
+                        <td class="p-2 text-right font-mono">${parseFloat(row.dhc2l_distance || 0).toFixed(1)}</td>
+                        <td class="p-2 text-right font-mono">${parseFloat(row.dijkstra_distance || 0).toFixed(1)}</td>
+                        <td class="p-2 text-right font-mono">${(parseFloat(row.relative_error || 0) * 100).toFixed(2)}%</td>
+                        <td class="p-2 text-center">
+                            <span class="px-2 py-0.5 rounded text-xs ${row.is_correct === 'True' || row.is_correct === true ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">
+                                ${row.is_correct === 'True' || row.is_correct === true ? '✓' : '✗'}
+                            </span>
+                        </td>
+                    </tr>
+                `).join('');
+                break;
+                
+            case 'construction':
+                tbody.innerHTML = data.map(row => `
+                    <tr class="hover:bg-gray-50 text-xs">
+                        <td class="p-2">${row.trial_id || ''}</td>
+                        <td class="p-2">${row.batch_id || ''}</td>
+                        <td class="p-2">${row.disruption_level || ''}</td>
+                        <td class="p-2 font-mono">${row.source_node || ''} → ${row.target_node || ''}</td>
+                        <td class="p-2">${row.query_id || ''}</td>
+                        <td class="p-2 text-right font-mono">${parseFloat(row.initial_construction_time_ms || 0).toFixed(3)}</td>
+                        <td class="p-2 text-right font-mono">${parseFloat(row.initial_label_size_mb || 0).toFixed(5)}</td>
+                        <td class="p-2 text-center">
+                            <span class="px-2 py-0.5 rounded text-xs ${row.is_correct === 'True' || row.is_correct === true ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">
+                                ${row.is_correct === 'True' || row.is_correct === true ? '✓' : '✗'}
+                            </span>
+                        </td>
+                    </tr>
+                `).join('');
+                break;
+                
+            case 'updates':
+                tbody.innerHTML = data.map(row => `
+                    <tr class="hover:bg-gray-50 text-xs">
+                        <td class="p-2">${row.trial_id || ''}</td>
+                        <td class="p-2">${row.batch_id || ''}</td>
+                        <td class="p-2">${row.disruption_level || ''}</td>
+                        <td class="p-2 font-mono">${row.source_node || ''} → ${row.target_node || ''}</td>
+                        <td class="p-2 text-right font-mono">${parseFloat(row.label_size_change_pct || 0).toFixed(2)}%</td>
+                        <td class="p-2 text-right font-mono">${parseFloat(row.lazy_update_time_ms || 0).toFixed(3)}</td>
+                        <td class="p-2 text-right font-mono">${parseFloat(row.peak_label_size_mb || 0).toFixed(5)}</td>
+                        <td class="p-2 text-right font-mono">${parseFloat(row.query_response_time_ms || 0).toFixed(3)}</td>
+                        <td class="p-2 text-right font-mono">${parseFloat(row.threshold_rebuild_time_ms || 0).toFixed(3)}</td>
+                    </tr>
+                `).join('');
+                break;
+                
+            case 'performance':
+                tbody.innerHTML = data.map(row => `
+                    <tr class="hover:bg-gray-50 text-xs ${row.algorithm === 'HC2L' ? 'bg-purple-50' : ''}">
+                        <td class="p-2">${row.trial_id || ''}</td>
+                        <td class="p-2">${row.batch_id || ''}</td>
+                        <td class="p-2">${row.disruption_level || ''}</td>
+                        <td class="p-2 font-mono">${row.source_node || ''} → ${row.target_node || ''}</td>
+                        <td class="p-2 font-medium ${row.algorithm === 'DHL' ? 'text-blue-600' : 'text-purple-600'}">${row.algorithm || ''}</td>
+                        <td class="p-2 text-right font-mono">${parseFloat(row.query_time_ms || 0).toFixed(3)}</td>
+                        <td class="p-2 text-right font-mono">${parseFloat(row.label_size_mb || 0).toFixed(5)}</td>
+                        <td class="p-2 text-right font-mono">${parseFloat(row.lazy_update_time_ms || 0).toFixed(3)}</td>
+                        <td class="p-2 text-right font-mono">${row.total_rebuilds || 0}</td>
+                    </tr>
+                `).join('');
+                break;
+                
+            case 'summary':
+                tbody.innerHTML = data.map(row => `
+                    <tr class="hover:bg-gray-50 text-xs">
+                        <td class="p-2">${row.trial_id || ''}</td>
+                        <td class="p-2">${row.batch_id || ''}</td>
+                        <td class="p-2">${row.disruption_level || ''}</td>
+                        <td class="p-2 text-right">${row.num_accident || 0}</td>
+                        <td class="p-2 text-right">${row.num_road_closure || 0}</td>
+                        <td class="p-2 text-right">${row.num_congestion || 0}</td>
+                        <td class="p-2 text-right">${row.num_other || 0}</td>
+                        <td class="p-2 text-right font-bold">${parseInt(row.num_accident || 0) + parseInt(row.num_road_closure || 0) + parseInt(row.num_congestion || 0) + parseInt(row.num_other || 0)}</td>
+                    </tr>
+                `).join('');
+                break;
+                
+            case 'similarity':
+                tbody.innerHTML = data.map(row => `
+                    <tr class="hover:bg-gray-50 text-xs">
+                        <td class="p-2">${row.batch_id || ''}</td>
+                        <td class="p-2">${row.route_id || ''}</td>
+                        <td class="p-2">${row.od_pair || ''}</td>
+                        <td class="p-2 text-right font-mono">${parseFloat(row.dhc2l_distance_km || 0).toFixed(3)}</td>
+                        <td class="p-2 text-right font-mono">${parseFloat(row.here_distance_km || 0).toFixed(3)}</td>
+                        <td class="p-2 text-right font-mono">${parseFloat(row.distance_deviation_pct || 0).toFixed(1)}%</td>
+                        <td class="p-2 text-right font-mono">${parseFloat(row.frechet_distance_m || 0).toFixed(0)}m</td>
+                        <td class="p-2 text-center">
+                            <span class="px-2 py-0.5 rounded text-xs ${row.fd_rating === 'Good' ? 'bg-green-100 text-green-700' : row.fd_rating === 'Fair' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}">
+                                ${row.fd_rating || 'N/A'}
+                            </span>
+                        </td>
+                    </tr>
+                `).join('');
+                break;
+                
+            default:
+                // Generic rendering
+                if (data.length > 0 && headers) {
+                    tbody.innerHTML = data.map(row => `
+                        <tr class="hover:bg-gray-50 text-xs">
+                            ${headers.map(h => `<td class="p-2">${row[h] || ''}</td>`).join('')}
+                        </tr>
+                    `).join('');
+                }
+        }
+    },
+    
+    /**
+     * Render pagination controls for per-route tables
+     * @param {string} csvType - Type of CSV
+     * @param {Object} pagination - Pagination info
+     */
+    renderPaginationControls(csvType, pagination) {
+        const containerId = `${csvType}-pagination`;
+        let container = document.getElementById(containerId);
+        
+        if (!container) {
+            // Create pagination container if it doesn't exist
+            const tableContainer = document.getElementById(`${csvType}-per-route-container`);
+            if (tableContainer) {
+                container = document.createElement('div');
+                container.id = containerId;
+                container.className = 'flex items-center justify-between px-4 py-2 bg-gray-50 border-t border-gray-200';
+                tableContainer.appendChild(container);
+            } else {
+                return;
+            }
+        }
+        
+        container.innerHTML = `
+            <div class="text-sm text-gray-600">
+                Showing ${Math.min((pagination.page - 1) * pagination.limit + 1, pagination.total_rows)} - ${Math.min(pagination.page * pagination.limit, pagination.total_rows)} of ${pagination.total_rows}
+            </div>
+            <div class="flex items-center gap-2">
+                <button 
+                    onclick="ExperimentRunner.loadPerRoutePage('${csvType}', ${pagination.page - 1})"
+                    class="btn btn--sm btn--outline ${!pagination.has_prev ? 'opacity-50 cursor-not-allowed' : ''}"
+                    ${!pagination.has_prev ? 'disabled' : ''}>
+                    <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                </button>
+                <span class="text-sm">Page ${pagination.page} of ${pagination.total_pages}</span>
+                <button 
+                    onclick="ExperimentRunner.loadPerRoutePage('${csvType}', ${pagination.page + 1})"
+                    class="btn btn--sm btn--outline ${!pagination.has_next ? 'opacity-50 cursor-not-allowed' : ''}"
+                    ${!pagination.has_next ? 'disabled' : ''}>
+                    <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                </button>
+            </div>
+        `;
+        
+        // Refresh icons
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    },
+    
+    /**
+     * Load a specific page of per-route data
+     * @param {string} csvType - Type of CSV
+     * @param {number} page - Page number
+     */
+    async loadPerRoutePage(csvType, page) {
+        const tbodyId = `${csvType}-per-route-tbody`;
+        const tbody = document.getElementById(tbodyId);
+        if (!tbody) return;
+        
+        const result = await this.loadPerRouteData(csvType, page);
+        
+        if (result && result.data) {
+            this.renderPerRouteRows(csvType, tbody, result.data, result.headers);
+            this.renderPaginationControls(csvType, result.pagination);
+        }
+    },
+    
+    /**
+     * Reset per-route data state when switching results
+     */
+    resetPerRouteDataState() {
+        for (const key of Object.keys(this.perRouteDataState)) {
+            this.perRouteDataState[key] = { page: 1, loaded: false, loading: false };
+        }
+        
+        // Hide all per-route containers
+        document.querySelectorAll('[id$="-per-route-container"]').forEach(el => {
+            el.classList.add('hidden');
+        });
     }
 };
 

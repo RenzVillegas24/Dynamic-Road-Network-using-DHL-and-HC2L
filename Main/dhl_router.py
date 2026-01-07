@@ -275,8 +275,10 @@ class DHLRouter:
             if path_nodes and self.geometry_loader:
                 path_summary = self.geometry_loader.get_path_summary(path_nodes)
             else:
+                metrics = dhl_data.get('metrics', {})
+                calculated_dist_m = metrics.get('calculated_distance_meters', 0)
                 path_summary = {
-                    'total_distance_m': dhl_data.get('metrics', {}).get('total_distance_units', 0),
+                    'total_distance_m': calculated_dist_m,
                     'num_segments': len(api_geometry),
                     'num_nodes': len(path_nodes) if path_nodes else 0
                 }
@@ -608,6 +610,7 @@ class DHLRouter:
         
         metrics = route_data.get('metrics', {})
         labeling_info = metrics.get('labeling_info', {})
+        calculated_dist_m = metrics.get('calculated_distance_meters', 0)
         
         summary = {
             'algorithm': 'DHL (Dual-Hierarchy Labelling)',
@@ -616,7 +619,7 @@ class DHLRouter:
             'query_time_microseconds': metrics.get('query_time_microseconds', 0),
             'labeling_time_ms': metrics.get('labeling_time_ms', 0),
             'labeling_size_bytes': labeling_info.get('index_size_bytes', 0.0) / 1024,
-            'total_distance_units': metrics.get('total_distance_units', 0),
+            'calculated_distance_meters': calculated_dist_m,
             'path_length': metrics.get('path_length', 0),
             'hoplinks_examined': metrics.get('hoplinks_examined', 0),
             'uses_disruptions': metrics.get('uses_disruptions', False),
@@ -682,9 +685,9 @@ class DHLRouter:
                     }
                 },
                 'comparison_metrics': {
-                    'distance_difference_units': (
-                        disrupted_route['metrics']['total_distance_units'] - 
-                        base_route['metrics']['total_distance_units']
+                    'distance_difference_meters': (
+                        disrupted_route['metrics']['calculated_distance_meters'] - 
+                        base_route['metrics']['calculated_distance_meters']
                     ),
                     'query_time_difference_ms': (
                         disrupted_route['metrics']['query_time_ms'] - 
