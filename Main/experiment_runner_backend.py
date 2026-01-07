@@ -216,6 +216,7 @@ class ThreadProgress:
     status: str = "not_started"  # running/paused/completed/error
     percentage: float = 0.0
     current_disruption: str = ""
+    current_disruption_level: str = ""  # "Light", "Medium", "Heavy" for variety_preset
     current_route_index: int = 0
     total_routes: int = 0
     routes_per_minute: float = 0.0
@@ -225,6 +226,12 @@ class ThreadProgress:
     query_phase: Dict = field(default_factory=dict)
     results_history: List[Dict] = field(default_factory=list)
     error_message: str = ""
+    # Performance stats for current batch
+    avg_query_time_ms: float = 0.0
+    avg_labeling_time_ms: float = 0.0
+    avg_labeling_size_mb: float = 0.0
+    successful_routes: int = 0
+    failed_routes: int = 0
 
 
 @dataclass
@@ -441,6 +448,10 @@ class DisruptionCacheManager:
             return None
         
         disruption_data = self._load_disruption_files(disruption_path)
+        
+        # Compute batch-level incident summary
+        incident_summary = self._compute_batch_incident_summary(disruption_path)
+        disruption_data["incident_summary"] = incident_summary
         
         with self.lock:
             # Add to cache
@@ -713,6 +724,113 @@ class DisruptionCacheManager:
         
         return result
     
+    def _compute_batch_incident_summary(self, disruption_path: Path) -> Dict:
+        """
+        Analyze disruption files and compute batch-level incident statistics.
+        
+        Returns dict with incident counts:
+        - num_incidents_total: Total number of incidents
+        - num_closures: Number of road closures
+        - num_slowdowns: Number of slowdown incidents (from flow data)
+        - num_accidents: Number of accidents
+        - num_construction: Number of construction incidents
+        - num_hazards: Number of hazard incidents
+        - num_other_incidents: Number of other/unknown incidents
+        """
+        import csv
+        
+        summary = {
+            "num_incidents_total": 0,
+            "num_closures": 0,
+            "num_slowdowns": 0,
+            "num_accidents": 0,
+            "num_construction": 0,
+            "num_hazards": 0,
+            "num_other_incidents": 0,
+            "disruption_level": "unknown",
+            "avg_jam_factor": 0.0,
+            "num_disrupted_edges": 0
+        }
+        
+        # Determine disruption level from path
+        path_str = str(disruption_path)
+        if "set_light_" in path_str:
+            summary["disruption_level"] = "light"
+        elif "set_medium_" in path_str:
+            summary["disruption_level"] = "medium"
+        elif "set_heavy_" in path_str:
+            summary["disruption_level"] = "heavy"
+        elif "set_batch_" in path_str:
+            # Extract from preset naming
+            summary["disruption_level"] = "preset"
+        else:
+            summary["disruption_level"] = "random"
+        
+        # Count incidents from incident files
+        incident_dir = disruption_path / "incidents"
+        if incident_dir.exists():
+            for incident_file in sorted(incident_dir.glob("incident_*.csv")):
+                try:
+                    with open(incident_file, 'r') as f:
+                        reader = csv.DictReader(f)
+                        for row in reader:
+                            summary["num_incidents_total"] += 1
+                            
+                            # Categorize by type
+                            incident_type = row.get("incident_type", "unknown").lower()
+                            if incident_type == "accident":
+                                summary["num_accidents"] += 1
+                            elif incident_type == "construction":
+                                summary["num_construction"] += 1
+                            elif incident_type == "hazard":
+                                summary["num_hazards"] += 1
+                            elif incident_type == "roadclosure":
+                                summary["num_closures"] += 1
+                            else:
+                                summary["num_other_incidents"] += 1
+                            
+                            # Check for road closure flag
+                            road_closed = str(row.get("incident_road_closed", "false")).lower() == "true"
+                            if road_closed:
+                                summary["num_closures"] += 1  # Count both type and flag
+                                
+                except Exception as e:
+                    logger.error(f"Error reading incident file {incident_file}: {e}")
+        
+        # Count slowdowns from flow files (jam_factor >= 4 or speed < 20 km/h)
+        # Also compute average jam_factor across all disrupted edges
+        flow_dir = disruption_path / "flow"
+        jam_factor_sum = 0.0
+        jam_factor_count = 0
+        
+        if flow_dir.exists():
+            for flow_file in sorted(flow_dir.glob("flow_*.csv")):
+                try:
+                    with open(flow_file, 'r') as f:
+                        reader = csv.DictReader(f)
+                        for row in reader:
+                            jam_factor = float(row.get("flow_jam_factor", 0))
+                            speed_kph = float(row.get("flow_speed_kph", 60))
+                            
+                            # Accumulate jam_factor for average
+                            if jam_factor > 0:
+                                jam_factor_sum += jam_factor
+                                jam_factor_count += 1
+                                summary["num_disrupted_edges"] += 1
+                            
+                            # Count as slowdown if significant congestion
+                            if jam_factor >= 4 or speed_kph < 20:
+                                summary["num_slowdowns"] += 1
+                                
+                except Exception as e:
+                    logger.error(f"Error reading flow file {flow_file}: {e}")
+        
+        # Calculate average jam_factor
+        if jam_factor_count > 0:
+            summary["avg_jam_factor"] = round(jam_factor_sum / jam_factor_count, 2)
+        
+        return summary
+    
     def preload_chunk(self, batch_idx: int, start_route: int, thread_id: str):
         """Pre-load a chunk of disruptions asynchronously (generates if needed)"""
         def _load():
@@ -766,6 +884,12 @@ class ExperimentRunner:
         
         # Metrics collectors for each experiment (numpy-based)
         self.metrics_collectors: Dict[str, ExperimentMetricsCollector] = {}
+        
+        # Dijkstra ground truth cache (for accuracy validation)
+        # Key: f"{experiment_id}_{batch_idx}_{route_idx}_{disruption_path_hash}"
+        # Value: {"distance_km": float, "computed_at": timestamp}
+        self.dijkstra_cache: Dict[str, Dict] = {}
+        self.dijkstra_cache_lock = threading.Lock()
         
         # Completion locks and tracking
         self.completion_locks: Dict[str, threading.Lock] = {}
@@ -2086,7 +2210,16 @@ class ExperimentRunner:
                         if route_idx > 0 and route_idx % 80 == 0:
                             cache.preload_chunk(b_idx, route_idx + 20, thread_id)
                     
-                    thread_progress.current_disruption = f"set_batch_{b_idx}_route_{route_idx}"
+                    # Determine disruption level for variety_preset mode
+                    config_disruption_mode = config.get("disruption_mode", "preset")
+                    if config_disruption_mode == "variety_preset":
+                        level_idx = b_idx % 3
+                        level_names = ["Light", "Medium", "Heavy"]
+                        thread_progress.current_disruption_level = level_names[level_idx]
+                        thread_progress.current_disruption = f"set_{level_names[level_idx].lower()}_route_{route_idx}"
+                    else:
+                        thread_progress.current_disruption_level = ""
+                        thread_progress.current_disruption = f"set_batch_{b_idx}_route_{route_idx}"
                     
                     for algorithm in algorithms:
                         if self.stop_events[experiment_id].is_set():
@@ -2176,6 +2309,29 @@ class ExperimentRunner:
                         # Update query phase with accumulated statistics
                         query_time = result.get("query_phase", {}).get("query_time_ms", 0)
                         label_size = result.get("summary", {}).get("label_size", 0)
+                        labeling_time = result.get("summary", {}).get("labeling_time_ms", 0)
+                        
+                        # Track success/failure
+                        accuracy = result.get("accuracy", {})
+                        if accuracy.get("is_correct", False):
+                            thread_progress.successful_routes += 1
+                        else:
+                            thread_progress.failed_routes += 1
+                        
+                        # Update running averages (only for successful routes)
+                        if accuracy.get("is_correct", False):
+                            current_count = thread_progress.successful_routes
+                            if current_count > 0:
+                                # Running average update
+                                thread_progress.avg_query_time_ms = (
+                                    (thread_progress.avg_query_time_ms * (current_count - 1) + query_time) / current_count
+                                )
+                                thread_progress.avg_labeling_time_ms = (
+                                    (thread_progress.avg_labeling_time_ms * (current_count - 1) + labeling_time) / current_count
+                                )
+                                thread_progress.avg_labeling_size_mb = (
+                                    (thread_progress.avg_labeling_size_mb * (current_count - 1) + label_size) / current_count
+                                )
                         distance_km = result.get("summary", {}).get("distance_km", 0)
                         actual_eta = result.get("summary", {}).get("actual_eta", "")
                         
@@ -2324,6 +2480,95 @@ class ExperimentRunner:
                     
                     self._broadcast_progress(experiment_id)
     
+    def _compute_dijkstra_ground_truth(self, experiment_id: str, batch_idx: int, 
+                                       route_idx: int, route_coords: Dict,
+                                       disruption_path: str) -> Optional[float]:
+        """
+        Compute Dijkstra ground truth distance for accuracy validation.
+        Uses C++ path finding with disruptions applied (same as DHC2L/HC2L).
+        Results are cached to avoid recomputation across trials.
+        
+        Args:
+            experiment_id: Experiment identifier
+            batch_idx: Batch index
+            route_idx: Route index
+            route_coords: Route coordinates dict with start/end snap data
+            disruption_path: Path to disruption directory
+            
+        Returns:
+            Ground truth distance in km, or None if computation failed
+        """
+        import hashlib
+        
+        # Create cache key based on route and disruption
+        disruption_hash = hashlib.md5(disruption_path.encode()).hexdigest()[:8] if disruption_path else "no_disruption"
+        cache_key = f"{experiment_id}_{batch_idx}_{route_idx}_{disruption_hash}"
+        
+        # Check cache first
+        with self.dijkstra_cache_lock:
+            if cache_key in self.dijkstra_cache:
+                cached = self.dijkstra_cache[cache_key]
+                logger.debug(f"Dijkstra cache hit: {cache_key} = {cached['distance_km']} km")
+                return cached['distance_km']
+        
+        # Compute using HC2L router (which uses Dijkstra for path reconstruction)
+        # We use HC2L instead of DHL because we need pure distance without label overhead
+        try:
+            if not self.hc2l_router:
+                logger.error("HC2L router not initialized for Dijkstra computation")
+                return None
+            
+            # Call HC2L API to get ground truth distance
+            api_result = self.hc2l_router.compute_route(
+                start_pin_lat=route_coords["start"]["lat"],
+                start_pin_lng=route_coords["start"]["lng"],
+                dest_pin_lat=route_coords["end"]["lat"],
+                dest_pin_lng=route_coords["end"]["lng"],
+                start_snap_lat=route_coords["start"]["snap_lat"],
+                start_snap_lng=route_coords["start"]["snap_lng"],
+                dest_snap_lat=route_coords["end"]["snap_lat"],
+                dest_snap_lng=route_coords["end"]["snap_lng"],
+                start_edge_source=route_coords["start"]["edge_source"],
+                start_edge_target=route_coords["start"]["edge_target"],
+                start_edge_oneway=route_coords["start"]["edge_oneway"],
+                dest_edge_source=route_coords["end"]["edge_source"],
+                dest_edge_target=route_coords["end"]["edge_target"],
+                dest_edge_oneway=route_coords["end"]["edge_oneway"],
+                disruption_file=disruption_path,
+                tau_threshold=1.0,  # Use tau=1.0 for immediate full update (ground truth)
+                generate_alternatives=False,
+                verbose=False
+            )
+            
+            if not api_result.get("success", False):
+                logger.warning(f"Dijkstra computation failed for route {route_idx}: {api_result.get('error')}")
+                return None
+            
+            # Extract distance from API result
+            metrics = api_result.get("metrics", {})
+            distance_km = metrics.get("calculated_distance_km", 0)
+            
+            if not distance_km and metrics.get("calculated_distance_meters"):
+                distance_km = metrics.get("calculated_distance_meters") / 1000
+            
+            if distance_km <= 0:
+                logger.warning(f"Invalid Dijkstra distance for route {route_idx}: {distance_km} km")
+                return None
+            
+            # Cache the result
+            with self.dijkstra_cache_lock:
+                self.dijkstra_cache[cache_key] = {
+                    "distance_km": distance_km,
+                    "computed_at": time.time()
+                }
+            
+            logger.debug(f"Dijkstra computed and cached: {cache_key} = {distance_km} km")
+            return distance_km
+            
+        except Exception as e:
+            logger.error(f"Error computing Dijkstra ground truth: {e}")
+            return None
+    
     def _execute_route(self, experiment_id: str, thread_id: str,
                        trial_idx: int, batch_idx: int, route_idx: int,
                        algorithm: str, tau_settings: Dict,
@@ -2369,7 +2614,10 @@ class ExperimentRunner:
             if disruption_data:
                 disruption_path = disruption_data.get("path", "")
             
-            # Call the appropriate router
+            # ========================================================================
+            # STEP 1: Execute DHC2L/HC2L query
+            # ========================================================================
+            api_result = None
             if algorithm.upper() == "DHL":
                 if self.dhl_router:
                     api_result = self.dhl_router.compute_route(
@@ -2392,7 +2640,6 @@ class ExperimentRunner:
                         generate_alternatives=False,
                         verbose=False
                     )
-                    result = self._parse_api_result(result, api_result, algorithm, tau)
                 else:
                     result["error"] = "DHL router not initialized"
                     
@@ -2418,14 +2665,86 @@ class ExperimentRunner:
                         generate_alternatives=False,
                         verbose=False
                     )
-                    result = self._parse_api_result(result, api_result, algorithm, tau)
                 else:
                     result["error"] = "HC2L router not initialized"
             else:
                 result["error"] = f"Unknown algorithm: {algorithm}"
+            
+            # Parse the API result first
+            if api_result:
+                result = self._parse_api_result(result, api_result, algorithm, tau)
+            
+            # ========================================================================
+            # STEP 2: Compute Dijkstra ground truth for accuracy validation
+            # ========================================================================
+            if not result.get("error") and api_result and api_result.get("success"):
+                dijkstra_distance = self._compute_dijkstra_ground_truth(
+                    experiment_id, batch_idx, route_idx, 
+                    route_coords, disruption_path
+                )
+                
+                if dijkstra_distance:
+                    # Extract DHC2L/HC2L distance
+                    dhc2l_distance = result["summary"].get("distance_km", 0)
+                    
+                    # ========================================================================
+                    # STEP 3: Compute accuracy metrics
+                    # ========================================================================
+                    distance_error = dhc2l_distance - dijkstra_distance  # Positive = overestimate, negative = underestimate
+                    relative_error = abs(distance_error) / dijkstra_distance if dijkstra_distance > 0 else 1.0
+                    is_correct = relative_error <= 0.05  # 5% tolerance
+                    
+                    # Store accuracy metrics in result
+                    result["accuracy"] = {
+                        "dijkstra_distance_km": round(dijkstra_distance, 4),
+                        "dhc2l_distance_km": round(dhc2l_distance, 4),
+                        "distance_error_km": round(distance_error, 4),
+                        "relative_error": round(relative_error, 4),
+                        "is_correct": is_correct,
+                        "tolerance": 0.05
+                    }
+                    
+                    logger.debug(
+                        f"Route {route_idx} accuracy: "
+                        f"DHC2L={dhc2l_distance:.3f}km, "
+                        f"Dijkstra={dijkstra_distance:.3f}km, "
+                        f"Error={relative_error*100:.2f}%, "
+                        f"Correct={is_correct}"
+                    )
+                else:
+                    # If Dijkstra computation failed, mark as incorrect
+                    result["accuracy"] = {
+                        "dijkstra_distance_km": None,
+                        "dhc2l_distance_km": result["summary"].get("distance_km", 0),
+                        "distance_error_km": None,
+                        "relative_error": None,
+                        "is_correct": False,
+                        "tolerance": 0.05,
+                        "error": "Dijkstra computation failed"
+                    }
+            else:
+                # If DHC2L computation failed, mark as incorrect
+                result["accuracy"] = {
+                    "dijkstra_distance_km": None,
+                    "dhc2l_distance_km": None,
+                    "distance_error_km": None,
+                    "relative_error": None,
+                    "is_correct": False,
+                    "tolerance": 0.05,
+                    "error": result.get("error", "DHC2L computation failed")
+                }
                 
         except Exception as e:
             result["error"] = str(e)
+            result["accuracy"] = {
+                "dijkstra_distance_km": None,
+                "dhc2l_distance_km": None,
+                "distance_error_km": None,
+                "relative_error": None,
+                "is_correct": False,
+                "tolerance": 0.05,
+                "error": str(e)
+            }
             logger.error(f"Error executing route: {e}")
         
         # Calculate total execution time
@@ -2509,7 +2828,10 @@ class ExperimentRunner:
             "memory_initial_mb": round(memory_initial_mb, 2),
             "memory_current_mb": round(memory_current_mb, 2),
             "memory_peak_mb": round(memory_peak_mb, 2),
-            "memory_increase_mb": round(memory_increase_mb, 2)
+            "memory_increase_mb": round(memory_increase_mb, 2),
+            # Add missing fields for CSV export
+            "eta_seconds": round(eta_seconds, 2) if eta_seconds else 0,
+            "labeling_time_ms": round(labeling_info.get("labeling_time_ms", 0), 3)
         }
         
         # Update Phase - extract from lazy_hc2l or dhl_update_info
