@@ -4778,6 +4778,7 @@ const ExperimentRunner = {
      * Universal CSV export function
      * @param {string} tabType - Type of tab (summary, accuracy, construction, updates, performance, similarity)
      * @param {string} tableType - Type of table ('per-trial', 'per-batch', 'per-route', 'all')
+     *                            'all' downloads ZIP with per-route, per-trial, and per-batch CSVs
      */
     async exportCSV(tabType, tableType = 'all') {
         if (!this.currentResultId) {
@@ -4797,7 +4798,13 @@ const ExperimentRunner = {
             link.click();
             document.body.removeChild(link);
 
-            const typeLabel = tableType === 'all' ? 'all tables' : tableType.replace('-', ' ');
+            // Create appropriate notification message
+            let typeLabel;
+            if (tableType === 'all') {
+                typeLabel = 'all tables (per-route, per-trial, per-batch in ZIP)';
+            } else {
+                typeLabel = tableType.replace('-', ' ');
+            }
             this.showNotification(`Downloading ${tabType} ${typeLabel} CSV...`, 'success');
         } catch (error) {
             console.error(`Error exporting ${tabType} ${tableType}:`, error);
