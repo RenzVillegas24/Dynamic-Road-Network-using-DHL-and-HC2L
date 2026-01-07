@@ -2498,16 +2498,220 @@ const ExperimentRunner = {
         const container = document.getElementById('result-updates-container');
         if (!container) return;
         
+        if (!graphData || !graphData.time_series) {
+            container.innerHTML = `
+                <div class="text-center py-8 text-gray-600">
+                    <i data-lucide="file-spreadsheet" class="w-12 h-12 mx-auto mb-2 text-gray-400"></i>
+                    <p class="font-semibold mb-2">Per-route update performance data available in CSV</p>
+                    <button onclick="ExperimentRunner.exportTab('updates')" class="btn btn--primary btn--sm">
+                        <i data-lucide="download" class="w-4 h-4"></i> Download Updates CSV
+                    </button>
+                </div>
+            `;
+            return;
+        }
+        
+        // Compute averages from graph_data
+        const dhlData = graphData.time_series.DHL || {};
+        const hc2lData = graphData.time_series.HC2L || {};
+        
+        const averages = this.computeUpdateAverages(dhlData, hc2lData);
+        
         container.innerHTML = `
-            <div class="text-center py-8 text-gray-600">
-                <i data-lucide="file-spreadsheet" class="w-12 h-12 mx-auto mb-2 text-gray-400"></i>
-                <p class="font-semibold mb-2">Per-route update performance data available in CSV</p>
-                <p class="text-sm text-gray-500 mb-4">Includes lazy update times, peak label sizes, and rebuild counts</p>
-                <button onclick="ExperimentRunner.exportTab('updates')" class="btn btn--primary btn--sm">
-                    <i data-lucide="download" class="w-4 h-4"></i> Download Updates CSV
-                </button>
+            <!-- Averages Section -->
+            <div class="space-y-4">
+                <!-- Per-Trial Averages -->
+                <div class="bg-white rounded-xl border border-indigo-200 overflow-hidden shadow-sm">
+                    <div class="bg-gradient-to-r from-indigo-50 to-purple-50 px-4 py-3 border-b border-indigo-200">
+                        <h5 class="font-bold text-indigo-900 flex items-center gap-2">
+                            <i data-lucide="layers" class="w-4 h-4"></i>
+                            Averages Per Trial
+                        </h5>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="bg-indigo-50 border-b border-indigo-200">
+                                <tr>
+                                    <th class="text-left p-3 font-semibold text-indigo-700">Trial</th>
+                                    <th class="text-left p-3 font-semibold text-indigo-700">Batch</th>
+                                    <th class="text-left p-3 font-semibold text-indigo-700">Algorithm</th>
+                                    <th class="text-center p-3 font-semibold text-indigo-700">Disruption Level</th>
+                                    <th class="text-right p-3 font-semibold text-indigo-700">Lazy Update (ms)</th>
+                                    <th class="text-right p-3 font-semibold text-indigo-700">Threshold Rebuild (ms)</th>
+                                    <th class="text-right p-3 font-semibold text-indigo-700">Peak Label (MB)</th>
+                                    <th class="text-right p-3 font-semibold text-indigo-700">% Size Change</th>
+                                    <th class="text-right p-3 font-semibold text-indigo-700">Query Avg (ms)</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100">
+                                ${averages.perTrial.map(row => `
+                                    <tr class="hover:bg-indigo-50 transition-colors">
+                                        <td class="p-3">${row.trial}</td>
+                                        <td class="p-3">${row.batch}</td>
+                                        <td class="p-3"><span class="px-2 py-1 rounded text-xs font-bold ${row.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">${row.algorithm}</span></td>
+                                        <td class="p-3 text-center">${row.level}</td>
+                                        <td class="p-3 text-right font-mono">${row.lazyUpdate}</td>
+                                        <td class="p-3 text-right font-mono">${row.rebuild}</td>
+                                        <td class="p-3 text-right font-mono">${row.peakLabel}</td>
+                                        <td class="p-3 text-right font-mono text-${row.sizeChange.startsWith('+') ? 'green' : 'red'}-600">${row.sizeChange}</td>
+                                        <td class="p-3 text-right font-mono">${row.queryAvg}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Per-Batch Averages -->
+                <div class="bg-white rounded-xl border border-purple-200 overflow-hidden shadow-sm">
+                    <div class="bg-gradient-to-r from-purple-50 to-pink-50 px-4 py-3 border-b border-purple-200">
+                        <h5 class="font-bold text-purple-900 flex items-center gap-2">
+                            <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+                            Averages Per Batch
+                        </h5>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="bg-purple-50 border-b border-purple-200">
+                                <tr>
+                                    <th class="text-left p-3 font-semibold text-purple-700">Batch</th>
+                                    <th class="text-left p-3 font-semibold text-purple-700">Algorithm</th>
+                                    <th class="text-center p-3 font-semibold text-purple-700">Disruption Level</th>
+                                    <th class="text-right p-3 font-semibold text-purple-700">Lazy Update (ms)</th>
+                                    <th class="text-right p-3 font-semibold text-purple-700">Threshold Rebuild (ms)</th>
+                                    <th class="text-right p-3 font-semibold text-purple-700">Peak Label (MB)</th>
+                                    <th class="text-right p-3 font-semibold text-purple-700">% Size Change</th>
+                                    <th class="text-right p-3 font-semibold text-purple-700">Query Avg (ms)</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100">
+                                ${averages.perBatch.map(row => `
+                                    <tr class="hover:bg-purple-50 transition-colors">
+                                        <td class="p-3">${row.batch}</td>
+                                        <td class="p-3"><span class="px-2 py-1 rounded text-xs font-bold ${row.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">${row.algorithm}</span></td>
+                                        <td class="p-3 text-center">${row.level}</td>
+                                        <td class="p-3 text-right font-mono">${row.lazyUpdate}</td>
+                                        <td class="p-3 text-right font-mono">${row.rebuild}</td>
+                                        <td class="p-3 text-right font-mono">${row.peakLabel}</td>
+                                        <td class="p-3 text-right font-mono text-${row.sizeChange.startsWith('+') ? 'green' : 'red'}-600">${row.sizeChange}</td>
+                                        <td class="p-3 text-right font-mono">${row.queryAvg}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Overall Average -->
+                <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border-2 border-blue-200 p-4 shadow-sm">
+                    <h5 class="font-bold text-blue-900 mb-3 flex items-center gap-2">
+                        <i data-lucide="trending-up" class="w-5 h-5"></i>
+                        Overall Averages
+                    </h5>
+                    <div class="grid grid-cols-2 gap-4">
+                        ${averages.overall.map(row => `
+                            <div class="bg-white rounded-lg p-3 border border-blue-200">
+                                <div class="text-xs text-gray-600 mb-1">${row.algorithm}</div>
+                                <div class="grid grid-cols-2 gap-2 text-xs">
+                                    <div><span class="font-semibold">Query:</span> ${row.queryAvg} ms</div>
+                                    <div><span class="font-semibold">Lazy:</span> ${row.lazyUpdate} ms</div>
+                                    <div><span class="font-semibold">Rebuild:</span> ${row.rebuild} ms</div>
+                                    <div><span class="font-semibold">Peak:</span> ${row.peakLabel} MB</div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
             </div>
         `;
+        
+        // Refresh Lucide icons
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    },
+    
+    computeUpdateAverages(dhlData, hc2lData) {
+        const perTrial = [];
+        const perBatch = [];
+        const overall = [];
+        
+        // Assuming 3 trials, 3 batches
+        const numTrials = 3;
+        const numBatches = 3;
+        const disruptions = ['light', 'medium', 'heavy'];
+        
+        // Per-Trial averages (for each trial, average across all batches)
+        for (let algo of ['DHL', 'HC2L']) {
+            const data = algo === 'DHL' ? dhlData : hc2lData;
+            
+            for (let t = 1; t <= numTrials; t++) {
+                for (let b = 1; b <= numBatches; b++) {
+                    const idx = (t - 1) * numBatches + (b - 1);
+                    
+                    perTrial.push({
+                        trial: t,
+                        batch: b,
+                        algorithm: algo,
+                        level: disruptions[b - 1] || 'unknown',
+                        lazyUpdate: data.update_times?.[idx]?.toFixed(3) || '0.000',
+                        rebuild: data.rebuild_times?.[idx]?.toFixed(3) || '0.000',
+                        peakLabel: data.label_sizes?.[idx]?.toFixed(5) || '0.00000',
+                        sizeChange: '+0.0%', // Placeholder
+                        queryAvg: data.query_times?.[idx]?.toFixed(3) || '0.000'
+                    });
+                }
+            }
+        }
+        
+        // Per-Batch averages (for each batch, average across all trials)
+        for (let algo of ['DHL', 'HC2L']) {
+            const data = algo === 'DHL' ? dhlData : hc2lData;
+            
+            for (let b = 1; b <= numBatches; b++) {
+                let sumQuery = 0, sumLazy = 0, sumRebuild = 0, sumLabel = 0, count = 0;
+                
+                for (let t = 1; t <= numTrials; t++) {
+                    const idx = (t - 1) * numBatches + (b - 1);
+                    sumQuery += data.query_times?.[idx] || 0;
+                    sumLazy += data.update_times?.[idx] || 0;
+                    sumRebuild += data.rebuild_times?.[idx] || 0;
+                    sumLabel += data.label_sizes?.[idx] || 0;
+                    count++;
+                }
+                
+                perBatch.push({
+                    batch: b,
+                    algorithm: algo,
+                    level: disruptions[b - 1] || 'unknown',
+                    lazyUpdate: (sumLazy / count).toFixed(3),
+                    rebuild: (sumRebuild / count).toFixed(3),
+                    peakLabel: (sumLabel / count).toFixed(5),
+                    sizeChange: '+0.0%', // Placeholder
+                    queryAvg: (sumQuery / count).toFixed(3)
+                });
+            }
+        }
+        
+        // Overall averages
+        for (let algo of ['DHL', 'HC2L']) {
+            const data = algo === 'DHL' ? dhlData : hc2lData;
+            
+            const avgQuery = data.query_times?.reduce((a, b) => a + b, 0) / (data.query_times?.length || 1);
+            const avgLazy = data.update_times?.reduce((a, b) => a + b, 0) / (data.update_times?.length || 1);
+            const avgRebuild = data.rebuild_times?.reduce((a, b) => a + b, 0) / (data.rebuild_times?.length || 1);
+            const avgLabel = data.label_sizes?.reduce((a, b) => a + b, 0) / (data.label_sizes?.length || 1);
+            
+            overall.push({
+                algorithm: algo,
+                queryAvg: avgQuery.toFixed(3),
+                lazyUpdate: avgLazy.toFixed(3),
+                rebuild: avgRebuild.toFixed(3),
+                peakLabel: avgLabel.toFixed(5)
+            });
+        }
+        
+        return { perTrial, perBatch, overall };
     },
     
     populatePerformanceComparison(performanceStats) {
@@ -2581,26 +2785,182 @@ const ExperimentRunner = {
     },
     
     populateSimilarityPlaceholder() {
-        const tbody = document.getElementById('result-similarity-tbody');
-        if (!tbody) return;
+        const container = document.getElementById('result-similarity-container');
+        if (!container) return;
         
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="11" class="text-center py-12">
-                    <div class="text-gray-600">
+        // Show loading state
+        container.innerHTML = `
+            <div class="text-center py-8">
+                <div class="animate-spin w-8 h-8 border-3 border-blue-500 border-t-transparent rounded-full mx-auto mb-3"></div>
+                <p class="text-gray-600">Loading similarity data...</p>
+            </div>
+        `;
+        
+        // Load similarity data from CSV endpoint
+        this.loadAndDisplaySimilarityData();
+    },
+    
+    async loadAndDisplaySimilarityData() {
+        const container = document.getElementById('result-similarity-container');
+        if (!container) return;
+        
+        if (!this.currentResultId) {
+            container.innerHTML = `
+                <div class="text-center py-8 text-gray-600">
+                    <i data-lucide="alert-circle" class="w-12 h-12 mx-auto mb-2 text-gray-400"></i>
+                    <p class="font-semibold mb-2">No experiment results loaded</p>
+                </div>
+            `;
+            return;
+        }
+        
+        try {
+            const url = `/api/experiment/results/${this.currentResultId}/csv/similarity/data?page=1&limit=100`;
+            const response = await fetch(url);
+            const result = await response.json();
+            
+            if (!result.success || !result.data || result.data.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-12 text-gray-600">
                         <i data-lucide="file-spreadsheet" class="w-16 h-16 mx-auto mb-3 text-gray-400"></i>
                         <p class="font-semibold text-lg mb-2">HERE vs HC2L Route Comparison Data</p>
-                        <p class="text-sm text-gray-500 mb-4">
-                            Complete route similarity metrics with Fréchet distance, travel time deviations,<br>
-                            and quality ratings are available in the CSV export
-                        </p>
+                        <p class="text-sm text-gray-500 mb-4">Complete route similarity metrics available in CSV export</p>
                         <button onclick="ExperimentRunner.exportTab('similarity')" class="btn btn--primary">
                             <i data-lucide="download" class="w-4 h-4"></i> Download Similarity CSV
                         </button>
                     </div>
-                </td>
-            </tr>
-        `;
+                `;
+                return;
+            }
+            
+            // Render similarity table
+            container.innerHTML = `
+                <div class="bg-white rounded-xl border border-yellow-200 overflow-hidden shadow-sm">
+                    <div class="bg-gradient-to-r from-yellow-50 to-amber-50 px-4 py-3 border-b border-yellow-200">
+                        <div class="flex items-center justify-between">
+                            <h5 class="font-bold text-yellow-900 flex items-center gap-2">
+                                <i data-lucide="git-compare" class="w-4 h-4"></i>
+                                Route Similarity Analysis (${result.data.length} routes compared)
+                            </h5>
+                            <button onclick="ExperimentRunner.exportTab('similarity')" class="btn btn--success btn--xs">
+                                <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+                            </button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto max-h-[600px]">
+                        <table class="w-full text-xs">
+                            <thead class="bg-yellow-50 border-b border-yellow-200 sticky top-0">
+                                <tr>
+                                    <th class="text-left p-2 font-semibold text-yellow-700">Batch</th>
+                                    <th class="text-left p-2 font-semibold text-yellow-700">Route</th>
+                                    <th class="text-left p-2 font-semibold text-yellow-700">Level</th>
+                                    <th class="text-left p-2 font-semibold text-yellow-700">Origin → Destination</th>
+                                    <th class="text-right p-2 font-semibold text-yellow-700">HC2L Dist (km)</th>
+                                    <th class="text-right p-2 font-semibold text-yellow-700">HERE Dist (km)</th>
+                                    <th class="text-right p-2 font-semibold text-yellow-700">Dist Dev %</th>
+                                    <th class="text-right p-2 font-semibold text-yellow-700">HC2L Time (min)</th>
+                                    <th class="text-right p-2 font-semibold text-yellow-700">HERE Time (min)</th>
+                                    <th class="text-right p-2 font-semibold text-yellow-700">Time Dev %</th>
+                                    <th class="text-right p-2 font-semibold text-yellow-700">Fréchet Dist (m)</th>
+                                    <th class="text-center p-2 font-semibold text-yellow-700">FD Rating</th>
+                                    <th class="text-center p-2 font-semibold text-yellow-700">TTD Rating</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100">
+                                ${result.data.map(row => {
+                                    const distDev = parseFloat(row.distance_deviation_pct || 0);
+                                    const timeDev = parseFloat(row.time_deviation_pct || 0);
+                                    const fdRating = this.getRatingClass(row.fd_rating);
+                                    const ttdRating = this.getRatingClass(row.ttd_rating);
+                                    
+                                    return `
+                                        <tr class="hover:bg-yellow-50 transition-colors">
+                                            <td class="p-2">${row.batch_id || ''}</td>
+                                            <td class="p-2">${row.route_id || ''}</td>
+                                            <td class="p-2"><span class="px-2 py-0.5 rounded text-xs bg-gray-100">${row.disruption_level || ''}</span></td>
+                                            <td class="p-2 font-mono text-xs">${row.source_node || ''} → ${row.target_node || ''}</td>
+                                            <td class="p-2 text-right font-mono">${parseFloat(row.dhc2l_distance_km || 0).toFixed(3)}</td>
+                                            <td class="p-2 text-right font-mono">${parseFloat(row.here_distance_km || 0).toFixed(3)}</td>
+                                            <td class="p-2 text-right font-mono ${distDev < 0 ? 'text-red-600' : 'text-green-600'}">${distDev.toFixed(2)}%</td>
+                                            <td class="p-2 text-right font-mono">${parseFloat(row.dhc2l_travel_time_min || 0).toFixed(2)}</td>
+                                            <td class="p-2 text-right font-mono">${parseFloat(row.here_travel_time_min || 0).toFixed(2)}</td>
+                                            <td class="p-2 text-right font-mono ${timeDev < 0 ? 'text-red-600' : 'text-green-600'}">${timeDev.toFixed(2)}%</td>
+                                            <td class="p-2 text-right font-mono">${parseFloat(row.frechet_distance_m || 0).toFixed(1)}</td>
+                                            <td class="p-2 text-center">
+                                                <span class="px-2 py-0.5 rounded text-xs font-medium ${fdRating.class}">${row.fd_rating || 'N/A'}</span>
+                                            </td>
+                                            <td class="p-2 text-center">
+                                                <span class="px-2 py-0.5 rounded text-xs font-medium ${ttdRating.class}">${row.ttd_rating || 'N/A'}</span>
+                                            </td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Summary Statistics -->
+                    <div class="bg-gradient-to-r from-yellow-50 to-amber-50 px-4 py-3 border-t border-yellow-200">
+                        <div class="grid grid-cols-4 gap-4 text-center">
+                            <div>
+                                <div class="text-2xl font-bold text-yellow-900">${result.data.length}</div>
+                                <div class="text-xs text-yellow-700">Routes Compared</div>
+                            </div>
+                            <div>
+                                <div class="text-2xl font-bold text-yellow-900">${this.calculateAverage(result.data, 'distance_deviation_pct').toFixed(2)}%</div>
+                                <div class="text-xs text-yellow-700">Avg Dist Deviation</div>
+                            </div>
+                            <div>
+                                <div class="text-2xl font-bold text-yellow-900">${this.calculateAverage(result.data, 'time_deviation_pct').toFixed(2)}%</div>
+                                <div class="text-xs text-yellow-700">Avg Time Deviation</div>
+                            </div>
+                            <div>
+                                <div class="text-2xl font-bold text-yellow-900">${this.calculateAverage(result.data, 'frechet_distance_m').toFixed(0)}m</div>
+                                <div class="text-xs text-yellow-700">Avg Fréchet Dist</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Refresh Lucide icons
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+            
+        } catch (error) {
+            console.error('Error loading similarity data:', error);
+            container.innerHTML = `
+                <div class="text-center py-8 text-red-600">
+                    <i data-lucide="alert-circle" class="w-12 h-12 mx-auto mb-2"></i>
+                    <p class="font-semibold mb-2">Error loading similarity data</p>
+                    <p class="text-sm text-gray-600">${error.message}</p>
+                </div>
+            `;
+        }
+    },
+    
+    getRatingClass(rating) {
+        switch(rating?.toLowerCase()) {
+            case 'excellent':
+                return { class: 'bg-green-100 text-green-700' };
+            case 'good':
+                return { class: 'bg-blue-100 text-blue-700' };
+            case 'fair':
+                return { class: 'bg-yellow-100 text-yellow-700' };
+            case 'poor':
+                return { class: 'bg-orange-100 text-orange-700' };
+            case 'bad':
+                return { class: 'bg-red-100 text-red-700' };
+            default:
+                return { class: 'bg-gray-100 text-gray-700' };
+        }
+    },
+    
+    calculateAverage(data, field) {
+        if (!data || data.length === 0) return 0;
+        const sum = data.reduce((acc, row) => acc + (parseFloat(row[field]) || 0), 0);
+        return sum / data.length;
     },
     
     // =========================================================================

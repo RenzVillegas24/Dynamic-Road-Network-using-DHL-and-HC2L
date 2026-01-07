@@ -1148,38 +1148,9 @@
             </div>
           </div>
           
-          <div class="overflow-x-auto rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-            <table class="w-full text-sm">
-              <thead class="bg-gradient-to-r from-amber-50 to-orange-50 border-b-2 border-amber-200">
-                <tr>
-                  <th class="text-left p-2 font-semibold text-amber-700 whitespace-nowrap">#</th>
-                  <th class="text-left p-2 font-semibold text-amber-700 whitespace-nowrap">Source → Target</th>
-                  <th class="text-left p-2 font-semibold text-amber-700 whitespace-nowrap">Start Road</th>
-                  <th class="text-left p-2 font-semibold text-amber-700 whitespace-nowrap">End Road</th>
-                  <th class="text-right p-2 font-semibold text-amber-700 whitespace-nowrap">Distance (km)<br><span class="text-xs font-normal">(HC2L | HERE)</span></th>
-                  <th class="text-right p-2 font-semibold text-amber-700 whitespace-nowrap">Time (min)<br><span class="text-xs font-normal">(HC2L | HERE)</span></th>
-                  <th class="text-right p-2 font-semibold text-amber-700 whitespace-nowrap">Query (ms)<br><span class="text-xs font-normal">(HC2L | HERE)</span></th>
-                  <th class="text-right p-2 font-semibold text-amber-700 whitespace-nowrap">FD (m)</th>
-                  <th class="text-center p-2 font-semibold text-amber-700 whitespace-nowrap">FD Rating</th>
-                  <th class="text-right p-2 font-semibold text-amber-700 whitespace-nowrap">∆Time %</th>
-                  <th class="text-center p-2 font-semibold text-amber-700 whitespace-nowrap">TTD Rating</th>
-                </tr>
-              </thead>
-              <tbody id="result-similarity-tbody" class="divide-y divide-gray-200">
-                <tr class="hover:bg-gray-50 transition-colors">
-                  <td colspan="11" class="text-center text-gray-500 py-6 font-medium">No data yet</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          
-          <!-- Load More / Infinite Scroll -->
-          <div id="similarity-load-more" class="hidden">
-            <button onclick="ExperimentRunner.loadMoreSimilarityData()" 
-              class="w-full py-3 text-center text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors font-medium">
-              <i data-lucide="chevron-down" class="w-4 h-4 inline mr-1"></i>
-              Load More Routes
-            </button>
+          <!-- Similarity Data Container -->
+          <div id="result-similarity-container">
+            <p class="text-center text-gray-500 py-8 font-medium">No data yet</p>
           </div>
 
           <!-- Rating Criteria (SOP 3 Tables 11 & 12) -->
