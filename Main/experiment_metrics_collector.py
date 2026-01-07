@@ -660,10 +660,11 @@ class ExperimentMetricsCollector:
         """
         Record metrics for a single route execution.
         
-        Implements accuracy-first gating:
-        1. Extract and compute accuracy metrics
-        2. If is_correct: extract performance metrics
-        3. If not is_correct: leave performance as NULL
+        Implements accuracy validation for both DHL and DHC2L:
+        1. Extract algorithm distance from API result
+        2. Extract Dijkstra reference distance
+        3. Compute accuracy metrics (both algorithms)
+        4. Extract and record performance metrics (always recorded)
         
         Args:
             trial: Trial index (0-based)
@@ -674,7 +675,7 @@ class ExperimentMetricsCollector:
             disruption_data: Optional disruption data for incident summary
             
         Returns:
-            Complete RouteMetricsRecord
+            Complete RouteMetricsRecord with accuracy and performance
         """
         with self.lock:
             try:
@@ -706,10 +707,12 @@ class ExperimentMetricsCollector:
                     self.incident_summaries[batch_key] = record.incident_summary
                 
                 # ============================================================
-                # STEP 1: ACCURACY COMPUTATION (HC2L/HC2L only)
+                # STEP 1: ACCURACY COMPUTATION (both DHL and DHC2L)
                 # ============================================================
+                metrics = api_result.get("metrics", {})
+                
                 if is_hc2l:
-                    metrics = api_result.get("metrics", {})
+                    # HC2L/DHC2L: Extract distances from API result
                     dhc2l_dist = float(metrics.get("calculated_distance_meters", 0))
                     dijkstra_dist = float(metrics.get("dijkstra_distance_meter", 0))
                     
@@ -719,6 +722,21 @@ class ExperimentMetricsCollector:
                     
                     # Store in numpy arrays
                     self.dhc2l_distance[trial, batch, route] = dhc2l_dist
+                    self.dijkstra_distance[trial, batch, route] = dijkstra_dist
+                    self.distance_error[trial, batch, route] = record.accuracy.distance_error
+                    self.relative_error[trial, batch, route] = record.accuracy.relative_error
+                    self.is_correct[trial, batch, route] = record.accuracy.is_correct
+                else:
+                    # DHL: Extract DHL distance and compute Dijkstra reference
+                    dhl_dist = float(metrics.get("calculated_distance_meters", 0))
+                    dijkstra_dist = float(metrics.get("dijkstra_distance_meter", 0))
+                    
+                    record.accuracy = AccuracyMetrics.compute(
+                        dhl_dist, dijkstra_dist, self.tolerance
+                    )
+                    
+                    # Store in numpy arrays
+                    self.dhc2l_distance[trial, batch, route] = dhl_dist  # Reuse array for DHL
                     self.dijkstra_distance[trial, batch, route] = dijkstra_dist
                     self.distance_error[trial, batch, route] = record.accuracy.distance_error
                     self.relative_error[trial, batch, route] = record.accuracy.relative_error
