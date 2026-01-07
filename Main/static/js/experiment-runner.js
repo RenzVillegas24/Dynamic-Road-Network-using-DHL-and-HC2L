@@ -2665,7 +2665,7 @@ const ExperimentRunner = {
                     <div class="bg-gradient-to-r from-cyan-50 to-blue-50 px-4 py-3 border-b border-cyan-200 flex items-center justify-between">
                         <h5 class="font-bold text-cyan-900 flex items-center gap-2 mb-0">
                             <i data-lucide="layers" class="w-4 h-4"></i>
-                            Averages Per Trial (All Trials Included)
+                            Averages Per Trial
                         </h5>
                         <button onclick="ExperimentRunner.exportCSV('accuracy', 'per-trial')"
                             class="btn btn--success btn--xs hover:shadow-md transition-all">
@@ -2936,7 +2936,7 @@ const ExperimentRunner = {
                     <div class="bg-gradient-to-r from-indigo-50 to-purple-50 px-4 py-3 border-b border-indigo-200 flex items-center justify-between">
                         <h5 class="font-bold text-indigo-900 flex items-center gap-2 mb-0">
                             <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
-                            Averages Per Batch (Across All Trials)
+                            Averages Per Batch
                         </h5>
                         <button onclick="ExperimentRunner.exportCSV('construction', 'per-batch')"
                             class="btn btn--success btn--xs hover:shadow-md transition-all">
@@ -3556,7 +3556,7 @@ const ExperimentRunner = {
                                 <i data-lucide="git-compare" class="w-4 h-4"></i>
                                 Route Similarity Analysis (${result.data.length} routes compared)
                             </h5>
-                            <button onclick="ExperimentRunner.exportCSV('similarity', 'all')" class="btn btn--success btn--xs">
+                            <button onclick="ExperimentRunner.exportCSV('similarity', 'per-route')" class="btn btn--success btn--xs">
                                 <i data-lucide="download" class="w-3 h-3"></i> Export CSV
                             </button>
                         </div>
