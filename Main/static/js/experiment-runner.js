@@ -1394,13 +1394,25 @@ const ExperimentRunner = {
                 if (response.ok) {
                     const data = await response.json();
                     if (data.success && data.result && data.result.summary) {
-                        // Results are ready and valid
-                        console.log(`✓ Results loaded successfully after ${attempts} attempts`);
-                        await this.fetchAndDisplayResults();
-                        await this.loadResultsList();
-                        this.showTab('results');
-                        this.showNotification('Results loaded successfully!', 'success');
-                        return; // Success - stop polling
+                        // Check if CSV data is also available / ready (essential for large datasets)
+                        try {
+                            const csvResponse = await fetch(`/api/experiment/results/${experimentId}/csv/summary/data?page=1&limit=1`);
+                            const csvData = await csvResponse.json();
+                            
+                            if (csvData.success && csvData.data && csvData.data.length > 0) {
+                                // Results AND CSV are ready
+                                console.log(`✓ Results and CSV loaded successfully after ${attempts} attempts`);
+                                await this.fetchAndDisplayResults();
+                                await this.loadResultsList();
+                                this.showTab('results');
+                                this.showNotification('Results loaded successfully!', 'success');
+                                return; // Success - stop polling
+                            } else {
+                                console.log(`Results loaded but CSVs not ready yet (attempt ${attempts})`);
+                            }
+                        } catch (e) {
+                            console.log(`Results loaded but CSV fetch failed (attempt ${attempts}): ${e.message}`);
+                        }
                     }
                 }
 
@@ -1623,6 +1635,7 @@ const ExperimentRunner = {
             const result = await response.json();
 
             if (result.success && result.result) {
+                this.currentResultId = this.currentExperimentId;
                 this.resultsData = result.result;
                 this.populateResultsDashboard(result.result);
             } else {
