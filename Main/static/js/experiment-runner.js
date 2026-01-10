@@ -3339,6 +3339,8 @@ const ExperimentRunner = {
             return;
         }
 
+        console.log('[populateGraphs] Received graph data:', graphData);
+
         // Clean up existing charts
         Object.values(this.chartInstances).forEach(chart => {
             if (chart) chart.destroy();
@@ -3346,372 +3348,39 @@ const ExperimentRunner = {
         this.chartInstances = {};
 
         // Render graphs using the new pre-calculated graph_data structure
-        this.renderJamFactorChart();
-        this.renderErrorRateChart();
-        this.renderPerBatchBreakdownChart(graphData.per_batch_comparison);
-        this.renderPerTrialBreakdownChart(graphData.per_trial_comparison);
+        console.log('[populateGraphs] Rendering jam factor chart...');
+        this.renderJamFactorChart(graphData.jam_factor);
+        
+        console.log('[populateGraphs] Rendering error rate chart...');
+        this.renderErrorRateChart(graphData.error_rate);
+        
+        console.log('[populateGraphs] Rendering per-batch charts...');
+        this.renderPerBatchQueryChart(graphData.per_batch_comparison);
+        this.renderPerBatchLabelSizeChart(graphData.per_batch_comparison);
+        
+        console.log('[populateGraphs] Rendering per-trial charts...');
+        this.renderPerTrialQueryChart(graphData.per_trial_comparison);
+        this.renderPerTrialLabelSizeChart(graphData.per_trial_comparison);
+        
+        console.log('[populateGraphs] Rendering rebuild analysis chart...');
         this.renderRebuildAnalysisChart(graphData.rebuild_analysis);
-    },
-
-    async loadAndRenderPerTrialPerBatchCharts(graphData) {
-        try {
-            // Load summary CSV data for jam factors
-            const summaryResponse = await fetch(`/api/experiment/results/${this.currentResultId}/csv/summary/data?page=1&limit=1000`);
-            const summaryResult = await summaryResponse.json();
-            
-            // Load accuracy CSV data for error rates
-            const accuracyResponse = await fetch(`/api/experiment/results/${this.currentResultId}/csv/accuracy/data?page=1&limit=1000`);
-            const accuracyResult = await accuracyResponse.json();
-
-            if (summaryResult.success && summaryResult.data && summaryResult.data.length > 0) {
-                // Compute jam factors per trial and per batch
-                const jamFactorData = this.computeJamFactorData(summaryResult.data);
-                
-                // Enhance graphData with jam factor data
-                if (graphData.per_trial) {
-                    graphData.per_trial.jam_factors = jamFactorData.perTrial;
-                }
-                if (graphData.per_batch) {
-                    graphData.per_batch.jam_factors = jamFactorData.perBatch;
-                }
-            }
-
-            if (accuracyResult.success && accuracyResult.data && accuracyResult.data.length > 0) {
-                // Compute error rates per trial and per batch
-                const errorRateData = this.computeErrorRateData(accuracyResult.data);
-                
-                // Enhance graphData with error rate data
-                if (graphData.per_trial) {
-                    graphData.per_trial.error_rates = errorRateData.perTrial;
-                }
-                if (graphData.per_batch) {
-                    graphData.per_batch.error_rates = errorRateData.perBatch;
-                }
-            }
-
-            // Now render the per-trial and per-batch breakdown charts with the enhanced data
-            this.renderPerTrialBreakdownChart(graphData.per_trial);
-            this.renderPerBatchBreakdownChart(graphData.per_batch);
-
-        } catch (error) {
-            console.error('Error loading per-trial/per-batch data:', error);
-            // Still render the charts even if data loading fails
-            this.renderPerTrialBreakdownChart(graphData.per_trial);
-            this.renderPerBatchBreakdownChart(graphData.per_batch);
-        }
-    },
-
-    computeJamFactorData(summaryData) {
-        const perTrialMap = {};
-        const perBatchMap = {};
-
-        // Group by trial and batch
-        summaryData.forEach(row => {
-            const trialKey = `T${row.trial_id}`;
-            const batchKey = `B${row.batch_id}`;
-            
-            // Calculate average jam factor from disruption counts and types
-            // Using a weighted average based on disruption severity
-            const total = (
-                parseInt(row.num_accident || 0) +
-                parseInt(row.num_construction || 0) +
-                parseInt(row.num_congestion || 0) +
-                parseInt(row.num_disabled_vehicle || 0) +
-                parseInt(row.num_mass_transit_event || 0) +
-                parseInt(row.num_planned_event || 0) +
-                parseInt(row.num_road_hazard || 0) +
-                parseInt(row.num_road_closure || 0) +
-                parseInt(row.num_weather || 0) +
-                parseInt(row.num_lane_restriction || 0) +
-                parseInt(row.num_other || 0)
-            );
-
-            // Map disruption level to jam factor
-            let jamFactor = 0;
-            if (row.disruption_level === 'light') jamFactor = 2;
-            else if (row.disruption_level === 'medium') jamFactor = 5;
-            else if (row.disruption_level === 'heavy') jamFactor = 8;
-
-            if (!perTrialMap[trialKey]) {
-                perTrialMap[trialKey] = [];
-            }
-            perTrialMap[trialKey].push(jamFactor);
-
-            if (!perBatchMap[batchKey]) {
-                perBatchMap[batchKey] = [];
-            }
-            perBatchMap[batchKey].push(jamFactor);
-        });
-
-        // Calculate averages
-        const perTrial = Object.keys(perTrialMap).sort().map(key => {
-            const values = perTrialMap[key];
-            return values.reduce((a, b) => a + b, 0) / values.length;
-        });
-
-        const perBatch = Object.keys(perBatchMap).sort().map(key => {
-            const values = perBatchMap[key];
-            return values.reduce((a, b) => a + b, 0) / values.length;
-        });
-
-        return { perTrial, perBatch };
-    },
-
-    computeErrorRateData(accuracyData) {
-        const perTrialMap = {};
-        const perBatchMap = {};
-
-        // Group by trial and batch
-        accuracyData.forEach(row => {
-            const trialKey = `T${row.trial_id}`;
-            const batchKey = `B${row.batch_id}`;
-            
-            const isIncorrect = row.is_correct === 'False' || row.is_correct === false;
-
-            if (!perTrialMap[trialKey]) {
-                perTrialMap[trialKey] = { total: 0, incorrect: 0 };
-            }
-            perTrialMap[trialKey].total++;
-            if (isIncorrect) perTrialMap[trialKey].incorrect++;
-
-            if (!perBatchMap[batchKey]) {
-                perBatchMap[batchKey] = { total: 0, incorrect: 0 };
-            }
-            perBatchMap[batchKey].total++;
-            if (isIncorrect) perBatchMap[batchKey].incorrect++;
-        });
-
-        // Calculate error rates as percentages
-        const perTrial = Object.keys(perTrialMap).sort().map(key => {
-            const data = perTrialMap[key];
-            return data.total > 0 ? (data.incorrect / data.total) * 100 : 0;
-        });
-
-        const perBatch = Object.keys(perBatchMap).sort().map(key => {
-            const data = perBatchMap[key];
-            return data.total > 0 ? (data.incorrect / data.total) * 100 : 0;
-        });
-
-        return { perTrial, perBatch };
-    },
-
-    renderQueryTimeSeriesChart(timeSeriesData) {
-        if (!timeSeriesData) return;
-
-        const ctx = document.getElementById('chart-query-time-series');
-        if (!ctx) return;
-
-        const dhlData = timeSeriesData.DHL || {};
-        const hc2lData = timeSeriesData.HC2L || {};
-
-        this.chartInstances['query-time-series'] = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: dhlData.batch_labels || [],
-                datasets: [
-                    {
-                        label: 'DHL Query Time',
-                        data: dhlData.query_times || [],
-                        borderColor: '#3B82F6',
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        tension: 0.4
-                    },
-                    {
-                        label: 'HC2L Query Time',
-                        data: hc2lData.query_times || [],
-                        borderColor: '#10B981',
-                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                        tension: 0.4
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    title: {
-                        display: true,
-                        text: 'Query Time Performance Over Batches'
-                    },
-                    legend: {
-                        position: 'top'
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title: {
-                            display: true,
-                            text: 'Time (ms)'
-                        }
-                    },
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Trial-Batch'
-                        }
-                    }
-                }
-            }
-        });
-    },
-
-    renderUpdateTimeSeriesChart(timeSeriesData) {
-        if (!timeSeriesData) return;
-
-        const ctx = document.getElementById('chart-update-time-series');
-        if (!ctx) return;
-
-        const dhlData = timeSeriesData.DHL || {};
-        const hc2lData = timeSeriesData.HC2L || {};
-
-        this.chartInstances['update-time-series'] = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: dhlData.batch_labels || [],
-                datasets: [
-                    {
-                        label: 'DHL Update Time',
-                        data: dhlData.update_times || [],
-                        borderColor: '#3B82F6',
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        tension: 0.4
-                    },
-                    {
-                        label: 'HC2L Update Time',
-                        data: hc2lData.update_times || [],
-                        borderColor: '#10B981',
-                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                        tension: 0.4
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    title: {
-                        display: true,
-                        text: 'Lazy Update Time Over Batches'
-                    },
-                    legend: {
-                        position: 'top'
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title: {
-                            display: true,
-                            text: 'Time (ms)'
-                        }
-                    },
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Trial-Batch'
-                        }
-                    }
-                }
-            }
-        });
-    },
-
-    renderAverageQueryTimeChart(comparisonData) {
-        if (!comparisonData) return;
-
-        const ctx = document.getElementById('chart-avg-query-time');
-        if (!ctx) return;
-
-        const avgQueryTime = comparisonData.avg_query_time || {};
-
-        this.chartInstances['avg-query-time'] = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: ['DHL', 'HC2L'],
-                datasets: [{
-                    label: 'Average Query Time (ms)',
-                    data: [avgQueryTime.DHL || 0, avgQueryTime.HC2L || 0],
-                    backgroundColor: ['rgba(59, 130, 246, 0.7)', 'rgba(16, 185, 129, 0.7)'],
-                    borderColor: ['#3B82F6', '#10B981'],
-                    borderWidth: 2
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    title: {
-                        display: true,
-                        text: 'Average Query Time Comparison'
-                    },
-                    legend: {
-                        display: false
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title: {
-                            display: true,
-                            text: 'Time (ms)'
-                        }
-                    }
-                }
-            }
-        });
-    },
-
-    renderAverageLabelSizeChart(comparisonData) {
-        if (!comparisonData) return;
-
-        const ctx = document.getElementById('chart-avg-label-size');
-        if (!ctx) return;
-
-        const avgLabelSize = comparisonData.avg_label_size || {};
-
-        this.chartInstances['avg-label-size'] = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: ['DHL', 'HC2L'],
-                datasets: [{
-                    label: 'Average Label Size (MB)',
-                    data: [avgLabelSize.DHL || 0, avgLabelSize.HC2L || 0],
-                    backgroundColor: ['rgba(139, 92, 246, 0.7)', 'rgba(251, 191, 36, 0.7)'],
-                    borderColor: ['#8B5CF6', '#FBBF24'],
-                    borderWidth: 2
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    title: {
-                        display: true,
-                        text: 'Average Label Size Comparison'
-                    },
-                    legend: {
-                        display: false
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title: {
-                            display: true,
-                            text: 'Size (MB)'
-                        }
-                    }
-                }
-            }
-        });
+        
+        console.log('[populateGraphs] All charts rendered');
     },
 
     renderPerTrialQueryChart(perTrialData) {
-        if (!perTrialData || !perTrialData.labels) return;
+        if (!perTrialData || !perTrialData.labels) {
+            console.warn('[renderPerTrialQueryChart] No data available:', perTrialData);
+            return;
+        }
 
         const ctx = document.getElementById('chart-per-trial-query');
-        if (!ctx) return;
+        if (!ctx) {
+            console.error('[renderPerTrialQueryChart] Canvas not found: chart-per-trial-query');
+            return;
+        }
+
+        console.log('[renderPerTrialQueryChart] Rendering with data:', perTrialData);
 
         this.chartInstances['per-trial-query'] = new Chart(ctx, {
             type: 'bar',
@@ -3931,13 +3600,6 @@ const ExperimentRunner = {
                 }
             }
         });
-    },
-
-    renderPerTrialBreakdownChart(perTrialData) {
-        // Render per-trial comparison charts
-        this.renderPerTrialQueryChart(perTrialData);
-        this.renderPerTrialLabelSizeChart(perTrialData);
-        // Note: Jam factor and error rate have their own dedicated charts
     },
 
     renderPerBatchQueryChart(perBatchData) {
@@ -4166,73 +3828,6 @@ const ExperimentRunner = {
         });
     },
 
-    renderPerBatchBreakdownChart(perBatchData) {
-        // Render per-batch comparison charts
-        this.renderPerBatchQueryChart(perBatchData);
-        this.renderPerBatchLabelSizeChart(perBatchData);
-        // Note: Jam factor and error rate have their own dedicated charts
-    },
-
-    renderOverallComparisonChart(comparisonData) {
-        if (!comparisonData) return;
-
-        const ctx = document.getElementById('chart-overall-comparison');
-        if (!ctx) return;
-
-        const avgQueryTime = comparisonData.avg_query_time || {};
-        const avgLabelSize = comparisonData.avg_label_size || {};
-
-        this.chartInstances['overall-comparison'] = new Chart(ctx, {
-            type: 'radar',
-            data: {
-                labels: ['Query Time', 'Label Size Efficiency', 'Overall Performance'],
-                datasets: [
-                    {
-                        label: 'DHL',
-                        data: [
-                            avgQueryTime.DHL ? 100 - (avgQueryTime.DHL / 10) : 0,
-                            avgLabelSize.DHL ? 100 - (avgLabelSize.DHL * 10) : 0,
-                            50
-                        ],
-                        backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                        borderColor: '#3B82F6',
-                        pointBackgroundColor: '#3B82F6'
-                    },
-                    {
-                        label: 'HC2L',
-                        data: [
-                            avgQueryTime.HC2L ? 100 - (avgQueryTime.HC2L / 10) : 0,
-                            avgLabelSize.HC2L ? 100 - (avgLabelSize.HC2L * 10) : 0,
-                            50
-                        ],
-                        backgroundColor: 'rgba(16, 185, 129, 0.2)',
-                        borderColor: '#10B981',
-                        pointBackgroundColor: '#10B981'
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    title: {
-                        display: true,
-                        text: 'Overall Algorithm Comparison (Higher = Better)'
-                    },
-                    legend: {
-                        position: 'top'
-                    }
-                },
-                scales: {
-                    r: {
-                        beginAtZero: true,
-                        max: 100
-                    }
-                }
-            }
-        });
-    },
-
     renderRebuildAnalysisChart(rebuildData) {
         if (!rebuildData) return;
 
@@ -4287,72 +3882,19 @@ const ExperimentRunner = {
         });
     },
 
-    renderLabelSizeTrendChart(labelSizeData) {
-        if (!labelSizeData) return;
+    renderJamFactorChart(graphData) {
+        if (!graphData?.labels || !graphData?.values) {
+            console.warn('[renderJamFactorChart] No data available:', graphData);
+            return;
+        }
 
-        const ctx = document.getElementById('chart-label-size-trend');
-        if (!ctx) return;
+        const ctx = document.getElementById('chart-per-batch-jam-factor');
+        if (!ctx) {
+            console.error('[renderJamFactorChart] Canvas not found: chart-per-batch-jam-factor');
+            return;
+        }
 
-        this.chartInstances['label-size-trend'] = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: labelSizeData.batch_labels || [],
-                datasets: [
-                    {
-                        label: 'DHL Label Size',
-                        data: labelSizeData.DHL_labels || [],
-                        borderColor: '#8B5CF6',
-                        backgroundColor: 'rgba(139, 92, 246, 0.2)',
-                        fill: true,
-                        tension: 0.4
-                    },
-                    {
-                        label: 'HC2L Label Size',
-                        data: labelSizeData.HC2L_labels || [],
-                        borderColor: '#EC4899',
-                        backgroundColor: 'rgba(236, 72, 153, 0.2)',
-                        fill: true,
-                        tension: 0.4
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    title: {
-                        display: true,
-                        text: 'Label Size Evolution Over Time'
-                    },
-                    legend: {
-                        position: 'top'
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title: {
-                            display: true,
-                            text: 'Size (MB)'
-                        }
-                    },
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Trial-Batch'
-                        }
-                    }
-                }
-            }
-        });
-    },
-
-    renderJamFactorChart() {
-        const graphData = this.resultsData?.graph_data?.jam_factor;
-        if (!graphData?.labels || !graphData?.values) return;
-
-        const ctx = document.getElementById('chart-jam-factor');
-        if (!ctx) return;
+        console.log('[renderJamFactorChart] Rendering with data:', graphData);
 
         const labels = graphData.labels;
         const jamFactors = graphData.values;
@@ -4422,12 +3964,19 @@ const ExperimentRunner = {
         });
     },
 
-    renderErrorRateChart() {
-        const graphData = this.resultsData?.graph_data?.error_rate;
-        if (!graphData?.labels || !graphData?.values) return;
+    renderErrorRateChart(graphData) {
+        if (!graphData?.labels || !graphData?.values) {
+            console.warn('[renderErrorRateChart] No data available:', graphData);
+            return;
+        }
 
-        const ctx = document.getElementById('chart-error-rate');
-        if (!ctx) return;
+        const ctx = document.getElementById('chart-per-batch-error-rate');
+        if (!ctx) {
+            console.error('[renderErrorRateChart] Canvas not found: chart-per-batch-error-rate');
+            return;
+        }
+
+        console.log('[renderErrorRateChart] Rendering with data:', graphData);
 
         const labels = graphData.labels;
         const errorRates = graphData.values;

@@ -1285,58 +1285,6 @@
             </div>
           </div>
 
-          <!-- Time Series Graphs -->
-          <div class="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-5">
-            <div class="flex items-center gap-3 mb-4">
-              <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                <i data-lucide="trending-up" class="w-5 h-5 text-blue-600"></i>
-              </div>
-              <h5 class="font-bold text-gray-800 mb-0">Query Time Over Batches</h5>
-            </div>
-            <div style="position: relative; height: 300px; width: 100%;">
-              <canvas id="chart-query-time-series"></canvas>
-            </div>
-          </div>
-
-          <div class="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-5">
-            <div class="flex items-center gap-3 mb-4">
-              <div class="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                <i data-lucide="activity" class="w-5 h-5 text-green-600"></i>
-              </div>
-              <h5 class="font-bold text-gray-800 mb-0">Update Time Over Batches</h5>
-            </div>
-            <div style="position: relative; height: 300px; width: 100%;">
-              <canvas id="chart-update-time-series"></canvas>
-            </div>
-          </div>
-
-          <!-- Algorithm Comparison Bar Charts -->
-          <div class="grid grid-cols-2 gap-5">
-            <div class="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-5">
-              <div class="flex items-center gap-3 mb-4">
-                <div class="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
-                  <i data-lucide="bar-chart" class="w-5 h-5 text-purple-600"></i>
-                </div>
-                <h5 class="font-bold text-gray-800 mb-0">Average Query Time</h5>
-              </div>
-              <div style="position: relative; height: 250px; width: 100%;">
-                <canvas id="chart-avg-query-time"></canvas>
-              </div>
-            </div>
-
-            <div class="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-5">
-              <div class="flex items-center gap-3 mb-4">
-                <div class="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center">
-                  <i data-lucide="bar-chart-2" class="w-5 h-5 text-amber-600"></i>
-                </div>
-                <h5 class="font-bold text-gray-800 mb-0">Average Label Size</h5>
-              </div>
-              <div style="position: relative; height: 250px; width: 100%;">
-                <canvas id="chart-avg-label-size"></canvas>
-              </div>
-            </div>
-          </div>
-
           <!-- Per-Trial Breakdown - Query Time -->
           <div class="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-5">
             <div class="flex items-center gap-3 mb-4">
@@ -1360,32 +1308,6 @@
             </div>
             <div style="position: relative; height: 300px; width: 100%;">
               <canvas id="chart-per-trial-label-size"></canvas>
-            </div>
-          </div>
-
-          <!-- Per-Trial Breakdown - Jam Factor -->
-          <div class="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-5">
-            <div class="flex items-center gap-3 mb-4">
-              <div class="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
-                <i data-lucide="traffic-cone" class="w-5 h-5 text-orange-600"></i>
-              </div>
-              <h5 class="font-bold text-gray-800 mb-0">Per-Trial Average Jam Factor</h5>
-            </div>
-            <div style="position: relative; height: 300px; width: 100%;">
-              <canvas id="chart-per-trial-jam-factor"></canvas>
-            </div>
-          </div>
-
-          <!-- Per-Trial Breakdown - Error Rate -->
-          <div class="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-5">
-            <div class="flex items-center gap-3 mb-4">
-              <div class="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
-                <i data-lucide="alert-triangle" class="w-5 h-5 text-red-600"></i>
-              </div>
-              <h5 class="font-bold text-gray-800 mb-0">Per-Trial Error Rate</h5>
-            </div>
-            <div style="position: relative; height: 300px; width: 100%;">
-              <canvas id="chart-per-trial-error-rate"></canvas>
             </div>
           </div>
 
@@ -1449,19 +1371,6 @@
             </div>
           </div>
 
-          <!-- Combined Performance Metrics -->
-          <div class="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-5">
-            <div class="flex items-center gap-3 mb-4">
-              <div class="w-8 h-8 bg-teal-100 rounded-lg flex items-center justify-center">
-                <i data-lucide="git-compare" class="w-5 h-5 text-teal-600"></i>
-              </div>
-              <h5 class="font-bold text-gray-800 mb-0">Overall Performance Comparison</h5>
-            </div>
-            <div style="position: relative; height: 350px; width: 100%;">
-              <canvas id="chart-overall-comparison"></canvas>
-            </div>
-          </div>
-
           <!-- Threshold Rebuild Time Analysis -->
           <div class="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-5">
             <div class="flex items-center gap-3 mb-4">
@@ -1472,47 +1381,6 @@
             </div>
             <div style="position: relative; height: 300px; width: 100%;">
               <canvas id="chart-rebuild-time-analysis"></canvas>
-            </div>
-          </div>
-
-          <!-- Label Size Change Trend -->
-          <div class="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-5">
-            <div class="flex items-center gap-3 mb-4">
-              <div class="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
-                <i data-lucide="hard-drive" class="w-5 h-5 text-orange-600"></i>
-              </div>
-              <h5 class="font-bold text-gray-800 mb-0">Label Size Change Over Time</h5>
-            </div>
-            <div style="position: relative; height: 300px; width: 100%;">
-              <canvas id="chart-label-size-trend"></canvas>
-            </div>
-          </div>
-
-          <!-- NEW: Jam Factor per Batch (Section 7.3) -->
-          <div class="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-5">
-            <div class="flex items-center gap-3 mb-4">
-              <div class="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
-                <i data-lucide="alert-triangle" class="w-5 h-5 text-yellow-600"></i>
-              </div>
-              <h5 class="font-bold text-gray-800">Average Jam Factor per Batch</h5>
-              <span class="text-xs text-gray-500">(Traffic disruption intensity)</span>
-            </div>
-            <div style="position: relative; height: 300px; width: 100%;">
-              <canvas id="chart-jam-factor-per-batch"></canvas>
-            </div>
-          </div>
-
-          <!-- NEW: Error Rate per Batch (Section 7.3) -->
-          <div class="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-5">
-            <div class="flex items-center gap-3 mb-4">
-              <div class="w-8 h-8 bg-rose-100 rounded-lg flex items-center justify-center">
-                <i data-lucide="alert-circle" class="w-5 h-5 text-rose-600"></i>
-              </div>
-              <h5 class="font-bold text-gray-800">HC2L Accuracy Error Rate per Batch</h5>
-              <span class="text-xs text-gray-500">(Routes with relative error > 10%)</span>
-            </div>
-            <div style="position: relative; height: 300px; width: 100%;">
-              <canvas id="chart-error-rate-per-batch"></canvas>
             </div>
           </div>
         </div>
