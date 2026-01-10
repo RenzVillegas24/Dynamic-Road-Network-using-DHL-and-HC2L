@@ -537,7 +537,7 @@ class HereAPIRateLimiter:
 class HereRoutingService:
     """Service for fetching routes from HERE Routing API with rate limiting and caching"""
     
-    def __init__(self, requests_per_second: float = 10):
+    def __init__(self, requests_per_second: float = 7):
         self.api_key = Config.HERE_API_KEY
         if not self.api_key:
             logger.warning("HERE API key not set")
