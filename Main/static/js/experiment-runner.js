@@ -432,15 +432,18 @@ const ExperimentRunner = {
     async togglePause(mode = 'toggle') {
         if (!this.currentExperimentId) return;
 
+        // Determine what the new state should be
+        let newPausedState;
         if (mode === 'toggle') {
-            this.isPaused = !this.isPaused;
+            newPausedState = !this.isPaused;
         } else if (mode === 'pause') {
-            this.isPaused = true;
+            newPausedState = true;
         } else if (mode === 'resume') {
-            this.isPaused = false;
+            newPausedState = false;
         }
 
-        const endpoint = this.isPaused ? 'pause' : 'resume';
+        // Determine endpoint based on desired new state
+        const endpoint = newPausedState ? 'pause' : 'resume';
 
         try {
             const response = await fetch(`/api/experiment/${this.currentExperimentId}/${endpoint}`, {
@@ -450,12 +453,17 @@ const ExperimentRunner = {
             const result = await response.json();
 
             if (result.success) {
-                this.isPaused = !this.isPaused;
+                // Update state only after successful API call
+                this.isPaused = newPausedState;
                 this.updatePauseButton();
                 this.showNotification(`Experiment ${this.isPaused ? 'paused' : 'resumed'}`, 'info');
+            } else {
+                console.error(`Failed to ${endpoint} experiment:`, result.error);
+                this.showNotification(`Failed to ${endpoint} experiment`, 'error');
             }
         } catch (error) {
             console.error(`Error ${endpoint}ing experiment:`, error);
+            this.showNotification(`Error ${endpoint}ing experiment`, 'error');
         }
     },
 
@@ -581,6 +589,15 @@ const ExperimentRunner = {
 
     handleProgressUpdate(data) {
         this.progressData = data;
+
+        // Sync pause state with backend status
+        if (data.status === 'paused' && !this.isPaused) {
+            this.isPaused = true;
+            this.updatePauseButton();
+        } else if (data.status === 'running' && this.isPaused) {
+            this.isPaused = false;
+            this.updatePauseButton();
+        }
 
         // Update overall progress
         this.updateOverallProgress(data);
@@ -2199,6 +2216,9 @@ const ExperimentRunner = {
             } else if (progress.status === 'error') {
                 statusBadge.className = 'px-2 py-1 rounded text-xs font-medium bg-red-100 text-red-700';
                 statusBadge.innerHTML = '<i data-lucide="alert-circle" class="w-3 h-3 inline mr-1"></i>Error';
+            } else if (progress.status === 'paused') {
+                statusBadge.className = 'px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-700';
+                statusBadge.innerHTML = '<i data-lucide="pause" class="w-3 h-3 inline mr-1"></i>Paused';
             } else {
                 statusBadge.className = 'px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-600';
                 statusBadge.innerHTML = '<i data-lucide="clock" class="w-3 h-3 inline mr-1"></i>Waiting';
@@ -2218,6 +2238,9 @@ const ExperimentRunner = {
             } else if (progress.status === 'error') {
                 runningStatusBadge.className = 'px-2 py-1 rounded text-xs font-medium bg-red-100 text-red-700';
                 runningStatusBadge.innerHTML = '<i data-lucide="alert-circle" class="w-3 h-3 inline mr-1"></i>Error';
+            } else if (progress.status === 'paused') {
+                runningStatusBadge.className = 'px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-700';
+                runningStatusBadge.innerHTML = '<i data-lucide="pause" class="w-3 h-3 inline mr-1"></i>Paused';
             } else {
                 runningStatusBadge.className = 'px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-600';
                 runningStatusBadge.innerHTML = '<i data-lucide="clock" class="w-3 h-3 inline mr-1"></i>Waiting';
@@ -2228,7 +2251,7 @@ const ExperimentRunner = {
 
         // Show/hide running tab progress section
         if (runningProgressDiv) {
-            if (progress.status === 'running' || progress.status === 'completed') {
+            if (progress.status === 'running' || progress.status === 'completed' || progress.status === 'paused') {
                 runningProgressDiv.classList.remove('hidden');
             } else {
                 runningProgressDiv.classList.add('hidden');
@@ -2279,7 +2302,29 @@ const ExperimentRunner = {
             // Update last route info and compute live metrics from the full results data
             if (progress.current_route !== undefined) {
                 const lastRouteEl = document.getElementById('running-here-last-route-idx');
-                if (lastRouteEl) lastRouteEl.textContent = progress.current_route;
+                if (lastRouteEl) lastRouteEl.textContent = progress.current_route + 1; // 1-indexed for display
+            }
+            
+            // Update last route details
+            if (progress.last_hc2l_dist_km !== undefined) {
+                const el = document.getElementById('running-here-last-hc2l-dist');
+                if (el) el.textContent = progress.last_hc2l_dist_km.toFixed(2) + ' km';
+            }
+            if (progress.last_here_dist_km !== undefined) {
+                const el = document.getElementById('running-here-last-here-dist');
+                if (el) el.textContent = progress.last_here_dist_km.toFixed(2) + ' km';
+            }
+            if (progress.last_hc2l_time_min !== undefined) {
+                const el = document.getElementById('running-here-last-hc2l-time');
+                if (el) el.textContent = progress.last_hc2l_time_min.toFixed(1) + ' min';
+            }
+            if (progress.last_here_time_min !== undefined) {
+                const el = document.getElementById('running-here-last-here-time');
+                if (el) el.textContent = progress.last_here_time_min.toFixed(1) + ' min';
+            }
+            if (progress.last_time_dev_pct !== undefined) {
+                const el = document.getElementById('running-here-last-time-dev');
+                if (el) el.textContent = progress.last_time_dev_pct.toFixed(1) + '%';
             }
 
             // Compute and display live metrics from resultsData if available

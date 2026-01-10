@@ -1768,6 +1768,16 @@ class ExperimentRunner:
             
             logger.info(f"Using adaptive rate limiting: 10 req/s, batch size: {batch_size}")
             
+            # Running metrics accumulators for live display
+            hc2l_query_times = []
+            hc2l_distances = []
+            hc2l_times = []
+            here_query_times = []
+            here_distances = []
+            here_times = []
+            frechet_distances = []
+            time_deviations = []
+            
             for route_idx, route_data in enumerate(routes_to_compare):
                 # Check if experiment is still running
                 if experiment_id not in self.experiments:
@@ -1778,10 +1788,50 @@ class ExperimentRunner:
                     logger.info(f"Experiment {experiment_id} stop requested, ending HERE comparison")
                     break
                 
+                # Wait if paused - this allows pause/resume functionality
+                pause_event = self.pause_events.get(experiment_id)
+                if pause_event is not None:
+                    if not pause_event.is_set():
+                        # Update status to paused
+                        collector.update_here_comparison_status('paused', total_routes)
+                        if experiment_id in self.experiments:
+                            self._broadcast_progress(experiment_id)
+                        logger.info(f"HERE comparison paused for {experiment_id}, waiting...")
+                    pause_event.wait()  # Block until resumed
+                    # Check if we should resume running status
+                    if experiment_id in self.experiments and collector.here_comparison_progress.get('status') == 'paused':
+                        collector.update_here_comparison_status('running', total_routes)
+                        if experiment_id in self.experiments:
+                            self._broadcast_progress(experiment_id)
+                        logger.info(f"HERE comparison resumed for {experiment_id}")
+                
                 try:
-                    comparison_result = self._compare_single_route_here_vs_hc2l(
-                        route_idx, route_data, here_service, config
-                    )
+                    # Retry logic: try up to 3 times with 1 second wait between attempts
+                    max_retries = 3
+                    comparison_result = None
+                    last_error = None
+                    
+                    for attempt in range(max_retries):
+                        comparison_result = self._compare_single_route_here_vs_hc2l(
+                            route_idx, route_data, here_service, config
+                        )
+                        
+                        # If successful (no error), break out of retry loop
+                        if not comparison_result.get('error'):
+                            break
+                        
+                        # If this is a HERE API error and not the last attempt, retry
+                        last_error = comparison_result.get('error', '')
+                        if attempt < max_retries - 1:
+                            logger.warning(
+                                f"Route {route_idx} attempt {attempt + 1}/{max_retries} failed: {last_error}. "
+                                f"Retrying in 1 second..."
+                            )
+                            time.sleep(1)
+                        else:
+                            logger.warning(
+                                f"Route {route_idx} failed after {max_retries} attempts: {last_error}"
+                            )
                     
                     # Check if rate limiting occurred
                     if comparison_result.get('error') and '429' in str(comparison_result.get('error', '')):
@@ -1798,6 +1848,55 @@ class ExperimentRunner:
                     else:
                         completed += 1
                         consecutive_failures = 0
+                        
+                        # Accumulate metrics for running averages display
+                        if comparison_result.get('query_time_ms_hc2l', 0) > 0:
+                            hc2l_query_times.append(comparison_result['query_time_ms_hc2l'])
+                        if comparison_result.get('distance_km_hc2l', 0) > 0:
+                            hc2l_distances.append(comparison_result['distance_km_hc2l'])
+                        if comparison_result.get('travel_time_min_hc2l', 0) > 0:
+                            hc2l_times.append(comparison_result['travel_time_min_hc2l'])
+                        if comparison_result.get('query_time_ms_here', 0) > 0:
+                            here_query_times.append(comparison_result['query_time_ms_here'])
+                        if comparison_result.get('distance_km_here', 0) > 0:
+                            here_distances.append(comparison_result['distance_km_here'])
+                        if comparison_result.get('travel_time_min_here', 0) > 0:
+                            here_times.append(comparison_result['travel_time_min_here'])
+                        if comparison_result.get('frechet_distance_m', 0) > 0:
+                            frechet_distances.append(comparison_result['frechet_distance_m'])
+                        if comparison_result.get('time_deviation_pct') is not None:
+                            time_deviations.append(abs(comparison_result['time_deviation_pct']))
+                        
+                        # Update running metrics in the collector's progress
+                        with collector.lock:
+                            progress = collector.here_comparison_progress
+                            # HC2L metrics
+                            if hc2l_query_times:
+                                progress['hc2l_avg_query_ms'] = sum(hc2l_query_times) / len(hc2l_query_times)
+                            if hc2l_distances:
+                                progress['hc2l_avg_distance_km'] = sum(hc2l_distances) / len(hc2l_distances)
+                            if hc2l_times:
+                                progress['hc2l_avg_time_min'] = sum(hc2l_times) / len(hc2l_times)
+                            # HERE metrics
+                            if here_query_times:
+                                progress['here_avg_query_ms'] = sum(here_query_times) / len(here_query_times)
+                            if here_distances:
+                                progress['here_avg_distance_km'] = sum(here_distances) / len(here_distances)
+                            if here_times:
+                                progress['here_avg_time_min'] = sum(here_times) / len(here_times)
+                            # Quality metrics
+                            if frechet_distances:
+                                progress['avg_frechet_m'] = sum(frechet_distances) / len(frechet_distances)
+                                progress['last_frechet_m'] = frechet_distances[-1]
+                            if time_deviations:
+                                progress['avg_time_deviation_pct'] = sum(time_deviations) / len(time_deviations)
+                            
+                            # Last route details for UI display
+                            progress['last_hc2l_dist_km'] = comparison_result.get('distance_km_hc2l', 0)
+                            progress['last_here_dist_km'] = comparison_result.get('distance_km_here', 0)
+                            progress['last_hc2l_time_min'] = comparison_result.get('travel_time_min_hc2l', 0)
+                            progress['last_here_time_min'] = comparison_result.get('travel_time_min_here', 0)
+                            progress['last_time_dev_pct'] = comparison_result.get('time_deviation_pct', 0)
                     
                     # Record similarity data (batch=0 for baseline comparison, route_idx is the route)
                     collector.record_similarity(batch=0, route=route_idx, comparison_data=comparison_result)
