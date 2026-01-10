@@ -40,7 +40,7 @@
   </div>
 
   <!-- Tab Content: Settings -->
-  <div id="experiment-tab-settings" data-experiment-tab-content class="overflow-x-auto pb-20">
+  <div id="experiment-tab-settings" data-experiment-tab-content class="overflow-x-auto">
     <div class="panel__body overflow-hidden space-y-4">
       <!-- Fixed Parameters Notice -->
       <div class="bg-purple-50 border border-purple-200 rounded-lg p-3 text-xs text-purple-800">
@@ -636,7 +636,7 @@
   </div>
 
   <!-- Tab Content: Individual Result View -->
-  <div id="experiment-tab-results" data-experiment-tab-content class="hidden overflow-x-auto pb-20">
+  <div id="experiment-tab-results" data-experiment-tab-content class="hidden overflow-x-auto">
     <div class="panel__body overflow-hidden space-y-6">
       <!-- Back Button -->
       <button onclick="ExperimentRunner.showTab('results-list')"
@@ -732,7 +732,7 @@
         
         <!-- Scrollable Tab Container -->
         <div class="relative rounded-xl border border-gray-200 overflow-hidden mb-4">
-          <div id="result-tabs-container" class="overflow-x-auto scroll-smooth px-2 pt-2" onscroll="ExperimentRunner.updateTabScrollButtons()">
+          <div id="result-tabs-container" class="overflow-x-auto scroll-smooth px-2 pt-2 scrollbar-hide" onscroll="ExperimentRunner.updateTabScrollButtons()">
             <div class="nav-select nav-select--horizontal min-w-max">
               <!-- Summary Tab (NEW) -->
               <label class="nav-select__option" data-color="green">

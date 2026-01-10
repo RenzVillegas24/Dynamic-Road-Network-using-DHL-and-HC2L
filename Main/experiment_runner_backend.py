@@ -2353,33 +2353,33 @@ class ExperimentRunner:
                         # ============================================================
                         # RECORD ALL METRICS (includes accuracy-first gating for HC2L)
                         # ============================================================
-                        if experiment_id in self.metrics_collectors:
-                            metrics_collector = self.metrics_collectors[experiment_id]
+                        # if experiment_id in self.metrics_collectors:
+                        #     metrics_collector = self.metrics_collectors[experiment_id]
                             
-                            # Record route metrics (handles accuracy, performance, construction all in one)
-                            record = metrics_collector.record_route_metric(
-                                trial=trial_idx,
-                                batch=b_idx,
-                                route=route_idx,
-                                algorithm=algorithm,
-                                api_result=result,
-                                disruption_data=disruption_data
-                            )
+                        #     # Record route metrics (handles accuracy, performance, construction all in one)
+                        #     record = metrics_collector.record_route_metric(
+                        #         trial=trial_idx,
+                        #         batch=b_idx,
+                        #         route=route_idx,
+                        #         algorithm=algorithm,
+                        #         api_result=result,
+                        #         disruption_data=disruption_data
+                        #     )
                             
-                            # Log accuracy result for HC2L routes
-                            if algorithm.upper() == "HC2L" and record.accuracy:
-                                if not record.accuracy.is_correct:
-                                    logger.warning(
-                                        f"Route [{trial_idx+1},{b_idx+1},{route_idx+1}] HC2L "
-                                        f"accuracy FAILED: dhc2l={record.accuracy.dhc2l_distance:.1f}m, "
-                                        f"dijkstra={record.accuracy.dijkstra_distance:.1f}m, "
-                                        f"error={record.accuracy.relative_error:.4f} > tolerance={record.accuracy.tolerance}"
-                                    )
-                                else:
-                                    logger.debug(
-                                        f"Route [{trial_idx+1},{b_idx+1},{route_idx+1}] HC2L "
-                                        f"accuracy OK: error={record.accuracy.relative_error:.4f}"
-                                    )
+                        #     # Log accuracy result for HC2L routes
+                        #     if algorithm.upper() == "HC2L" and record.accuracy:
+                        #         if not record.accuracy.is_correct:
+                        #             logger.warning(
+                        #                 f"Route [{trial_idx+1},{b_idx+1},{route_idx+1}] HC2L "
+                        #                 f"accuracy FAILED: dhc2l={record.accuracy.dhc2l_distance:.1f}m, "
+                        #                 f"dijkstra={record.accuracy.dijkstra_distance:.1f}m, "
+                        #                 f"error={record.accuracy.relative_error:.4f} > tolerance={record.accuracy.tolerance}"
+                        #             )
+                        #         else:
+                        #             logger.debug(
+                        #                 f"Route [{trial_idx+1},{b_idx+1},{route_idx+1}] HC2L "
+                        #                 f"accuracy OK: error={record.accuracy.relative_error:.4f}"
+                        #             )
                         
                         # Update progress
                         completed += 1
@@ -2623,7 +2623,7 @@ class ExperimentRunner:
         with self.dijkstra_cache_lock:
             if cache_key in self.dijkstra_cache:
                 cached = self.dijkstra_cache[cache_key]
-                logger.debug(f"Dijkstra cache hit: {cache_key} = {cached['distance_km']} km")
+                # logger.debug(f"Dijkstra cache hit: {cache_key} = {cached['distance_km']} km")
                 return cached['distance_km']
         
         # Compute using HC2L router (which uses Dijkstra for path reconstruction)
@@ -2677,7 +2677,7 @@ class ExperimentRunner:
                     "computed_at": time.time()
                 }
             
-            logger.debug(f"Dijkstra computed and cached: {cache_key} = {distance_km} km")
+            # logger.debug(f"Dijkstra computed and cached: {cache_key} = {distance_km} km")
             return distance_km
             
         except Exception as e:
@@ -2819,13 +2819,13 @@ class ExperimentRunner:
                         "tolerance": 0.05
                     }
                     
-                    logger.debug(
-                        f"Route {route_idx} accuracy: "
-                        f"HC2L={dhc2l_distance:.3f}km, "
-                        f"Dijkstra={dijkstra_distance:.3f}km, "
-                        f"Error={relative_error*100:.2f}%, "
-                        f"Correct={is_correct}"
-                    )
+                    # logger.debug(
+                    #     f"Route {route_idx} accuracy: "
+                    #     f"HC2L={dhc2l_distance:.3f}km, "
+                    #     f"Dijkstra={dijkstra_distance:.3f}km, "
+                    #     f"Error={relative_error*100:.2f}%, "
+                    #     f"Correct={is_correct}"
+                    # )
                 else:
                     # If Dijkstra computation failed, mark as incorrect
                     result["accuracy"] = {
