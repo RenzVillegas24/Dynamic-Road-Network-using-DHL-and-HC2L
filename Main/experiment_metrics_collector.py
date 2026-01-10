@@ -1159,8 +1159,8 @@ class ExperimentMetricsCollector:
     
     def generate_results_json(self, experiment_config: Optional[Dict] = None) -> Path:
         """
-        Generate minimal JSON results file with configuration and summary statistics.
-        Detailed data is in CSV files.
+        Generate comprehensive JSON results file with pre-calculated aggregations.
+        All per-trial and per-batch averages are computed in backend.
         
         Args:
             experiment_config: Optional experiment configuration to include
@@ -1173,13 +1173,20 @@ class ExperimentMetricsCollector:
         results = {
             "metadata": {
                 "generated_at": datetime.now().isoformat(),
-                "version": "2.0",
-                "format": "minimal_json_with_csv"
+                "version": "3.0",
+                "format": "pre_calculated_aggregations"
             },
             "configuration": experiment_config or self._get_default_config(),
             "summary": self._compute_summary(),
             "accuracy_stats": self._compute_accuracy_stats(),
             "performance_stats": self._compute_performance_stats(),
+            "aggregated_data": {
+                "summary": self._compute_summary_aggregations(),
+                "accuracy": self._compute_accuracy_aggregations(),
+                "construction": self._compute_construction_aggregations(),
+                "updates": self._compute_updates_aggregations(),
+                "performance": self._compute_performance_aggregations()
+            },
             "graph_data": self._compute_graph_data(),
             "csv_files": {
                 "summary": "summary_results.csv",
@@ -1372,291 +1379,438 @@ class ExperimentMetricsCollector:
         return result_paths
     
     # ========================================================================
+    # PRE-CALCULATED AGGREGATIONS FOR FRONTEND
+    # ========================================================================
+    
+    def _compute_summary_aggregations(self) -> Dict:
+        """Pre-calculate summary aggregations (incident data) per trial and per batch"""
+        per_trial = []
+        per_batch = []
+        
+        # Per-trial data (each trial-batch combination)
+        for trial in range(self.trials):
+            for batch in range(self.batches):
+                # Find matching incident summary (incident_summaries is a dict with (trial, batch) keys)
+                batch_key = (trial + 1, batch + 1)
+                if batch_key in self.incident_summaries:
+                    summary = self.incident_summaries[batch_key]
+                    per_trial.append({
+                        "trial": trial + 1,
+                        "batch": batch + 1,
+                        "level": get_disruption_level(batch + 1),
+                        "accident": summary.num_accident,
+                        "construction": summary.num_construction,
+                        "congestion": summary.num_congestion,
+                        "total": (summary.num_accident + summary.num_construction + 
+                                 summary.num_congestion + summary.num_disabled_vehicle +
+                                 summary.num_mass_transit_event + summary.num_planned_event +
+                                 summary.num_road_hazard + summary.num_road_closure +
+                                 summary.num_weather + summary.num_lane_restriction +
+                                 summary.num_other)
+                    })
+        
+        # Per-batch averages (average across trials for each batch)
+        for batch in range(self.batches):
+            # Get all summaries for this batch from the dictionary
+            batch_summaries = [summary for (trial_id, batch_id), summary in self.incident_summaries.items() 
+                              if batch_id == batch + 1]
+            if batch_summaries:
+                avg_accident = np.mean([s.num_accident for s in batch_summaries])
+                avg_construction = np.mean([s.num_construction for s in batch_summaries])
+                avg_congestion = np.mean([s.num_congestion for s in batch_summaries])
+                avg_total = np.mean([
+                    s.num_accident + s.num_construction + s.num_congestion +
+                    s.num_disabled_vehicle + s.num_mass_transit_event + s.num_planned_event +
+                    s.num_road_hazard + s.num_road_closure + s.num_weather +
+                    s.num_lane_restriction + s.num_other
+                    for s in batch_summaries
+                ])
+                
+                per_batch.append({
+                    "batch": batch + 1,
+                    "level": get_disruption_level(batch + 1),
+                    "accident": round(float(avg_accident), 1),
+                    "construction": round(float(avg_construction), 1),
+                    "congestion": round(float(avg_congestion), 1),
+                    "total": round(float(avg_total), 1)
+                })
+        
+        return {"per_trial": per_trial, "per_batch": per_batch}
+    
+    def _compute_accuracy_aggregations(self) -> Dict:
+        """Pre-calculate accuracy aggregations per trial and per batch"""
+        per_trial = []
+        per_batch = []
+        
+        # Per-trial data (each trial-batch combination)
+        for trial in range(self.trials):
+            for batch in range(self.batches):
+                mask = self.filled_dhc2l[trial, batch, :]
+                total = int(np.sum(mask))
+                
+                if total > 0:
+                    correct = int(np.sum(self.is_correct[trial, batch, :][mask]))
+                    incorrect = total - correct
+                    avg_error = float(np.mean(self.relative_error[trial, batch, :][mask]))
+                    
+                    per_trial.append({
+                        "trial": trial + 1,
+                        "batch": batch + 1,
+                        "level": get_disruption_level(batch + 1),
+                        "total": total,
+                        "correct": correct,
+                        "incorrect": incorrect,
+                        "accuracy_rate": round(correct / total, 4),
+                        "avg_error": round(avg_error, 6)
+                    })
+        
+        # Per-batch averages (average across trials for each batch)
+        for batch in range(self.batches):
+            batch_data = [d for d in per_trial if d["batch"] == batch + 1]
+            if batch_data:
+                avg_total = np.mean([d["total"] for d in batch_data])
+                avg_correct = np.mean([d["correct"] for d in batch_data])
+                avg_incorrect = np.mean([d["incorrect"] for d in batch_data])
+                avg_accuracy = np.mean([d["accuracy_rate"] for d in batch_data])
+                avg_error = np.mean([d["avg_error"] for d in batch_data])
+                
+                per_batch.append({
+                    "batch": batch + 1,
+                    "level": get_disruption_level(batch + 1),
+                    "total": round(float(avg_total), 1),
+                    "correct": round(float(avg_correct), 1),
+                    "incorrect": round(float(avg_incorrect), 1),
+                    "accuracy_rate": round(float(avg_accuracy), 4),
+                    "avg_error": round(float(avg_error), 6)
+                })
+        
+        return {"per_trial": per_trial, "per_batch": per_batch}
+    
+    def _compute_construction_aggregations(self) -> Dict:
+        """Pre-calculate construction aggregations per trial"""
+        per_trial_dhl = []
+        per_trial_hc2l = []
+        
+        for trial in range(self.trials):
+            if self.construction_recorded_dhl[trial]:
+                per_trial_dhl.append({
+                    "trial": trial + 1,
+                    "algorithm": "DHL",
+                    "construction_time_ms": round(float(self.construction_time_dhl[trial]), 2),
+                    "initial_label_size_mb": round(float(self.initial_label_size_dhl[trial]), 5)
+                })
+            
+            if self.construction_recorded_dhc2l[trial]:
+                per_trial_hc2l.append({
+                    "trial": trial + 1,
+                    "algorithm": "HC2L",
+                    "construction_time_ms": round(float(self.construction_time_dhc2l[trial]), 2),
+                    "initial_label_size_mb": round(float(self.initial_label_size_dhc2l[trial]), 5)
+                })
+        
+        # Compute averages per algorithm (batch doesn't apply to initial construction)
+        avg_dhl = {
+            "batch": 1,  # Construction happens at batch 1
+            "algorithm": "DHL",
+            "avg_construction_time_ms": round(float(np.mean([d["construction_time_ms"] for d in per_trial_dhl])), 2) if per_trial_dhl else 0,
+            "avg_label_size_mb": round(float(np.mean([d["initial_label_size_mb"] for d in per_trial_dhl])), 5) if per_trial_dhl else 0
+        }
+        
+        avg_hc2l = {
+            "batch": 1,  # Construction happens at batch 1
+            "algorithm": "HC2L",
+            "avg_construction_time_ms": round(float(np.mean([d["construction_time_ms"] for d in per_trial_hc2l])), 2) if per_trial_hc2l else 0,
+            "avg_label_size_mb": round(float(np.mean([d["initial_label_size_mb"] for d in per_trial_hc2l])), 5) if per_trial_hc2l else 0
+        }
+        
+        return {
+            "per_trial": per_trial_dhl + per_trial_hc2l,
+            "per_batch": [avg_dhl, avg_hc2l]
+        }
+    
+    def _compute_updates_aggregations(self) -> Dict:
+        """Pre-calculate updates aggregations per trial and per batch"""
+        per_trial = []
+        per_batch = []
+        
+        # Per-trial data (each trial-batch-algorithm combination)
+        for trial in range(self.trials):
+            for batch in range(self.batches):
+                disruption_level = get_disruption_level(batch + 1)
+                
+                # HC2L data
+                dhc2l_query_times = self._batch_query_times_dhc2l[trial][batch]
+                if dhc2l_query_times:
+                    dhc2l_lazy_times = self._batch_lazy_times_dhc2l[trial][batch]
+                    initial_label = float(self.initial_label_size_dhc2l[trial])
+                    peak_label = float(self.peak_label_size_dhc2l[trial, batch])
+                    label_change_pct = ((peak_label - initial_label) / initial_label * 100) if initial_label > 0 else 0
+                    
+                    per_trial.append({
+                        "trial": trial + 1,
+                        "batch": batch + 1,
+                        "algorithm": "HC2L",
+                        "level": disruption_level,
+                        "lazy_update_time_ms": round(float(np.mean(dhc2l_lazy_times)), 3) if dhc2l_lazy_times else 0,
+                        "threshold_rebuild_time_ms": round(float(self.threshold_rebuild_time_dhc2l[trial, batch]), 3),
+                        "peak_label_size_mb": round(peak_label, 5),
+                        "label_size_change_pct": round(label_change_pct, 1),
+                        "query_avg_ms": round(float(np.mean(dhc2l_query_times)), 3)
+                    })
+                
+                # DHL data
+                dhl_query_times = self._batch_query_times_dhl[trial][batch]
+                if dhl_query_times:
+                    dhl_lazy_times = self._batch_lazy_times_dhl[trial][batch]
+                    initial_label = float(self.initial_label_size_dhl[trial])
+                    peak_label = float(self.peak_label_size_dhl[trial, batch])
+                    label_change_pct = ((peak_label - initial_label) / initial_label * 100) if initial_label > 0 else 0
+                    
+                    per_trial.append({
+                        "trial": trial + 1,
+                        "batch": batch + 1,
+                        "algorithm": "DHL",
+                        "level": disruption_level,
+                        "lazy_update_time_ms": round(float(np.mean(dhl_lazy_times)), 3) if dhl_lazy_times else 0,
+                        "threshold_rebuild_time_ms": round(float(self.threshold_rebuild_time_dhl[trial, batch]), 3),
+                        "peak_label_size_mb": round(peak_label, 5),
+                        "label_size_change_pct": round(label_change_pct, 1),
+                        "query_avg_ms": round(float(np.mean(dhl_query_times)), 3)
+                    })
+        
+        # Per-batch averages (average across trials for each batch-algorithm combination)
+        for batch in range(self.batches):
+            for algorithm in ["DHL", "HC2L"]:
+                batch_data = [d for d in per_trial if d["batch"] == batch + 1 and d["algorithm"] == algorithm]
+                if batch_data:
+                    per_batch.append({
+                        "batch": batch + 1,
+                        "algorithm": algorithm,
+                        "level": get_disruption_level(batch + 1),
+                        "lazy_update_time_ms": round(float(np.mean([d["lazy_update_time_ms"] for d in batch_data])), 3),
+                        "threshold_rebuild_time_ms": round(float(np.mean([d["threshold_rebuild_time_ms"] for d in batch_data])), 3),
+                        "peak_label_size_mb": round(float(np.mean([d["peak_label_size_mb"] for d in batch_data])), 5),
+                        "label_size_change_pct": round(float(np.mean([d["label_size_change_pct"] for d in batch_data])), 1),
+                        "query_avg_ms": round(float(np.mean([d["query_avg_ms"] for d in batch_data])), 3)
+                    })
+        
+        return {"per_trial": per_trial, "per_batch": per_batch}
+    
+    def _compute_performance_aggregations(self) -> Dict:
+        """Pre-calculate performance aggregations per trial and per batch"""
+        per_trial = []
+        per_batch = []
+        
+        # Per-trial data (each trial-batch-algorithm combination)
+        for trial in range(self.trials):
+            for batch in range(self.batches):
+                for algorithm in ["DHL", "HC2L"]:
+                    is_dhl = algorithm == "DHL"
+                    mask = self.filled_dhl[trial, batch, :] if is_dhl else self.filled_dhc2l[trial, batch, :]
+                    
+                    if np.any(mask):
+                        query_times = self.query_time_dhl if is_dhl else self.query_time_dhc2l
+                        label_sizes = self.label_size_dhl if is_dhl else self.label_size_dhc2l
+                        peak_sizes = self.peak_label_size_dhl if is_dhl else self.peak_label_size_dhc2l
+                        lazy_times = self._batch_lazy_times_dhl[trial][batch] if is_dhl else self._batch_lazy_times_dhc2l[trial][batch]
+                        
+                        per_trial.append({
+                            "trial": trial + 1,
+                            "batch": batch + 1,
+                            "algorithm": algorithm,
+                            "level": get_disruption_level(batch + 1),
+                            "avg_query_time_ms": round(float(np.mean(query_times[trial, batch, :][mask])), 3),
+                            "avg_label_size_mb": round(float(np.mean(label_sizes[trial, batch, :][mask])), 5),
+                            "peak_label_size_mb": round(float(peak_sizes[trial, batch]), 5),
+                            "avg_lazy_update_time_ms": round(float(np.mean(lazy_times)), 3) if lazy_times else 0
+                        })
+        
+        # Per-batch averages (average across trials for each batch-algorithm combination)
+        for batch in range(self.batches):
+            for algorithm in ["DHL", "HC2L"]:
+                batch_data = [d for d in per_trial if d["batch"] == batch + 1 and d["algorithm"] == algorithm]
+                if batch_data:
+                    per_batch.append({
+                        "batch": batch + 1,
+                        "algorithm": algorithm,
+                        "level": get_disruption_level(batch + 1),
+                        "avg_query_time_ms": round(float(np.mean([d["avg_query_time_ms"] for d in batch_data])), 3),
+                        "avg_label_size_mb": round(float(np.mean([d["avg_label_size_mb"] for d in batch_data])), 5),
+                        "peak_label_size_mb": round(float(np.mean([d["peak_label_size_mb"] for d in batch_data])), 5),
+                        "avg_lazy_update_time_ms": round(float(np.mean([d["avg_lazy_update_time_ms"] for d in batch_data])), 3)
+                    })
+        
+        return {"per_trial": per_trial, "per_batch": per_batch}
+    
+    # ========================================================================
     # GRAPH DATA COMPUTATION
     # ========================================================================
     
     def _compute_graph_data(self) -> Dict:
         """
         Compute comprehensive data for graph visualizations.
-        Includes jam factor, error rate, query time, and label size charts.
+        Simplified and focused on most important metrics.
         """
         with self.lock:
             graph_data = {
-                "time_series": self._compute_time_series(),
-                "algorithm_comparison": self._compute_algorithm_comparison(),
-                "per_trial": self._compute_per_trial_data(),
-                "per_batch": self._compute_per_batch_data(),
-                "jam_factor_chart": self._compute_jam_factor_chart(),
-                "error_rate_chart": self._compute_error_rate_chart(),
-                "label_size_trend": self._compute_label_size_trend(),
+                "per_batch_comparison": self._compute_per_batch_comparison(),
+                "per_trial_comparison": self._compute_per_trial_comparison(),
+                "jam_factor": self._compute_jam_factor_data(),
+                "error_rate": self._compute_error_rate_data(),
                 "rebuild_analysis": self._compute_rebuild_analysis()
             }
             return graph_data
     
-    def _compute_time_series(self) -> Dict:
-        """Compute time series data for query and update times"""
-        result = {}
-        
-        for algorithm in ["DHL", "HC2L"]:
-            # Use normalized check for algorithm type
-            is_dhl = not is_hc2l_algorithm(algorithm)
-            query_data = self.query_time_dhl if is_dhl else self.query_time_dhc2l
-            rebuild_data = self.threshold_rebuild_time_dhl if is_dhl else self.threshold_rebuild_time_dhc2l
-            filled = self.filled_dhl if is_dhl else self.filled_dhc2l
-            lazy_buffers = self._batch_lazy_times_dhl if is_dhl else self._batch_lazy_times_dhc2l
-            
-            batch_labels = []
-            query_times = []
-            update_times = []
-            rebuild_times = []
-            
-            for trial in range(self.trials):
-                for batch in range(self.batches):
-                    batch_label = f"T{trial+1}B{batch+1}"
-                    batch_labels.append(batch_label)
-                    
-                    # Average query time for this batch
-                    mask = filled[trial, batch, :]
-                    if np.any(mask):
-                        avg_query = float(np.mean(query_data[trial, batch, :][mask]))
-                        query_times.append(round(avg_query, 3))
-                    else:
-                        query_times.append(0)
-                    
-                    # Average lazy update time
-                    batch_lazy = lazy_buffers[trial][batch]
-                    if batch_lazy:
-                        update_times.append(round(float(np.mean(batch_lazy)), 3))
-                    else:
-                        update_times.append(0)
-                    
-                    # Threshold rebuild time
-                    rebuild_times.append(round(float(rebuild_data[trial, batch]), 3))
-            
-            result[algorithm] = {
-                "batch_labels": batch_labels,
-                "query_times": query_times,
-                "update_times": update_times,
-                "rebuild_times": rebuild_times
-            }
-        
-        return result
     
-    def _compute_algorithm_comparison(self) -> Dict:
-        """Compute algorithm comparison averages"""
-        dhl_avg_query = []
-        dhc2l_avg_query = []
-        dhl_avg_label = []
-        dhc2l_avg_label = []
+    def _compute_per_batch_comparison(self) -> Dict:
+        """Compute per-batch comparison (averaged across all trials)"""
+        batch_labels = [f"Batch {i+1}<br>({get_disruption_level(i+1)})" for i in range(self.batches)]
         
-        for trial in range(self.trials):
-            dhl_mask = self.filled_dhl[trial, :, :]
-            dhc2l_mask = self.filled_dhc2l[trial, :, :]
-            
-            if np.any(dhl_mask):
-                dhl_avg_query.append(float(np.mean(self.query_time_dhl[trial, :, :][dhl_mask])))
-                dhl_avg_label.append(float(np.mean(self.label_size_dhl[trial, :, :][dhl_mask])))
-            
-            if np.any(dhc2l_mask):
-                dhc2l_avg_query.append(float(np.mean(self.query_time_dhc2l[trial, :, :][dhc2l_mask])))
-                dhc2l_avg_label.append(float(np.mean(self.label_size_dhc2l[trial, :, :][dhc2l_mask])))
-        
-        return {
-            "avg_query_time": {
-                "DHL": round(float(np.mean(dhl_avg_query)), 3) if dhl_avg_query else 0,
-                "HC2L": round(float(np.mean(dhc2l_avg_query)), 3) if dhc2l_avg_query else 0
-            },
-            "avg_label_size": {
-                "DHL": round(float(np.mean(dhl_avg_label)), 5) if dhl_avg_label else 0,
-                "HC2L": round(float(np.mean(dhc2l_avg_label)), 5) if dhc2l_avg_label else 0
-            }
-        }
-    
-    def _compute_per_trial_data(self) -> Dict:
-        """Compute per-trial breakdown"""
-        trial_labels = [f"Trial {i+1}" for i in range(self.trials)]
-        dhl_trial_query = []
-        dhc2l_trial_query = []
-        dhl_trial_update = []
-        dhc2l_trial_update = []
-        
-        for trial in range(self.trials):
-            dhl_mask = self.filled_dhl[trial, :, :]
-            dhc2l_mask = self.filled_dhc2l[trial, :, :]
-            
-            if np.any(dhl_mask):
-                dhl_trial_query.append(round(float(np.mean(self.query_time_dhl[trial, :, :][dhl_mask])), 3))
-            else:
-                dhl_trial_query.append(0)
-            
-            if np.any(dhc2l_mask):
-                dhc2l_trial_query.append(round(float(np.mean(self.query_time_dhc2l[trial, :, :][dhc2l_mask])), 3))
-            else:
-                dhc2l_trial_query.append(0)
-            
-            # Update times
-            dhl_lazy_all = []
-            dhc2l_lazy_all = []
-            for batch in range(self.batches):
-                dhl_lazy_all.extend(self._batch_lazy_times_dhl[trial][batch])
-                dhc2l_lazy_all.extend(self._batch_lazy_times_dhc2l[trial][batch])
-            
-            dhl_trial_update.append(round(float(np.mean(dhl_lazy_all)), 3) if dhl_lazy_all else 0)
-            dhc2l_trial_update.append(round(float(np.mean(dhc2l_lazy_all)), 3) if dhc2l_lazy_all else 0)
-        
-        return {
-            "trial_labels": trial_labels,
-            "DHL_query": dhl_trial_query,
-            "HC2L_query": dhc2l_trial_query,
-            "DHL_update": dhl_trial_update,
-            "HC2L_update": dhc2l_trial_update
-        }
-    
-    def _compute_per_batch_data(self) -> Dict:
-        """Compute per-batch averages across trials"""
-        batch_labels = [f"Batch {i+1} ({get_disruption_level(i+1)})" for i in range(self.batches)]
-        
-        dhl_batch_query = []
-        dhc2l_batch_query = []
-        dhl_batch_label = []
-        dhc2l_batch_label = []
-        dhl_batch_error = []
-        dhc2l_batch_error = []
+        dhl_query = []
+        hc2l_query = []
+        dhl_label = []
+        hc2l_label = []
+        hc2l_error = []
         
         for batch in range(self.batches):
-            # DHL stats for this batch
+            # DHL stats averaged across all trials for this batch
             dhl_mask = self.filled_dhl[:, batch, :]
             if np.any(dhl_mask):
-                dhl_batch_query.append(round(float(np.mean(self.query_time_dhl[:, batch, :][dhl_mask])), 3))
-                dhl_batch_label.append(round(float(np.mean(self.label_size_dhl[:, batch, :][dhl_mask])), 5))
+                dhl_query.append(round(float(np.mean(self.query_time_dhl[:, batch, :][dhl_mask])), 3))
+                dhl_label.append(round(float(np.mean(self.label_size_dhl[:, batch, :][dhl_mask])), 5))
             else:
-                dhl_batch_query.append(0)
-                dhl_batch_label.append(0)
-            dhl_batch_error.append(0)  # DHL doesn't have accuracy metrics
+                dhl_query.append(0)
+                dhl_label.append(0)
             
-            # HC2L stats for this batch
-            dhc2l_mask = self.filled_dhc2l[:, batch, :]
-            if np.any(dhc2l_mask):
-                dhc2l_batch_query.append(round(float(np.mean(self.query_time_dhc2l[:, batch, :][dhc2l_mask])), 3))
-                dhc2l_batch_label.append(round(float(np.mean(self.label_size_dhc2l[:, batch, :][dhc2l_mask])), 5))
-                # Error rate = percentage of incorrect routes
-                total = np.sum(dhc2l_mask)
-                incorrect = total - np.sum(self.is_correct[:, batch, :][dhc2l_mask])
-                dhc2l_batch_error.append(round(float(incorrect / total * 100), 2) if total > 0 else 0)
+            # HC2L stats averaged across all trials for this batch
+            hc2l_mask = self.filled_dhc2l[:, batch, :]
+            if np.any(hc2l_mask):
+                hc2l_query.append(round(float(np.mean(self.query_time_dhc2l[:, batch, :][hc2l_mask])), 3))
+                hc2l_label.append(round(float(np.mean(self.label_size_dhc2l[:, batch, :][hc2l_mask])), 5))
+                # Error rate
+                total = np.sum(hc2l_mask)
+                incorrect = total - np.sum(self.is_correct[:, batch, :][hc2l_mask])
+                hc2l_error.append(round(float(incorrect / total * 100), 2) if total > 0 else 0)
             else:
-                dhc2l_batch_query.append(0)
-                dhc2l_batch_label.append(0)
-                dhc2l_batch_error.append(0)
+                hc2l_query.append(0)
+                hc2l_label.append(0)
+                hc2l_error.append(0)
         
         return {
-            "batch_labels": batch_labels,
-            "DHL_query": dhl_batch_query,
-            "HC2L_query": dhc2l_batch_query,
-            "DHL_label_size": dhl_batch_label,
-            "HC2L_label_size": dhc2l_batch_label,
-            "HC2L_error_rate": dhc2l_batch_error
+            "labels": batch_labels,
+            "DHL": {
+                "query_time_ms": dhl_query,
+                "label_size_mb": dhl_label
+            },
+            "HC2L": {
+                "query_time_ms": hc2l_query,
+                "label_size_mb": hc2l_label,
+                "error_rate_pct": hc2l_error
+            }
         }
     
-    def _compute_jam_factor_chart(self) -> Dict:
-        """Compute jam factor chart data per batch"""
-        batch_labels = []
+    def _compute_per_trial_comparison(self) -> Dict:
+        """Compute per-trial comparison (averaged across all batches)"""
+        trial_labels = [f"Trial {i+1}" for i in range(self.trials)]
+        
+        dhl_query = []
+        hc2l_query = []
+        dhl_label = []
+        hc2l_label = []
+        
+        for trial in range(self.trials):
+            # DHL stats averaged across all batches for this trial
+            dhl_mask = self.filled_dhl[trial, :, :]
+            if np.any(dhl_mask):
+                dhl_query.append(round(float(np.mean(self.query_time_dhl[trial, :, :][dhl_mask])), 3))
+                dhl_label.append(round(float(np.mean(self.label_size_dhl[trial, :, :][dhl_mask])), 5))
+            else:
+                dhl_query.append(0)
+                dhl_label.append(0)
+            
+            # HC2L stats averaged across all batches for this trial
+            hc2l_mask = self.filled_dhc2l[trial, :, :]
+            if np.any(hc2l_mask):
+                hc2l_query.append(round(float(np.mean(self.query_time_dhc2l[trial, :, :][hc2l_mask])), 3))
+                hc2l_label.append(round(float(np.mean(self.label_size_dhc2l[trial, :, :][hc2l_mask])), 5))
+            else:
+                hc2l_query.append(0)
+                hc2l_label.append(0)
+        
+        return {
+            "labels": trial_labels,
+            "DHL": {
+                "query_time_ms": dhl_query,
+                "label_size_mb": dhl_label
+            },
+            "HC2L": {
+                "query_time_ms": hc2l_query,
+                "label_size_mb": hc2l_label
+            }
+        }
+    
+    def _compute_jam_factor_data(self) -> Dict:
+        """Compute jam factor data per batch (averaged across trials)"""
+        batch_labels = [f"Batch {i+1}<br>({get_disruption_level(i+1)})" for i in range(self.batches)]
         avg_jam_factors = []
         
-        for trial in range(self.trials):
-            for batch in range(self.batches):
-                batch_labels.append(f"T{trial+1}B{batch+1}")
-                
-                jam_factors = self._batch_jam_factors[trial][batch]
-                if jam_factors:
-                    avg_jam_factors.append(round(float(np.mean(jam_factors)), 2))
-                else:
-                    avg_jam_factors.append(0)
-        
-        # Compute per-disruption-level averages (FIX: handle empty arrays properly)
-        per_level = {}
-        if self.batches >= 3:
-            # Light (batch 0)
-            light_factors = [jf for t in range(self.trials) for jf in self._batch_jam_factors[t][0]]
-            per_level["light"] = round(float(np.mean(light_factors)), 2) if light_factors else 0.0
+        for batch in range(self.batches):
+            # Collect jam factors from all trials for this batch
+            batch_jam_factors = []
+            for trial in range(self.trials):
+                batch_jam_factors.extend(self._batch_jam_factors[trial][batch])
             
-            # Medium (batch 1)
-            medium_factors = [jf for t in range(self.trials) for jf in self._batch_jam_factors[t][1]]
-            per_level["medium"] = round(float(np.mean(medium_factors)), 2) if medium_factors else 0.0
-            
-            # Heavy (batch 2)
-            heavy_factors = [jf for t in range(self.trials) for jf in self._batch_jam_factors[t][2]]
-            per_level["heavy"] = round(float(np.mean(heavy_factors)), 2) if heavy_factors else 0.0
+            if batch_jam_factors:
+                avg_jam_factors.append(round(float(np.mean(batch_jam_factors)), 2))
+            else:
+                avg_jam_factors.append(0.0)
         
-        return {
-            "batch_labels": batch_labels,
-            "avg_jam_factors": avg_jam_factors,
-            "per_disruption_level": per_level
-        }
-    
-    def _compute_error_rate_chart(self) -> Dict:
-        """Compute error rate chart data per batch (HC2L only)"""
-        batch_labels = []
-        error_rates = []
-        
-        for trial in range(self.trials):
-            for batch in range(self.batches):
-                batch_labels.append(f"T{trial+1}B{batch+1}")
-                
-                # Compute error rate for this trial/batch
-                mask = self.filled_dhc2l[trial, batch, :]
-                if np.any(mask):
-                    total = np.sum(mask)
-                    incorrect = total - np.sum(self.is_correct[trial, batch, :][mask])
-                    error_rates.append(round(float(incorrect / total * 100), 2))
-                else:
-                    error_rates.append(0)
-        
-        # Per disruption level averages
+        # Per-level summary
         per_level = {}
         for batch in range(min(self.batches, 3)):
             level = get_disruption_level(batch + 1)
-            level_rates = []
+            level_factors = []
+            for trial in range(self.trials):
+                level_factors.extend(self._batch_jam_factors[trial][batch])
+            per_level[level] = round(float(np.mean(level_factors)), 2) if level_factors else 0.0
+        
+        return {
+            "labels": batch_labels,
+            "values": avg_jam_factors,
+            "per_level": per_level
+        }
+    
+    def _compute_error_rate_data(self) -> Dict:
+        """Compute HC2L error rate per batch (averaged across trials)"""
+        batch_labels = [f"Batch {i+1}<br>({get_disruption_level(i+1)})" for i in range(self.batches)]
+        error_rates = []
+        
+        for batch in range(self.batches):
+            # Average error rate across all trials for this batch
+            batch_error_rates = []
             for trial in range(self.trials):
                 mask = self.filled_dhc2l[trial, batch, :]
                 if np.any(mask):
                     total = np.sum(mask)
                     incorrect = total - np.sum(self.is_correct[trial, batch, :][mask])
-                    level_rates.append(incorrect / total * 100)
-            per_level[level] = round(float(np.mean(level_rates)), 2) if level_rates else 0
+                    batch_error_rates.append(incorrect / total * 100)
+            
+            if batch_error_rates:
+                error_rates.append(round(float(np.mean(batch_error_rates)), 2))
+            else:
+                error_rates.append(0.0)
+        
+        # Per-level summary
+        per_level = {}
+        for batch in range(min(self.batches, 3)):
+            level = get_disruption_level(batch + 1)
+            per_level[level] = error_rates[batch] if batch < len(error_rates) else 0.0
         
         return {
-            "batch_labels": batch_labels,
-            "error_rates": error_rates,
-            "per_disruption_level": per_level
-        }
-    
-    def _compute_label_size_trend(self) -> Dict:
-        """Compute label size trend over batches"""
-        dhl_label_trend = []
-        dhc2l_label_trend = []
-        batch_labels = []
-        
-        for trial in range(self.trials):
-            for batch in range(self.batches):
-                batch_labels.append(f"T{trial+1}B{batch+1}")
-                
-                dhl_mask = self.filled_dhl[trial, batch, :]
-                dhc2l_mask = self.filled_dhc2l[trial, batch, :]
-                
-                if np.any(dhl_mask):
-                    dhl_label_trend.append(round(float(np.mean(self.label_size_dhl[trial, batch, :][dhl_mask])), 5))
-                else:
-                    dhl_label_trend.append(0)
-                
-                if np.any(dhc2l_mask):
-                    dhc2l_label_trend.append(round(float(np.mean(self.label_size_dhc2l[trial, batch, :][dhc2l_mask])), 5))
-                else:
-                    dhc2l_label_trend.append(0)
-        
-        return {
-            "batch_labels": batch_labels,
-            "DHL_labels": dhl_label_trend,
-            "HC2L_labels": dhc2l_label_trend
+            "labels": batch_labels,
+            "values": error_rates,
+            "per_level": per_level,
+            "tolerance_pct": self.tolerance * 100
         }
     
     def _compute_rebuild_analysis(self) -> Dict:

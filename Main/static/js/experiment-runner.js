@@ -2450,222 +2450,124 @@ const ExperimentRunner = {
     // =========================================================================
 
     populateSummaryTabFromGraphData(graphData) {
-        // Summary tab shows aggregated incident statistics
-        const container = document.getElementById('result-summary-container');
-        if (!container) return;
-
-        // Load summary data from CSV endpoint
+        // Use pre-calculated aggregated data from backend (no CSV loading needed)
         this.loadAndDisplaySummaryAggregates();
     },
 
     async loadAndDisplaySummaryAggregates() {
         const container = document.getElementById('result-summary-container');
-        if (!container) return;
+        if (!container || !this.resultsData) return;
 
-        if (!this.currentResultId) {
+        // Use pre-calculated aggregations from backend (NO CSV FETCHING)
+        const aggregated = this.resultsData.aggregated_data?.summary;
+        if (!aggregated) {
             container.innerHTML = `
                 <div class="text-center py-8 text-gray-600">
                     <i data-lucide="alert-circle" class="w-12 h-12 mx-auto mb-2 text-gray-400"></i>
-                    <p class="font-semibold mb-2">No experiment results loaded</p>
+                    <p class="font-semibold mb-2">No summary data available</p>
                 </div>
             `;
             return;
         }
 
-        // Show loading state
+        const { per_trial, per_batch } = aggregated;
+
+        // Render pre-calculated data (NO COMPUTATION)
         container.innerHTML = `
-            <div class="text-center py-8">
-                <div class="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-2"></div>
-                <p class="text-gray-500">Loading incident summary data...</p>
+            <!-- Per-Trial Data -->
+            <div class="bg-white rounded-xl border border-green-200 overflow-hidden shadow-sm">
+                <div class="bg-gradient-to-r from-green-50 to-teal-50 px-4 py-3 border-b border-green-200 flex items-center justify-between">
+                    <h5 class="font-bold text-green-900 flex items-center gap-2 mb-0">
+                        <i data-lucide="layers" class="w-4 h-4"></i>
+                        Incidents Per Trial
+                    </h5>
+                    <button onclick="ExperimentRunner.exportCSV('summary', 'per-trial')"
+                        class="btn btn--success btn--xs hover:shadow-md transition-all">
+                        <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-green-50 border-b border-green-200">
+                            <tr>
+                                <th class="text-left p-3 font-semibold text-green-700">Trial</th>
+                                <th class="text-left p-3 font-semibold text-green-700">Batch</th>
+                                <th class="text-center p-3 font-semibold text-green-700">Level</th>
+                                <th class="text-right p-3 font-semibold text-green-700">Accidents</th>
+                                <th class="text-right p-3 font-semibold text-green-700">Construction</th>
+                                <th class="text-right p-3 font-semibold text-green-700">Congestion</th>
+                                <th class="text-right p-3 font-semibold text-green-700">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            ${per_trial.map(row => `
+                                <tr class="hover:bg-green-50 transition-colors">
+                                    <td class="p-3">T${row.trial}</td>
+                                    <td class="p-3">B${row.batch}</td>
+                                    <td class="p-3 text-center"><span class="px-2 py-1 rounded text-xs font-medium ${this.getLevelBadgeClass(row.level)}">${row.level}</span></td>
+                                    <td class="p-3 text-right font-mono">${row.accident}</td>
+                                    <td class="p-3 text-right font-mono">${row.construction}</td>
+                                    <td class="p-3 text-right font-mono">${row.congestion}</td>
+                                    <td class="p-3 text-right font-mono font-bold">${row.total}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Per-Batch Averages -->
+            <div class="bg-white rounded-xl border border-teal-200 overflow-hidden shadow-sm mt-4">
+                <div class="bg-gradient-to-r from-teal-50 to-cyan-50 px-4 py-3 border-b border-teal-200 flex items-center justify-between">
+                    <h5 class="font-bold text-teal-900 flex items-center gap-2 mb-0">
+                        <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+                        Averages Per Batch (across all trials)
+                    </h5>
+                    <button onclick="ExperimentRunner.exportCSV('summary', 'per-batch')"
+                        class="btn btn--success btn--xs hover:shadow-md transition-all">
+                        <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-teal-50 border-b border-teal-200">
+                            <tr>
+                                <th class="text-left p-3 font-semibold text-teal-700">Batch</th>
+                                <th class="text-center p-3 font-semibold text-teal-700">Level</th>
+                                <th class="text-right p-3 font-semibold text-teal-700">Avg Accidents</th>
+                                <th class="text-right p-3 font-semibold text-teal-700">Avg Construction</th>
+                                <th class="text-right p-3 font-semibold text-teal-700">Avg Congestion</th>
+                                <th class="text-right p-3 font-semibold text-teal-700">Avg Total</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            ${per_batch.map(row => `
+                                <tr class="hover:bg-teal-50 transition-colors">
+                                    <td class="p-3">Batch ${row.batch}</td>
+                                    <td class="p-3 text-center"><span class="px-2 py-1 rounded text-xs font-medium ${this.getLevelBadgeClass(row.level)}">${row.level}</span></td>
+                                    <td class="p-3 text-right font-mono">${row.accident}</td>
+                                    <td class="p-3 text-right font-mono">${row.construction}</td>
+                                    <td class="p-3 text-right font-mono">${row.congestion}</td>
+                                    <td class="p-3 text-right font-mono font-bold">${row.total}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         `;
 
-        try {
-            const url = `/api/experiment/results/${this.currentResultId}/csv/summary/data?page=1&limit=100`;
-            const response = await fetch(url);
-            const result = await response.json();
-
-            if (!result.success || !result.data || result.data.length === 0) {
-                container.innerHTML = `
-                    <div class="text-center py-8 text-gray-600">
-                        <i data-lucide="file-spreadsheet" class="w-12 h-12 mx-auto mb-2 text-gray-400"></i>
-                        <p class="font-semibold mb-2">No incident data available</p>
-                    </div>
-                `;
-                return;
-            }
-
-            // Compute averages
-            const averages = this.computeSummaryAverages(result.data);
-
-            // Render aggregated tables
-            container.innerHTML = `
-                <!-- Per-Trial Averages -->
-                <div class="bg-white rounded-xl border border-green-200 overflow-hidden shadow-sm">
-                    <div class="bg-gradient-to-r from-green-50 to-teal-50 px-4 py-3 border-b border-green-200 flex items-center justify-between">
-                        <h5 class="font-bold text-green-900 flex items-center gap-2 mb-0">
-                            <i data-lucide="layers" class="w-4 h-4"></i>
-                            Averages Per Trial
-                        </h5>
-                        <button onclick="ExperimentRunner.exportCSV('summary', 'per-trial')"
-                            class="btn btn--success btn--xs hover:shadow-md transition-all">
-                            <i data-lucide="download" class="w-3 h-3"></i> Export CSV
-                        </button>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm">
-                            <thead class="bg-green-50 border-b border-green-200">
-                                <tr>
-                                    <th class="text-left p-3 font-semibold text-green-700">Trial</th>
-                                    <th class="text-left p-3 font-semibold text-green-700">Batch</th>
-                                    <th class="text-center p-3 font-semibold text-green-700">Level</th>
-                                    <th class="text-right p-3 font-semibold text-green-700 text-xs">Accident</th>
-                                    <th class="text-right p-3 font-semibold text-green-700 text-xs">Construction</th>
-                                    <th class="text-right p-3 font-semibold text-green-700 text-xs">Congestion</th>
-                                    <th class="text-right p-3 font-semibold text-green-700 text-xs">Total</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-100">
-                                ${averages.perTrial.map(row => `
-                                    <tr class="hover:bg-green-50 transition-colors">
-                                        <td class="p-3">T${row.trial}</td>
-                                        <td class="p-3">B${row.batch}</td>
-                                        <td class="p-3 text-center"><span class="px-2 py-1 rounded text-xs font-medium ${row.level === 'light' ? 'bg-green-100 text-green-700' :
-                    row.level === 'medium' ? 'bg-yellow-100 text-yellow-700' :
-                        'bg-red-100 text-red-700'
-                }">${row.level}</span></td>
-                                        <td class="p-3 text-right font-mono">${row.accident}</td>
-                                        <td class="p-3 text-right font-mono">${row.construction}</td>
-                                        <td class="p-3 text-right font-mono">${row.congestion}</td>
-                                        <td class="p-3 text-right font-mono font-bold">${row.total}</td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                
-                <!-- Per-Batch Averages -->
-                <div class="bg-white rounded-xl border border-teal-200 overflow-hidden shadow-sm">
-                    <div class="bg-gradient-to-r from-teal-50 to-cyan-50 px-4 py-3 border-b border-teal-200 flex items-center justify-between">
-                        <h5 class="font-bold text-teal-900 flex items-center gap-2 mb-0">
-                            <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
-                            Averages Per Batch
-                        </h5>
-                        <button onclick="ExperimentRunner.exportCSV('summary', 'per-batch')"
-                            class="btn btn--success btn--xs hover:shadow-md transition-all">
-                            <i data-lucide="download" class="w-3 h-3"></i> Export CSV
-                        </button>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm">
-                            <thead class="bg-teal-50 border-b border-teal-200">
-                                <tr>
-                                    <th class="text-left p-3 font-semibold text-teal-700">Batch</th>
-                                    <th class="text-center p-3 font-semibold text-teal-700">Level</th>
-                                    <th class="text-right p-3 font-semibold text-teal-700 text-xs">Avg Accident</th>
-                                    <th class="text-right p-3 font-semibold text-teal-700 text-xs">Avg Construction</th>
-                                    <th class="text-right p-3 font-semibold text-teal-700 text-xs">Avg Congestion</th>
-                                    <th class="text-right p-3 font-semibold text-teal-700 text-xs">Avg Total</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-100">
-                                ${averages.perBatch.map(row => `
-                                    <tr class="hover:bg-teal-50 transition-colors">
-                                        <td class="p-3">Batch ${row.batch}</td>
-                                        <td class="p-3 text-center"><span class="px-2 py-1 rounded text-xs font-medium ${row.level === 'light' ? 'bg-green-100 text-green-700' :
-                        row.level === 'medium' ? 'bg-yellow-100 text-yellow-700' :
-                            'bg-red-100 text-red-700'
-                    }">${row.level}</span></td>
-                                        <td class="p-3 text-right font-mono">${row.accident}</td>
-                                        <td class="p-3 text-right font-mono">${row.construction}</td>
-                                        <td class="p-3 text-right font-mono">${row.congestion}</td>
-                                        <td class="p-3 text-right font-mono font-bold">${row.total}</td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            `;
-
-            // Refresh Lucide icons
-            if (typeof lucide !== 'undefined') {
-                lucide.createIcons();
-            }
-
-        } catch (error) {
-            console.error('Error loading summary data:', error);
-            container.innerHTML = `
-                <div class="text-center py-8 text-red-600">
-                    <i data-lucide="alert-circle" class="w-12 h-12 mx-auto mb-2"></i>
-                    <p class="font-semibold mb-2">Error loading summary data</p>
-                    <p class="text-sm">${error.message}</p>
-                </div>
-            `;
-        }
+        // Refresh icons
+        if (typeof lucide !== 'undefined') lucide.createIcons();
     },
 
-    computeSummaryAverages(data) {
-        const perTrial = [];
-        const perBatchMap = {};
-        const disruptions = ['light', 'medium', 'heavy'];
-
-        // Per-Trial data (each row is already per trial/batch)
-        data.forEach(row => {
-            const total = (
-                parseInt(row.num_accident || 0) +
-                parseInt(row.num_construction || 0) +
-                parseInt(row.num_congestion || 0) +
-                parseInt(row.num_disabled_vehicle || 0) +
-                parseInt(row.num_mass_transit_event || 0) +
-                parseInt(row.num_planned_event || 0) +
-                parseInt(row.num_road_hazard || 0) +
-                parseInt(row.num_road_closure || 0) +
-                parseInt(row.num_weather || 0) +
-                parseInt(row.num_lane_restriction || 0) +
-                parseInt(row.num_other || 0)
-            );
-
-            perTrial.push({
-                trial: row.trial_id,
-                batch: row.batch_id,
-                level: row.disruption_level,
-                accident: row.num_accident || 0,
-                construction: row.num_construction || 0,
-                congestion: row.num_congestion || 0,
-                total: total
-            });
-
-            // Aggregate for per-batch averages
-            const batchKey = row.batch_id;
-            if (!perBatchMap[batchKey]) {
-                perBatchMap[batchKey] = {
-                    batch: row.batch_id,
-                    level: row.disruption_level,
-                    accident: [],
-                    construction: [],
-                    congestion: [],
-                    total: []
-                };
-            }
-            perBatchMap[batchKey].accident.push(parseInt(row.num_accident || 0));
-            perBatchMap[batchKey].construction.push(parseInt(row.num_construction || 0));
-            perBatchMap[batchKey].congestion.push(parseInt(row.num_congestion || 0));
-            perBatchMap[batchKey].total.push(total);
-        });
-
-        // Compute per-batch averages
-        const perBatch = Object.values(perBatchMap).map(batch => ({
-            batch: batch.batch,
-            level: batch.level,
-            accident: (batch.accident.reduce((a, b) => a + b, 0) / batch.accident.length).toFixed(1),
-            construction: (batch.construction.reduce((a, b) => a + b, 0) / batch.construction.length).toFixed(1),
-            congestion: (batch.congestion.reduce((a, b) => a + b, 0) / batch.congestion.length).toFixed(1),
-            total: (batch.total.reduce((a, b) => a + b, 0) / batch.total.length).toFixed(1)
-        }));
-
-        return { perTrial, perBatch };
+    getLevelBadgeClass(level) {
+        const classes = {
+            'light': 'bg-green-100 text-green-700',
+            'medium': 'bg-yellow-100 text-yellow-700',
+            'heavy': 'bg-red-100 text-red-700'
+        };
+        return classes[level] || 'bg-gray-100 text-gray-700';
     },
 
     populateAccuracyTabFromStats(accuracyStats) {
@@ -2684,232 +2586,111 @@ const ExperimentRunner = {
 
     async loadAndDisplayAccuracyAggregates() {
         const container = document.getElementById('result-accuracy-container');
-        if (!container) return;
+        if (!container || !this.resultsData) return;
 
-        if (!this.currentResultId) {
+        // Use pre-calculated aggregations from backend (NO CSV FETCHING)
+        const aggregated = this.resultsData.aggregated_data?.accuracy;
+        if (!aggregated) {
             container.innerHTML = `<div class="text-center py-8 text-gray-600">
                 <i data-lucide="alert-circle" class="w-12 h-12 mx-auto mb-2 text-gray-400"></i>
-                <p class="font-semibold mb-2">No experiment results loaded</p>
+                <p class="font-semibold mb-2">No accuracy data available</p>
             </div>`;
             return;
         }
 
-        // Show loading state
-        container.innerHTML = `<div class="text-center py-8">
-            <div class="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-2"></div>
-            <p class="text-gray-500">Loading accuracy data...</p>
-        </div>`;
+        const { per_trial, per_batch } = aggregated;
 
-        try {
-            const url = `/api/experiment/results/${this.currentResultId}/csv/accuracy/data?page=1&limit=100`;
-            const response = await fetch(url);
-            const result = await response.json();
-
-            if (!result.success || !result.data || result.data.length === 0) {
-                container.innerHTML = `<div class="text-center py-8 text-gray-600">
-                    <i data-lucide="file-spreadsheet" class="w-12 h-12 mx-auto mb-2 text-gray-400"></i>
-                    <p class="font-semibold mb-2">No accuracy data available</p>
-                </div>`;
-                return;
-            }
-
-            // Compute averages
-            const averages = this.computeAccuracyAverages(result.data);
-
-            // Render aggregated tables
-            container.innerHTML = `
-                <!-- Per-Trial Averages -->
-                <div class="bg-white rounded-xl border border-cyan-200 overflow-hidden shadow-sm">
-                    <div class="bg-gradient-to-r from-cyan-50 to-blue-50 px-4 py-3 border-b border-cyan-200 flex items-center justify-between">
-                        <h5 class="font-bold text-cyan-900 flex items-center gap-2 mb-0">
-                            <i data-lucide="layers" class="w-4 h-4"></i>
-                            Averages Per Trial
-                        </h5>
-                        <button onclick="ExperimentRunner.exportCSV('accuracy', 'per-trial')"
-                            class="btn btn--success btn--xs hover:shadow-md transition-all">
-                            <i data-lucide="download" class="w-3 h-3"></i> Export CSV
-                        </button>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm">
-                            <thead class="bg-cyan-50 border-b border-cyan-200">
-                                <tr>
-                                    <th class="text-left p-3 font-semibold text-cyan-700">Trial</th>
-                                    <th class="text-left p-3 font-semibold text-cyan-700">Batch</th>
-                                    <th class="text-center p-3 font-semibold text-cyan-700">Level</th>
-                                    <th class="text-right p-3 font-semibold text-cyan-700">Total Routes</th>
-                                    <th class="text-right p-3 font-semibold text-cyan-700">Correct</th>
-                                    <th class="text-right p-3 font-semibold text-cyan-700">Incorrect</th>
-                                    <th class="text-right p-3 font-semibold text-cyan-700">Accuracy Rate</th>
-                                    <th class="text-right p-3 font-semibold text-cyan-700">Avg Error</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-100">
-                                ${averages.perTrial.map(row => `
-                                    <tr class="hover:bg-cyan-50 transition-colors">
-                                        <td class="p-3">T${row.trial}</td>
-                                        <td class="p-3">B${row.batch}</td>
-                                        <td class="p-3 text-center"><span class="px-2 py-1 rounded text-xs font-medium ${row.level === 'light' ? 'bg-green-100 text-green-700' :
-                    row.level === 'medium' ? 'bg-yellow-100 text-yellow-700' :
-                        'bg-red-100 text-red-700'
-                }">${row.level}</span></td>
-                                        <td class="p-3 text-right font-mono">${row.total}</td>
-                                        <td class="p-3 text-right font-mono text-green-600">${row.correct}</td>
-                                        <td class="p-3 text-right font-mono text-red-600">${row.incorrect}</td>
-                                        <td class="p-3 text-right"><span class="px-2 py-1 rounded text-xs font-bold ${row.accuracyRate >= 95 ? 'bg-green-100 text-green-700' :
-                    row.accuracyRate >= 90 ? 'bg-yellow-100 text-yellow-700' :
-                        'bg-red-100 text-red-700'
-                }">${row.accuracyRate}%</span></td>
-                                        <td class="p-3 text-right font-mono text-gray-600">${row.avgError}%</td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                    </div>
+        // Render pre-calculated data (NO COMPUTATION)
+        container.innerHTML = `
+            <!-- Per-Trial Data -->
+            <div class="bg-white rounded-xl border border-cyan-200 overflow-hidden shadow-sm">
+                <div class="bg-gradient-to-r from-cyan-50 to-blue-50 px-4 py-3 border-b border-cyan-200 flex items-center justify-between">
+                    <h5 class="font-bold text-cyan-900 flex items-center gap-2 mb-0">
+                        <i data-lucide="layers" class="w-4 h-4"></i>
+                        Accuracy Per Trial
+                    </h5>
+                    <button onclick="ExperimentRunner.exportCSV('accuracy', 'per-trial')"
+                        class="btn btn--success btn--xs hover:shadow-md transition-all">
+                        <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+                    </button>
                 </div>
-                
-                <!-- Per-Batch Averages -->
-                <div class="bg-white rounded-xl border border-blue-200 overflow-hidden shadow-sm">
-                    <div class="bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 border-b border-blue-200 flex items-center justify-between">
-                        <h5 class="font-bold text-blue-900 flex items-center gap-2 mb-0">
-                            <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
-                            Averages Per Batch
-                        </h5>
-                        <button onclick="ExperimentRunner.exportCSV('accuracy', 'per-batch')"
-                            class="btn btn--success btn--xs hover:shadow-md transition-all">
-                            <i data-lucide="download" class="w-3 h-3"></i> Export CSV
-                        </button>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm">
-                            <thead class="bg-blue-50 border-b border-blue-200">
-                                <tr>
-                                    <th class="text-left p-3 font-semibold text-blue-700">Batch</th>
-                                    <th class="text-center p-3 font-semibold text-blue-700">Level</th>
-                                    <th class="text-right p-3 font-semibold text-blue-700">Avg Routes</th>
-                                    <th class="text-right p-3 font-semibold text-blue-700">Avg Correct</th>
-                                    <th class="text-right p-3 font-semibold text-blue-700">Avg Incorrect</th>
-                                    <th class="text-right p-3 font-semibold text-blue-700">Avg Accuracy</th>
-                                    <th class="text-right p-3 font-semibold text-blue-700">Avg Error</th>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-cyan-50 border-b border-cyan-200">
+                            <tr>
+                                <th class="text-left p-3 font-semibold text-cyan-700">Trial</th>
+                                <th class="text-left p-3 font-semibold text-cyan-700">Batch</th>
+                                <th class="text-center p-3 font-semibold text-cyan-700">Level</th>
+                                <th class="text-right p-3 font-semibold text-cyan-700">Total</th>
+                                <th class="text-right p-3 font-semibold text-cyan-700">Correct</th>
+                                <th class="text-right p-3 font-semibold text-cyan-700">Incorrect</th>
+                                <th class="text-right p-3 font-semibold text-cyan-700">Accuracy</th>
+                                <th class="text-right p-3 font-semibold text-cyan-700">Avg Error</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            ${per_trial.map(row => `
+                                <tr class="hover:bg-cyan-50 transition-colors">
+                                    <td class="p-3">T${row.trial}</td>
+                                    <td class="p-3">B${row.batch}</td>
+                                    <td class="p-3 text-center"><span class="px-2 py-1 rounded text-xs font-medium ${this.getLevelBadgeClass(row.level)}">${row.level}</span></td>
+                                    <td class="p-3 text-right font-mono">${row.total}</td>
+                                    <td class="p-3 text-right font-mono text-green-600">${row.correct}</td>
+                                    <td class="p-3 text-right font-mono text-red-600">${row.incorrect}</td>
+                                    <td class="p-3 text-right font-mono font-bold">${(row.accuracy_rate * 100).toFixed(1)}%</td>
+                                    <td class="p-3 text-right font-mono">${(row.avg_error * 100).toFixed(2)}%</td>
                                 </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-100">
-                                ${averages.perBatch.map(row => `
-                                    <tr class="hover:bg-blue-50 transition-colors">
-                                        <td class="p-3">Batch ${row.batch}</td>
-                                        <td class="p-3 text-center"><span class="px-2 py-1 rounded text-xs font-medium ${row.level === 'light' ? 'bg-green-100 text-green-700' :
-                        row.level === 'medium' ? 'bg-yellow-100 text-yellow-700' :
-                            'bg-red-100 text-red-700'
-                    }">${row.level}</span></td>
-                                        <td class="p-3 text-right font-mono">${row.total}</td>
-                                        <td class="p-3 text-right font-mono text-green-600">${row.correct}</td>
-                                        <td class="p-3 text-right font-mono text-red-600">${row.incorrect}</td>
-                                        <td class="p-3 text-right"><span class="px-2 py-1 rounded text-xs font-bold ${row.accuracyRate >= 95 ? 'bg-green-100 text-green-700' :
-                        row.accuracyRate >= 90 ? 'bg-yellow-100 text-yellow-700' :
-                            'bg-red-100 text-red-700'
-                    }">${row.accuracyRate}%</span></td>
-                                        <td class="p-3 text-right font-mono text-gray-600">${row.avgError}%</td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                    </div>
+                            `).join('')}
+                        </tbody>
+                    </table>
                 </div>
-            `;
+            </div>
+            
+            <!-- Per-Batch Averages -->
+            <div class="bg-white rounded-xl border border-blue-200 overflow-hidden shadow-sm mt-4">
+                <div class="bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 border-b border-blue-200 flex items-center justify-between">
+                    <h5 class="font-bold text-blue-900 flex items-center gap-2 mb-0">
+                        <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+                        Averages Per Batch (across all trials)
+                    </h5>
+                    <button onclick="ExperimentRunner.exportCSV('accuracy', 'per-batch')"
+                        class="btn btn--success btn--xs hover:shadow-md transition-all">
+                        <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-blue-50 border-b border-blue-200">
+                            <tr>
+                                <th class="text-left p-3 font-semibold text-blue-700">Batch</th>
+                                <th class="text-center p-3 font-semibold text-blue-700">Level</th>
+                                <th class="text-right p-3 font-semibold text-blue-700">Avg Total</th>
+                                <th class="text-right p-3 font-semibold text-blue-700">Avg Correct</th>
+                                <th class="text-right p-3 font-semibold text-blue-700">Avg Incorrect</th>
+                                <th class="text-right p-3 font-semibold text-blue-700">Accuracy Rate</th>
+                                <th class="text-right p-3 font-semibold text-blue-700">Avg Error</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            ${per_batch.map(row => `
+                                <tr class="hover:bg-blue-50 transition-colors">
+                                    <td class="p-3">Batch ${row.batch}</td>
+                                    <td class="p-3 text-center"><span class="px-2 py-1 rounded text-xs font-medium ${this.getLevelBadgeClass(row.level)}">${row.level}</span></td>
+                                    <td class="p-3 text-right font-mono">${row.total}</td>
+                                    <td class="p-3 text-right font-mono text-green-600">${row.correct}</td>
+                                    <td class="p-3 text-right font-mono text-red-600">${row.incorrect}</td>
+                                    <td class="p-3 text-right font-mono font-bold">${(row.accuracy_rate * 100).toFixed(1)}%</td>
+                                    <td class="p-3 text-right font-mono">${(row.avg_error * 100).toFixed(2)}%</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
 
-            // Refresh Lucide icons
-            if (typeof lucide !== 'undefined') {
-                lucide.createIcons();
-            }
-
-        } catch (error) {
-            console.error('Error loading accuracy data:', error);
-            container.innerHTML = `<div class="text-center py-8 text-red-600">
-                <i data-lucide="alert-circle" class="w-12 h-12 mx-auto mb-2"></i>
-                <p class="font-semibold mb-2">Error loading accuracy data</p>
-                <p class="text-sm">${error.message}</p>
-            </div>`;
-        }
-    },
-
-    computeAccuracyAverages(data) {
-        const perTrial = [];
-        const perBatchMap = {};
-
-        // Group by trial and batch
-        const trialBatchMap = {};
-        data.forEach(row => {
-            const key = `${row.trial_id}_${row.batch_id}`;
-            if (!trialBatchMap[key]) {
-                trialBatchMap[key] = {
-                    trial: row.trial_id,
-                    batch: row.batch_id,
-                    level: row.disruption_level,
-                    total: 0,
-                    correct: 0,
-                    errorSum: 0
-                };
-            }
-            trialBatchMap[key].total++;
-            if (row.is_correct === 'True' || row.is_correct === true) {
-                trialBatchMap[key].correct++;
-            }
-            trialBatchMap[key].errorSum += parseFloat(row.relative_error || 0);
-        });
-
-        // Per-Trial data
-        Object.values(trialBatchMap).forEach(batch => {
-            const incorrect = batch.total - batch.correct;
-            const accuracyRate = batch.total > 0 ? ((batch.correct / batch.total) * 100).toFixed(1) : '0.0';
-            const avgError = batch.total > 0 ? ((batch.errorSum / batch.total) * 100).toFixed(2) : '0.00';
-
-            perTrial.push({
-                trial: batch.trial,
-                batch: batch.batch,
-                level: batch.level,
-                total: batch.total,
-                correct: batch.correct,
-                incorrect: incorrect,
-                accuracyRate: accuracyRate,
-                avgError: avgError
-            });
-
-            // Aggregate for per-batch averages
-            const batchKey = batch.batch;
-            if (!perBatchMap[batchKey]) {
-                perBatchMap[batchKey] = {
-                    batch: batch.batch,
-                    level: batch.level,
-                    totals: [],
-                    corrects: [],
-                    errors: []
-                };
-            }
-            perBatchMap[batchKey].totals.push(batch.total);
-            perBatchMap[batchKey].corrects.push(batch.correct);
-            perBatchMap[batchKey].errors.push(batch.errorSum / batch.total);
-        });
-
-        // Compute per-batch averages
-        const perBatch = Object.values(perBatchMap).map(batch => {
-            const avgTotal = (batch.totals.reduce((a, b) => a + b, 0) / batch.totals.length).toFixed(1);
-            const avgCorrect = (batch.corrects.reduce((a, b) => a + b, 0) / batch.corrects.length).toFixed(1);
-            const avgIncorrect = (avgTotal - avgCorrect).toFixed(1);
-            const avgAccuracy = avgTotal > 0 ? ((avgCorrect / avgTotal) * 100).toFixed(1) : '0.0';
-            const avgError = ((batch.errors.reduce((a, b) => a + b, 0) / batch.errors.length) * 100).toFixed(2);
-
-            return {
-                batch: batch.batch,
-                level: batch.level,
-                total: avgTotal,
-                correct: avgCorrect,
-                incorrect: avgIncorrect,
-                accuracyRate: avgAccuracy,
-                avgError: avgError
-            };
-        });
-
-        return { perTrial, perBatch };
+        // Refresh icons
+        if (typeof lucide !== 'undefined') lucide.createIcons();
     },
 
     populateConstructionFromStats(performanceStats) {
@@ -2921,35 +2702,18 @@ const ExperimentRunner = {
         const container = document.getElementById('result-construction-container');
         if (!container) return;
 
-        if (!this.currentResultId) {
+        if (!this.resultsData?.aggregated_data?.construction) {
             container.innerHTML = `<div class="text-center py-8 text-gray-600">
                 <i data-lucide="alert-circle" class="w-12 h-12 mx-auto mb-2 text-gray-400"></i>
-                <p class="font-semibold mb-2">No experiment results loaded</p>
+                <p class="font-semibold mb-2">No construction data available</p>
             </div>`;
             return;
         }
 
-        // Show loading state
-        container.innerHTML = `<div class="text-center py-8">
-            <div class="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-2"></div>
-            <p class="text-gray-500">Loading construction data...</p>
-        </div>`;
-
         try {
-            const url = `/api/experiment/results/${this.currentResultId}/csv/construction/data?page=1&limit=100`;
-            const response = await fetch(url);
-            const result = await response.json();
-
-            if (!result.success || !result.data || result.data.length === 0) {
-                container.innerHTML = `<div class="text-center py-8 text-gray-600">
-                    <i data-lucide="file-spreadsheet" class="w-12 h-12 mx-auto mb-2 text-gray-400"></i>
-                    <p class="font-semibold mb-2">No construction data available</p>
-                </div>`;
-                return;
-            }
-
-            // Compute averages
-            const averages = this.computeConstructionAverages(result.data);
+            // Get pre-calculated aggregations from loaded results
+            const perTrial = this.resultsData.aggregated_data.construction.per_trial;
+            const perBatch = this.resultsData.aggregated_data.construction.per_batch;
 
             // Render aggregated tables
             container.innerHTML = `
@@ -2976,12 +2740,12 @@ const ExperimentRunner = {
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-100">
-                                ${averages.perTrial.map(row => `
+                                ${perTrial.map(row => `
                                     <tr class="hover:bg-purple-50 transition-colors ${row.algorithm === 'HC2L' ? 'bg-purple-50' : ''}">
                                         <td class="p-3">T${row.trial}</td>
                                         <td class="p-3"><span class="px-2 py-1 rounded text-xs font-bold ${row.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">${row.algorithm}</span></td>
-                                        <td class="p-3 text-right font-mono">${row.constructionTime}</td>
-                                        <td class="p-3 text-right font-mono">${row.labelSize}</td>
+                                        <td class="p-3 text-right font-mono">${row.construction_time_ms}</td>
+                                        <td class="p-3 text-right font-mono">${row.initial_label_size_mb}</td>
                                     </tr>
                                 `).join('')}
                             </tbody>
@@ -3012,12 +2776,12 @@ const ExperimentRunner = {
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-100">
-                                ${averages.perBatch.map(row => `
+                                ${perBatch.map(row => `
                                     <tr class="hover:bg-indigo-50 transition-colors ${row.algorithm === 'HC2L' ? 'bg-indigo-50' : ''}">
                                         <td class="p-3">Batch ${row.batch}</td>
                                         <td class="p-3"><span class="px-2 py-1 rounded text-xs font-bold ${row.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">${row.algorithm}</span></td>
-                                        <td class="p-3 text-right font-mono">${row.constructionTime}</td>
-                                        <td class="p-3 text-right font-mono">${row.labelSize}</td>
+                                        <td class="p-3 text-right font-mono">${row.avg_construction_time_ms}</td>
+                                        <td class="p-3 text-right font-mono">${row.avg_label_size_mb}</td>
                                     </tr>
                                 `).join('')}
                             </tbody>
@@ -3041,90 +2805,23 @@ const ExperimentRunner = {
         }
     },
 
-    computeConstructionAverages(data) {
-        const perTrial = [];
-        const perBatchMap = {};
-
-        // Group by trial and algorithm
-        const trialAlgoMap = {};
-        data.forEach(row => {
-            // Use algorithm from CSV (now included in construction CSV)
-            const algorithm = row.algorithm || 'DHL';
-
-            const key = `${row.trial_id}_${algorithm}`;
-            if (!trialAlgoMap[key]) {
-                trialAlgoMap[key] = {
-                    trial: row.trial_id,
-                    algorithm: algorithm,
-                    constructionSum: 0,
-                    labelSum: 0,
-                    count: 0
-                };
-            }
-            trialAlgoMap[key].constructionSum += parseFloat(row.initial_construction_time_ms || 0);
-            trialAlgoMap[key].labelSum += parseFloat(row.initial_label_size_mb || 0);
-            trialAlgoMap[key].count++;
-        });
-
-        // Per-Trial data
-        Object.values(trialAlgoMap).forEach(trial => {
-            const avgConstruction = trial.count > 0 ? (trial.constructionSum / trial.count).toFixed(2) : '0.00';
-            const avgLabel = trial.count > 0 ? (trial.labelSum / trial.count).toFixed(5) : '0.00000';
-
-            perTrial.push({
-                trial: trial.trial,
-                algorithm: trial.algorithm,
-                constructionTime: avgConstruction,
-                labelSize: avgLabel
-            });
-
-            // Aggregate for per-batch averages (all trials same for construction)
-            const batchKey = `1_${trial.algorithm}`;  // Batch 1 for construction
-            if (!perBatchMap[batchKey]) {
-                perBatchMap[batchKey] = {
-                    batch: 1,
-                    algorithm: trial.algorithm,
-                    constructions: [],
-                    labels: []
-                };
-            }
-            perBatchMap[batchKey].constructions.push(parseFloat(avgConstruction));
-            perBatchMap[batchKey].labels.push(parseFloat(avgLabel));
-        });
-
-        // Compute per-batch averages
-        const perBatch = Object.values(perBatchMap).map(batch => ({
-            batch: batch.batch,
-            algorithm: batch.algorithm,
-            constructionTime: (batch.constructions.reduce((a, b) => a + b, 0) / batch.constructions.length).toFixed(2),
-            labelSize: (batch.labels.reduce((a, b) => a + b, 0) / batch.labels.length).toFixed(5)
-        }));
-
-        return { perTrial, perBatch };
-    },
-
     populateUpdatesFromGraphData(graphData) {
         const container = document.getElementById('result-updates-container');
         if (!container) return;
 
-        if (!graphData || !graphData.time_series) {
+        if (!this.resultsData?.aggregated_data?.updates) {
             container.innerHTML = `
                 <div class="text-center py-8 text-gray-600">
                     <i data-lucide="file-spreadsheet" class="w-12 h-12 mx-auto mb-2 text-gray-400"></i>
-                    <p class="font-semibold mb-2">Per-route update performance data available in CSV</p>
-                    <button onclick="ExperimentRunner.exportCSV('updates', 'all')" class="btn btn--primary btn--sm">
-                        <i data-lucide="download" class="w-4 h-4"></i> Download Updates CSV
-                    </button>
+                    <p class="font-semibold mb-2">No updates data available</p>
                 </div>
             `;
             return;
         }
 
-        // Compute averages from graph_data
-        const dhlData = graphData.time_series.DHL || {};
-        const hc2lData = graphData.time_series.HC2L || {};
-
-        const averages = this.computeUpdateAverages(dhlData, hc2lData);
+        // Get pre-calculated aggregations
+        const perTrial = this.resultsData.aggregated_data.updates.per_trial;
+        const perBatch = this.resultsData.aggregated_data.updates.per_batch;
 
         container.innerHTML = `
             <!-- Averages Section -->
@@ -3157,17 +2854,17 @@ const ExperimentRunner = {
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-100">
-                                ${averages.perTrial.map(row => `
+                                ${perTrial.map(row => `
                                     <tr class="hover:bg-indigo-50 transition-colors">
-                                        <td class="p-3">${row.trial}</td>
-                                        <td class="p-3">${row.batch}</td>
+                                        <td class="p-3">T${row.trial}</td>
+                                        <td class="p-3">B${row.batch}</td>
                                         <td class="p-3"><span class="px-2 py-1 rounded text-xs font-bold ${row.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">${row.algorithm}</span></td>
-                                        <td class="p-3 text-center">${row.level}</td>
-                                        <td class="p-3 text-right font-mono">${row.lazyUpdate}</td>
-                                        <td class="p-3 text-right font-mono">${row.rebuild}</td>
-                                        <td class="p-3 text-right font-mono">${row.peakLabel}</td>
-                                        <td class="p-3 text-right font-mono text-${row.sizeChange.startsWith('+') ? 'green' : 'red'}-600">${row.sizeChange}</td>
-                                        <td class="p-3 text-right font-mono">${row.queryAvg}</td>
+                                        <td class="p-3 text-center"><span class="px-2 py-1 rounded text-xs font-medium ${this.getLevelBadgeClass(row.level)}">${row.level}</span></td>
+                                        <td class="p-3 text-right font-mono">${row.lazy_update_time_ms}</td>
+                                        <td class="p-3 text-right font-mono">${row.threshold_rebuild_time_ms}</td>
+                                        <td class="p-3 text-right font-mono">${row.peak_label_size_mb}</td>
+                                        <td class="p-3 text-right font-mono text-${row.label_size_change_pct >= 0 ? 'green' : 'red'}-600">${row.label_size_change_pct > 0 ? '+' : ''}${row.label_size_change_pct}%</td>
+                                        <td class="p-3 text-right font-mono">${row.query_avg_ms}</td>
                                     </tr>
                                 `).join('')}
                             </tbody>
@@ -3202,41 +2899,20 @@ const ExperimentRunner = {
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-100">
-                                ${averages.perBatch.map(row => `
+                                ${perBatch.map(row => `
                                     <tr class="hover:bg-purple-50 transition-colors">
-                                        <td class="p-3">${row.batch}</td>
+                                        <td class="p-3">Batch ${row.batch}</td>
                                         <td class="p-3"><span class="px-2 py-1 rounded text-xs font-bold ${row.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">${row.algorithm}</span></td>
-                                        <td class="p-3 text-center">${row.level}</td>
-                                        <td class="p-3 text-right font-mono">${row.lazyUpdate}</td>
-                                        <td class="p-3 text-right font-mono">${row.rebuild}</td>
-                                        <td class="p-3 text-right font-mono">${row.peakLabel}</td>
-                                        <td class="p-3 text-right font-mono text-${row.sizeChange.startsWith('+') ? 'green' : 'red'}-600">${row.sizeChange}</td>
-                                        <td class="p-3 text-right font-mono">${row.queryAvg}</td>
+                                        <td class="p-3 text-center"><span class="px-2 py-1 rounded text-xs font-medium ${this.getLevelBadgeClass(row.level)}">${row.level}</span></td>
+                                        <td class="p-3 text-right font-mono">${row.lazy_update_time_ms}</td>
+                                        <td class="p-3 text-right font-mono">${row.threshold_rebuild_time_ms}</td>
+                                        <td class="p-3 text-right font-mono">${row.peak_label_size_mb}</td>
+                                        <td class="p-3 text-right font-mono text-${row.label_size_change_pct >= 0 ? 'green' : 'red'}-600">${row.label_size_change_pct > 0 ? '+' : ''}${row.label_size_change_pct}%</td>
+                                        <td class="p-3 text-right font-mono">${row.query_avg_ms}</td>
                                     </tr>
                                 `).join('')}
                             </tbody>
                         </table>
-                    </div>
-                </div>
-                
-                <!-- Overall Average -->
-                <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border-2 border-blue-200 p-4 shadow-sm">
-                    <h5 class="font-bold text-blue-900 mb-3 flex items-center gap-2 mb-0">
-                        <i data-lucide="trending-up" class="w-5 h-5"></i>
-                        Overall Averages
-                    </h5>
-                    <div class="grid grid-cols-2 gap-4">
-                        ${averages.overall.map(row => `
-                            <div class="bg-white rounded-lg p-3 border border-blue-200">
-                                <div class="text-xs text-gray-600 mb-1">${row.algorithm}</div>
-                                <div class="grid grid-cols-2 gap-2 text-xs">
-                                    <div><span class="font-semibold">Query:</span> ${row.queryAvg} ms</div>
-                                    <div><span class="font-semibold">Lazy:</span> ${row.lazyUpdate} ms</div>
-                                    <div><span class="font-semibold">Rebuild:</span> ${row.rebuild} ms</div>
-                                    <div><span class="font-semibold">Peak:</span> ${row.peakLabel} MB</div>
-                                </div>
-                            </div>
-                        `).join('')}
                     </div>
                 </div>
             </div>
@@ -3248,89 +2924,6 @@ const ExperimentRunner = {
         }
     },
 
-    computeUpdateAverages(dhlData, hc2lData) {
-        const perTrial = [];
-        const perBatch = [];
-        const overall = [];
-
-        // Assuming 3 trials, 3 batches
-        const numTrials = 3;
-        const numBatches = 3;
-        const disruptions = ['light', 'medium', 'heavy'];
-
-        // Per-Trial averages (for each trial, average across all batches)
-        for (let algo of ['DHL', 'HC2L']) {
-            const data = algo === 'DHL' ? dhlData : hc2lData;
-
-            for (let t = 1; t <= numTrials; t++) {
-                for (let b = 1; b <= numBatches; b++) {
-                    const idx = (t - 1) * numBatches + (b - 1);
-
-                    perTrial.push({
-                        trial: t,
-                        batch: b,
-                        algorithm: algo,
-                        level: disruptions[b - 1] || 'unknown',
-                        lazyUpdate: data.update_times?.[idx]?.toFixed(3) || '0.000',
-                        rebuild: data.rebuild_times?.[idx]?.toFixed(3) || '0.000',
-                        peakLabel: data.label_sizes?.[idx]?.toFixed(5) || '0.00000',
-                        sizeChange: '+0.0%', // Placeholder
-                        queryAvg: data.query_times?.[idx]?.toFixed(3) || '0.000'
-                    });
-                }
-            }
-        }
-
-        // Per-Batch averages (for each batch, average across all trials)
-        for (let algo of ['DHL', 'HC2L']) {
-            const data = algo === 'DHL' ? dhlData : hc2lData;
-
-            for (let b = 1; b <= numBatches; b++) {
-                let sumQuery = 0, sumLazy = 0, sumRebuild = 0, sumLabel = 0, count = 0;
-
-                for (let t = 1; t <= numTrials; t++) {
-                    const idx = (t - 1) * numBatches + (b - 1);
-                    sumQuery += data.query_times?.[idx] || 0;
-                    sumLazy += data.update_times?.[idx] || 0;
-                    sumRebuild += data.rebuild_times?.[idx] || 0;
-                    sumLabel += data.label_sizes?.[idx] || 0;
-                    count++;
-                }
-
-                perBatch.push({
-                    batch: b,
-                    algorithm: algo,
-                    level: disruptions[b - 1] || 'unknown',
-                    lazyUpdate: (sumLazy / count).toFixed(3),
-                    rebuild: (sumRebuild / count).toFixed(3),
-                    peakLabel: (sumLabel / count).toFixed(5),
-                    sizeChange: '+0.0%', // Placeholder
-                    queryAvg: (sumQuery / count).toFixed(3)
-                });
-            }
-        }
-
-        // Overall averages
-        for (let algo of ['DHL', 'HC2L']) {
-            const data = algo === 'DHL' ? dhlData : hc2lData;
-
-            const avgQuery = data.query_times?.reduce((a, b) => a + b, 0) / (data.query_times?.length || 1);
-            const avgLazy = data.update_times?.reduce((a, b) => a + b, 0) / (data.update_times?.length || 1);
-            const avgRebuild = data.rebuild_times?.reduce((a, b) => a + b, 0) / (data.rebuild_times?.length || 1);
-            const avgLabel = data.label_sizes?.reduce((a, b) => a + b, 0) / (data.label_sizes?.length || 1);
-
-            overall.push({
-                algorithm: algo,
-                queryAvg: avgQuery.toFixed(3),
-                lazyUpdate: avgLazy.toFixed(3),
-                rebuild: avgRebuild.toFixed(3),
-                peakLabel: avgLabel.toFixed(5)
-            });
-        }
-
-        return { perTrial, perBatch, overall };
-    },
-
     populatePerformanceComparison(performanceStats) {
         // Load aggregated performance data
         this.loadAndDisplayPerformanceAggregates();
@@ -3340,35 +2933,18 @@ const ExperimentRunner = {
         const container = document.getElementById('result-performance-container');
         if (!container) return;
 
-        if (!this.currentResultId) {
+        if (!this.resultsData?.aggregated_data?.performance) {
             container.innerHTML = `<div class="text-center py-8 text-gray-600">
                 <i data-lucide="alert-circle" class="w-12 h-12 mx-auto mb-2 text-gray-400"></i>
-                <p class="font-semibold mb-2">No experiment results loaded</p>
+                <p class="font-semibold mb-2">No performance data available</p>
             </div>`;
             return;
         }
 
-        // Show loading state
-        container.innerHTML = `<div class="text-center py-8">
-            <div class="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-2"></div>
-            <p class="text-gray-500">Loading performance data...</p>
-        </div>`;
-
         try {
-            const url = `/api/experiment/results/${this.currentResultId}/csv/performance/data?page=1&limit=500`;
-            const response = await fetch(url);
-            const result = await response.json();
-
-            if (!result.success || !result.data || result.data.length === 0) {
-                container.innerHTML = `<div class="text-center py-8 text-gray-600">
-                    <i data-lucide="file-spreadsheet" class="w-12 h-12 mx-auto mb-2 text-gray-400"></i>
-                    <p class="font-semibold mb-2">No performance data available</p>
-                </div>`;
-                return;
-            }
-
-            // Compute averages
-            const averages = this.computePerformanceAverages(result.data);
+            // Get pre-calculated aggregations
+            const perTrial = this.resultsData.aggregated_data.performance.per_trial;
+            const perBatch = this.resultsData.aggregated_data.performance.per_batch;
 
             // Render aggregated tables
             container.innerHTML = `
@@ -3394,24 +2970,21 @@ const ExperimentRunner = {
                                     <th class="text-center p-3 font-semibold text-emerald-700">Level</th>
                                     <th class="text-right p-3 font-semibold text-emerald-700">Query Time (ms)</th>
                                     <th class="text-right p-3 font-semibold text-emerald-700">Label Size (MB)</th>
+                                    <th class="text-right p-3 font-semibold text-emerald-700">Peak Label (MB)</th>
                                     <th class="text-right p-3 font-semibold text-emerald-700">Lazy Update (ms)</th>
-                                    <th class="text-right p-3 font-semibold text-emerald-700">Total Rebuilds</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-100">
-                                ${averages.perTrial.map(row => `
+                                ${perTrial.map(row => `
                                     <tr class="hover:bg-emerald-50 transition-colors ${row.algorithm === 'HC2L' ? 'bg-emerald-50' : ''}">
                                         <td class="p-3">T${row.trial}</td>
                                         <td class="p-3">B${row.batch}</td>
                                         <td class="p-3"><span class="px-2 py-1 rounded text-xs font-bold ${row.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">${row.algorithm}</span></td>
-                                        <td class="p-3 text-center"><span class="px-2 py-1 rounded text-xs font-medium ${row.level === 'light' ? 'bg-green-100 text-green-700' :
-                    row.level === 'medium' ? 'bg-yellow-100 text-yellow-700' :
-                        'bg-red-100 text-red-700'
-                }">${row.level}</span></td>
-                                        <td class="p-3 text-right font-mono">${row.queryTime}</td>
-                                        <td class="p-3 text-right font-mono">${row.labelSize}</td>
-                                        <td class="p-3 text-right font-mono">${row.lazyUpdate}</td>
-                                        <td class="p-3 text-right font-mono">${row.rebuilds}</td>
+                                        <td class="p-3 text-center"><span class="px-2 py-1 rounded text-xs font-medium ${this.getLevelBadgeClass(row.level)}">${row.level}</span></td>
+                                        <td class="p-3 text-right font-mono">${row.avg_query_time_ms}</td>
+                                        <td class="p-3 text-right font-mono">${row.avg_label_size_mb}</td>
+                                        <td class="p-3 text-right font-mono">${row.peak_label_size_mb}</td>
+                                        <td class="p-3 text-right font-mono">${row.avg_lazy_update_time_ms}</td>
                                     </tr>
                                 `).join('')}
                             </tbody>
@@ -3440,23 +3013,20 @@ const ExperimentRunner = {
                                     <th class="text-center p-3 font-semibold text-green-700">Level</th>
                                     <th class="text-right p-3 font-semibold text-green-700">Avg Query (ms)</th>
                                     <th class="text-right p-3 font-semibold text-green-700">Avg Label (MB)</th>
+                                    <th class="text-right p-3 font-semibold text-green-700">Peak Label (MB)</th>
                                     <th class="text-right p-3 font-semibold text-green-700">Avg Lazy Update (ms)</th>
-                                    <th class="text-right p-3 font-semibold text-green-700">Avg Rebuilds</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-100">
-                                ${averages.perBatch.map(row => `
+                                ${perBatch.map(row => `
                                     <tr class="hover:bg-green-50 transition-colors ${row.algorithm === 'HC2L' ? 'bg-green-50' : ''}">
                                         <td class="p-3">Batch ${row.batch}</td>
                                         <td class="p-3"><span class="px-2 py-1 rounded text-xs font-bold ${row.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">${row.algorithm}</span></td>
-                                        <td class="p-3 text-center"><span class="px-2 py-1 rounded text-xs font-medium ${row.level === 'light' ? 'bg-green-100 text-green-700' :
-                        row.level === 'medium' ? 'bg-yellow-100 text-yellow-700' :
-                            'bg-red-100 text-red-700'
-                    }">${row.level}</span></td>
-                                        <td class="p-3 text-right font-mono">${row.queryTime}</td>
-                                        <td class="p-3 text-right font-mono">${row.labelSize}</td>
-                                        <td class="p-3 text-right font-mono">${row.lazyUpdate}</td>
-                                        <td class="p-3 text-right font-mono">${row.rebuilds}</td>
+                                        <td class="p-3 text-center"><span class="px-2 py-1 rounded text-xs font-medium ${this.getLevelBadgeClass(row.level)}">${row.level}</span></td>
+                                        <td class="p-3 text-right font-mono">${row.avg_query_time_ms}</td>
+                                        <td class="p-3 text-right font-mono">${row.avg_label_size_mb}</td>
+                                        <td class="p-3 text-right font-mono">${row.peak_label_size_mb}</td>
+                                        <td class="p-3 text-right font-mono">${row.avg_lazy_update_time_ms}</td>
                                     </tr>
                                 `).join('')}
                             </tbody>
@@ -3478,82 +3048,6 @@ const ExperimentRunner = {
                 <p class="text-sm">${error.message}</p>
             </div>`;
         }
-    },
-
-    computePerformanceAverages(data) {
-        const perTrial = [];
-        const perBatchMap = {};
-
-        // Group by trial, batch, and algorithm
-        const trialBatchAlgoMap = {};
-        data.forEach(row => {
-            const algorithm = row.algorithm || 'DHL';
-            const key = `${row.trial_id}_${row.batch_id}_${algorithm}`;
-
-            if (!trialBatchAlgoMap[key]) {
-                trialBatchAlgoMap[key] = {
-                    trial: row.trial_id,
-                    batch: row.batch_id,
-                    algorithm: algorithm,
-                    level: row.disruption_level,
-                    querySum: 0,
-                    labelSum: 0,
-                    lazySum: 0,
-                    rebuildsSum: 0,
-                    count: 0
-                };
-            }
-            trialBatchAlgoMap[key].querySum += parseFloat(row.query_time_ms || 0);
-            trialBatchAlgoMap[key].labelSum += parseFloat(row.label_size_mb || 0);
-            trialBatchAlgoMap[key].lazySum += parseFloat(row.lazy_update_time_ms || 0);
-            trialBatchAlgoMap[key].rebuildsSum += parseInt(row.total_rebuilds || 0);
-            trialBatchAlgoMap[key].count++;
-        });
-
-        // Per-Trial data
-        Object.values(trialBatchAlgoMap).forEach(item => {
-            perTrial.push({
-                trial: item.trial,
-                batch: item.batch,
-                algorithm: item.algorithm,
-                level: item.level,
-                queryTime: (item.querySum / item.count).toFixed(3),
-                labelSize: (item.labelSum / item.count).toFixed(5),
-                lazyUpdate: (item.lazySum / item.count).toFixed(3),
-                rebuilds: Math.round(item.rebuildsSum / item.count)
-            });
-
-            // Aggregate for per-batch averages
-            const batchKey = `${item.batch}_${item.algorithm}`;
-            if (!perBatchMap[batchKey]) {
-                perBatchMap[batchKey] = {
-                    batch: item.batch,
-                    algorithm: item.algorithm,
-                    level: item.level,
-                    queries: [],
-                    labels: [],
-                    lazies: [],
-                    rebuilds: []
-                };
-            }
-            perBatchMap[batchKey].queries.push(item.querySum / item.count);
-            perBatchMap[batchKey].labels.push(item.labelSum / item.count);
-            perBatchMap[batchKey].lazies.push(item.lazySum / item.count);
-            perBatchMap[batchKey].rebuilds.push(item.rebuildsSum / item.count);
-        });
-
-        // Compute per-batch averages
-        const perBatch = Object.values(perBatchMap).map(batch => ({
-            batch: batch.batch,
-            algorithm: batch.algorithm,
-            level: batch.level,
-            queryTime: (batch.queries.reduce((a, b) => a + b, 0) / batch.queries.length).toFixed(3),
-            labelSize: (batch.labels.reduce((a, b) => a + b, 0) / batch.labels.length).toFixed(5),
-            lazyUpdate: (batch.lazies.reduce((a, b) => a + b, 0) / batch.lazies.length).toFixed(3),
-            rebuilds: Math.round(batch.rebuilds.reduce((a, b) => a + b, 0) / batch.rebuilds.length)
-        }));
-
-        return { perTrial, perBatch };
     },
 
     populateSimilarityPlaceholder() {
@@ -3851,18 +3345,12 @@ const ExperimentRunner = {
         });
         this.chartInstances = {};
 
-        // Render basic graphs first
-        this.renderQueryTimeSeriesChart(graphData.time_series);
-        this.renderUpdateTimeSeriesChart(graphData.time_series);
-        this.renderAverageQueryTimeChart(graphData.algorithm_comparison);
-        this.renderAverageLabelSizeChart(graphData.algorithm_comparison);
-        this.renderOverallComparisonChart(graphData.algorithm_comparison);
+        // Render graphs using the new pre-calculated graph_data structure
+        this.renderJamFactorChart();
+        this.renderErrorRateChart();
+        this.renderPerBatchBreakdownChart(graphData.per_batch_comparison);
+        this.renderPerTrialBreakdownChart(graphData.per_trial_comparison);
         this.renderRebuildAnalysisChart(graphData.rebuild_analysis);
-        this.renderLabelSizeTrendChart(graphData.label_size_trend);
-
-        // Load CSV data to compute jam factors and error rates for per-trial/per-batch charts
-        await this.loadAndRenderPerTrialPerBatchCharts(graphData);
-
     },
 
     async loadAndRenderPerTrialPerBatchCharts(graphData) {
@@ -4220,7 +3708,7 @@ const ExperimentRunner = {
     },
 
     renderPerTrialQueryChart(perTrialData) {
-        if (!perTrialData) return;
+        if (!perTrialData || !perTrialData.labels) return;
 
         const ctx = document.getElementById('chart-per-trial-query');
         if (!ctx) return;
@@ -4228,18 +3716,18 @@ const ExperimentRunner = {
         this.chartInstances['per-trial-query'] = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: perTrialData.trial_labels || [],
+                labels: perTrialData.labels,
                 datasets: [
                     {
                         label: 'DHL Query Time',
-                        data: perTrialData.DHL_query || [],
+                        data: perTrialData.DHL?.query_time_ms || [],
                         backgroundColor: 'rgba(59, 130, 246, 0.7)',
                         borderColor: '#3B82F6',
                         borderWidth: 1
                     },
                     {
                         label: 'HC2L Query Time',
-                        data: perTrialData.HC2L_query || [],
+                        data: perTrialData.HC2L?.query_time_ms || [],
                         backgroundColor: 'rgba(16, 185, 129, 0.7)',
                         borderColor: '#10B981',
                         borderWidth: 1
@@ -4279,7 +3767,7 @@ const ExperimentRunner = {
     },
 
     renderPerTrialLabelSizeChart(perTrialData) {
-        if (!perTrialData) return;
+        if (!perTrialData || !perTrialData.labels) return;
 
         const ctx = document.getElementById('chart-per-trial-label-size');
         if (!ctx) return;
@@ -4287,18 +3775,18 @@ const ExperimentRunner = {
         this.chartInstances['per-trial-label-size'] = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: perTrialData.trial_labels || [],
+                labels: perTrialData.labels,
                 datasets: [
                     {
                         label: 'DHL Label Size',
-                        data: perTrialData.DHL_label_size || [],
+                        data: perTrialData.DHL?.label_size_mb || [],
                         backgroundColor: 'rgba(139, 92, 246, 0.7)',
                         borderColor: '#8B5CF6',
                         borderWidth: 1
                     },
                     {
                         label: 'HC2L Label Size',
-                        data: perTrialData.HC2L_label_size || [],
+                        data: perTrialData.HC2L?.label_size_mb || [],
                         backgroundColor: 'rgba(251, 191, 36, 0.7)',
                         borderColor: '#FBBF24',
                         borderWidth: 1
@@ -4446,15 +3934,14 @@ const ExperimentRunner = {
     },
 
     renderPerTrialBreakdownChart(perTrialData) {
-        // This function is now split into separate charts
+        // Render per-trial comparison charts
         this.renderPerTrialQueryChart(perTrialData);
         this.renderPerTrialLabelSizeChart(perTrialData);
-        this.renderPerTrialJamFactorChart(perTrialData);
-        this.renderPerTrialErrorRateChart(perTrialData);
+        // Note: Jam factor and error rate have their own dedicated charts
     },
 
     renderPerBatchQueryChart(perBatchData) {
-        if (!perBatchData) return;
+        if (!perBatchData || !perBatchData.labels) return;
 
         const ctx = document.getElementById('chart-per-batch-query');
         if (!ctx) return;
@@ -4462,18 +3949,18 @@ const ExperimentRunner = {
         this.chartInstances['per-batch-query'] = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: perBatchData.batch_labels || [],
+                labels: perBatchData.labels,
                 datasets: [
                     {
                         label: 'DHL Query Time',
-                        data: perBatchData.DHL_query || [],
+                        data: perBatchData.DHL?.query_time_ms || [],
                         backgroundColor: 'rgba(6, 182, 212, 0.7)',
                         borderColor: '#06B6D4',
                         borderWidth: 1
                     },
                     {
                         label: 'HC2L Query Time',
-                        data: perBatchData.HC2L_query || [],
+                        data: perBatchData.HC2L?.query_time_ms || [],
                         backgroundColor: 'rgba(34, 197, 94, 0.7)',
                         borderColor: '#22C55E',
                         borderWidth: 1
@@ -4513,7 +4000,7 @@ const ExperimentRunner = {
     },
 
     renderPerBatchLabelSizeChart(perBatchData) {
-        if (!perBatchData) return;
+        if (!perBatchData || !perBatchData.labels) return;
 
         const ctx = document.getElementById('chart-per-batch-label-size');
         if (!ctx) return;
@@ -4521,18 +4008,18 @@ const ExperimentRunner = {
         this.chartInstances['per-batch-label-size'] = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: perBatchData.batch_labels || [],
+                labels: perBatchData.labels,
                 datasets: [
                     {
                         label: 'DHL Label Size',
-                        data: perBatchData.DHL_label_size || [],
+                        data: perBatchData.DHL?.label_size_mb || [],
                         backgroundColor: 'rgba(139, 92, 246, 0.7)',
                         borderColor: '#8B5CF6',
                         borderWidth: 1
                     },
                     {
                         label: 'HC2L Label Size',
-                        data: perBatchData.HC2L_label_size || [],
+                        data: perBatchData.HC2L?.label_size_mb || [],
                         backgroundColor: 'rgba(245, 158, 11, 0.7)',
                         borderColor: '#F59E0B',
                         borderWidth: 1
@@ -4680,11 +4167,10 @@ const ExperimentRunner = {
     },
 
     renderPerBatchBreakdownChart(perBatchData) {
-        // Render all per-batch charts
+        // Render per-batch comparison charts
         this.renderPerBatchQueryChart(perBatchData);
         this.renderPerBatchLabelSizeChart(perBatchData);
-        this.renderPerBatchJamFactorChart(perBatchData);
-        this.renderPerBatchErrorRateChart(perBatchData);
+        // Note: Jam factor and error rate have their own dedicated charts
     },
 
     renderOverallComparisonChart(comparisonData) {
@@ -4862,15 +4348,14 @@ const ExperimentRunner = {
     },
 
     renderJamFactorChart() {
-        const summaryData = this.currentResults?.summary_data;
-        if (!summaryData?.batches) return;
+        const graphData = this.resultsData?.graph_data?.jam_factor;
+        if (!graphData?.labels || !graphData?.values) return;
 
         const ctx = document.getElementById('chart-jam-factor');
         if (!ctx) return;
 
-        const batches = summaryData.batches;
-        const labels = batches.map((_, i) => `Batch ${i + 1}`);
-        const jamFactors = batches.map(b => b.average_jam_factor || 0);
+        const labels = graphData.labels;
+        const jamFactors = graphData.values;
 
         this.chartInstances['jam-factor'] = new Chart(ctx, {
             type: 'bar',
@@ -4938,16 +4423,15 @@ const ExperimentRunner = {
     },
 
     renderErrorRateChart() {
-        const accuracyData = this.currentResults?.accuracy_data;
-        if (!accuracyData?.batches) return;
+        const graphData = this.resultsData?.graph_data?.error_rate;
+        if (!graphData?.labels || !graphData?.values) return;
 
         const ctx = document.getElementById('chart-error-rate');
         if (!ctx) return;
 
-        const batches = accuracyData.batches;
-        const labels = batches.map((_, i) => `Batch ${i + 1}`);
-        const errorRates = batches.map(b => (b.error_rate || 0) * 100); // Convert to percentage
-        const tolerance = (accuracyData.tolerance || 0.05) * 100;
+        const labels = graphData.labels;
+        const errorRates = graphData.values;
+        const tolerance = graphData.tolerance || 5.0; // Already in percentage
 
         this.chartInstances['error-rate'] = new Chart(ctx, {
             type: 'line',
