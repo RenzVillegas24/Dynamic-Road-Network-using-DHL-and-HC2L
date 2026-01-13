@@ -183,6 +183,37 @@ CSV_HEADERS_SCENARIO_UPDATES = [
     "peak_label_size_mb", "label_size_change_pct", "query_avg_ms"
 ]
 
+# Scenario Comprehensive - All simulation data in a single row per route/scenario/severity
+CSV_HEADERS_SCENARIO_COMPREHENSIVE = [
+    # Route identification
+    "route_id",
+    "route_start_lat", "route_start_lon",
+    "route_end_lat", "route_end_lon",
+    "route_start_edge_source", "route_start_edge_target",
+    "route_end_edge_source", "route_end_edge_target",
+    "route_start_name", "route_end_name",
+    "route_length_category",
+    # Disruption scenario
+    "disruption_scenario_id", "disruption_scenario_name",
+    "disruption_severity_level",
+    # Incident counts
+    "disruption_num_road_closure", "disruption_num_road_hazard",
+    "disruption_num_construction", "disruption_num_congestion",
+    "disruption_num_disabled_vehicle", "disruption_num_mass_transit_event",
+    "disruption_num_planned_event", "disruption_num_weather",
+    "disruption_num_lane_restriction", "disruption_num_other",
+    "disruption_num_accident",
+    # Algorithm performance
+    "algorithm_labeling_time_ms", "algorithm_label_size_mb",
+    "algorithm_query_response_time_ms",
+    "algorithm_here_travel_time_sec", "algorithm_dhc2l_travel_time_sec",
+    "algorithm_dhl_travel_time_sec",
+    "algorithm_here_distance_km", "algorithm_dhc2l_distance_km",
+    "algorithm_dhl_distance_km",
+    "algorithm_frechet_distance_km",
+    "algorithm_is_correct"
+]
+
 
 class DisruptionLevel(Enum):
     """Disruption level categories"""
@@ -902,6 +933,7 @@ class ExperimentMetricsCollector:
                         "route_category": scenario_metadata["route_category"],
                         "route_id": scenario_metadata["route_id"],
                         "scenario_id": scenario_metadata["scenario_id"],
+                        "scenario_name": api_result.get("scenario_name", ""),
                         "severity_level": scenario_metadata["severity_level"],
                         "source_node": record.source_node,
                         "target_node": record.target_node,
@@ -913,6 +945,9 @@ class ExperimentMetricsCollector:
                         "is_correct": record.accuracy.is_correct if record.accuracy else False,
                         "query_time_ms": record.performance.query_response_time_ms if record.performance else 0,
                         "label_size_mb": record.performance.labeling_size_mb if record.performance else 0,
+                        "labeling_time_ms": record.performance.labeling_time_ms if record.performance else 0,
+                        # Route info for comprehensive CSV
+                        "route_info": api_result.get("route_info", {}),
                     }
                     
                     # Add incident counts from disruption_data
@@ -1890,6 +1925,74 @@ class ExperimentMetricsCollector:
         logger.info(f"Exported scenario updates CSV: {csv_path} ({total_rows} rows)")
         return csv_path
     
+    def export_scenario_comprehensive_csv(self) -> Path:
+        """
+        Export Scenario Comprehensive CSV.
+        All simulation data in a single row per route/scenario/severity.
+        This includes route info, disruption details, and algorithm metrics.
+        """
+        csv_path = self.results_path / "comprehensive_results.csv"
+        
+        with self.csv_lock:
+            with open(csv_path, 'w', newline='') as f:
+                writer = csv.DictWriter(f, fieldnames=CSV_HEADERS_SCENARIO_COMPREHENSIVE)
+                writer.writeheader()
+                
+                for record in self.scenario_records:
+                    # Get route info from comprehensive_route_data if available
+                    route_info = record.get("route_info", {})
+                    
+                    writer.writerow({
+                        # Route identification
+                        "route_id": record.get("route_id", 0),
+                        "route_start_lat": route_info.get("start_lat", 0),
+                        "route_start_lon": route_info.get("start_lon", 0),
+                        "route_end_lat": route_info.get("end_lat", 0),
+                        "route_end_lon": route_info.get("end_lon", 0),
+                        "route_start_edge_source": route_info.get("start_edge_source", 0),
+                        "route_start_edge_target": route_info.get("start_edge_target", 0),
+                        "route_end_edge_source": route_info.get("end_edge_source", 0),
+                        "route_end_edge_target": route_info.get("end_edge_target", 0),
+                        "route_start_name": route_info.get("start_name", ""),
+                        "route_end_name": route_info.get("end_name", ""),
+                        "route_length_category": record.get("route_category", ""),
+                        
+                        # Disruption scenario
+                        "disruption_scenario_id": record.get("scenario_id", ""),
+                        "disruption_scenario_name": record.get("scenario_name", ""),
+                        "disruption_severity_level": record.get("severity_level", ""),
+                        
+                        # Incident counts
+                        "disruption_num_road_closure": record.get("num_road_closure", 0),
+                        "disruption_num_road_hazard": record.get("num_road_hazard", 0),
+                        "disruption_num_construction": record.get("num_construction", 0),
+                        "disruption_num_congestion": record.get("num_congestion", 0),
+                        "disruption_num_disabled_vehicle": record.get("num_disabled_vehicle", 0),
+                        "disruption_num_mass_transit_event": record.get("num_mass_transit_event", 0),
+                        "disruption_num_planned_event": record.get("num_planned_event", 0),
+                        "disruption_num_weather": record.get("num_weather", 0),
+                        "disruption_num_lane_restriction": record.get("num_lane_restriction", 0),
+                        "disruption_num_other": record.get("num_other", 0),
+                        "disruption_num_accident": record.get("num_accident", 0),
+                        
+                        # Algorithm performance
+                        "algorithm_labeling_time_ms": record.get("labeling_time_ms", 0),
+                        "algorithm_label_size_mb": record.get("label_size_mb", 0),
+                        "algorithm_query_response_time_ms": record.get("query_time_ms", 0),
+                        "algorithm_here_travel_time_sec": route_info.get("here_travel_time_sec", 0),
+                        "algorithm_dhc2l_travel_time_sec": record.get("dhc2l_travel_time_sec", 0),
+                        "algorithm_dhl_travel_time_sec": record.get("dhl_travel_time_sec", 0),
+                        "algorithm_here_distance_km": route_info.get("here_distance_km", 0),
+                        "algorithm_dhc2l_distance_km": record.get("dhc2l_distance", 0),
+                        "algorithm_dhl_distance_km": record.get("dhl_distance", 0),
+                        "algorithm_frechet_distance_km": route_info.get("frechet_distance_km", 0),
+                        "algorithm_is_correct": record.get("is_correct", False),
+                    })
+        
+        total_rows = len(self.scenario_records)
+        logger.info(f"Exported scenario comprehensive CSV: {csv_path} ({total_rows} rows)")
+        return csv_path
+    
     def export_scenario_csvs(self) -> Dict[str, Path]:
         """
         Export all scenario-specific CSV files.
@@ -1906,7 +2009,8 @@ class ExperimentMetricsCollector:
             "performance": self.export_scenario_performance_csv(),
             "construction": self.export_scenario_construction_csv(),
             "updates": self.export_scenario_updates_csv(),
-            "similarity": self.export_similarity_csv()  # Similarity uses standard export
+            "similarity": self.export_similarity_csv(),  # Similarity uses standard export
+            "comprehensive": self.export_scenario_comprehensive_csv()
         }
         
         logger.info(f"All scenario CSVs exported to: {self.results_path}")

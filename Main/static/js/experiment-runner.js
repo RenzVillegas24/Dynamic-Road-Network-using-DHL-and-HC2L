@@ -4892,16 +4892,29 @@ const ExperimentRunner = {
     },
 
     exportAllCSV(data) {
-        // Download all 6 per-route CSVs directly from backend
-        const csvTypes = ['summary', 'accuracy', 'construction', 'updates', 'performance', 'similarity'];
+        // Download all CSV files and JSON as a single ZIP from backend
+        if (!this.currentResultId) {
+            this.showNotification('No result selected', 'warning');
+            return;
+        }
 
-        csvTypes.forEach(csvType => {
-            setTimeout(() => {
-                this.exportCSV(csvType, 'all');
-            }, 100 * csvTypes.indexOf(csvType)); // Stagger downloads
-        });
+        try {
+            // Use the new export-all endpoint
+            const url = `/api/experiment/results/${this.currentResultId}/export-all`;
+            
+            // Create hidden link and trigger download
+            const link = document.createElement('a');
+            link.href = url;
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
 
-        this.showNotification('Downloading all CSV files...', 'success');
+            this.showNotification('Downloading all CSV files and JSON as ZIP...', 'success');
+        } catch (error) {
+            console.error('Error exporting all files:', error);
+            this.showNotification('Export failed', 'error');
+        }
     },
 
     convertToCSV(data) {
@@ -4963,7 +4976,8 @@ const ExperimentRunner = {
         construction: { page: 1, loaded: false, loading: false },
         updates: { page: 1, loaded: false, loading: false },
         performance: { page: 1, loaded: false, loading: false },
-        similarity: { page: 1, loaded: false, loading: false }
+        similarity: { page: 1, loaded: false, loading: false },
+        comprehensive: { page: 1, loaded: false, loading: false }
     },
 
     /**
@@ -5075,115 +5089,220 @@ const ExperimentRunner = {
      * @param {Array} headers - Column headers
      */
     renderPerRouteRows(csvType, tbody, data, headers) {
+        // Detect scenario mode from data or stored state
+        const isScenario = this.isScenarioMode || 
+                          (data.length > 0 && data[0].route_category !== undefined);
+        
+        // Always update table headers based on mode
+        this.updatePerRouteTableHeaders(csvType, isScenario);
+        
         switch (csvType) {
             case 'accuracy':
-                tbody.innerHTML = data.map(row => `
-                    <tr class="hover:bg-gray-50 text-xs">
-                        <td class="p-2">${row.trial_id || ''}</td>
-                        <td class="p-2">${row.batch_id || ''}</td>
-                        <td class="p-2">${row.disruption_level || ''}</td>
-                        <td class="p-2 font-mono">${row.source_node || ''} → ${row.target_node || ''}</td>
-                        <td class="p-2 text-right font-mono">${parseFloat(row.dhc2l_distance || 0).toFixed(1)}</td>
-                        <td class="p-2 text-right font-mono">${parseFloat(row.dijkstra_distance || 0).toFixed(1)}</td>
-                        <td class="p-2 text-right font-mono">${(parseFloat(row.relative_error || 0) * 100).toFixed(2)}%</td>
-                        <td class="p-2 text-center">
-                            <span class="px-2 py-0.5 rounded text-xs ${row.is_correct === 'True' || row.is_correct === true ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">
-                                ${row.is_correct === 'True' || row.is_correct === true ? '✓' : '✗'}
-                            </span>
-                        </td>
-                    </tr>
-                `).join('');
+                if (isScenario) {
+                    tbody.innerHTML = data.map(row => `
+                        <tr class="hover:bg-gray-50 text-xs">
+                            <td class="p-2"><span class="px-2 py-0.5 rounded text-xs font-medium ${this.getCategoryBadgeClass(row.route_category)}">${row.route_category || ''}</span></td>
+                            <td class="p-2">${row.scenario_id || ''}</td>
+                            <td class="p-2"><span class="px-2 py-0.5 rounded text-xs ${this.getLevelBadgeClass(row.severity_level)}">${row.severity_level || ''}</span></td>
+                            <td class="p-2 font-mono">${row.source_node || ''} → ${row.target_node || ''}</td>
+                            <td class="p-2 text-right font-mono">${parseFloat(row.dhc2l_distance || 0).toFixed(1)}</td>
+                            <td class="p-2 text-right font-mono">${parseFloat(row.dijkstra_distance || 0).toFixed(1)}</td>
+                            <td class="p-2 text-right font-mono">${(parseFloat(row.relative_error || 0) * 100).toFixed(2)}%</td>
+                            <td class="p-2 text-center">
+                                <span class="px-2 py-0.5 rounded text-xs ${row.is_correct === 'True' || row.is_correct === true ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">
+                                    ${row.is_correct === 'True' || row.is_correct === true ? '✓' : '✗'}
+                                </span>
+                            </td>
+                        </tr>
+                    `).join('');
+                } else {
+                    tbody.innerHTML = data.map(row => `
+                        <tr class="hover:bg-gray-50 text-xs">
+                            <td class="p-2">${row.trial_id || ''}</td>
+                            <td class="p-2">${row.batch_id || ''}</td>
+                            <td class="p-2">${row.disruption_level || ''}</td>
+                            <td class="p-2 font-mono">${row.source_node || ''} → ${row.target_node || ''}</td>
+                            <td class="p-2 text-right font-mono">${parseFloat(row.dhc2l_distance || 0).toFixed(1)}</td>
+                            <td class="p-2 text-right font-mono">${parseFloat(row.dijkstra_distance || 0).toFixed(1)}</td>
+                            <td class="p-2 text-right font-mono">${(parseFloat(row.relative_error || 0) * 100).toFixed(2)}%</td>
+                            <td class="p-2 text-center">
+                                <span class="px-2 py-0.5 rounded text-xs ${row.is_correct === 'True' || row.is_correct === true ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">
+                                    ${row.is_correct === 'True' || row.is_correct === true ? '✓' : '✗'}
+                                </span>
+                            </td>
+                        </tr>
+                    `).join('');
+                }
                 break;
 
             case 'construction':
-                tbody.innerHTML = data.map(row => `
-                    <tr class="hover:bg-gray-50 text-xs">
-                        <td class="p-2">${row.trial_id || ''}</td>
-                        <td class="p-2">${row.batch_id || ''}</td>
-                        <td class="p-2">${row.disruption_level || ''}</td>
-                        <td class="p-2 font-mono">${row.source_node || ''} → ${row.target_node || ''}</td>
-                        <td class="p-2">${row.query_id || ''}</td>
-                        <td class="p-2 text-right font-mono">${parseFloat(row.initial_construction_time_ms || 0).toFixed(3)}</td>
-                        <td class="p-2 text-right font-mono">${parseFloat(row.initial_label_size_mb || 0).toFixed(5)}</td>
-                        <td class="p-2 text-center">
-                            <span class="px-2 py-0.5 rounded text-xs ${row.is_correct === 'True' || row.is_correct === true ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">
-                                ${row.is_correct === 'True' || row.is_correct === true ? '✓' : '✗'}
-                            </span>
-                        </td>
-                    </tr>
-                `).join('');
+                if (isScenario) {
+                    // Scenario mode: construction is per-category aggregated
+                    tbody.innerHTML = data.map(row => `
+                        <tr class="hover:bg-gray-50 text-xs">
+                            <td class="p-2"><span class="px-2 py-0.5 rounded text-xs font-medium ${this.getCategoryBadgeClass(row.route_category)}">${row.route_category || ''}</span></td>
+                            <td class="p-2 font-medium ${row.algorithm === 'DHL' ? 'text-blue-600' : 'text-purple-600'}">${row.algorithm || ''}</td>
+                            <td class="p-2 text-right font-mono">${parseFloat(row.construction_time_ms || 0).toFixed(3)}</td>
+                            <td class="p-2 text-right font-mono">${parseFloat(row.initial_label_size_mb || 0).toFixed(5)}</td>
+                        </tr>
+                    `).join('');
+                } else {
+                    tbody.innerHTML = data.map(row => `
+                        <tr class="hover:bg-gray-50 text-xs">
+                            <td class="p-2">${row.trial_id || ''}</td>
+                            <td class="p-2">${row.batch_id || ''}</td>
+                            <td class="p-2">${row.disruption_level || ''}</td>
+                            <td class="p-2 font-mono">${row.source_node || ''} → ${row.target_node || ''}</td>
+                            <td class="p-2">${row.query_id || ''}</td>
+                            <td class="p-2 text-right font-mono">${parseFloat(row.initial_construction_time_ms || 0).toFixed(3)}</td>
+                            <td class="p-2 text-right font-mono">${parseFloat(row.initial_label_size_mb || 0).toFixed(5)}</td>
+                            <td class="p-2 text-center">
+                                <span class="px-2 py-0.5 rounded text-xs ${row.is_correct === 'True' || row.is_correct === true ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">
+                                    ${row.is_correct === 'True' || row.is_correct === true ? '✓' : '✗'}
+                                </span>
+                            </td>
+                        </tr>
+                    `).join('');
+                }
                 break;
 
             case 'updates':
-                tbody.innerHTML = data.map(row => `
-                    <tr class="hover:bg-gray-50 text-xs">
-                        <td class="p-2">${row.trial_id || ''}</td>
-                        <td class="p-2">${row.batch_id || ''}</td>
-                        <td class="p-2">${row.disruption_level || ''}</td>
-                        <td class="p-2 font-mono">${row.source_node || ''} → ${row.target_node || ''}</td>
-                        <td class="p-2 text-right font-mono">${parseFloat(row.label_size_change_pct || 0).toFixed(2)}%</td>
-                        <td class="p-2 text-right font-mono">${parseFloat(row.lazy_update_time_ms || 0).toFixed(3)}</td>
-                        <td class="p-2 text-right font-mono">${parseFloat(row.peak_label_size_mb || 0).toFixed(5)}</td>
-                        <td class="p-2 text-right font-mono">${parseFloat(row.query_response_time_ms || 0).toFixed(3)}</td>
-                        <td class="p-2 text-right font-mono">${parseFloat(row.threshold_rebuild_time_ms || 0).toFixed(3)}</td>
-                    </tr>
-                `).join('');
+                if (isScenario) {
+                    // Scenario mode: updates is per-category aggregated
+                    tbody.innerHTML = data.map(row => `
+                        <tr class="hover:bg-gray-50 text-xs">
+                            <td class="p-2"><span class="px-2 py-0.5 rounded text-xs font-medium ${this.getCategoryBadgeClass(row.route_category)}">${row.route_category || ''}</span></td>
+                            <td class="p-2 font-medium ${row.algorithm === 'DHL' ? 'text-blue-600' : 'text-purple-600'}">${row.algorithm || ''}</td>
+                            <td class="p-2 text-right font-mono">${parseFloat(row.lazy_update_time_ms || 0).toFixed(3)}</td>
+                            <td class="p-2 text-right font-mono">${parseFloat(row.peak_label_size_mb || 0).toFixed(5)}</td>
+                            <td class="p-2 text-right font-mono">${parseFloat(row.label_size_change_pct || 0).toFixed(2)}%</td>
+                            <td class="p-2 text-right font-mono">${parseFloat(row.query_avg_ms || 0).toFixed(3)}</td>
+                        </tr>
+                    `).join('');
+                } else {
+                    tbody.innerHTML = data.map(row => `
+                        <tr class="hover:bg-gray-50 text-xs">
+                            <td class="p-2">${row.trial_id || ''}</td>
+                            <td class="p-2">${row.batch_id || ''}</td>
+                            <td class="p-2">${row.disruption_level || ''}</td>
+                            <td class="p-2 font-mono">${row.source_node || ''} → ${row.target_node || ''}</td>
+                            <td class="p-2 text-right font-mono">${parseFloat(row.label_size_change_pct || 0).toFixed(2)}%</td>
+                            <td class="p-2 text-right font-mono">${parseFloat(row.lazy_update_time_ms || 0).toFixed(3)}</td>
+                            <td class="p-2 text-right font-mono">${parseFloat(row.peak_label_size_mb || 0).toFixed(5)}</td>
+                            <td class="p-2 text-right font-mono">${parseFloat(row.query_response_time_ms || 0).toFixed(3)}</td>
+                            <td class="p-2 text-right font-mono">${parseFloat(row.threshold_rebuild_time_ms || 0).toFixed(3)}</td>
+                        </tr>
+                    `).join('');
+                }
                 break;
 
             case 'performance':
-                tbody.innerHTML = data.map(row => `
-                    <tr class="hover:bg-gray-50 text-xs ${row.algorithm === 'HC2L' ? 'bg-purple-50' : ''}">
-                        <td class="p-2">${row.trial_id || ''}</td>
-                        <td class="p-2">${row.batch_id || ''}</td>
-                        <td class="p-2">${row.disruption_level || ''}</td>
-                        <td class="p-2 font-mono">${row.source_node || ''} → ${row.target_node || ''}</td>
-                        <td class="p-2 font-medium ${row.algorithm === 'DHL' ? 'text-blue-600' : 'text-purple-600'}">${row.algorithm || ''}</td>
-                        <td class="p-2 text-right font-mono">${parseFloat(row.query_time_ms || 0).toFixed(3)}</td>
-                        <td class="p-2 text-right font-mono">${parseFloat(row.label_size_mb || 0).toFixed(5)}</td>
-                        <td class="p-2 text-right font-mono">${parseFloat(row.lazy_update_time_ms || 0).toFixed(3)}</td>
-                        <td class="p-2 text-right font-mono">${row.total_rebuilds || 0}</td>
-                    </tr>
-                `).join('');
+                if (isScenario) {
+                    tbody.innerHTML = data.map(row => `
+                        <tr class="hover:bg-gray-50 text-xs ${row.algorithm === 'HC2L' ? 'bg-purple-50' : ''}">
+                            <td class="p-2"><span class="px-2 py-0.5 rounded text-xs font-medium ${this.getCategoryBadgeClass(row.route_category)}">${row.route_category || ''}</span></td>
+                            <td class="p-2">${row.scenario_id || ''}</td>
+                            <td class="p-2"><span class="px-2 py-0.5 rounded text-xs ${this.getLevelBadgeClass(row.severity_level)}">${row.severity_level || ''}</span></td>
+                            <td class="p-2 font-mono">${row.source_node || ''} → ${row.target_node || ''}</td>
+                            <td class="p-2 font-medium ${row.algorithm === 'DHL' ? 'text-blue-600' : 'text-purple-600'}">${row.algorithm || ''}</td>
+                            <td class="p-2 text-right font-mono">${parseFloat(row.query_time_ms || 0).toFixed(3)}</td>
+                            <td class="p-2 text-right font-mono">${parseFloat(row.label_size_mb || 0).toFixed(5)}</td>
+                            <td class="p-2 text-right font-mono">${parseFloat(row.lazy_update_time_ms || 0).toFixed(3)}</td>
+                            <td class="p-2 text-right font-mono">${row.total_rebuilds || 0}</td>
+                        </tr>
+                    `).join('');
+                } else {
+                    tbody.innerHTML = data.map(row => `
+                        <tr class="hover:bg-gray-50 text-xs ${row.algorithm === 'HC2L' ? 'bg-purple-50' : ''}">
+                            <td class="p-2">${row.trial_id || ''}</td>
+                            <td class="p-2">${row.batch_id || ''}</td>
+                            <td class="p-2">${row.disruption_level || ''}</td>
+                            <td class="p-2 font-mono">${row.source_node || ''} → ${row.target_node || ''}</td>
+                            <td class="p-2 font-medium ${row.algorithm === 'DHL' ? 'text-blue-600' : 'text-purple-600'}">${row.algorithm || ''}</td>
+                            <td class="p-2 text-right font-mono">${parseFloat(row.query_time_ms || 0).toFixed(3)}</td>
+                            <td class="p-2 text-right font-mono">${parseFloat(row.label_size_mb || 0).toFixed(5)}</td>
+                            <td class="p-2 text-right font-mono">${parseFloat(row.lazy_update_time_ms || 0).toFixed(3)}</td>
+                            <td class="p-2 text-right font-mono">${row.total_rebuilds || 0}</td>
+                        </tr>
+                    `).join('');
+                }
                 break;
 
             case 'summary':
-                tbody.innerHTML = data.map(row => {
-                    const total = (
-                        parseInt(row.num_accident || 0) +
-                        parseInt(row.num_construction || 0) +
-                        parseInt(row.num_congestion || 0) +
-                        parseInt(row.num_disabled_vehicle || 0) +
-                        parseInt(row.num_mass_transit_event || 0) +
-                        parseInt(row.num_planned_event || 0) +
-                        parseInt(row.num_road_hazard || 0) +
-                        parseInt(row.num_road_closure || 0) +
-                        parseInt(row.num_weather || 0) +
-                        parseInt(row.num_lane_restriction || 0) +
-                        parseInt(row.num_other || 0)
-                    );
-                    return `
-                    <tr class="hover:bg-gray-50 text-xs">
-                        <td class="p-2">T${row.trial_id || ''}</td>
-                        <td class="p-2">B${row.batch_id || ''}</td>
-                        <td class="p-2"><span class="px-2 py-0.5 rounded text-xs ${row.disruption_level === 'light' ? 'bg-green-100 text-green-700' :
-                            row.disruption_level === 'medium' ? 'bg-yellow-100 text-yellow-700' :
-                                'bg-red-100 text-red-700'
-                        }">${row.disruption_level || 'unknown'}</span></td>
-                        <td class="p-2 text-right">${row.num_accident || 0}</td>
-                        <td class="p-2 text-right">${row.num_construction || 0}</td>
-                        <td class="p-2 text-right">${row.num_congestion || 0}</td>
-                        <td class="p-2 text-right">${row.num_disabled_vehicle || 0}</td>
-                        <td class="p-2 text-right">${row.num_mass_transit_event || 0}</td>
-                        <td class="p-2 text-right">${row.num_planned_event || 0}</td>
-                        <td class="p-2 text-right">${row.num_road_hazard || 0}</td>
-                        <td class="p-2 text-right">${row.num_road_closure || 0}</td>
-                        <td class="p-2 text-right">${row.num_weather || 0}</td>
-                        <td class="p-2 text-right">${row.num_lane_restriction || 0}</td>
-                        <td class="p-2 text-right">${row.num_other || 0}</td>
-                        <td class="p-2 text-right font-bold">${total}</td>
-                    </tr>
-                `;
-                }).join('');
+                if (isScenario) {
+                    tbody.innerHTML = data.map(row => {
+                        const total = (
+                            parseInt(row.num_accident || 0) +
+                            parseInt(row.num_construction || 0) +
+                            parseInt(row.num_congestion || 0) +
+                            parseInt(row.num_disabled_vehicle || 0) +
+                            parseInt(row.num_mass_transit_event || 0) +
+                            parseInt(row.num_planned_event || 0) +
+                            parseInt(row.num_road_hazard || 0) +
+                            parseInt(row.num_road_closure || 0) +
+                            parseInt(row.num_weather || 0) +
+                            parseInt(row.num_lane_restriction || 0) +
+                            parseInt(row.num_other || 0)
+                        );
+                        return `
+                        <tr class="hover:bg-gray-50 text-xs">
+                            <td class="p-2"><span class="px-2 py-0.5 rounded text-xs font-medium ${this.getCategoryBadgeClass(row.route_category)}">${row.route_category || ''}</span></td>
+                            <td class="p-2">${row.scenario_id || ''}</td>
+                            <td class="p-2"><span class="px-2 py-0.5 rounded text-xs ${this.getLevelBadgeClass(row.severity_level)}">${row.severity_level || ''}</span></td>
+                            <td class="p-2 text-right">${row.num_accident || 0}</td>
+                            <td class="p-2 text-right">${row.num_construction || 0}</td>
+                            <td class="p-2 text-right">${row.num_congestion || 0}</td>
+                            <td class="p-2 text-right">${row.num_disabled_vehicle || 0}</td>
+                            <td class="p-2 text-right">${row.num_mass_transit_event || 0}</td>
+                            <td class="p-2 text-right">${row.num_planned_event || 0}</td>
+                            <td class="p-2 text-right">${row.num_road_hazard || 0}</td>
+                            <td class="p-2 text-right">${row.num_road_closure || 0}</td>
+                            <td class="p-2 text-right">${row.num_weather || 0}</td>
+                            <td class="p-2 text-right">${row.num_lane_restriction || 0}</td>
+                            <td class="p-2 text-right">${row.num_other || 0}</td>
+                            <td class="p-2 text-right font-bold">${total}</td>
+                        </tr>
+                    `;
+                    }).join('');
+                } else {
+                    tbody.innerHTML = data.map(row => {
+                        const total = (
+                            parseInt(row.num_accident || 0) +
+                            parseInt(row.num_construction || 0) +
+                            parseInt(row.num_congestion || 0) +
+                            parseInt(row.num_disabled_vehicle || 0) +
+                            parseInt(row.num_mass_transit_event || 0) +
+                            parseInt(row.num_planned_event || 0) +
+                            parseInt(row.num_road_hazard || 0) +
+                            parseInt(row.num_road_closure || 0) +
+                            parseInt(row.num_weather || 0) +
+                            parseInt(row.num_lane_restriction || 0) +
+                            parseInt(row.num_other || 0)
+                        );
+                        return `
+                        <tr class="hover:bg-gray-50 text-xs">
+                            <td class="p-2">T${row.trial_id || ''}</td>
+                            <td class="p-2">B${row.batch_id || ''}</td>
+                            <td class="p-2"><span class="px-2 py-0.5 rounded text-xs ${row.disruption_level === 'light' ? 'bg-green-100 text-green-700' :
+                                row.disruption_level === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                                    'bg-red-100 text-red-700'
+                            }">${row.disruption_level || 'unknown'}</span></td>
+                            <td class="p-2 text-right">${row.num_accident || 0}</td>
+                            <td class="p-2 text-right">${row.num_construction || 0}</td>
+                            <td class="p-2 text-right">${row.num_congestion || 0}</td>
+                            <td class="p-2 text-right">${row.num_disabled_vehicle || 0}</td>
+                            <td class="p-2 text-right">${row.num_mass_transit_event || 0}</td>
+                            <td class="p-2 text-right">${row.num_planned_event || 0}</td>
+                            <td class="p-2 text-right">${row.num_road_hazard || 0}</td>
+                            <td class="p-2 text-right">${row.num_road_closure || 0}</td>
+                            <td class="p-2 text-right">${row.num_weather || 0}</td>
+                            <td class="p-2 text-right">${row.num_lane_restriction || 0}</td>
+                            <td class="p-2 text-right">${row.num_other || 0}</td>
+                            <td class="p-2 text-right font-bold">${total}</td>
+                        </tr>
+                    `;
+                    }).join('');
+                }
                 break;
 
             case 'similarity':
@@ -5205,6 +5324,36 @@ const ExperimentRunner = {
                 `).join('');
                 break;
 
+            case 'comprehensive':
+                tbody.innerHTML = data.map(row => `
+                    <tr class="hover:bg-gray-50 text-xs">
+                        <td class="p-2 text-center font-mono">${row.route_id || ''}</td>
+                        <td class="p-2 text-center"><span class="px-2 py-0.5 rounded text-xs font-medium ${this.getCategoryBadgeClass(row.route_category)}">${row.route_category || ''}</span></td>
+                        <td class="p-2 text-center">${row.scenario_id || ''}</td>
+                        <td class="p-2 text-center"><span class="px-2 py-0.5 rounded text-xs ${this.getLevelBadgeClass(row.severity_level)}">${row.severity_level || ''}</span></td>
+                        <td class="p-2 text-right font-mono text-xs">${parseFloat(row.start_lat || 0).toFixed(5)}</td>
+                        <td class="p-2 text-right font-mono text-xs">${parseFloat(row.start_lon || 0).toFixed(5)}</td>
+                        <td class="p-2 text-right font-mono text-xs">${parseFloat(row.end_lat || 0).toFixed(5)}</td>
+                        <td class="p-2 text-right font-mono text-xs">${parseFloat(row.end_lon || 0).toFixed(5)}</td>
+                        <td class="p-2 text-right">${row.total_disruptions || 0}</td>
+                        <td class="p-2 text-right text-xs">${row.disruption_types || ''}</td>
+                        <td class="p-2 text-right font-mono">${parseFloat(row.hc2l_distance_km || 0).toFixed(3)}</td>
+                        <td class="p-2 text-right font-mono">${parseFloat(row.dijkstra_distance_km || 0).toFixed(3)}</td>
+                        <td class="p-2 text-right font-mono">${parseFloat(row.here_distance_km || 0).toFixed(3)}</td>
+                        <td class="p-2 text-right font-mono">${parseFloat(row.hc2l_query_time_ms || 0).toFixed(3)}</td>
+                        <td class="p-2 text-right font-mono">${parseFloat(row.dijkstra_query_time_ms || 0).toFixed(3)}</td>
+                        <td class="p-2 text-right font-mono">${parseFloat(row.here_query_time_ms || 0).toFixed(3)}</td>
+                        <td class="p-2 text-center">
+                            <span class="px-2 py-0.5 rounded text-xs ${row.accuracy_status === 'Pass' || row.accuracy_status === 'OK' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">
+                                ${row.accuracy_status || 'N/A'}
+                            </span>
+                        </td>
+                        <td class="p-2 text-right font-mono">${parseFloat(row.frechet_distance_m || 0).toFixed(0)}m</td>
+                        <td class="p-2 text-right text-xs text-gray-500">${row.timestamp || ''}</td>
+                    </tr>
+                `).join('');
+                break;
+
             default:
                 // Generic rendering
                 if (data.length > 0 && headers) {
@@ -5214,6 +5363,74 @@ const ExperimentRunner = {
                         </tr>
                     `).join('');
                 }
+        }
+    },
+    
+    /**
+     * Update per-route table headers for scenario mode
+     * @param {string} csvType - Type of CSV
+     * @param {boolean} isScenario - Whether in scenario mode
+     */
+    updatePerRouteTableHeaders(csvType, isScenario) {
+        const containerId = `${csvType}-per-route-container`;
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        
+        const thead = container.querySelector('thead');
+        if (!thead) return;
+        
+        // Define headers for scenario mode (ExperimentPresetScenario)
+        const scenarioHeaders = {
+            'summary': ['Category', 'Scenario', 'Severity', 'Accident', 'Construction', 'Congestion', 'Disabled Vehicle', 'Mass Transit', 'Planned Event', 'Road Hazard', 'Road Closure', 'Weather', 'Lane Restriction', 'Other', 'Total'],
+            'accuracy': ['Category', 'Scenario', 'Severity', 'Route', 'HC2L', 'Dijkstra', 'Error', 'OK'],
+            'construction': ['Category', 'Algorithm', 'Time (ms)', 'Size (MB)'],
+            'updates': ['Category', 'Algorithm', 'Lazy (ms)', 'Peak (MB)', 'Size Δ%', 'Query (ms)'],
+            'performance': ['Category', 'Scenario', 'Severity', 'Route', 'Algorithm', 'Query (ms)', 'Label (MB)', 'Lazy (ms)', 'Rebuilds'],
+            'similarity': ['Batch', 'Route', 'OD Pair', 'HC2L Dist', 'HERE Dist', 'Deviation', 'Fréchet', 'Rating'],
+            'comprehensive': ['Route', 'Category', 'Scenario', 'Severity', 'Start Lat', 'Start Lon', 'End Lat', 'End Lon', 'Disruptions', 'Types', 'HC2L Dist', 'Dijkstra', 'HERE Dist', 'HC2L Time', 'Dijkstra Time', 'HERE Time', 'Accuracy', 'Fréchet', 'Timestamp']
+        };
+        
+        // Define headers for standard mode
+        const standardHeaders = {
+            'summary': ['Trial', 'Batch', 'Level', 'Accident', 'Construction', 'Congestion', 'Disabled Vehicle', 'Mass Transit', 'Planned Event', 'Road Hazard', 'Road Closure', 'Weather', 'Lane Restriction', 'Other', 'Total'],
+            'accuracy': ['Trial', 'Batch', 'Level', 'Route', 'HC2L', 'Dijkstra', 'Error', 'OK'],
+            'construction': ['Trial', 'Batch', 'Algorithm', 'Time (ms)', 'Size (MB)'],
+            'updates': ['Trial', 'Batch', 'Algorithm', 'Lazy (ms)', 'Peak (MB)', 'Size Δ%', 'Query (ms)'],
+            'performance': ['Trial', 'Batch', 'Level', 'Route', 'Algorithm', 'Query (ms)', 'Label (MB)', 'Lazy (ms)', 'Rebuilds'],
+            'similarity': ['Batch', 'Route', 'OD Pair', 'HC2L Dist', 'HERE Dist', 'Deviation', 'Fréchet', 'Rating'],
+            'comprehensive': ['Route', 'Category', 'Scenario', 'Severity', 'Start Lat', 'Start Lon', 'End Lat', 'End Lon', 'Disruptions', 'Types', 'HC2L Dist', 'Dijkstra', 'HERE Dist', 'HC2L Time', 'Dijkstra Time', 'HERE Time', 'Accuracy', 'Fréchet', 'Timestamp']
+        };
+        
+        const colorClasses = {
+            'summary': 'text-green-700',
+            'accuracy': 'text-cyan-700',
+            'construction': 'text-purple-700',
+            'updates': 'text-indigo-700',
+            'performance': 'text-emerald-700',
+            'similarity': 'text-amber-700',
+            'comprehensive': 'text-slate-700'
+        };
+        
+        const bgClasses = {
+            'summary': 'bg-green-50 border-green-200',
+            'accuracy': 'bg-cyan-50 border-cyan-200',
+            'construction': 'bg-purple-50 border-purple-200',
+            'updates': 'bg-indigo-50 border-indigo-200',
+            'performance': 'bg-emerald-50 border-emerald-200',
+            'similarity': 'bg-amber-50 border-amber-200',
+            'comprehensive': 'bg-slate-50 border-slate-200'
+        };
+        
+        const headers = isScenario ? scenarioHeaders[csvType] : standardHeaders[csvType];
+        if (headers) {
+            const colorClass = colorClasses[csvType] || 'text-gray-700';
+            const bgClass = bgClasses[csvType] || 'bg-gray-50 border-gray-200';
+            thead.className = `${bgClass} border-b sticky top-0`;
+            thead.innerHTML = `
+                <tr>
+                    ${headers.map((h, i) => `<th class="${i < (isScenario ? 4 : 3) ? 'text-center' : 'text-right'} p-2 font-semibold ${colorClass}">${h}</th>`).join('')}
+                </tr>
+            `;
         }
     },
 

@@ -3225,6 +3225,41 @@ class ExperimentRunner:
                                 result["severity_level"] = severity_level
                                 result["route_category"] = category
                                 
+                                # Get route node information from result for comprehensive CSV
+                                route_coords = result.get("route_coords", {})
+                                start_node = route_coords.get("start_node", 0)
+                                end_node = route_coords.get("end_node", 0)
+                                start_edge_target = route_coords.get("start_edge_target", 0)
+                                end_edge_target = route_coords.get("end_edge_target", 0)
+                                
+                                # Get road names for start and end nodes
+                                start_road_name = "Unknown Road"
+                                end_road_name = "Unknown Road"
+                                
+                                if self.road_mapper:
+                                    try:
+                                        start_road_name = self.road_mapper.get_road_name(start_node, start_edge_target)
+                                        end_road_name = self.road_mapper.get_road_name(end_node, end_edge_target)
+                                    except Exception as e:
+                                        logger.debug(f"Error getting road names: {e}")
+                                
+                                # Add comprehensive route info to result
+                                result["route_info"] = {
+                                    "start_lat": route_data.get("start", {}).get("lat", 0),
+                                    "start_lon": route_data.get("start", {}).get("lon", 0),
+                                    "end_lat": route_data.get("end", {}).get("lat", 0),
+                                    "end_lon": route_data.get("end", {}).get("lon", 0),
+                                    "start_edge_source": start_node,
+                                    "start_edge_target": start_edge_target,
+                                    "end_edge_source": end_node,
+                                    "end_edge_target": end_edge_target,
+                                    "start_name": start_road_name,
+                                    "end_name": end_road_name,
+                                    "here_travel_time_sec": result.get("here_data", {}).get("travel_time_sec", 0),
+                                    "here_distance_km": result.get("here_data", {}).get("distance_km", 0),
+                                    "frechet_distance_km": result.get("route_similarity", {}).get("frechet_distance_km", 0),
+                                }
+                                
                                 record = metrics_collector.record_route_metric(
                                     trial=category_idx,  # Use category index as trial
                                     batch=batch_idx,
@@ -3963,15 +3998,20 @@ class ExperimentRunner:
             # Export CSV files individually with progress updates
             # Both scenario and standard modes now use individual exports for granular progress
             csv_exports = [
-                ("summary", "summary_results.csv", 10),
-                ("accuracy", "accuracy_results.csv", 20),
-                ("construction", "construction_results.csv", 30),
-                ("updates", "updates_results.csv", 40),
-                ("performance", "performance_results.csv", 50),
-                ("similarity", "similarity_results.csv", 60)
+                ("summary", "summary_results.csv", 8),
+                ("accuracy", "accuracy_results.csv", 16),
+                ("construction", "construction_results.csv", 24),
+                ("updates", "updates_results.csv", 32),
+                ("performance", "performance_results.csv", 40),
+                ("similarity", "similarity_results.csv", 48),
+                ("comprehensive", "comprehensive_results.csv", 60)  # Comprehensive CSV (scenario only)
             ]
             
             for csv_name, csv_filename, percent in csv_exports:
+                # Skip comprehensive export for non-scenario mode
+                if csv_name == "comprehensive" and not is_scenario:
+                    continue
+                    
                 progress.finalization_phase = f"Phase 1/3: Exporting {csv_filename}..."
                 progress.finalization_percentage = percent / 10.0  # Scale to 0-10%
                 progress.overall_percentage = 90.0 + (progress.finalization_percentage * 0.6)  # 0-60% of 10%
@@ -3991,6 +4031,8 @@ class ExperimentRunner:
                         csv_files[csv_name] = collector.export_scenario_performance_csv()
                     elif csv_name == "similarity":
                         csv_files[csv_name] = collector.export_similarity_csv()  # Similarity uses standard
+                    elif csv_name == "comprehensive":
+                        csv_files[csv_name] = collector.export_scenario_comprehensive_csv()
                 else:
                     # Use standard export methods
                     if csv_name == "summary":
@@ -4619,7 +4661,8 @@ def download_result_csv(result_id, csv_type):
         'construction': 'construction_results.csv',
         'updates': 'updates_results.csv',
         'performance': 'performance_results.csv',
-        'similarity': 'similarity_results.csv'
+        'similarity': 'similarity_results.csv',
+        'comprehensive': 'comprehensive_results.csv'
     }
     
     if csv_type not in csv_files:
@@ -4648,6 +4691,78 @@ def download_result_csv(result_id, csv_type):
         )
     except Exception as e:
         logger.error(f"Error downloading CSV {csv_type} for result {result_id}: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@experiment_bp.route('/results/<result_id>/export-all', methods=['GET'])
+def export_all_result_files(result_id):
+    """
+    Export ALL CSV files and JSON configuration as a single ZIP file.
+    
+    Args:
+        result_id: Result folder name (timestamp-based)
+    
+    Returns:
+        ZIP file containing all CSVs and experiment config JSON
+    """
+    import io
+    import zipfile
+    
+    if not experiment_runner:
+        return jsonify({"success": False, "error": "Experiment runner not initialized"}), 500
+    
+    # All CSV file mappings
+    csv_files = {
+        'summary': 'summary_results.csv',
+        'accuracy': 'accuracy_results.csv',
+        'construction': 'construction_results.csv',
+        'updates': 'updates_results.csv',
+        'performance': 'performance_results.csv',
+        'similarity': 'similarity_results.csv',
+        'comprehensive': 'comprehensive_results.csv'
+    }
+    
+    try:
+        results_dir = Path(Config.EXPERIMENT_DATA_DIR) / "preset" / "results"
+        result_folder = results_dir / result_id
+        
+        if not result_folder.exists():
+            # Try with .json extension (result_id might be JSON filename)
+            result_folder_name = result_id.replace('.json', '').replace('experiment_', '')
+            result_folder = results_dir / result_folder_name
+        
+        if not result_folder.exists():
+            return jsonify({"success": False, "error": f"Result folder not found: {result_id}"}), 404
+        
+        zip_buffer = io.BytesIO()
+        
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            # Add all CSV files that exist
+            for csv_name, csv_filename in csv_files.items():
+                csv_path = result_folder / csv_filename
+                if csv_path.exists():
+                    zip_file.write(csv_path, arcname=csv_filename)
+            
+            # Add JSON configuration file if exists
+            json_path = result_folder / "experiment_config.json"
+            if json_path.exists():
+                zip_file.write(json_path, arcname="experiment_config.json")
+            
+            # Also add any other JSON files in the folder
+            for json_file in result_folder.glob("*.json"):
+                if json_file.name != "experiment_config.json":
+                    zip_file.write(json_file, arcname=json_file.name)
+        
+        zip_buffer.seek(0)
+        return send_file(
+            zip_buffer,
+            mimetype='application/zip',
+            as_attachment=True,
+            download_name=f"{result_id}_all-results.zip"
+        )
+        
+    except Exception as e:
+        logger.error(f"Error exporting all files for result {result_id}: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -4690,7 +4805,8 @@ def export_result_csv(result_id, csv_type):
         'construction': 'construction_results.csv',
         'updates': 'updates_results.csv',
         'performance': 'performance_results.csv',
-        'similarity': 'similarity_results.csv'
+        'similarity': 'similarity_results.csv',
+        'comprehensive': 'comprehensive_results.csv'
     }
     
     if csv_type not in csv_files:
@@ -4921,7 +5037,8 @@ def get_result_csv_data(result_id, csv_type):
         'construction': 'construction_results.csv',
         'updates': 'updates_results.csv',
         'performance': 'performance_results.csv',
-        'similarity': 'similarity_results.csv'
+        'similarity': 'similarity_results.csv',
+        'comprehensive': 'comprehensive_results.csv'
     }
     
     if csv_type not in csv_files:

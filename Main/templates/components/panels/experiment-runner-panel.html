@@ -863,12 +863,18 @@
             <p class="text-purple-100 text-sm font-medium">HC2L vs DHL Algorithm Comparison</p>
             <p class="text-purple-200 text-xs mt-1">Comprehensive evaluation for dynamic graph labeling</p>
           </div>
-          <div class="text-right">
+          <div class="text-right flex flex-col gap-2">
             <div class="inline-block backdrop-blur-md rounded-lg px-3 py-2"
               style="background: rgba(255, 255, 255, 0.1);">
               <p class="text-xs text-purple-100 font-medium">DASHBOARD</p>
               <p class="text-sm font-bold text-white">Active Analysis</p>
             </div>
+            <button onclick="ExperimentRunner.exportAllCSV()" 
+              class="inline-flex items-center gap-2 backdrop-blur-md rounded-lg px-4 py-2 hover:bg-white/20 transition-colors"
+              style="background: rgba(255, 255, 255, 0.15);">
+              <i data-lucide="download" class="w-4 h-4"></i>
+              <span class="text-sm font-medium">Export All Data</span>
+            </button>
           </div>
         </div>
       </div>
@@ -990,6 +996,14 @@
                 <div class="nav-select__icon"><i data-lucide="bar-chart-4" class="w-4 h-4"></i></div>
                 <div class="nav-select__content">
                   <span class="nav-select__title">Graphs</span>
+                </div>
+              </label>
+              <!-- Comprehensive Tab (All Route Data) -->
+              <label class="nav-select__option" data-color="slate">
+                <input type="radio" name="result-main-tab" value="comprehensive" onchange="ExperimentRunner.showResultTab('comprehensive')">
+                <div class="nav-select__icon"><i data-lucide="database" class="w-4 h-4"></i></div>
+                <div class="nav-select__content">
+                  <span class="nav-select__title">Comprehensive</span>
                 </div>
               </label>
             </div> 
@@ -1588,6 +1602,92 @@
             </div>
             <div style="position: relative; height: 300px; width: 100%;">
               <canvas id="chart-rebuild-time-analysis"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Comprehensive Tab (All Route Data) -->
+        <div id="result-tab-comprehensive" data-result-tab-content class="hidden space-y-4">
+          <div class="flex items-center justify-between bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl px-5 py-4 border border-gray-200">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
+                <i data-lucide="database" class="w-5 h-5 text-slate-600"></i>
+              </div>
+              <div>
+                <h4 class="font-bold text-gray-800 text-sm mb-1">Comprehensive Route Data</h4>
+                <p class="text-xs text-gray-500 mt-0.5">Complete route, disruption, and algorithm metrics</p>
+              </div>
+            </div>
+            <button onclick="ExperimentRunner.exportCSV('comprehensive', 'all')"
+              class="btn btn--success btn--xs hover:shadow-md transition-all">
+              <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+            </button>
+          </div>
+
+          <!-- Comprehensive Data Summary Cards -->
+          <div class="grid grid-cols-4 gap-3">
+            <div class="bg-gradient-to-br from-slate-50 to-gray-50 rounded-lg p-3 border border-slate-200">
+              <p class="text-xs text-slate-600 font-medium">Total Records</p>
+              <p id="comprehensive-total-records" class="text-2xl font-bold text-slate-700">--</p>
+            </div>
+            <div class="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-lg p-3 border border-blue-200">
+              <p class="text-xs text-blue-600 font-medium">Algorithms</p>
+              <p id="comprehensive-algorithms" class="text-2xl font-bold text-blue-700">--</p>
+            </div>
+            <div class="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-3 border border-green-200">
+              <p class="text-xs text-green-600 font-medium">Route Categories</p>
+              <p id="comprehensive-categories" class="text-2xl font-bold text-green-700">--</p>
+            </div>
+            <div class="bg-gradient-to-br from-amber-50 to-orange-50 rounded-lg p-3 border border-amber-200">
+              <p class="text-xs text-amber-600 font-medium">Severity Levels</p>
+              <p id="comprehensive-severity-levels" class="text-2xl font-bold text-amber-700">--</p>
+            </div>
+          </div>
+
+          <!-- Per-Route Comprehensive Data -->
+          <div class="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-4">
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center gap-2">
+                <button onclick="ExperimentRunner.togglePerRouteTable('comprehensive')" 
+                        class="flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-slate-900">
+                  <i data-lucide="chevron-right" id="comprehensive-toggle-icon" class="w-4 h-4 transition-transform"></i>
+                  <span>View All Route Data</span>
+                </button>
+              </div>
+              <span id="comprehensive-data-count" class="text-xs text-gray-500">-- records</span>
+            </div>
+
+            <div id="comprehensive-per-route-container" class="hidden">
+              <div class="overflow-x-auto max-h-[600px]">
+                <table class="w-full text-xs">
+                  <thead id="comprehensive-table-header" class="bg-slate-50 border-b border-slate-200 sticky top-0">
+                    <tr>
+                      <th class="text-center p-2 font-semibold text-slate-700">Route</th>
+                      <th class="text-center p-2 font-semibold text-slate-700">Category</th>
+                      <th class="text-center p-2 font-semibold text-slate-700">Scenario</th>
+                      <th class="text-center p-2 font-semibold text-slate-700">Severity</th>
+                      <th class="text-right p-2 font-semibold text-slate-700">Start Lat</th>
+                      <th class="text-right p-2 font-semibold text-slate-700">Start Lon</th>
+                      <th class="text-right p-2 font-semibold text-slate-700">End Lat</th>
+                      <th class="text-right p-2 font-semibold text-slate-700">End Lon</th>
+                      <th class="text-right p-2 font-semibold text-slate-700">Disruptions</th>
+                      <th class="text-right p-2 font-semibold text-slate-700">Disruption Types</th>
+                      <th class="text-right p-2 font-semibold text-slate-700">HC2L Distance</th>
+                      <th class="text-right p-2 font-semibold text-slate-700">Dijkstra Dist</th>
+                      <th class="text-right p-2 font-semibold text-slate-700">HERE Distance</th>
+                      <th class="text-right p-2 font-semibold text-slate-700">HC2L Time</th>
+                      <th class="text-right p-2 font-semibold text-slate-700">Dijkstra Time</th>
+                      <th class="text-right p-2 font-semibold text-slate-700">HERE Time</th>
+                      <th class="text-right p-2 font-semibold text-slate-700">Accuracy</th>
+                      <th class="text-right p-2 font-semibold text-slate-700">Fréchet</th>
+                      <th class="text-right p-2 font-semibold text-slate-700">Timestamp</th>
+                    </tr>
+                  </thead>
+                  <tbody id="comprehensive-per-route-tbody" class="divide-y divide-gray-100">
+                    <tr><td colspan="19" class="text-center py-4 text-gray-500">Click to load data</td></tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>
