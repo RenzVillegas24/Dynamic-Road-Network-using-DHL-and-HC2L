@@ -927,11 +927,12 @@ class ExperimentMetricsCollector:
                     self._record_construction_from_result(trial, alg, api_result, record)
                 
                 # ============================================================
-                # STEP 5: SCENARIO MODE - Store in scenario_records
+                # STEP 5: SCENARIO MODE - Store in scenario_records for BOTH algorithms
                 # ============================================================
-                if is_scenario and scenario_metadata and is_hc2l:
-                    # Only record HC2L in scenario mode (skip DHL)
+                if is_scenario and scenario_metadata:
+                    # Record BOTH DHL and HC2L in scenario mode
                     scenario_record = {
+                        "algorithm": alg,  # "DHL" or "HC2L"
                         "route_category": scenario_metadata["route_category"],
                         "route_id": scenario_metadata["route_id"],
                         "scenario_id": scenario_metadata["scenario_id"],
@@ -1430,74 +1431,101 @@ class ExperimentMetricsCollector:
             }
     
     def _compute_scenario_summary_aggregations(self) -> Dict:
-        """Compute scenario-specific aggregations for the summary tab"""
+        """Compute scenario-specific aggregations for the summary tab (separated by algorithm)"""
         with self.lock:
-            # Aggregate by route category
+            # Aggregate by route category and algorithm
             per_category = []
             for category in ["short", "medium", "long"]:
-                cat_records = [r for r in self.scenario_records if r.get("route_category") == category]
-                if cat_records:
-                    incident_counts = {
-                        "accident": sum(r.get("num_accident", 0) for r in cat_records),
-                        "construction": sum(r.get("num_construction", 0) for r in cat_records),
-                        "congestion": sum(r.get("num_congestion", 0) for r in cat_records),
-                        "disabled_vehicle": sum(r.get("num_disabled_vehicle", 0) for r in cat_records),
-                        "mass_transit": sum(r.get("num_mass_transit_event", 0) for r in cat_records),
-                        "planned_event": sum(r.get("num_planned_event", 0) for r in cat_records),
-                        "road_hazard": sum(r.get("num_road_hazard", 0) for r in cat_records),
-                        "road_closure": sum(r.get("num_road_closure", 0) for r in cat_records),
-                        "weather": sum(r.get("num_weather", 0) for r in cat_records),
-                        "lane_restriction": sum(r.get("num_lane_restriction", 0) for r in cat_records),
-                        "other": sum(r.get("num_other", 0) for r in cat_records),
-                    }
-                    per_category.append({
-                        "category": category,
-                        "simulations": len(cat_records),
-                        **incident_counts,
-                        "total": sum(incident_counts.values())
-                    })
+                for algorithm in ["DHL", "HC2L"]:
+                    cat_records = [r for r in self.scenario_records 
+                                   if r.get("route_category") == category and r.get("algorithm") == algorithm]
+                    if cat_records:
+                        incident_counts = {
+                            "accident": sum(r.get("num_accident", 0) for r in cat_records),
+                            "construction": sum(r.get("num_construction", 0) for r in cat_records),
+                            "congestion": sum(r.get("num_congestion", 0) for r in cat_records),
+                            "disabled_vehicle": sum(r.get("num_disabled_vehicle", 0) for r in cat_records),
+                            "mass_transit": sum(r.get("num_mass_transit_event", 0) for r in cat_records),
+                            "planned_event": sum(r.get("num_planned_event", 0) for r in cat_records),
+                            "road_hazard": sum(r.get("num_road_hazard", 0) for r in cat_records),
+                            "road_closure": sum(r.get("num_road_closure", 0) for r in cat_records),
+                            "weather": sum(r.get("num_weather", 0) for r in cat_records),
+                            "lane_restriction": sum(r.get("num_lane_restriction", 0) for r in cat_records),
+                            "other": sum(r.get("num_other", 0) for r in cat_records),
+                        }
+                        per_category.append({
+                            "category": category,
+                            "algorithm": algorithm,
+                            "simulations": len(cat_records),
+                            **incident_counts,
+                            "total": sum(incident_counts.values())
+                        })
             
-            # Aggregate by scenario ID
+            # Aggregate by scenario ID and algorithm
             per_scenario = []
             for scenario in self.scenarios if self.is_scenario_mode else [f"DS{i}" for i in range(1, 11)]:
-                sc_records = [r for r in self.scenario_records if r.get("scenario_id") == scenario]
-                if sc_records:
-                    incident_counts = {
-                        "accident": sum(r.get("num_accident", 0) for r in sc_records),
-                        "construction": sum(r.get("num_construction", 0) for r in sc_records),
-                        "congestion": sum(r.get("num_congestion", 0) for r in sc_records),
-                        "disabled_vehicle": sum(r.get("num_disabled_vehicle", 0) for r in sc_records),
-                        "mass_transit": sum(r.get("num_mass_transit_event", 0) for r in sc_records),
-                        "planned_event": sum(r.get("num_planned_event", 0) for r in sc_records),
-                        "road_hazard": sum(r.get("num_road_hazard", 0) for r in sc_records),
-                        "road_closure": sum(r.get("num_road_closure", 0) for r in sc_records),
-                        "weather": sum(r.get("num_weather", 0) for r in sc_records),
-                        "lane_restriction": sum(r.get("num_lane_restriction", 0) for r in sc_records),
-                        "other": sum(r.get("num_other", 0) for r in sc_records),
-                    }
-                    per_scenario.append({
-                        "scenario": scenario,
-                        "simulations": len(sc_records),
-                        **incident_counts,
-                        "total": sum(incident_counts.values())
-                    })
+                for algorithm in ["DHL", "HC2L"]:
+                    sc_records = [r for r in self.scenario_records 
+                                  if r.get("scenario_id") == scenario and r.get("algorithm") == algorithm]
+                    if sc_records:
+                        incident_counts = {
+                            "accident": sum(r.get("num_accident", 0) for r in sc_records),
+                            "construction": sum(r.get("num_construction", 0) for r in sc_records),
+                            "congestion": sum(r.get("num_congestion", 0) for r in sc_records),
+                            "disabled_vehicle": sum(r.get("num_disabled_vehicle", 0) for r in sc_records),
+                            "mass_transit": sum(r.get("num_mass_transit_event", 0) for r in sc_records),
+                            "planned_event": sum(r.get("num_planned_event", 0) for r in sc_records),
+                            "road_hazard": sum(r.get("num_road_hazard", 0) for r in sc_records),
+                            "road_closure": sum(r.get("num_road_closure", 0) for r in sc_records),
+                            "weather": sum(r.get("num_weather", 0) for r in sc_records),
+                            "lane_restriction": sum(r.get("num_lane_restriction", 0) for r in sc_records),
+                            "other": sum(r.get("num_other", 0) for r in sc_records),
+                        }
+                        per_scenario.append({
+                            "scenario": scenario,
+                            "algorithm": algorithm,
+                            "simulations": len(sc_records),
+                            **incident_counts,
+                            "total": sum(incident_counts.values())
+                        })
             
-            # Aggregate by severity level
+            # Aggregate by severity level and algorithm
             per_severity = []
             for severity in ["light", "medium", "heavy"]:
-                sev_records = [r for r in self.scenario_records if r.get("severity_level") == severity]
-                if sev_records:
-                    avg_query_time = sum(r.get("query_time_ms", 0) for r in sev_records) / len(sev_records)
-                    per_severity.append({
-                        "severity": severity,
-                        "simulations": len(sev_records),
-                        "avg_query_time_ms": round(avg_query_time, 3)
+                for algorithm in ["DHL", "HC2L"]:
+                    sev_records = [r for r in self.scenario_records 
+                                   if r.get("severity_level") == severity and r.get("algorithm") == algorithm]
+                    if sev_records:
+                        avg_query_time = sum(r.get("query_time_ms", 0) for r in sev_records) / len(sev_records)
+                        per_severity.append({
+                            "severity": severity,
+                            "algorithm": algorithm,
+                            "simulations": len(sev_records),
+                            "avg_query_time_ms": round(avg_query_time, 3)
+                        })
+            
+            # Algorithm averages
+            averages = []
+            for algorithm in ["DHL", "HC2L"]:
+                algo_records = [r for r in self.scenario_records if r.get("algorithm") == algorithm]
+                if algo_records:
+                    incident_counts = {
+                        "accident": sum(r.get("num_accident", 0) for r in algo_records),
+                        "construction": sum(r.get("num_construction", 0) for r in algo_records),
+                        "congestion": sum(r.get("num_congestion", 0) for r in algo_records),
+                    }
+                    averages.append({
+                        "algorithm": algorithm,
+                        "total_simulations": len(algo_records),
+                        "avg_query_time_ms": round(sum(r.get("query_time_ms", 0) for r in algo_records) / len(algo_records), 3),
+                        "total_incidents": sum(incident_counts.values())
                     })
             
             return {
                 "per_category": per_category,
                 "per_scenario": per_scenario,
-                "per_severity": per_severity
+                "per_severity": per_severity,
+                "averages": averages
             }
     
     def _compute_scenario_accuracy_aggregations(self) -> Dict:
@@ -1570,60 +1598,69 @@ class ExperimentMetricsCollector:
             }
     
     def _compute_scenario_performance_aggregations(self) -> Dict:
-        """Compute performance aggregations for scenario mode"""
+        """Compute performance aggregations for scenario mode (separated by algorithm)"""
         with self.lock:
-            # By category
+            # By category and algorithm
             per_category = []
             for category in ["short", "medium", "long"]:
-                cat_records = [r for r in self.scenario_records if r.get("route_category") == category]
-                if cat_records:
-                    avg_query = sum(r.get("query_time_ms", 0) for r in cat_records) / len(cat_records)
-                    avg_label = sum(r.get("label_size_mb", 0) for r in cat_records) / len(cat_records)
-                    avg_distance = sum(r.get("route_distance_km", 0) for r in cat_records) / len(cat_records)
-                    per_category.append({
-                        "category": category,
-                        "simulations": len(cat_records),
-                        "avg_distance_km": round(avg_distance, 2),
-                        "avg_query_time_ms": round(avg_query, 3),
-                        "avg_label_size_mb": round(avg_label, 4)
-                    })
+                for algorithm in ["DHL", "HC2L"]:
+                    cat_records = [r for r in self.scenario_records 
+                                   if r.get("route_category") == category and r.get("algorithm") == algorithm]
+                    if cat_records:
+                        avg_query = sum((r.get("query_time_ms") or 0) for r in cat_records) / len(cat_records)
+                        avg_label = sum((r.get("label_size_mb") or 0) for r in cat_records) / len(cat_records)
+                        avg_distance = sum((r.get("route_distance_km") or 0) for r in cat_records) / len(cat_records)
+                        per_category.append({
+                            "category": category,
+                            "algorithm": algorithm,
+                            "simulations": len(cat_records),
+                            "avg_distance_km": round(avg_distance, 2),
+                            "avg_query_time_ms": round(avg_query, 3),
+                            "avg_label_size_mb": round(avg_label, 4)
+                        })
             
-            # By severity
+            # By severity and algorithm
             per_severity = []
             for severity in ["light", "medium", "heavy"]:
-                sev_records = [r for r in self.scenario_records if r.get("severity_level") == severity]
-                if sev_records:
-                    avg_query = sum(r.get("query_time_ms", 0) for r in sev_records) / len(sev_records)
-                    avg_label = sum(r.get("label_size_mb", 0) for r in sev_records) / len(sev_records)
-                    per_severity.append({
-                        "severity": severity,
-                        "simulations": len(sev_records),
-                        "avg_query_time_ms": round(avg_query, 3),
-                        "avg_label_size_mb": round(avg_label, 4)
-                    })
+                for algorithm in ["DHL", "HC2L"]:
+                    sev_records = [r for r in self.scenario_records 
+                                   if r.get("severity_level") == severity and r.get("algorithm") == algorithm]
+                    if sev_records:
+                        avg_query = sum((r.get("query_time_ms") or 0) for r in sev_records) / len(sev_records)
+                        avg_label = sum((r.get("label_size_mb") or 0) for r in sev_records) / len(sev_records)
+                        per_severity.append({
+                            "severity": severity,
+                            "algorithm": algorithm,
+                            "simulations": len(sev_records),
+                            "avg_query_time_ms": round(avg_query, 3),
+                            "avg_label_size_mb": round(avg_label, 4)
+                        })
             
-            # By scenario
+            # By scenario and algorithm
             per_scenario = []
             for scenario in self.scenarios if self.is_scenario_mode else [f"DS{i}" for i in range(1, 11)]:
-                sc_records = [r for r in self.scenario_records if r.get("scenario_id") == scenario]
-                if sc_records:
-                    avg_query = sum(r.get("query_time_ms", 0) for r in sc_records) / len(sc_records)
-                    avg_label = sum(r.get("label_size_mb", 0) for r in sc_records) / len(sc_records)
-                    per_scenario.append({
-                        "scenario": scenario,
-                        "simulations": len(sc_records),
-                        "avg_query_time_ms": round(avg_query, 3),
-                        "avg_label_size_mb": round(avg_label, 4)
-                    })
+                for algorithm in ["DHL", "HC2L"]:
+                    sc_records = [r for r in self.scenario_records 
+                                  if r.get("scenario_id") == scenario and r.get("algorithm") == algorithm]
+                    if sc_records:
+                        avg_query = sum((r.get("query_time_ms") or 0) for r in sc_records) / len(sc_records)
+                        avg_label = sum((r.get("label_size_mb") or 0) for r in sc_records) / len(sc_records)
+                        per_scenario.append({
+                            "scenario": scenario,
+                            "algorithm": algorithm,
+                            "simulations": len(sc_records),
+                            "avg_query_time_ms": round(avg_query, 3),
+                            "avg_label_size_mb": round(avg_label, 4)
+                        })
             
             # Algorithm averages (DHL and HC2L)
             averages = []
             for algorithm in ["DHL", "HC2L"]:
                 algo_records = [r for r in self.scenario_records if r.get("algorithm") == algorithm]
                 if algo_records:
-                    avg_query = sum(r.get("query_time_ms", 0) for r in algo_records) / len(algo_records)
-                    avg_label = sum(r.get("label_size_mb", 0) for r in algo_records) / len(algo_records)
-                    avg_distance = sum(r.get("route_distance_km", 0) for r in algo_records) / len(algo_records)
+                    avg_query = sum((r.get("query_time_ms") or 0) for r in algo_records) / len(algo_records)
+                    avg_label = sum((r.get("label_size_mb") or 0) for r in algo_records) / len(algo_records)
+                    avg_distance = sum((r.get("route_distance_km") or 0) for r in algo_records) / len(algo_records)
                     averages.append({
                         "algorithm": algorithm,
                         "total_simulations": len(algo_records),
@@ -1678,33 +1715,39 @@ class ExperimentMetricsCollector:
             "avg_label_size_mb": round(float(np.mean([d["initial_label_size_mb"] for d in per_category_hc2l])), 5) if per_category_hc2l else 0
         }
         
-        # Per-scenario construction data
+        # Per-scenario construction data (separated by algorithm)
         per_scenario = []
         for scenario in self.scenarios if self.is_scenario_mode else [f"DS{i}" for i in range(1, 11)]:
-            sc_records = [r for r in self.scenario_records if r.get("scenario_id") == scenario]
-            if sc_records:
-                avg_construction = sum(r.get("initial_construction_time_ms", 0) for r in sc_records) / len(sc_records)
-                avg_label_size = sum(r.get("initial_label_size_mb", 0) for r in sc_records) / len(sc_records)
-                per_scenario.append({
-                    "scenario": scenario,
-                    "simulations": len(sc_records),
-                    "avg_construction_time_ms": round(avg_construction, 2),
-                    "avg_label_size_mb": round(avg_label_size, 5)
-                })
+            for algorithm in ["DHL", "HC2L"]:
+                sc_records = [r for r in self.scenario_records 
+                              if r.get("scenario_id") == scenario and r.get("algorithm") == algorithm]
+                if sc_records:
+                    avg_construction = sum((r.get("labeling_time_ms") or 0) for r in sc_records) / len(sc_records)
+                    avg_label_size = sum((r.get("label_size_mb") or 0) for r in sc_records) / len(sc_records)
+                    per_scenario.append({
+                        "scenario": scenario,
+                        "algorithm": algorithm,
+                        "simulations": len(sc_records),
+                        "avg_construction_time_ms": round(avg_construction, 2),
+                        "avg_label_size_mb": round(avg_label_size, 5)
+                    })
         
-        # Per-severity construction data
+        # Per-severity construction data (separated by algorithm)
         per_severity = []
         for severity in ["light", "medium", "heavy"]:
-            sev_records = [r for r in self.scenario_records if r.get("severity_level") == severity]
-            if sev_records:
-                avg_construction = sum(r.get("initial_construction_time_ms", 0) for r in sev_records) / len(sev_records)
-                avg_label_size = sum(r.get("initial_label_size_mb", 0) for r in sev_records) / len(sev_records)
-                per_severity.append({
-                    "severity": severity,
-                    "simulations": len(sev_records),
-                    "avg_construction_time_ms": round(avg_construction, 2),
-                    "avg_label_size_mb": round(avg_label_size, 5)
-                })
+            for algorithm in ["DHL", "HC2L"]:
+                sev_records = [r for r in self.scenario_records 
+                               if r.get("severity_level") == severity and r.get("algorithm") == algorithm]
+                if sev_records:
+                    avg_construction = sum((r.get("labeling_time_ms") or 0) for r in sev_records) / len(sev_records)
+                    avg_label_size = sum((r.get("label_size_mb") or 0) for r in sev_records) / len(sev_records)
+                    per_severity.append({
+                        "severity": severity,
+                        "algorithm": algorithm,
+                        "simulations": len(sev_records),
+                        "avg_construction_time_ms": round(avg_construction, 2),
+                        "avg_label_size_mb": round(avg_label_size, 5)
+                    })
         
         return {
             "per_category": per_category_dhl + per_category_hc2l,
@@ -1798,30 +1841,33 @@ class ExperimentMetricsCollector:
                     "query_avg_ms": round(float(np.mean(dhl_query_times)), 3)
                 })
         
-        # Per-severity data (aggregate by severity across all categories)
+        # Per-severity data (aggregate by severity across all categories, separated by algorithm)
         per_severity = []
         for severity in ["light", "medium", "heavy"]:
-            sev_records = [r for r in self.scenario_records if r.get("severity_level") == severity]
-            if sev_records:
-                avg_lazy_time = sum(r.get("lazy_update_time_ms", 0) for r in sev_records) / len(sev_records)
-                avg_query_time = sum(r.get("query_time_ms", 0) for r in sev_records) / len(sev_records)
-                avg_label_size = sum(r.get("label_size_mb", 0) for r in sev_records) / len(sev_records)
-                per_severity.append({
-                    "severity": severity,
-                    "simulations": len(sev_records),
-                    "avg_lazy_update_time_ms": round(avg_lazy_time, 3),
-                    "avg_query_time_ms": round(avg_query_time, 3),
-                    "avg_label_size_mb": round(avg_label_size, 5)
-                })
+            for algorithm in ["DHL", "HC2L"]:
+                sev_records = [r for r in self.scenario_records 
+                               if r.get("severity_level") == severity and r.get("algorithm") == algorithm]
+                if sev_records:
+                    avg_lazy_time = sum((r.get("lazy_update_time_ms") or 0) for r in sev_records) / len(sev_records)
+                    avg_query_time = sum((r.get("query_time_ms") or 0) for r in sev_records) / len(sev_records)
+                    avg_label_size = sum((r.get("label_size_mb") or 0) for r in sev_records) / len(sev_records)
+                    per_severity.append({
+                        "severity": severity,
+                        "algorithm": algorithm,
+                        "simulations": len(sev_records),
+                        "avg_lazy_update_time_ms": round(avg_lazy_time, 3),
+                        "avg_query_time_ms": round(avg_query_time, 3),
+                        "avg_label_size_mb": round(avg_label_size, 5)
+                    })
         
         # Algorithm averages (DHL and HC2L)
         averages = []
         for algorithm in ["DHL", "HC2L"]:
             algo_records = [r for r in self.scenario_records if r.get("algorithm") == algorithm]
             if algo_records:
-                avg_lazy_time = sum(r.get("lazy_update_time_ms", 0) for r in algo_records) / len(algo_records)
-                avg_query_time = sum(r.get("query_time_ms", 0) for r in algo_records) / len(algo_records)
-                avg_label_size = sum(r.get("label_size_mb", 0) for r in algo_records) / len(algo_records)
+                avg_lazy_time = sum((r.get("lazy_update_time_ms") or 0) for r in algo_records) / len(algo_records)
+                avg_query_time = sum((r.get("query_time_ms") or 0) for r in algo_records) / len(algo_records)
+                avg_label_size = sum((r.get("label_size_mb") or 0) for r in algo_records) / len(algo_records)
                 averages.append({
                     "algorithm": algorithm,
                     "total_simulations": len(algo_records),
@@ -2074,10 +2120,26 @@ class ExperimentMetricsCollector:
         Export Scenario Comprehensive CSV.
         All simulation data in a single row per route/scenario/severity.
         This includes route info, disruption details, and algorithm metrics.
+        
+        Uses similarity_records for HERE travel time, HERE distance, and Frechet distance
+        since these values are from HC2L vs HERE comparisons (not affected by disruptions).
         """
         csv_path = self.results_path / "comprehensive_results.csv"
         
         with self.csv_lock:
+            # Build lookup from similarity_records for HERE data and Frechet
+            # Key: (source_node, target_node) -> {here_travel_time_sec, here_distance_km, frechet_distance_km, dhc2l_distance_km, dhc2l_travel_time_sec}
+            similarity_lookup = {}
+            for sim_record in self.similarity_records:
+                key = (sim_record.source_node, sim_record.target_node)
+                similarity_lookup[key] = {
+                    "here_travel_time_sec": sim_record.similarity.here_travel_time_min * 60,  # Convert min to sec
+                    "here_distance_km": sim_record.similarity.here_distance_km,
+                    "frechet_distance_km": sim_record.similarity.frechet_distance_m / 1000,  # Convert m to km
+                    "dhc2l_distance_km": sim_record.similarity.dhc2l_distance_km,
+                    "dhc2l_travel_time_sec": sim_record.similarity.dhc2l_travel_time_min * 60,  # Convert min to sec
+                }
+            
             with open(csv_path, 'w', newline='') as f:
                 writer = csv.DictWriter(f, fieldnames=CSV_HEADERS_SCENARIO_COMPREHENSIVE)
                 writer.writeheader()
@@ -2085,6 +2147,34 @@ class ExperimentMetricsCollector:
                 for record in self.scenario_records:
                     # Get route info from comprehensive_route_data if available
                     route_info = record.get("route_info", {})
+                    
+                    # Look up HERE and Frechet data from similarity_records
+                    source_node = record.get("source_node", 0)
+                    target_node = record.get("target_node", 0)
+                    sim_data = similarity_lookup.get((source_node, target_node), {})
+                    
+                    # Get HERE travel time and distance from similarity lookup
+                    here_travel_time_sec = sim_data.get("here_travel_time_sec", 0)
+                    here_distance_km = sim_data.get("here_distance_km", 0)
+                    frechet_distance_km = sim_data.get("frechet_distance_km", 0)
+                    
+                    # Get algorithm-specific distances
+                    # The dhc2l_distance in scenario_record is actually the algorithm's computed distance
+                    algorithm = record.get("algorithm", "HC2L")
+                    computed_distance = record.get("dhc2l_distance", 0)
+                    
+                    # Assign to correct column based on algorithm
+                    if algorithm == "DHL":
+                        dhl_distance = computed_distance
+                        # For HC2L distance, use from similarity lookup (baseline without disruption)
+                        dhc2l_distance = sim_data.get("dhc2l_distance_km", 0)
+                        dhl_travel_time_sec = 0  # DHL doesn't provide travel time
+                        dhc2l_travel_time_sec = sim_data.get("dhc2l_travel_time_sec", 0)
+                    else:  # HC2L
+                        dhc2l_distance = computed_distance
+                        dhl_distance = 0  # DHL value not available for this row
+                        dhc2l_travel_time_sec = sim_data.get("dhc2l_travel_time_sec", 0)
+                        dhl_travel_time_sec = 0
                     
                     writer.writerow({
                         # Route identification
@@ -2123,13 +2213,13 @@ class ExperimentMetricsCollector:
                         "algorithm_labeling_time_ms": record.get("labeling_time_ms", 0),
                         "algorithm_label_size_mb": record.get("label_size_mb", 0),
                         "algorithm_query_response_time_ms": record.get("query_time_ms", 0),
-                        "algorithm_here_travel_time_sec": route_info.get("here_travel_time_sec", 0),
-                        "algorithm_dhc2l_travel_time_sec": record.get("dhc2l_travel_time_sec", 0),
-                        "algorithm_dhl_travel_time_sec": record.get("dhl_travel_time_sec", 0),
-                        "algorithm_here_distance_km": route_info.get("here_distance_km", 0),
-                        "algorithm_dhc2l_distance_km": record.get("dhc2l_distance", 0),
-                        "algorithm_dhl_distance_km": record.get("dhl_distance", 0),
-                        "algorithm_frechet_distance_km": route_info.get("frechet_distance_km", 0),
+                        "algorithm_here_travel_time_sec": here_travel_time_sec,
+                        "algorithm_dhc2l_travel_time_sec": dhc2l_travel_time_sec,
+                        "algorithm_dhl_travel_time_sec": dhl_travel_time_sec,
+                        "algorithm_here_distance_km": here_distance_km,
+                        "algorithm_dhc2l_distance_km": dhc2l_distance,
+                        "algorithm_dhl_distance_km": dhl_distance,
+                        "algorithm_frechet_distance_km": frechet_distance_km,
                         "algorithm_is_correct": record.get("is_correct", False),
                     })
         

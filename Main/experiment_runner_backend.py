@@ -4752,6 +4752,16 @@ def export_all_result_files(result_id):
             for tab_name, csv_filename in tab_csv_files.items():
                 csv_path = result_folder / csv_filename
                 if csv_path.exists():
+                    # Special handling for comprehensive - put at root level only
+                    if tab_name == 'comprehensive':
+                        zip_file.write(csv_path, arcname="comprehensive.csv")
+                        continue
+                    
+                    # Special handling for similarity - only per-route, in folder
+                    if tab_name == 'similarity':
+                        zip_file.write(csv_path, arcname=f"similarity/similarity_per-route.csv")
+                        continue
+                    
                     folder_name = tab_name
                     
                     # Add per-route CSV (the original file)
