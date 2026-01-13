@@ -3244,15 +3244,16 @@ class ExperimentRunner:
                                         logger.debug(f"Error getting road names: {e}")
                                 
                                 # Add comprehensive route info to result
+                                # Route data uses start_pin_lat/start_pin_lng/dest_pin_lat/dest_pin_lng format
                                 result["route_info"] = {
-                                    "start_lat": route_data.get("start", {}).get("lat", 0),
-                                    "start_lon": route_data.get("start", {}).get("lon", 0),
-                                    "end_lat": route_data.get("end", {}).get("lat", 0),
-                                    "end_lon": route_data.get("end", {}).get("lon", 0),
-                                    "start_edge_source": start_node,
-                                    "start_edge_target": start_edge_target,
-                                    "end_edge_source": end_node,
-                                    "end_edge_target": end_edge_target,
+                                    "start_lat": route_data.get("start_pin_lat", route_data.get("start_snap_lat", 0)),
+                                    "start_lon": route_data.get("start_pin_lng", route_data.get("start_snap_lng", 0)),
+                                    "end_lat": route_data.get("dest_pin_lat", route_data.get("dest_snap_lat", 0)),
+                                    "end_lon": route_data.get("dest_pin_lng", route_data.get("dest_snap_lng", 0)),
+                                    "start_edge_source": start_node if start_node else route_data.get("start_edge_source", 0),
+                                    "start_edge_target": start_edge_target if start_edge_target else route_data.get("start_edge_target", 0),
+                                    "end_edge_source": end_node if end_node else route_data.get("dest_edge_source", 0),
+                                    "end_edge_target": end_edge_target if end_edge_target else route_data.get("dest_edge_target", 0),
                                     "start_name": start_road_name,
                                     "end_name": end_road_name,
                                     "here_travel_time_sec": result.get("here_data", {}).get("travel_time_sec", 0),
@@ -4793,8 +4794,12 @@ def export_result_csv(result_id, csv_type):
     # Get table_type from query parameter
     table_type = request.args.get('table_type', 'all')
     
-    # Validate table_type
-    valid_table_types = ['all', 'per-trial', 'per-batch', 'per-route']
+    # Validate table_type - include both standard and scenario mode types
+    valid_table_types = [
+        'all', 'per-trial', 'per-batch', 'per-route',
+        # Scenario mode table types
+        'per-category', 'per-scenario', 'per-severity', 'overall-averages', 'averages'
+    ]
     if table_type not in valid_table_types:
         return jsonify({"success": False, "error": f"Invalid table_type: {table_type}. Must be one of: {', '.join(valid_table_types)}"}), 400
     
@@ -4862,6 +4867,20 @@ def export_result_csv(result_id, csv_type):
         # For per-trial or per-batch, aggregate the data and return as CSV
         if table_type in ['per-trial', 'per-batch']:
             csv_content = _generate_aggregated_csv(csv_path, table_type, csv_type)
+            
+            csv_bytes = io.BytesIO(csv_content.encode('utf-8'))
+            csv_bytes.seek(0)
+            
+            return send_file(
+                csv_bytes,
+                mimetype='text/csv',
+                as_attachment=True,
+                download_name=f"{result_id}_{csv_type}_{table_type}.csv"
+            )
+        
+        # For scenario mode aggregations (per-category, per-scenario, per-severity, overall-averages)
+        if table_type in ['per-category', 'per-scenario', 'per-severity', 'overall-averages', 'averages']:
+            csv_content = _generate_scenario_aggregated_csv(csv_path, table_type, csv_type, result_id, results_dir)
             
             csv_bytes = io.BytesIO(csv_content.encode('utf-8'))
             csv_bytes.seek(0)
@@ -5003,6 +5022,169 @@ def _generate_aggregated_csv(csv_path, table_type, csv_type):
     return output.getvalue()
 
 
+def _generate_scenario_aggregated_csv(csv_path, table_type, csv_type, result_id, results_dir):
+    """
+    Helper function to generate scenario mode aggregated CSV content.
+    
+    Args:
+        csv_path: Path to the original CSV file
+        table_type: 'per-category', 'per-scenario', 'per-severity', 'overall-averages', or 'averages'
+        csv_type: Type of CSV (summary, accuracy, construction, updates, performance, etc.)
+        result_id: Result folder name
+        results_dir: Path to results directory
+    
+    Returns:
+        CSV content as string
+    """
+    import csv as csv_module
+    import io
+    import json
+    
+    # Try to load the JSON results file for aggregated data
+    json_path = results_dir / result_id / f"experiment_{result_id}.json"
+    if not json_path.exists():
+        # Try alternate path
+        json_path = results_dir / result_id / "experiment_results.json"
+    
+    aggregated_data = {}
+    if json_path.exists():
+        try:
+            with open(json_path, 'r', encoding='utf-8') as f:
+                results = json.load(f)
+                aggregated_data = results.get('aggregated_data', {}).get(csv_type, {})
+        except Exception as e:
+            logger.warning(f"Failed to load JSON for scenario aggregation: {e}")
+    
+    # Get the appropriate aggregation data
+    if table_type == 'per-category':
+        data = aggregated_data.get('per_category', [])
+    elif table_type == 'per-scenario':
+        data = aggregated_data.get('per_scenario', [])
+    elif table_type == 'per-severity':
+        data = aggregated_data.get('per_severity', [])
+    elif table_type == 'overall-averages':
+        overall = aggregated_data.get('overall_averages', {})
+        data = [overall] if overall else []
+    elif table_type == 'averages':
+        data = aggregated_data.get('averages', [])
+    else:
+        data = []
+    
+    # If no JSON data, fall back to CSV aggregation
+    if not data:
+        return _aggregate_scenario_from_csv(csv_path, table_type, csv_type)
+    
+    # Generate CSV from aggregated data
+    output = io.StringIO()
+    if data:
+        headers = list(data[0].keys())
+        writer = csv_module.DictWriter(output, fieldnames=headers)
+        writer.writeheader()
+        writer.writerows(data)
+    
+    return output.getvalue()
+
+
+def _aggregate_scenario_from_csv(csv_path, table_type, csv_type):
+    """
+    Fallback function to aggregate scenario data directly from CSV when JSON is unavailable.
+    """
+    import csv as csv_module
+    import io
+    
+    with open(csv_path, 'r', newline='', encoding='utf-8') as f:
+        reader = csv_module.DictReader(f)
+        all_rows = list(reader)
+    
+    aggregated_rows = []
+    
+    if table_type == 'per-category':
+        # Group by route_category
+        groups = {}
+        for row in all_rows:
+            cat = row.get('route_category', 'unknown')
+            if cat not in groups:
+                groups[cat] = []
+            groups[cat].append(row)
+        
+        for cat, rows in sorted(groups.items()):
+            agg = {'category': cat, 'simulations': len(rows)}
+            # Add averages for numeric fields
+            _add_numeric_averages(agg, rows)
+            aggregated_rows.append(agg)
+    
+    elif table_type == 'per-scenario':
+        # Group by scenario_id
+        groups = {}
+        for row in all_rows:
+            scenario = row.get('scenario_id', 'unknown')
+            if scenario not in groups:
+                groups[scenario] = []
+            groups[scenario].append(row)
+        
+        for scenario, rows in sorted(groups.items()):
+            agg = {'scenario': scenario, 'simulations': len(rows)}
+            _add_numeric_averages(agg, rows)
+            aggregated_rows.append(agg)
+    
+    elif table_type == 'per-severity':
+        # Group by severity_level
+        groups = {}
+        for row in all_rows:
+            severity = row.get('severity_level', 'unknown')
+            if severity not in groups:
+                groups[severity] = []
+            groups[severity].append(row)
+        
+        for severity, rows in sorted(groups.items()):
+            agg = {'severity': severity, 'simulations': len(rows)}
+            _add_numeric_averages(agg, rows)
+            aggregated_rows.append(agg)
+    
+    elif table_type == 'overall-averages':
+        agg = {'total_simulations': len(all_rows)}
+        _add_numeric_averages(agg, all_rows)
+        aggregated_rows.append(agg)
+    
+    # Generate CSV
+    output = io.StringIO()
+    if aggregated_rows:
+        headers = list(aggregated_rows[0].keys())
+        writer = csv_module.DictWriter(output, fieldnames=headers)
+        writer.writeheader()
+        writer.writerows(aggregated_rows)
+    
+    return output.getvalue()
+
+
+def _add_numeric_averages(agg_dict, rows):
+    """Add average values for common numeric fields to aggregation dictionary."""
+    numeric_fields = [
+        ('query_time_ms', 'avg_query_time_ms'),
+        ('label_size_mb', 'avg_label_size_mb'),
+        ('construction_time_ms', 'avg_construction_time_ms'),
+        ('lazy_update_time_ms', 'avg_lazy_update_time_ms'),
+        ('route_distance_km', 'avg_distance_km'),
+        ('relative_error', 'avg_relative_error')
+    ]
+    
+    for field, avg_name in numeric_fields:
+        values = []
+        for row in rows:
+            try:
+                val = float(row.get(field, 0))
+                values.append(val)
+            except (ValueError, TypeError):
+                pass
+        if values:
+            agg_dict[avg_name] = round(sum(values) / len(values), 4)
+    
+    # Handle is_correct for accuracy
+    if 'is_correct' in rows[0] if rows else {}:
+        correct_count = sum(1 for r in rows if str(r.get('is_correct', '')).lower() in ['true', '1', 'yes'])
+        agg_dict['correct'] = correct_count
+        agg_dict['total'] = len(rows)
+        agg_dict['accuracy_rate'] = round(correct_count / len(rows), 4) if rows else 0
 
 
 @experiment_bp.route('/results/<result_id>/csv/<csv_type>/data', methods=['GET'])

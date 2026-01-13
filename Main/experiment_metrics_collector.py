@@ -172,14 +172,16 @@ CSV_HEADERS_SCENARIO_PERFORMANCE = [
     "threshold_rebuild_time_ms", "total_rebuilds"
 ]
 
-# Scenario Construction - per route_category construction performance
+# Scenario Construction - per route construction performance (all route data)
 CSV_HEADERS_SCENARIO_CONSTRUCTION = [
-    "route_category", "algorithm", "construction_time_ms", "initial_label_size_mb"
+    "route_id", "route_category", "scenario_id", "severity_level",
+    "algorithm", "construction_time_ms", "initial_label_size_mb"
 ]
 
-# Scenario Updates - per route_category update performance
+# Scenario Updates - per route update performance (all route data)
 CSV_HEADERS_SCENARIO_UPDATES = [
-    "route_category", "algorithm", "lazy_update_time_ms",
+    "route_id", "route_category", "scenario_id", "severity_level",
+    "algorithm", "lazy_update_time_ms",
     "peak_label_size_mb", "label_size_change_pct", "query_avg_ms"
 ]
 
@@ -1499,7 +1501,7 @@ class ExperimentMetricsCollector:
             }
     
     def _compute_scenario_accuracy_aggregations(self) -> Dict:
-        """Compute accuracy aggregations for scenario mode (by category and scenario)"""
+        """Compute accuracy aggregations for scenario mode (by category, scenario, severity, and overall)"""
         with self.lock:
             # By category
             per_category = []
@@ -1531,9 +1533,38 @@ class ExperimentMetricsCollector:
                         "avg_relative_error": round(avg_error, 6)
                     })
             
+            # By severity level
+            per_severity = []
+            for severity in ["light", "medium", "heavy"]:
+                sev_records = [r for r in self.scenario_records if r.get("severity_level") == severity]
+                if sev_records:
+                    correct = sum(1 for r in sev_records if r.get("is_correct", False))
+                    avg_error = sum(r.get("relative_error", 0) for r in sev_records) / len(sev_records)
+                    per_severity.append({
+                        "severity": severity,
+                        "total": len(sev_records),
+                        "correct": correct,
+                        "accuracy_rate": round(correct / len(sev_records), 4) if len(sev_records) > 0 else 0,
+                        "avg_relative_error": round(avg_error, 6)
+                    })
+            
+            # Overall averages
+            all_records = self.scenario_records
+            overall_averages = {}
+            if all_records:
+                total_correct = sum(1 for r in all_records if r.get("is_correct", False))
+                overall_averages = {
+                    "total_simulations": len(all_records),
+                    "total_correct": total_correct,
+                    "accuracy_rate": round(total_correct / len(all_records), 4) if len(all_records) > 0 else 0,
+                    "avg_relative_error": round(sum(r.get("relative_error", 0) for r in all_records) / len(all_records), 6)
+                }
+            
             return {
                 "per_category": per_category,
-                "per_scenario": per_scenario
+                "per_scenario": per_scenario,
+                "per_severity": per_severity,
+                "overall_averages": overall_averages
             }
     
     def _compute_scenario_performance_aggregations(self) -> Dict:
@@ -1569,9 +1600,36 @@ class ExperimentMetricsCollector:
                         "avg_label_size_mb": round(avg_label, 4)
                     })
             
+            # By scenario
+            per_scenario = []
+            for scenario in self.scenarios if self.is_scenario_mode else [f"DS{i}" for i in range(1, 11)]:
+                sc_records = [r for r in self.scenario_records if r.get("scenario_id") == scenario]
+                if sc_records:
+                    avg_query = sum(r.get("query_time_ms", 0) for r in sc_records) / len(sc_records)
+                    avg_label = sum(r.get("label_size_mb", 0) for r in sc_records) / len(sc_records)
+                    per_scenario.append({
+                        "scenario": scenario,
+                        "simulations": len(sc_records),
+                        "avg_query_time_ms": round(avg_query, 3),
+                        "avg_label_size_mb": round(avg_label, 4)
+                    })
+            
+            # Overall averages
+            all_records = self.scenario_records
+            overall_averages = {}
+            if all_records:
+                overall_averages = {
+                    "total_simulations": len(all_records),
+                    "avg_query_time_ms": round(sum(r.get("query_time_ms", 0) for r in all_records) / len(all_records), 3),
+                    "avg_label_size_mb": round(sum(r.get("label_size_mb", 0) for r in all_records) / len(all_records), 4),
+                    "avg_distance_km": round(sum(r.get("route_distance_km", 0) for r in all_records) / len(all_records), 2)
+                }
+            
             return {
                 "per_category": per_category,
-                "per_severity": per_severity
+                "per_severity": per_severity,
+                "per_scenario": per_scenario,
+                "overall_averages": overall_averages
             }
     
     def _compute_scenario_construction_aggregations(self) -> Dict:
@@ -1613,8 +1671,49 @@ class ExperimentMetricsCollector:
             "avg_label_size_mb": round(float(np.mean([d["initial_label_size_mb"] for d in per_category_hc2l])), 5) if per_category_hc2l else 0
         }
         
+        # Per-scenario construction data
+        per_scenario = []
+        for scenario in self.scenarios if self.is_scenario_mode else [f"DS{i}" for i in range(1, 11)]:
+            sc_records = [r for r in self.scenario_records if r.get("scenario_id") == scenario]
+            if sc_records:
+                avg_construction = sum(r.get("initial_construction_time_ms", 0) for r in sc_records) / len(sc_records)
+                avg_label_size = sum(r.get("initial_label_size_mb", 0) for r in sc_records) / len(sc_records)
+                per_scenario.append({
+                    "scenario": scenario,
+                    "simulations": len(sc_records),
+                    "avg_construction_time_ms": round(avg_construction, 2),
+                    "avg_label_size_mb": round(avg_label_size, 5)
+                })
+        
+        # Per-severity construction data
+        per_severity = []
+        for severity in ["light", "medium", "heavy"]:
+            sev_records = [r for r in self.scenario_records if r.get("severity_level") == severity]
+            if sev_records:
+                avg_construction = sum(r.get("initial_construction_time_ms", 0) for r in sev_records) / len(sev_records)
+                avg_label_size = sum(r.get("initial_label_size_mb", 0) for r in sev_records) / len(sev_records)
+                per_severity.append({
+                    "severity": severity,
+                    "simulations": len(sev_records),
+                    "avg_construction_time_ms": round(avg_construction, 2),
+                    "avg_label_size_mb": round(avg_label_size, 5)
+                })
+        
+        # Overall averages
+        all_records = self.scenario_records
+        overall_averages = {}
+        if all_records:
+            overall_averages = {
+                "total_simulations": len(all_records),
+                "avg_construction_time_ms": round(sum(r.get("initial_construction_time_ms", 0) for r in all_records) / len(all_records), 2),
+                "avg_initial_label_size_mb": round(sum(r.get("initial_label_size_mb", 0) for r in all_records) / len(all_records), 5)
+            }
+        
         return {
             "per_category": per_category_dhl + per_category_hc2l,
+            "per_scenario": per_scenario,
+            "per_severity": per_severity,
+            "overall_averages": overall_averages,
             "averages": [avg_dhl, avg_hc2l]
         }
     
@@ -1703,9 +1802,41 @@ class ExperimentMetricsCollector:
                     "query_avg_ms": round(float(np.mean(dhl_query_times)), 3)
                 })
         
+        # Per-severity data (aggregate by severity across all categories)
+        per_severity = []
+        for severity in ["light", "medium", "heavy"]:
+            sev_records = [r for r in self.scenario_records if r.get("severity_level") == severity]
+            if sev_records:
+                avg_lazy_time = sum(r.get("lazy_update_time_ms", 0) for r in sev_records) / len(sev_records)
+                avg_query_time = sum(r.get("query_time_ms", 0) for r in sev_records) / len(sev_records)
+                avg_label_size = sum(r.get("label_size_mb", 0) for r in sev_records) / len(sev_records)
+                per_severity.append({
+                    "severity": severity,
+                    "simulations": len(sev_records),
+                    "avg_lazy_update_time_ms": round(avg_lazy_time, 3),
+                    "avg_query_time_ms": round(avg_query_time, 3),
+                    "avg_label_size_mb": round(avg_label_size, 5)
+                })
+        
+        # Overall averages
+        all_records = self.scenario_records
+        overall_averages = {}
+        if all_records:
+            avg_lazy_time = sum(r.get("lazy_update_time_ms", 0) for r in all_records) / len(all_records)
+            avg_query_time = sum(r.get("query_time_ms", 0) for r in all_records) / len(all_records)
+            avg_label_size = sum(r.get("label_size_mb", 0) for r in all_records) / len(all_records)
+            overall_averages = {
+                "total_simulations": len(all_records),
+                "avg_lazy_update_time_ms": round(avg_lazy_time, 3),
+                "avg_query_time_ms": round(avg_query_time, 3),
+                "avg_label_size_mb": round(avg_label_size, 5)
+            }
+        
         return {
             "per_category": per_category,
-            "per_scenario": per_scenario
+            "per_scenario": per_scenario,
+            "per_severity": per_severity,
+            "overall_averages": overall_averages
         }
     
     def record_scenario_metric(self, 
@@ -1878,50 +2009,65 @@ class ExperimentMetricsCollector:
     def export_scenario_construction_csv(self) -> Path:
         """
         Export Scenario Construction CSV.
-        Per route_category construction data.
+        Per route construction data (all route data, not just averages).
         """
         csv_path = self.results_path / "construction_results.csv"
-        construction_data = self._compute_scenario_construction_aggregations()
         
         with self.csv_lock:
             with open(csv_path, 'w', newline='') as f:
                 writer = csv.DictWriter(f, fieldnames=CSV_HEADERS_SCENARIO_CONSTRUCTION)
                 writer.writeheader()
-                for row in construction_data.get("per_category", []):
+                
+                # Write all scenario records with construction data
+                for record in self.scenario_records:
                     writer.writerow({
-                        "route_category": row.get("category"),
-                        "algorithm": row.get("algorithm"),
-                        "construction_time_ms": row.get("construction_time_ms"),
-                        "initial_label_size_mb": row.get("initial_label_size_mb"),
+                        "route_id": record.get("route_id", 0),
+                        "route_category": record.get("route_category", ""),
+                        "scenario_id": record.get("scenario_id", ""),
+                        "severity_level": record.get("severity_level", ""),
+                        "algorithm": record.get("algorithm", ""),
+                        "construction_time_ms": record.get("initial_construction_time_ms", 0),
+                        "initial_label_size_mb": record.get("initial_label_size_mb", 0),
                     })
         
-        total_rows = len(construction_data.get("per_category", []))
+        total_rows = len(self.scenario_records)
         logger.info(f"Exported scenario construction CSV: {csv_path} ({total_rows} rows)")
         return csv_path
     
     def export_scenario_updates_csv(self) -> Path:
         """
         Export Scenario Updates CSV.
-        Per route_category updates data.
+        Per route update data (all route data, not just averages).
         """
         csv_path = self.results_path / "updates_results.csv"
-        updates_data = self._compute_scenario_updates_aggregations()
         
         with self.csv_lock:
             with open(csv_path, 'w', newline='') as f:
                 writer = csv.DictWriter(f, fieldnames=CSV_HEADERS_SCENARIO_UPDATES)
                 writer.writeheader()
-                for row in updates_data.get("per_category", []):
+                
+                # Write all scenario records with update data
+                for record in self.scenario_records:
+                    # Compute label size change percentage
+                    initial_size = record.get("initial_label_size_mb", 0)
+                    peak_size = record.get("peak_label_size_mb", 0)
+                    change_pct = 0
+                    if initial_size > 0:
+                        change_pct = ((peak_size - initial_size) / initial_size) * 100
+                    
                     writer.writerow({
-                        "route_category": row.get("category"),
-                        "algorithm": row.get("algorithm"),
-                        "lazy_update_time_ms": row.get("lazy_update_time_ms"),
-                        "peak_label_size_mb": row.get("peak_label_size_mb"),
-                        "label_size_change_pct": row.get("label_size_change_pct"),
-                        "query_avg_ms": row.get("query_avg_ms"),
+                        "route_id": record.get("route_id", 0),
+                        "route_category": record.get("route_category", ""),
+                        "scenario_id": record.get("scenario_id", ""),
+                        "severity_level": record.get("severity_level", ""),
+                        "algorithm": record.get("algorithm", ""),
+                        "lazy_update_time_ms": record.get("lazy_update_time_ms", 0),
+                        "peak_label_size_mb": peak_size,
+                        "label_size_change_pct": round(change_pct, 2),
+                        "query_avg_ms": record.get("query_time_ms", 0),
                     })
         
-        total_rows = len(updates_data.get("per_category", []))
+        total_rows = len(self.scenario_records)
         logger.info(f"Exported scenario updates CSV: {csv_path} ({total_rows} rows)")
         return csv_path
     

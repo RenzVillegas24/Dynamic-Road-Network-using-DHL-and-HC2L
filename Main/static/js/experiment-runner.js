@@ -2895,6 +2895,10 @@ const ExperimentRunner = {
                         <i data-lucide="thermometer" class="w-4 h-4"></i>
                         Simulations Per Severity Level
                     </h5>
+                    <button onclick="ExperimentRunner.exportCSV('summary', 'per-severity')"
+                        class="btn btn--warning btn--xs hover:shadow-md transition-all">
+                        <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+                    </button>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm">
@@ -2935,7 +2939,7 @@ const ExperimentRunner = {
         const container = document.getElementById('result-accuracy-container');
         if (!container || !aggregatedAccuracy) return;
         
-        const { per_category, per_scenario } = aggregatedAccuracy;
+        const { per_category, per_scenario, per_severity, overall_averages } = aggregatedAccuracy;
         
         container.innerHTML = `
             <!-- Per-Category Accuracy -->
@@ -2983,6 +2987,10 @@ const ExperimentRunner = {
                         <i data-lucide="target" class="w-4 h-4"></i>
                         Accuracy Per Scenario
                     </h5>
+                    <button onclick="ExperimentRunner.exportCSV('accuracy', 'per-scenario')"
+                        class="btn btn--purple btn--xs hover:shadow-md transition-all">
+                        <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+                    </button>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm">
@@ -3009,6 +3017,78 @@ const ExperimentRunner = {
                     </table>
                 </div>
             </div>
+            
+            <!-- Per-Severity Accuracy -->
+            <div class="bg-white rounded-xl border border-amber-200 overflow-hidden shadow-sm mt-4">
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 px-4 py-3 border-b border-amber-200 flex items-center justify-between">
+                    <h5 class="font-bold text-amber-900 flex items-center gap-2 mb-0">
+                        <i data-lucide="thermometer" class="w-4 h-4"></i>
+                        Accuracy Per Severity Level
+                    </h5>
+                    <button onclick="ExperimentRunner.exportCSV('accuracy', 'per-severity')"
+                        class="btn btn--warning btn--xs hover:shadow-md transition-all">
+                        <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-amber-50 border-b border-amber-200">
+                            <tr>
+                                <th class="text-left p-3 font-semibold text-amber-700">Severity</th>
+                                <th class="text-right p-3 font-semibold text-amber-700">Total</th>
+                                <th class="text-right p-3 font-semibold text-amber-700">Correct</th>
+                                <th class="text-right p-3 font-semibold text-amber-700">Accuracy Rate</th>
+                                <th class="text-right p-3 font-semibold text-amber-700">Avg Error</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            ${(per_severity || []).map(row => `
+                                <tr class="hover:bg-amber-50 transition-colors">
+                                    <td class="p-3"><span class="px-2 py-1 rounded text-xs font-medium ${this.getLevelBadgeClass(row.severity)}">${row.severity}</span></td>
+                                    <td class="p-3 text-right font-mono">${row.total}</td>
+                                    <td class="p-3 text-right font-mono">${row.correct}</td>
+                                    <td class="p-3 text-right font-mono font-bold">${((row.accuracy_rate || 0) * 100).toFixed(1)}%</td>
+                                    <td class="p-3 text-right font-mono">${((row.avg_relative_error || 0) * 100).toFixed(2)}%</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Overall Averages -->
+            <div class="bg-white rounded-xl border border-green-200 overflow-hidden shadow-sm mt-4">
+                <div class="bg-gradient-to-r from-green-50 to-emerald-50 px-4 py-3 border-b border-green-200 flex items-center justify-between">
+                    <h5 class="font-bold text-green-900 flex items-center gap-2 mb-0">
+                        <i data-lucide="bar-chart" class="w-4 h-4"></i>
+                        Overall Averages
+                    </h5>
+                    <button onclick="ExperimentRunner.exportCSV('accuracy', 'overall-averages')"
+                        class="btn btn--success btn--xs hover:shadow-md transition-all">
+                        <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-green-50 border-b border-green-200">
+                            <tr>
+                                <th class="text-right p-3 font-semibold text-green-700">Total Simulations</th>
+                                <th class="text-right p-3 font-semibold text-green-700">Correct</th>
+                                <th class="text-right p-3 font-semibold text-green-700">Accuracy Rate</th>
+                                <th class="text-right p-3 font-semibold text-green-700">Avg Error</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="hover:bg-green-50 transition-colors">
+                                <td class="p-3 text-right font-mono font-bold">${overall_averages?.total || 0}</td>
+                                <td class="p-3 text-right font-mono font-bold">${overall_averages?.correct || 0}</td>
+                                <td class="p-3 text-right font-mono font-bold">${((overall_averages?.accuracy_rate || 0) * 100).toFixed(1)}%</td>
+                                <td class="p-3 text-right font-mono font-bold">${((overall_averages?.avg_relative_error || 0) * 100).toFixed(2)}%</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         `;
         
         if (typeof lucide !== 'undefined') lucide.createIcons();
@@ -3019,7 +3099,7 @@ const ExperimentRunner = {
         const container = document.getElementById('result-performance-container');
         if (!container || !aggregatedPerformance) return;
         
-        const { per_category, per_severity } = aggregatedPerformance;
+        const { per_category, per_scenario, per_severity, overall_averages } = aggregatedPerformance;
         
         container.innerHTML = `
             <!-- Per-Category Performance -->
@@ -3060,6 +3140,40 @@ const ExperimentRunner = {
                 </div>
             </div>
             
+            <!-- Per-Scenario Performance -->
+            <div class="bg-white rounded-xl border border-purple-200 overflow-hidden shadow-sm mt-4">
+                <div class="bg-gradient-to-r from-purple-50 to-pink-50 px-4 py-3 border-b border-purple-200 flex items-center justify-between">
+                    <h5 class="font-bold text-purple-900 flex items-center gap-2 mb-0">
+                        <i data-lucide="target" class="w-4 h-4"></i>
+                        Performance Per Scenario
+                    </h5>
+                    <button onclick="ExperimentRunner.exportCSV('performance', 'per-scenario')"
+                        class="btn btn--purple btn--xs hover:shadow-md transition-all">
+                        <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-purple-50 border-b border-purple-200">
+                            <tr>
+                                <th class="text-left p-3 font-semibold text-purple-700">Scenario</th>
+                                <th class="text-right p-3 font-semibold text-purple-700">Simulations</th>
+                                <th class="text-right p-3 font-semibold text-purple-700">Avg Query Time (ms)</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            ${(per_scenario || []).map(row => `
+                                <tr class="hover:bg-purple-50 transition-colors">
+                                    <td class="p-3 font-medium">${row.scenario}</td>
+                                    <td class="p-3 text-right font-mono">${row.simulations}</td>
+                                    <td class="p-3 text-right font-mono font-bold">${row.avg_query_time_ms?.toFixed(3) || '--'}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
             <!-- Per-Severity Performance -->
             <div class="bg-white rounded-xl border border-amber-200 overflow-hidden shadow-sm mt-4">
                 <div class="bg-gradient-to-r from-amber-50 to-yellow-50 px-4 py-3 border-b border-amber-200 flex items-center justify-between">
@@ -3067,6 +3181,10 @@ const ExperimentRunner = {
                         <i data-lucide="activity" class="w-4 h-4"></i>
                         Performance Per Severity Level
                     </h5>
+                    <button onclick="ExperimentRunner.exportCSV('performance', 'per-severity')"
+                        class="btn btn--warning btn--xs hover:shadow-md transition-all">
+                        <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+                    </button>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm">
@@ -3087,6 +3205,40 @@ const ExperimentRunner = {
                                     <td class="p-3 text-right font-mono">${row.avg_label_size_mb?.toFixed(4) || '--'}</td>
                                 </tr>
                             `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Overall Averages -->
+            <div class="bg-white rounded-xl border border-green-200 overflow-hidden shadow-sm mt-4">
+                <div class="bg-gradient-to-r from-green-50 to-emerald-50 px-4 py-3 border-b border-green-200 flex items-center justify-between">
+                    <h5 class="font-bold text-green-900 flex items-center gap-2 mb-0">
+                        <i data-lucide="bar-chart" class="w-4 h-4"></i>
+                        Overall Averages
+                    </h5>
+                    <button onclick="ExperimentRunner.exportCSV('performance', 'overall-averages')"
+                        class="btn btn--success btn--xs hover:shadow-md transition-all">
+                        <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-green-50 border-b border-green-200">
+                            <tr>
+                                <th class="text-right p-3 font-semibold text-green-700">Total Simulations</th>
+                                <th class="text-right p-3 font-semibold text-green-700">Avg Distance (km)</th>
+                                <th class="text-right p-3 font-semibold text-green-700">Avg Query Time (ms)</th>
+                                <th class="text-right p-3 font-semibold text-green-700">Avg Label Size (MB)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="hover:bg-green-50 transition-colors">
+                                <td class="p-3 text-right font-mono font-bold">${overall_averages?.total_simulations || 0}</td>
+                                <td class="p-3 text-right font-mono font-bold">${overall_averages?.avg_distance_km?.toFixed(2) || '--'}</td>
+                                <td class="p-3 text-right font-mono font-bold">${overall_averages?.avg_query_time_ms?.toFixed(3) || '--'}</td>
+                                <td class="p-3 text-right font-mono font-bold">${overall_averages?.avg_label_size_mb?.toFixed(4) || '--'}</td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -3241,8 +3393,11 @@ const ExperimentRunner = {
             const isScenarioMode = this.resultsData?.metadata?.preset_type === 'scenario';
             
             if (isScenarioMode) {
-                // Scenario mode: display per_category and averages
+                // Scenario mode: display per_category, per_scenario, per_severity, and overall_averages
                 const perCategory = this.resultsData.aggregated_data.construction.per_category || [];
+                const perScenario = this.resultsData.aggregated_data.construction.per_scenario || [];
+                const perSeverity = this.resultsData.aggregated_data.construction.per_severity || [];
+                const overallAverages = this.resultsData.aggregated_data.construction.overall_averages || {};
                 const averages = this.resultsData.aggregated_data.construction.averages || [];
 
                 container.innerHTML = `
@@ -3282,12 +3437,84 @@ const ExperimentRunner = {
                         </div>
                     </div>
                     
-                    <!-- Overall Averages -->
-                    <div class="bg-white rounded-xl border border-indigo-200 overflow-hidden shadow-sm">
+                    <!-- Per-Scenario Construction -->
+                    <div class="bg-white rounded-xl border border-blue-200 overflow-hidden shadow-sm mt-4">
+                        <div class="bg-gradient-to-r from-blue-50 to-cyan-50 px-4 py-3 border-b border-blue-200 flex items-center justify-between">
+                            <h5 class="font-bold text-blue-900 flex items-center gap-2 mb-0">
+                                <i data-lucide="target" class="w-4 h-4"></i>
+                                Construction Per Scenario
+                            </h5>
+                            <button onclick="ExperimentRunner.exportCSV('construction', 'per-scenario')"
+                                class="btn btn--primary btn--xs hover:shadow-md transition-all">
+                                <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-blue-50 border-b border-blue-200">
+                                    <tr>
+                                        <th class="text-left p-3 font-semibold text-blue-700">Scenario</th>
+                                        <th class="text-right p-3 font-semibold text-blue-700">Simulations</th>
+                                        <th class="text-right p-3 font-semibold text-blue-700">Avg Construction Time (ms)</th>
+                                        <th class="text-right p-3 font-semibold text-blue-700">Avg Label Size (MB)</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100">
+                                    ${perScenario.map(row => `
+                                        <tr class="hover:bg-blue-50 transition-colors">
+                                            <td class="p-3 font-medium">${row.scenario}</td>
+                                            <td class="p-3 text-right font-mono">${row.simulations}</td>
+                                            <td class="p-3 text-right font-mono">${row.avg_construction_time_ms}</td>
+                                            <td class="p-3 text-right font-mono">${row.avg_label_size_mb}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- Per-Severity Construction -->
+                    <div class="bg-white rounded-xl border border-amber-200 overflow-hidden shadow-sm mt-4">
+                        <div class="bg-gradient-to-r from-amber-50 to-yellow-50 px-4 py-3 border-b border-amber-200 flex items-center justify-between">
+                            <h5 class="font-bold text-amber-900 flex items-center gap-2 mb-0">
+                                <i data-lucide="thermometer" class="w-4 h-4"></i>
+                                Construction Per Severity Level
+                            </h5>
+                            <button onclick="ExperimentRunner.exportCSV('construction', 'per-severity')"
+                                class="btn btn--warning btn--xs hover:shadow-md transition-all">
+                                <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-amber-50 border-b border-amber-200">
+                                    <tr>
+                                        <th class="text-left p-3 font-semibold text-amber-700">Severity</th>
+                                        <th class="text-right p-3 font-semibold text-amber-700">Simulations</th>
+                                        <th class="text-right p-3 font-semibold text-amber-700">Avg Construction Time (ms)</th>
+                                        <th class="text-right p-3 font-semibold text-amber-700">Avg Label Size (MB)</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100">
+                                    ${perSeverity.map(row => `
+                                        <tr class="hover:bg-amber-50 transition-colors">
+                                            <td class="p-3"><span class="px-2 py-1 rounded text-xs font-medium ${this.getLevelBadgeClass(row.severity)}">${row.severity}</span></td>
+                                            <td class="p-3 text-right font-mono">${row.simulations}</td>
+                                            <td class="p-3 text-right font-mono">${row.avg_construction_time_ms}</td>
+                                            <td class="p-3 text-right font-mono">${row.avg_label_size_mb}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- Algorithm Averages -->
+                    <div class="bg-white rounded-xl border border-indigo-200 overflow-hidden shadow-sm mt-4">
                         <div class="bg-gradient-to-r from-indigo-50 to-purple-50 px-4 py-3 border-b border-indigo-200 flex items-center justify-between">
                             <h5 class="font-bold text-indigo-900 flex items-center gap-2 mb-0">
                                 <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
-                                Overall Averages
+                                Algorithm Averages
                             </h5>
                             <button onclick="ExperimentRunner.exportCSV('construction', 'averages')"
                                 class="btn btn--success btn--xs hover:shadow-md transition-all">
@@ -3311,6 +3538,38 @@ const ExperimentRunner = {
                                             <td class="p-3 text-right font-mono">${row.avg_label_size_mb}</td>
                                         </tr>
                                     `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- Overall Averages -->
+                    <div class="bg-white rounded-xl border border-green-200 overflow-hidden shadow-sm mt-4">
+                        <div class="bg-gradient-to-r from-green-50 to-emerald-50 px-4 py-3 border-b border-green-200 flex items-center justify-between">
+                            <h5 class="font-bold text-green-900 flex items-center gap-2 mb-0">
+                                <i data-lucide="bar-chart" class="w-4 h-4"></i>
+                                Overall Averages
+                            </h5>
+                            <button onclick="ExperimentRunner.exportCSV('construction', 'overall-averages')"
+                                class="btn btn--success btn--xs hover:shadow-md transition-all">
+                                <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-green-50 border-b border-green-200">
+                                    <tr>
+                                        <th class="text-right p-3 font-semibold text-green-700">Total Simulations</th>
+                                        <th class="text-right p-3 font-semibold text-green-700">Avg Construction Time (ms)</th>
+                                        <th class="text-right p-3 font-semibold text-green-700">Avg Label Size (MB)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="hover:bg-green-50 transition-colors">
+                                        <td class="p-3 text-right font-mono font-bold">${overallAverages.total_simulations || 0}</td>
+                                        <td class="p-3 text-right font-mono font-bold">${overallAverages.avg_construction_time_ms || 0}</td>
+                                        <td class="p-3 text-right font-mono font-bold">${overallAverages.avg_initial_label_size_mb || 0}</td>
+                                    </tr>
                                 </tbody>
                             </table>
                         </div>
@@ -3430,9 +3689,11 @@ const ExperimentRunner = {
         const isScenarioMode = this.resultsData?.metadata?.preset_type === 'scenario';
         
         if (isScenarioMode) {
-            // Scenario mode: display per_category and per_scenario
+            // Scenario mode: display per_category, per_scenario, per_severity, and overall_averages
             const perCategory = this.resultsData.aggregated_data.updates.per_category || [];
             const perScenario = this.resultsData.aggregated_data.updates.per_scenario || [];
+            const perSeverity = this.resultsData.aggregated_data.updates.per_severity || [];
+            const overallAverages = this.resultsData.aggregated_data.updates.overall_averages || {};
 
             container.innerHTML = `
                 <!-- Averages Section -->
@@ -3508,6 +3769,78 @@ const ExperimentRunner = {
                                             <td class="p-3 text-right font-mono">${row.query_avg_ms}</td>
                                         </tr>
                                     `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- Per-Severity Updates -->
+                    <div class="bg-white rounded-xl border border-amber-200 overflow-hidden shadow-sm">
+                        <div class="bg-gradient-to-r from-amber-50 to-yellow-50 px-4 py-3 border-b border-amber-200 flex items-center justify-between">
+                            <h5 class="font-bold text-amber-900 flex items-center gap-2 mb-0">
+                                <i data-lucide="thermometer" class="w-4 h-4"></i>
+                                Updates Per Severity Level
+                            </h5>
+                            <button onclick="ExperimentRunner.exportCSV('updates', 'per-severity')"
+                                class="btn btn--warning btn--xs hover:shadow-md transition-all">
+                                <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-amber-50 border-b border-amber-200">
+                                    <tr>
+                                        <th class="text-left p-3 font-semibold text-amber-700">Severity</th>
+                                        <th class="text-right p-3 font-semibold text-amber-700">Simulations</th>
+                                        <th class="text-right p-3 font-semibold text-amber-700">Avg Lazy Update (ms)</th>
+                                        <th class="text-right p-3 font-semibold text-amber-700">Avg Query Time (ms)</th>
+                                        <th class="text-right p-3 font-semibold text-amber-700">Avg Label Size (MB)</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100">
+                                    ${perSeverity.map(row => `
+                                        <tr class="hover:bg-amber-50 transition-colors">
+                                            <td class="p-3"><span class="px-2 py-1 rounded text-xs font-medium ${this.getLevelBadgeClass(row.severity)}">${row.severity}</span></td>
+                                            <td class="p-3 text-right font-mono">${row.simulations}</td>
+                                            <td class="p-3 text-right font-mono">${row.avg_lazy_update_time_ms}</td>
+                                            <td class="p-3 text-right font-mono">${row.avg_query_time_ms}</td>
+                                            <td class="p-3 text-right font-mono">${row.avg_label_size_mb}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- Overall Averages -->
+                    <div class="bg-white rounded-xl border border-green-200 overflow-hidden shadow-sm">
+                        <div class="bg-gradient-to-r from-green-50 to-emerald-50 px-4 py-3 border-b border-green-200 flex items-center justify-between">
+                            <h5 class="font-bold text-green-900 flex items-center gap-2 mb-0">
+                                <i data-lucide="bar-chart" class="w-4 h-4"></i>
+                                Overall Averages
+                            </h5>
+                            <button onclick="ExperimentRunner.exportCSV('updates', 'overall-averages')"
+                                class="btn btn--success btn--xs hover:shadow-md transition-all">
+                                <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-green-50 border-b border-green-200">
+                                    <tr>
+                                        <th class="text-right p-3 font-semibold text-green-700">Total Simulations</th>
+                                        <th class="text-right p-3 font-semibold text-green-700">Avg Lazy Update (ms)</th>
+                                        <th class="text-right p-3 font-semibold text-green-700">Avg Query Time (ms)</th>
+                                        <th class="text-right p-3 font-semibold text-green-700">Avg Label Size (MB)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="hover:bg-green-50 transition-colors">
+                                        <td class="p-3 text-right font-mono font-bold">${overallAverages.total_simulations || 0}</td>
+                                        <td class="p-3 text-right font-mono font-bold">${overallAverages.avg_lazy_update_time_ms || 0}</td>
+                                        <td class="p-3 text-right font-mono font-bold">${overallAverages.avg_query_time_ms || 0}</td>
+                                        <td class="p-3 text-right font-mono font-bold">${overallAverages.avg_label_size_mb || 0}</td>
+                                    </tr>
                                 </tbody>
                             </table>
                         </div>
