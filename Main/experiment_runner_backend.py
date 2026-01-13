@@ -4699,12 +4699,19 @@ def download_result_csv(result_id, csv_type):
 def export_all_result_files(result_id):
     """
     Export ALL CSV files and JSON configuration as a single ZIP file.
+    Files are organized in folders by tab name, with each folder containing all aggregation CSVs.
     
     Args:
         result_id: Result folder name (timestamp-based)
     
+    Query params:
+        preset_type: 'standard' or 'scenario' (default: 'standard')
+    
     Returns:
-        ZIP file containing all CSVs and experiment config JSON
+        ZIP file containing folders per tab with all CSVs and experiment config JSON
+    
+    Standard mode folders contain: per-route, per-trial, per-batch CSVs
+    Scenario mode folders contain: per-route, per-category, per-scenario, per-severity, averages CSVs
     """
     import io
     import zipfile
@@ -4712,8 +4719,11 @@ def export_all_result_files(result_id):
     if not experiment_runner:
         return jsonify({"success": False, "error": "Experiment runner not initialized"}), 500
     
-    # All CSV file mappings
-    csv_files = {
+    # Get preset_type from query parameter
+    preset_type = request.args.get('preset_type', 'standard')
+    
+    # Tab folders and their CSV file mappings
+    tab_csv_files = {
         'summary': 'summary_results.csv',
         'accuracy': 'accuracy_results.csv',
         'construction': 'construction_results.csv',
@@ -4738,18 +4748,60 @@ def export_all_result_files(result_id):
         zip_buffer = io.BytesIO()
         
         with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-            # Add all CSV files that exist
-            for csv_name, csv_filename in csv_files.items():
+            # Add each tab's files in a folder
+            for tab_name, csv_filename in tab_csv_files.items():
                 csv_path = result_folder / csv_filename
                 if csv_path.exists():
-                    zip_file.write(csv_path, arcname=csv_filename)
+                    folder_name = tab_name
+                    
+                    # Add per-route CSV (the original file)
+                    zip_file.write(csv_path, arcname=f"{folder_name}/{tab_name}_per-route.csv")
+                    
+                    if preset_type == 'scenario':
+                        # Scenario mode: per-category, per-scenario, per-severity, averages
+                        try:
+                            per_category_csv = _generate_scenario_aggregated_csv(csv_path, 'per-category', tab_name, result_id, results_dir)
+                            zip_file.writestr(f"{folder_name}/{tab_name}_per-category.csv", per_category_csv)
+                        except Exception as e:
+                            logger.warning(f"Failed to generate per-category CSV for {tab_name}: {e}")
+                        
+                        try:
+                            per_scenario_csv = _generate_scenario_aggregated_csv(csv_path, 'per-scenario', tab_name, result_id, results_dir)
+                            zip_file.writestr(f"{folder_name}/{tab_name}_per-scenario.csv", per_scenario_csv)
+                        except Exception as e:
+                            logger.warning(f"Failed to generate per-scenario CSV for {tab_name}: {e}")
+                        
+                        try:
+                            per_severity_csv = _generate_scenario_aggregated_csv(csv_path, 'per-severity', tab_name, result_id, results_dir)
+                            zip_file.writestr(f"{folder_name}/{tab_name}_per-severity.csv", per_severity_csv)
+                        except Exception as e:
+                            logger.warning(f"Failed to generate per-severity CSV for {tab_name}: {e}")
+                        
+                        try:
+                            averages_csv = _generate_scenario_aggregated_csv(csv_path, 'averages', tab_name, result_id, results_dir)
+                            zip_file.writestr(f"{folder_name}/{tab_name}_averages.csv", averages_csv)
+                        except Exception as e:
+                            logger.warning(f"Failed to generate averages CSV for {tab_name}: {e}")
+                    else:
+                        # Standard mode: per-trial, per-batch
+                        try:
+                            per_trial_csv = _generate_aggregated_csv(csv_path, 'per-trial', tab_name)
+                            zip_file.writestr(f"{folder_name}/{tab_name}_per-trial.csv", per_trial_csv)
+                        except Exception as e:
+                            logger.warning(f"Failed to generate per-trial CSV for {tab_name}: {e}")
+                        
+                        try:
+                            per_batch_csv = _generate_aggregated_csv(csv_path, 'per-batch', tab_name)
+                            zip_file.writestr(f"{folder_name}/{tab_name}_per-batch.csv", per_batch_csv)
+                        except Exception as e:
+                            logger.warning(f"Failed to generate per-batch CSV for {tab_name}: {e}")
             
-            # Add JSON configuration file if exists
+            # Add JSON configuration file if exists (in root of ZIP)
             json_path = result_folder / "experiment_config.json"
             if json_path.exists():
                 zip_file.write(json_path, arcname="experiment_config.json")
             
-            # Also add any other JSON files in the folder
+            # Also add any other JSON files in the folder (in root of ZIP)
             for json_file in result_folder.glob("*.json"):
                 if json_file.name != "experiment_config.json":
                     zip_file.write(json_file, arcname=json_file.name)
@@ -4772,14 +4824,19 @@ def export_result_csv(result_id, csv_type):
     """
     Export a specific CSV file or aggregated subset from saved experiment results.
     
-    For table_type='all': Downloads a ZIP file containing per-route, per-trial, and per-batch CSVs
+    For table_type='all': Downloads a ZIP file containing all aggregation CSVs based on preset type
+    - Standard mode: per-route, per-trial, per-batch
+    - Scenario mode: per-route, per-category, per-scenario, per-severity, averages
     
     Args:
         result_id: Result folder name (timestamp-based)
         csv_type: One of 'summary', 'accuracy', 'construction', 'updates', 'performance', 'similarity'
     
     Query params:
-        table_type: Type of export - 'all', 'per-trial', 'per-batch', 'per-route' (default: 'all')
+        table_type: Type of export:
+                   Standard: 'all', 'per-trial', 'per-batch', 'per-route'
+                   Scenario: 'all', 'per-category', 'per-scenario', 'per-severity', 'per-route', 'averages'
+        preset_type: 'standard' or 'scenario' (default: 'standard')
     
     Returns:
         CSV file download or ZIP file with multiple CSVs
@@ -4791,17 +4848,18 @@ def export_result_csv(result_id, csv_type):
     if not experiment_runner:
         return jsonify({"success": False, "error": "Experiment runner not initialized"}), 500
     
-    # Get table_type from query parameter
+    # Get query parameters
     table_type = request.args.get('table_type', 'all')
+    preset_type = request.args.get('preset_type', 'standard')
     
-    # Validate table_type - include both standard and scenario mode types
-    valid_table_types = [
-        'all', 'per-trial', 'per-batch', 'per-route',
-        # Scenario mode table types
-        'per-category', 'per-scenario', 'per-severity', 'overall-averages', 'averages'
-    ]
+    # Validate table_type based on preset_type
+    if preset_type == 'scenario':
+        valid_table_types = ['all', 'per-route', 'per-category', 'per-scenario', 'per-severity', 'averages']
+    else:
+        valid_table_types = ['all', 'per-trial', 'per-batch', 'per-route']
+    
     if table_type not in valid_table_types:
-        return jsonify({"success": False, "error": f"Invalid table_type: {table_type}. Must be one of: {', '.join(valid_table_types)}"}), 400
+        return jsonify({"success": False, "error": f"Invalid table_type for {preset_type} mode: {table_type}. Must be one of: {', '.join(valid_table_types)}"}), 400
     
     # Map CSV types to filenames
     csv_files = {
@@ -4831,21 +4889,34 @@ def export_result_csv(result_id, csv_type):
         if not csv_path.exists():
             return jsonify({"success": False, "error": f"CSV file not found: {csv_files[csv_type]}"}), 404
         
-        # For 'all': Create ZIP with per-route, per-trial, and per-batch
+        # For 'all': Create ZIP with all aggregations based on preset type
         if table_type == 'all':
             zip_buffer = io.BytesIO()
             
             with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-                # 1. Add per-route CSV (complete file)
+                # Always add per-route CSV (complete file)
                 zip_file.write(csv_path, arcname=f"{csv_type}_per-route.csv")
                 
-                # 2. Add per-trial CSV (aggregated)
-                per_trial_csv = _generate_aggregated_csv(csv_path, 'per-trial', csv_type)
-                zip_file.writestr(f"{csv_type}_per-trial.csv", per_trial_csv)
-                
-                # 3. Add per-batch CSV (aggregated)
-                per_batch_csv = _generate_aggregated_csv(csv_path, 'per-batch', csv_type)
-                zip_file.writestr(f"{csv_type}_per-batch.csv", per_batch_csv)
+                if preset_type == 'scenario':
+                    # Scenario mode: per-category, per-scenario, per-severity, averages
+                    per_category_csv = _generate_scenario_aggregated_csv(csv_path, 'per-category', csv_type, result_id, results_dir)
+                    zip_file.writestr(f"{csv_type}_per-category.csv", per_category_csv)
+                    
+                    per_scenario_csv = _generate_scenario_aggregated_csv(csv_path, 'per-scenario', csv_type, result_id, results_dir)
+                    zip_file.writestr(f"{csv_type}_per-scenario.csv", per_scenario_csv)
+                    
+                    per_severity_csv = _generate_scenario_aggregated_csv(csv_path, 'per-severity', csv_type, result_id, results_dir)
+                    zip_file.writestr(f"{csv_type}_per-severity.csv", per_severity_csv)
+                    
+                    averages_csv = _generate_scenario_aggregated_csv(csv_path, 'averages', csv_type, result_id, results_dir)
+                    zip_file.writestr(f"{csv_type}_averages.csv", averages_csv)
+                else:
+                    # Standard mode: per-trial, per-batch
+                    per_trial_csv = _generate_aggregated_csv(csv_path, 'per-trial', csv_type)
+                    zip_file.writestr(f"{csv_type}_per-trial.csv", per_trial_csv)
+                    
+                    per_batch_csv = _generate_aggregated_csv(csv_path, 'per-batch', csv_type)
+                    zip_file.writestr(f"{csv_type}_per-batch.csv", per_batch_csv)
             
             zip_buffer.seek(0)
             return send_file(
@@ -4878,8 +4949,8 @@ def export_result_csv(result_id, csv_type):
                 download_name=f"{result_id}_{csv_type}_{table_type}.csv"
             )
         
-        # For scenario mode aggregations (per-category, per-scenario, per-severity, overall-averages)
-        if table_type in ['per-category', 'per-scenario', 'per-severity', 'overall-averages', 'averages']:
+        # For scenario mode aggregations (per-category, per-scenario, per-severity, averages)
+        if table_type in ['per-category', 'per-scenario', 'per-severity', 'averages']:
             csv_content = _generate_scenario_aggregated_csv(csv_path, table_type, csv_type, result_id, results_dir)
             
             csv_bytes = io.BytesIO(csv_content.encode('utf-8'))
@@ -5028,7 +5099,7 @@ def _generate_scenario_aggregated_csv(csv_path, table_type, csv_type, result_id,
     
     Args:
         csv_path: Path to the original CSV file
-        table_type: 'per-category', 'per-scenario', 'per-severity', 'overall-averages', or 'averages'
+        table_type: 'per-category', 'per-scenario', 'per-severity', or 'averages'
         csv_type: Type of CSV (summary, accuracy, construction, updates, performance, etc.)
         result_id: Result folder name
         results_dir: Path to results directory
@@ -5062,9 +5133,6 @@ def _generate_scenario_aggregated_csv(csv_path, table_type, csv_type, result_id,
         data = aggregated_data.get('per_scenario', [])
     elif table_type == 'per-severity':
         data = aggregated_data.get('per_severity', [])
-    elif table_type == 'overall-averages':
-        overall = aggregated_data.get('overall_averages', {})
-        data = [overall] if overall else []
     elif table_type == 'averages':
         data = aggregated_data.get('averages', [])
     else:
@@ -5141,10 +5209,19 @@ def _aggregate_scenario_from_csv(csv_path, table_type, csv_type):
             _add_numeric_averages(agg, rows)
             aggregated_rows.append(agg)
     
-    elif table_type == 'overall-averages':
-        agg = {'total_simulations': len(all_rows)}
-        _add_numeric_averages(agg, all_rows)
-        aggregated_rows.append(agg)
+    elif table_type == 'averages':
+        # Group by algorithm and calculate averages
+        groups = {}
+        for row in all_rows:
+            algorithm = row.get('algorithm', 'unknown')
+            if algorithm not in groups:
+                groups[algorithm] = []
+            groups[algorithm].append(row)
+        
+        for algorithm, rows in sorted(groups.items()):
+            agg = {'algorithm': algorithm, 'total_simulations': len(rows)}
+            _add_numeric_averages(agg, rows)
+            aggregated_rows.append(agg)
     
     # Generate CSV
     output = io.StringIO()

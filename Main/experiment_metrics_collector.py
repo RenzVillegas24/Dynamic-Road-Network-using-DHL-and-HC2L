@@ -1548,23 +1548,25 @@ class ExperimentMetricsCollector:
                         "avg_relative_error": round(avg_error, 6)
                     })
             
-            # Overall averages
-            all_records = self.scenario_records
-            overall_averages = {}
-            if all_records:
-                total_correct = sum(1 for r in all_records if r.get("is_correct", False))
-                overall_averages = {
-                    "total_simulations": len(all_records),
-                    "total_correct": total_correct,
-                    "accuracy_rate": round(total_correct / len(all_records), 4) if len(all_records) > 0 else 0,
-                    "avg_relative_error": round(sum(r.get("relative_error", 0) for r in all_records) / len(all_records), 6)
-                }
+            # Algorithm averages (DHL and HC2L)
+            averages = []
+            for algorithm in ["DHL", "HC2L"]:
+                algo_records = [r for r in self.scenario_records if r.get("algorithm") == algorithm]
+                if algo_records:
+                    total_correct = sum(1 for r in algo_records if r.get("is_correct", False))
+                    averages.append({
+                        "algorithm": algorithm,
+                        "total_simulations": len(algo_records),
+                        "total_correct": total_correct,
+                        "accuracy_rate": round(total_correct / len(algo_records), 4) if len(algo_records) > 0 else 0,
+                        "avg_relative_error": round(sum(r.get("relative_error", 0) for r in algo_records) / len(algo_records), 6)
+                    })
             
             return {
                 "per_category": per_category,
                 "per_scenario": per_scenario,
                 "per_severity": per_severity,
-                "overall_averages": overall_averages
+                "averages": averages
             }
     
     def _compute_scenario_performance_aggregations(self) -> Dict:
@@ -1614,22 +1616,27 @@ class ExperimentMetricsCollector:
                         "avg_label_size_mb": round(avg_label, 4)
                     })
             
-            # Overall averages
-            all_records = self.scenario_records
-            overall_averages = {}
-            if all_records:
-                overall_averages = {
-                    "total_simulations": len(all_records),
-                    "avg_query_time_ms": round(sum(r.get("query_time_ms", 0) for r in all_records) / len(all_records), 3),
-                    "avg_label_size_mb": round(sum(r.get("label_size_mb", 0) for r in all_records) / len(all_records), 4),
-                    "avg_distance_km": round(sum(r.get("route_distance_km", 0) for r in all_records) / len(all_records), 2)
-                }
+            # Algorithm averages (DHL and HC2L)
+            averages = []
+            for algorithm in ["DHL", "HC2L"]:
+                algo_records = [r for r in self.scenario_records if r.get("algorithm") == algorithm]
+                if algo_records:
+                    avg_query = sum(r.get("query_time_ms", 0) for r in algo_records) / len(algo_records)
+                    avg_label = sum(r.get("label_size_mb", 0) for r in algo_records) / len(algo_records)
+                    avg_distance = sum(r.get("route_distance_km", 0) for r in algo_records) / len(algo_records)
+                    averages.append({
+                        "algorithm": algorithm,
+                        "total_simulations": len(algo_records),
+                        "avg_query_time_ms": round(avg_query, 3),
+                        "avg_label_size_mb": round(avg_label, 4),
+                        "avg_distance_km": round(avg_distance, 2)
+                    })
             
             return {
                 "per_category": per_category,
                 "per_severity": per_severity,
                 "per_scenario": per_scenario,
-                "overall_averages": overall_averages
+                "averages": averages
             }
     
     def _compute_scenario_construction_aggregations(self) -> Dict:
@@ -1699,21 +1706,10 @@ class ExperimentMetricsCollector:
                     "avg_label_size_mb": round(avg_label_size, 5)
                 })
         
-        # Overall averages
-        all_records = self.scenario_records
-        overall_averages = {}
-        if all_records:
-            overall_averages = {
-                "total_simulations": len(all_records),
-                "avg_construction_time_ms": round(sum(r.get("initial_construction_time_ms", 0) for r in all_records) / len(all_records), 2),
-                "avg_initial_label_size_mb": round(sum(r.get("initial_label_size_mb", 0) for r in all_records) / len(all_records), 5)
-            }
-        
         return {
             "per_category": per_category_dhl + per_category_hc2l,
             "per_scenario": per_scenario,
             "per_severity": per_severity,
-            "overall_averages": overall_averages,
             "averages": [avg_dhl, avg_hc2l]
         }
     
@@ -1818,25 +1814,27 @@ class ExperimentMetricsCollector:
                     "avg_label_size_mb": round(avg_label_size, 5)
                 })
         
-        # Overall averages
-        all_records = self.scenario_records
-        overall_averages = {}
-        if all_records:
-            avg_lazy_time = sum(r.get("lazy_update_time_ms", 0) for r in all_records) / len(all_records)
-            avg_query_time = sum(r.get("query_time_ms", 0) for r in all_records) / len(all_records)
-            avg_label_size = sum(r.get("label_size_mb", 0) for r in all_records) / len(all_records)
-            overall_averages = {
-                "total_simulations": len(all_records),
-                "avg_lazy_update_time_ms": round(avg_lazy_time, 3),
-                "avg_query_time_ms": round(avg_query_time, 3),
-                "avg_label_size_mb": round(avg_label_size, 5)
-            }
+        # Algorithm averages (DHL and HC2L)
+        averages = []
+        for algorithm in ["DHL", "HC2L"]:
+            algo_records = [r for r in self.scenario_records if r.get("algorithm") == algorithm]
+            if algo_records:
+                avg_lazy_time = sum(r.get("lazy_update_time_ms", 0) for r in algo_records) / len(algo_records)
+                avg_query_time = sum(r.get("query_time_ms", 0) for r in algo_records) / len(algo_records)
+                avg_label_size = sum(r.get("label_size_mb", 0) for r in algo_records) / len(algo_records)
+                averages.append({
+                    "algorithm": algorithm,
+                    "total_simulations": len(algo_records),
+                    "avg_lazy_update_time_ms": round(avg_lazy_time, 3),
+                    "avg_query_time_ms": round(avg_query_time, 3),
+                    "avg_label_size_mb": round(avg_label_size, 5)
+                })
         
         return {
             "per_category": per_category,
             "per_scenario": per_scenario,
             "per_severity": per_severity,
-            "overall_averages": overall_averages
+            "averages": averages
         }
     
     def record_scenario_metric(self, 

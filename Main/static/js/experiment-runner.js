@@ -2939,7 +2939,7 @@ const ExperimentRunner = {
         const container = document.getElementById('result-accuracy-container');
         if (!container || !aggregatedAccuracy) return;
         
-        const { per_category, per_scenario, per_severity, overall_averages } = aggregatedAccuracy;
+        const { per_category, per_scenario, per_severity, averages } = aggregatedAccuracy;
         
         container.innerHTML = `
             <!-- Per-Category Accuracy -->
@@ -3056,14 +3056,14 @@ const ExperimentRunner = {
                 </div>
             </div>
             
-            <!-- Overall Averages -->
+            <!-- Algorithm Averages -->
             <div class="bg-white rounded-xl border border-green-200 overflow-hidden shadow-sm mt-4">
                 <div class="bg-gradient-to-r from-green-50 to-emerald-50 px-4 py-3 border-b border-green-200 flex items-center justify-between">
                     <h5 class="font-bold text-green-900 flex items-center gap-2 mb-0">
                         <i data-lucide="bar-chart" class="w-4 h-4"></i>
-                        Overall Averages
+                        Algorithm Averages
                     </h5>
-                    <button onclick="ExperimentRunner.exportCSV('accuracy', 'overall-averages')"
+                    <button onclick="ExperimentRunner.exportCSV('accuracy', 'averages')"
                         class="btn btn--success btn--xs hover:shadow-md transition-all">
                         <i data-lucide="download" class="w-3 h-3"></i> Export CSV
                     </button>
@@ -3072,19 +3072,23 @@ const ExperimentRunner = {
                     <table class="w-full text-sm">
                         <thead class="bg-green-50 border-b border-green-200">
                             <tr>
+                                <th class="text-left p-3 font-semibold text-green-700">Algorithm</th>
                                 <th class="text-right p-3 font-semibold text-green-700">Total Simulations</th>
                                 <th class="text-right p-3 font-semibold text-green-700">Correct</th>
                                 <th class="text-right p-3 font-semibold text-green-700">Accuracy Rate</th>
                                 <th class="text-right p-3 font-semibold text-green-700">Avg Error</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            <tr class="hover:bg-green-50 transition-colors">
-                                <td class="p-3 text-right font-mono font-bold">${overall_averages?.total || 0}</td>
-                                <td class="p-3 text-right font-mono font-bold">${overall_averages?.correct || 0}</td>
-                                <td class="p-3 text-right font-mono font-bold">${((overall_averages?.accuracy_rate || 0) * 100).toFixed(1)}%</td>
-                                <td class="p-3 text-right font-mono font-bold">${((overall_averages?.avg_relative_error || 0) * 100).toFixed(2)}%</td>
-                            </tr>
+                        <tbody class="divide-y divide-gray-100">
+                            ${(averages || []).map(row => `
+                                <tr class="hover:bg-green-50 transition-colors">
+                                    <td class="p-3 font-medium font-bold">${row.algorithm}</td>
+                                    <td class="p-3 text-right font-mono font-bold">${row.total_simulations || 0}</td>
+                                    <td class="p-3 text-right font-mono font-bold">${row.total_correct || 0}</td>
+                                    <td class="p-3 text-right font-mono font-bold">${((row.accuracy_rate || 0) * 100).toFixed(1)}%</td>
+                                    <td class="p-3 text-right font-mono font-bold">${((row.avg_relative_error || 0) * 100).toFixed(2)}%</td>
+                                </tr>
+                            `).join('')}
                         </tbody>
                     </table>
                 </div>
@@ -3099,7 +3103,7 @@ const ExperimentRunner = {
         const container = document.getElementById('result-performance-container');
         if (!container || !aggregatedPerformance) return;
         
-        const { per_category, per_scenario, per_severity, overall_averages } = aggregatedPerformance;
+        const { per_category, per_scenario, per_severity, averages } = aggregatedPerformance;
         
         container.innerHTML = `
             <!-- Per-Category Performance -->
@@ -3210,14 +3214,14 @@ const ExperimentRunner = {
                 </div>
             </div>
             
-            <!-- Overall Averages -->
+            <!-- Algorithm Averages -->
             <div class="bg-white rounded-xl border border-green-200 overflow-hidden shadow-sm mt-4">
                 <div class="bg-gradient-to-r from-green-50 to-emerald-50 px-4 py-3 border-b border-green-200 flex items-center justify-between">
                     <h5 class="font-bold text-green-900 flex items-center gap-2 mb-0">
                         <i data-lucide="bar-chart" class="w-4 h-4"></i>
-                        Overall Averages
+                        Algorithm Averages
                     </h5>
-                    <button onclick="ExperimentRunner.exportCSV('performance', 'overall-averages')"
+                    <button onclick="ExperimentRunner.exportCSV('performance', 'averages')"
                         class="btn btn--success btn--xs hover:shadow-md transition-all">
                         <i data-lucide="download" class="w-3 h-3"></i> Export CSV
                     </button>
@@ -3226,19 +3230,23 @@ const ExperimentRunner = {
                     <table class="w-full text-sm">
                         <thead class="bg-green-50 border-b border-green-200">
                             <tr>
+                                <th class="text-left p-3 font-semibold text-green-700">Algorithm</th>
                                 <th class="text-right p-3 font-semibold text-green-700">Total Simulations</th>
                                 <th class="text-right p-3 font-semibold text-green-700">Avg Distance (km)</th>
                                 <th class="text-right p-3 font-semibold text-green-700">Avg Query Time (ms)</th>
                                 <th class="text-right p-3 font-semibold text-green-700">Avg Label Size (MB)</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            <tr class="hover:bg-green-50 transition-colors">
-                                <td class="p-3 text-right font-mono font-bold">${overall_averages?.total_simulations || 0}</td>
-                                <td class="p-3 text-right font-mono font-bold">${overall_averages?.avg_distance_km?.toFixed(2) || '--'}</td>
-                                <td class="p-3 text-right font-mono font-bold">${overall_averages?.avg_query_time_ms?.toFixed(3) || '--'}</td>
-                                <td class="p-3 text-right font-mono font-bold">${overall_averages?.avg_label_size_mb?.toFixed(4) || '--'}</td>
-                            </tr>
+                        <tbody class="divide-y divide-gray-100">
+                            ${(averages || []).map(row => `
+                                <tr class="hover:bg-green-50 transition-colors">
+                                    <td class="p-3 font-medium font-bold">${row.algorithm}</td>
+                                    <td class="p-3 text-right font-mono font-bold">${row.total_simulations || 0}</td>
+                                    <td class="p-3 text-right font-mono font-bold">${row.avg_distance_km?.toFixed(2) || '--'}</td>
+                                    <td class="p-3 text-right font-mono font-bold">${row.avg_query_time_ms?.toFixed(3) || '--'}</td>
+                                    <td class="p-3 text-right font-mono font-bold">${row.avg_label_size_mb?.toFixed(4) || '--'}</td>
+                                </tr>
+                            `).join('')}
                         </tbody>
                     </table>
                 </div>
@@ -3393,11 +3401,10 @@ const ExperimentRunner = {
             const isScenarioMode = this.resultsData?.metadata?.preset_type === 'scenario';
             
             if (isScenarioMode) {
-                // Scenario mode: display per_category, per_scenario, per_severity, and overall_averages
+                // Scenario mode: display per_category, per_scenario, per_severity, and averages
                 const perCategory = this.resultsData.aggregated_data.construction.per_category || [];
                 const perScenario = this.resultsData.aggregated_data.construction.per_scenario || [];
                 const perSeverity = this.resultsData.aggregated_data.construction.per_severity || [];
-                const overallAverages = this.resultsData.aggregated_data.construction.overall_averages || {};
                 const averages = this.resultsData.aggregated_data.construction.averages || [];
 
                 container.innerHTML = `
@@ -3542,38 +3549,6 @@ const ExperimentRunner = {
                             </table>
                         </div>
                     </div>
-                    
-                    <!-- Overall Averages -->
-                    <div class="bg-white rounded-xl border border-green-200 overflow-hidden shadow-sm mt-4">
-                        <div class="bg-gradient-to-r from-green-50 to-emerald-50 px-4 py-3 border-b border-green-200 flex items-center justify-between">
-                            <h5 class="font-bold text-green-900 flex items-center gap-2 mb-0">
-                                <i data-lucide="bar-chart" class="w-4 h-4"></i>
-                                Overall Averages
-                            </h5>
-                            <button onclick="ExperimentRunner.exportCSV('construction', 'overall-averages')"
-                                class="btn btn--success btn--xs hover:shadow-md transition-all">
-                                <i data-lucide="download" class="w-3 h-3"></i> Export CSV
-                            </button>
-                        </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-sm">
-                                <thead class="bg-green-50 border-b border-green-200">
-                                    <tr>
-                                        <th class="text-right p-3 font-semibold text-green-700">Total Simulations</th>
-                                        <th class="text-right p-3 font-semibold text-green-700">Avg Construction Time (ms)</th>
-                                        <th class="text-right p-3 font-semibold text-green-700">Avg Label Size (MB)</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr class="hover:bg-green-50 transition-colors">
-                                        <td class="p-3 text-right font-mono font-bold">${overallAverages.total_simulations || 0}</td>
-                                        <td class="p-3 text-right font-mono font-bold">${overallAverages.avg_construction_time_ms || 0}</td>
-                                        <td class="p-3 text-right font-mono font-bold">${overallAverages.avg_initial_label_size_mb || 0}</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
                 `;
             } else {
                 // Standard mode: display per_trial and per_batch
@@ -3689,11 +3664,11 @@ const ExperimentRunner = {
         const isScenarioMode = this.resultsData?.metadata?.preset_type === 'scenario';
         
         if (isScenarioMode) {
-            // Scenario mode: display per_category, per_scenario, per_severity, and overall_averages
+            // Scenario mode: display per_category, per_scenario, per_severity, and averages
             const perCategory = this.resultsData.aggregated_data.updates.per_category || [];
             const perScenario = this.resultsData.aggregated_data.updates.per_scenario || [];
             const perSeverity = this.resultsData.aggregated_data.updates.per_severity || [];
-            const overallAverages = this.resultsData.aggregated_data.updates.overall_averages || {};
+            const averages = this.resultsData.aggregated_data.updates.averages || [];
 
             container.innerHTML = `
                 <!-- Averages Section -->
@@ -3812,14 +3787,14 @@ const ExperimentRunner = {
                         </div>
                     </div>
                     
-                    <!-- Overall Averages -->
+                    <!-- Algorithm Averages -->
                     <div class="bg-white rounded-xl border border-green-200 overflow-hidden shadow-sm">
                         <div class="bg-gradient-to-r from-green-50 to-emerald-50 px-4 py-3 border-b border-green-200 flex items-center justify-between">
                             <h5 class="font-bold text-green-900 flex items-center gap-2 mb-0">
                                 <i data-lucide="bar-chart" class="w-4 h-4"></i>
-                                Overall Averages
+                                Algorithm Averages
                             </h5>
-                            <button onclick="ExperimentRunner.exportCSV('updates', 'overall-averages')"
+                            <button onclick="ExperimentRunner.exportCSV('updates', 'averages')"
                                 class="btn btn--success btn--xs hover:shadow-md transition-all">
                                 <i data-lucide="download" class="w-3 h-3"></i> Export CSV
                             </button>
@@ -3828,19 +3803,23 @@ const ExperimentRunner = {
                             <table class="w-full text-sm">
                                 <thead class="bg-green-50 border-b border-green-200">
                                     <tr>
+                                        <th class="text-left p-3 font-semibold text-green-700">Algorithm</th>
                                         <th class="text-right p-3 font-semibold text-green-700">Total Simulations</th>
                                         <th class="text-right p-3 font-semibold text-green-700">Avg Lazy Update (ms)</th>
                                         <th class="text-right p-3 font-semibold text-green-700">Avg Query Time (ms)</th>
                                         <th class="text-right p-3 font-semibold text-green-700">Avg Label Size (MB)</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    <tr class="hover:bg-green-50 transition-colors">
-                                        <td class="p-3 text-right font-mono font-bold">${overallAverages.total_simulations || 0}</td>
-                                        <td class="p-3 text-right font-mono font-bold">${overallAverages.avg_lazy_update_time_ms || 0}</td>
-                                        <td class="p-3 text-right font-mono font-bold">${overallAverages.avg_query_time_ms || 0}</td>
-                                        <td class="p-3 text-right font-mono font-bold">${overallAverages.avg_label_size_mb || 0}</td>
-                                    </tr>
+                                <tbody class="divide-y divide-gray-100">
+                                    ${(averages || []).map(row => `
+                                        <tr class="hover:bg-green-50 transition-colors">
+                                            <td class="p-3 font-medium font-bold">${row.algorithm}</td>
+                                            <td class="p-3 text-right font-mono font-bold">${row.total_simulations || 0}</td>
+                                            <td class="p-3 text-right font-mono font-bold">${row.avg_lazy_update_time_ms || 0}</td>
+                                            <td class="p-3 text-right font-mono font-bold">${row.avg_query_time_ms || 0}</td>
+                                            <td class="p-3 text-right font-mono font-bold">${row.avg_label_size_mb || 0}</td>
+                                        </tr>
+                                    `).join('')}
                                 </tbody>
                             </table>
                         </div>
@@ -5141,8 +5120,9 @@ const ExperimentRunner = {
     /**
      * Universal CSV export function
      * @param {string} tabType - Type of tab (summary, accuracy, construction, updates, performance, similarity)
-     * @param {string} tableType - Type of table ('per-trial', 'per-batch', 'per-route', 'all')
-     *                            'all' downloads ZIP with per-route, per-trial, and per-batch CSVs
+     * @param {string} tableType - Type of table:
+     *                            Standard mode: 'per-trial', 'per-batch', 'per-route', 'all'
+     *                            Scenario mode: 'per-category', 'per-scenario', 'per-severity', 'per-route', 'averages', 'all'
      */
     async exportCSV(tabType, tableType = 'all') {
         if (!this.currentResultId) {
@@ -5151,8 +5131,11 @@ const ExperimentRunner = {
         }
 
         try {
-            // Use API endpoint for export
-            const url = `/api/experiment/results/${this.currentResultId}/csv/${tabType}/export?table_type=${tableType}`;
+            // Determine preset type from current results
+            const presetType = this.resultsData?.metadata?.preset_type || 'standard';
+            
+            // Use API endpoint for export with preset type
+            const url = `/api/experiment/results/${this.currentResultId}/csv/${tabType}/export?table_type=${tableType}&preset_type=${presetType}`;
             
             // Create hidden link and trigger download
             const link = document.createElement('a');
@@ -5165,7 +5148,11 @@ const ExperimentRunner = {
             // Create appropriate notification message
             let typeLabel;
             if (tableType === 'all') {
-                typeLabel = 'all tables (per-route, per-trial, per-batch in ZIP)';
+                if (presetType === 'scenario') {
+                    typeLabel = 'all tables (per-category, per-scenario, per-severity, per-route, averages in ZIP)';
+                } else {
+                    typeLabel = 'all tables (per-route, per-trial, per-batch in ZIP)';
+                }
             } else {
                 typeLabel = tableType.replace('-', ' ');
             }
@@ -5226,14 +5213,18 @@ const ExperimentRunner = {
 
     exportAllCSV(data) {
         // Download all CSV files and JSON as a single ZIP from backend
+        // Files are organized in folders by tab name
         if (!this.currentResultId) {
             this.showNotification('No result selected', 'warning');
             return;
         }
 
         try {
-            // Use the new export-all endpoint
-            const url = `/api/experiment/results/${this.currentResultId}/export-all`;
+            // Determine preset type from current results
+            const presetType = this.resultsData?.metadata?.preset_type || 'standard';
+            
+            // Use the export-all endpoint with preset type
+            const url = `/api/experiment/results/${this.currentResultId}/export-all?preset_type=${presetType}`;
             
             // Create hidden link and trigger download
             const link = document.createElement('a');
@@ -5243,7 +5234,7 @@ const ExperimentRunner = {
             link.click();
             document.body.removeChild(link);
 
-            this.showNotification('Downloading all CSV files and JSON as ZIP...', 'success');
+            this.showNotification('Downloading all CSV files organized by tab folders as ZIP...', 'success');
         } catch (error) {
             console.error('Error exporting all files:', error);
             this.showNotification('Export failed', 'error');
