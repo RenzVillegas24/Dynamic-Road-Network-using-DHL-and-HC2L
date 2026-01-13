@@ -1679,21 +1679,30 @@
                       <th class="text-right p-2 font-semibold text-slate-700">End Lon</th>
                       <th class="text-right p-2 font-semibold text-slate-700">Disruptions</th>
                       <th class="text-right p-2 font-semibold text-slate-700">Disruption Types</th>
-                      <th class="text-right p-2 font-semibold text-slate-700">HC2L Distance</th>
-                      <th class="text-right p-2 font-semibold text-slate-700">Dijkstra Dist</th>
-                      <th class="text-right p-2 font-semibold text-slate-700">HERE Distance</th>
-                      <th class="text-right p-2 font-semibold text-slate-700">HC2L Time</th>
-                      <th class="text-right p-2 font-semibold text-slate-700">Dijkstra Time</th>
-                      <th class="text-right p-2 font-semibold text-slate-700">HERE Time</th>
+                      <th class="text-right p-2 font-semibold text-slate-700">HC2L Dist (km)</th>
+                      <th class="text-right p-2 font-semibold text-slate-700">DHL Dist (km)</th>
+                      <th class="text-right p-2 font-semibold text-slate-700">HERE Dist (km)</th>
+                      <th class="text-right p-2 font-semibold text-slate-700">HC2L Time (s)</th>
+                      <th class="text-right p-2 font-semibold text-slate-700">DHL Time (s)</th>
+                      <th class="text-right p-2 font-semibold text-slate-700">HERE Time (s)</th>
                       <th class="text-right p-2 font-semibold text-slate-700">Accuracy</th>
-                      <th class="text-right p-2 font-semibold text-slate-700">Fréchet</th>
-                      <th class="text-right p-2 font-semibold text-slate-700">Timestamp</th>
+                      <th class="text-right p-2 font-semibold text-slate-700">Fréchet (km)</th>
+                      <th class="text-right p-2 font-semibold text-slate-700">Avg Query (ms)</th>
                     </tr>
                   </thead>
                   <tbody id="comprehensive-per-route-tbody" class="divide-y divide-gray-100">
                     <tr><td colspan="19" class="text-center py-4 text-gray-500">Click to load data</td></tr>
                   </tbody>
                 </table>
+              </div>
+              <!-- Pagination -->
+              <div id="comprehensive-pagination" class="flex justify-center items-center gap-4 mt-4 py-2 border-t border-gray-100">
+                <button onclick="ExperimentRunner.loadMorePerRouteData('comprehensive')" 
+                        id="comprehensive-load-more-btn" 
+                        class="btn btn--ghost btn--sm">
+                  <i data-lucide="chevron-down" class="w-4 h-4"></i> Load More
+                </button>
+                <span id="comprehensive-page-info" class="text-xs text-gray-500">Page 1</span>
               </div>
             </div>
           </div>

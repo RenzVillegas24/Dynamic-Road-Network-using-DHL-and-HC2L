@@ -5392,6 +5392,16 @@ const ExperimentRunner = {
         if (!container) return;
 
         const isVisible = !container.classList.contains('hidden');
+        
+        // Toggle icon rotation
+        const toggleIcon = document.getElementById(`${csvType}-toggle-icon`);
+        if (toggleIcon) {
+            if (isVisible) {
+                toggleIcon.classList.remove('rotate-90');
+            } else {
+                toggleIcon.classList.add('rotate-90');
+            }
+        }
 
         if (isVisible) {
             container.classList.add('hidden');
@@ -5917,9 +5927,24 @@ const ExperimentRunner = {
             this.perRouteDataState[key] = { page: 1, loaded: false, loading: false };
         }
 
-        // Hide all per-route containers
+        // Hide all per-route containers and reset toggle icons
         document.querySelectorAll('[id$="-per-route-container"]').forEach(el => {
             el.classList.add('hidden');
+        });
+        
+        // Reset toggle icons
+        document.querySelectorAll('[id$="-toggle-icon"]').forEach(el => {
+            el.classList.remove('rotate-90');
+        });
+        
+        // Clear pagination containers
+        document.querySelectorAll('[id$="-pagination"]').forEach(el => {
+            el.innerHTML = '';
+        });
+        
+        // Clear tbody contents
+        document.querySelectorAll('[id$="-per-route-tbody"]').forEach(el => {
+            el.innerHTML = '<tr><td colspan="19" class="text-center py-4 text-gray-500">Click to load data</td></tr>';
         });
     }
 };
