@@ -433,9 +433,207 @@ def generate_routes_with_snap_data(
     return routes
 
 
+def generate_routes_by_distance_category(
+    categories: Dict[str, Dict],
+    hc2l_router,
+    node_mapper = None,
+    progress_callback = None,
+    max_attempts_per_route: int = 50
+) -> Dict[str, List[Dict]]:
+    """
+    Generate routes categorized by HC2L distance (short, medium, long).
+    
+    Uses HC2L to calculate actual route distance (no disruption) and categorizes
+    routes based on the specified distance ranges.
+    
+    Args:
+        categories: Dict with category definitions, e.g.:
+            {
+                "short": {"min": 0, "max": 5.0, "count": 10},
+                "medium": {"min": 5.0, "max": 10.0, "count": 10},
+                "long": {"min": 10.0, "max": float('inf'), "count": 10}
+            }
+        hc2l_router: HC2L router instance for distance calculation
+        node_mapper: NodeMapper instance (optional)
+        progress_callback: Callback function for progress updates: callback(completed, total, category, distance_km)
+        max_attempts_per_route: Max attempts to find a route in each category
+        
+    Returns:
+        Dict with category names as keys and lists of routes as values
+    """
+    import math
+    
+    # Calculate total routes needed
+    total_needed = sum(cat["count"] for cat in categories.values())
+    logger.info(f"Generating {total_needed} routes by distance category...")
+    
+    # Get extra random road points for filtering
+    road_points = get_random_road_points_data(total_needed * max_attempts_per_route)
+    
+    if len(road_points) < total_needed * 2:
+        logger.error(f"Insufficient road points: got {len(road_points)}, need at least {total_needed * 2}")
+        return {}
+    
+    # Create mapper if not provided
+    if node_mapper is None:
+        from coordinate_mapper import NodeMapper
+        node_mapper = NodeMapper(str(Config.NODES_CSV))
+    
+    # Initialize result structure
+    categorized_routes = {cat_name: [] for cat_name in categories.keys()}
+    point_index = 0
+    total_completed = 0
+    attempts = 0
+    max_total_attempts = len(road_points) // 2  # Max pairs we can try
+    
+    logger.info(f"Categories: {list(categories.keys())}")
+    for cat_name, cat_config in categories.items():
+        logger.info(f"  {cat_name}: {cat_config['min']:.1f} - {cat_config['max']:.1f} km, need {cat_config['count']} routes")
+    
+    # Keep generating until all categories are filled
+    while total_completed < total_needed and attempts < max_total_attempts:
+        # Check if all categories are complete
+        all_complete = True
+        for cat_name, cat_config in categories.items():
+            if len(categorized_routes[cat_name]) < cat_config["count"]:
+                all_complete = False
+                break
+        
+        if all_complete:
+            break
+        
+        # Pick two points for start and end
+        if point_index * 2 + 1 >= len(road_points):
+            logger.warning(f"Ran out of road points after {attempts} attempts")
+            break
+            
+        start_point = road_points[point_index * 2]
+        end_point = road_points[point_index * 2 + 1]
+        point_index += 1
+        attempts += 1
+        
+        # Snap both points to get full edge data
+        start_snap = snap_location_to_edge_data(
+            start_point['lat'], 
+            start_point['lng'],
+            node_mapper=node_mapper
+        )
+        end_snap = snap_location_to_edge_data(
+            end_point['lat'], 
+            end_point['lng'],
+            node_mapper=node_mapper
+        )
+        
+        if not start_snap.get('success') or not end_snap.get('success'):
+            continue
+        
+        # Calculate HC2L distance (no disruption)
+        try:
+            hc2l_result = hc2l_router.compute_route(
+                start_pin_lat=start_point['lat'],
+                start_pin_lng=start_point['lng'],
+                dest_pin_lat=end_point['lat'],
+                dest_pin_lng=end_point['lng'],
+                start_snap_lat=start_snap['snap_lat'],
+                start_snap_lng=start_snap['snap_lng'],
+                dest_snap_lat=end_snap['snap_lat'],
+                dest_snap_lng=end_snap['snap_lng'],
+                start_edge_source=start_snap['source'],
+                start_edge_target=start_snap['target'],
+                start_edge_oneway=start_snap['oneway'],
+                dest_edge_source=end_snap['source'],
+                dest_edge_target=end_snap['target'],
+                dest_edge_oneway=end_snap['oneway'],
+                disruption_file="",  # No disruption for baseline distance
+                tau_threshold=0.5,
+                generate_alternatives=False,
+                verbose=False
+            )
+            
+            if not hc2l_result.get('success'):
+                continue
+                
+            # Get distance in km
+            metrics = hc2l_result.get('metrics', {})
+            distance_meters = metrics.get('calculated_distance_meters', 0)
+            distance_km = distance_meters / 1000.0
+            
+            if distance_km <= 0:
+                continue
+            
+            # Find which category this route belongs to
+            assigned_category = None
+            for cat_name, cat_config in categories.items():
+                if len(categorized_routes[cat_name]) >= cat_config["count"]:
+                    continue  # Category already full
+                    
+                min_dist = cat_config["min"]
+                max_dist = cat_config["max"]
+                
+                if min_dist <= distance_km < max_dist:
+                    assigned_category = cat_name
+                    break
+            
+            if assigned_category is None:
+                # Route doesn't fit any needed category
+                continue
+            
+            # Create route data
+            route_id = f"route_{assigned_category}_{len(categorized_routes[assigned_category])}"
+            route = {
+                "id": route_id,
+                "category": assigned_category,
+                "distance_km": round(distance_km, 2),
+                "start": {
+                    "pin_lat": start_point['lat'],
+                    "pin_lng": start_point['lng'],
+                    "snap_lat": start_snap['snap_lat'],
+                    "snap_lng": start_snap['snap_lng'],
+                    "edge_source": start_snap['source'],
+                    "edge_target": start_snap['target'],
+                    "edge_oneway": start_snap['oneway'],
+                    "name": start_point.get('road_name', 'Start Location')
+                },
+                "end": {
+                    "pin_lat": end_point['lat'],
+                    "pin_lng": end_point['lng'],
+                    "snap_lat": end_snap['snap_lat'],
+                    "snap_lng": end_snap['snap_lng'],
+                    "edge_source": end_snap['source'],
+                    "edge_target": end_snap['target'],
+                    "edge_oneway": end_snap['oneway'],
+                    "name": end_point.get('road_name', 'End Location')
+                }
+            }
+            
+            categorized_routes[assigned_category].append(route)
+            total_completed += 1
+            
+            logger.info(f"Found {assigned_category} route: {distance_km:.2f} km (total: {total_completed}/{total_needed})")
+            
+            # Progress callback
+            if progress_callback:
+                progress_callback(total_completed, total_needed, assigned_category, distance_km)
+                
+        except Exception as e:
+            logger.warning(f"Error computing route distance: {e}")
+            continue
+    
+    # Log summary
+    logger.info(f"Route generation complete after {attempts} attempts:")
+    for cat_name, routes in categorized_routes.items():
+        expected = categories[cat_name]["count"]
+        actual = len(routes)
+        status = "✓" if actual >= expected else "⚠"
+        logger.info(f"  {status} {cat_name}: {actual}/{expected} routes")
+    
+    return categorized_routes
+
+
 def clear_caches():
     """Clear all module-level caches. Useful for testing or after data updates."""
     global _node_coords_cache, _edges_data_cache
     _node_coords_cache = None
     _edges_data_cache = None
     logger.info("Road network caches cleared")
+

@@ -265,7 +265,67 @@ class RoadNameMapper:
             directions.append(direction)
         
         return directions
+    
+    def get_edges_in_area(self, min_lat: float, max_lat: float, 
+                         min_lng: float, max_lng: float, 
+                         limit: int = 100) -> List[Dict]:
+        """
+        Get edges within a geographic bounding box.
+        
+        Args:
+            min_lat: Minimum latitude of bounding box
+            max_lat: Maximum latitude of bounding box  
+            min_lng: Minimum longitude of bounding box
+            max_lng: Maximum longitude of bounding box
+            limit: Maximum number of edges to return
+            
+        Returns:
+            List of edge dictionaries with source, target, coordinates, and road info
+        """
+        try:
+            if not os.path.exists(self.edges_csv_path):
+                logger.warning(f"Edges file not found: {self.edges_csv_path}")
+                return []
+            
+            edges = []
+            with open(self.edges_csv_path, 'r') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    # Get coordinates - try different column name patterns
+                    source_lat = float(row.get('source_lat', row.get('y_source', 0)))
+                    source_lon = float(row.get('source_lon', row.get('x_source', row.get('source_lng', 0))))
+                    target_lat = float(row.get('target_lat', row.get('y_target', 0)))
+                    target_lon = float(row.get('target_lon', row.get('x_target', row.get('target_lng', 0))))
+                    
+                    # Check if edge is within bounding box (check midpoint)
+                    mid_lat = (source_lat + target_lat) / 2
+                    mid_lon = (source_lon + target_lon) / 2
+                    
+                    if min_lat <= mid_lat <= max_lat and min_lng <= mid_lon <= max_lng:
+                        edges.append({
+                            'source': int(row['source']),
+                            'target': int(row['target']),
+                            'source_lat': source_lat,
+                            'source_lon': source_lon,
+                            'target_lat': target_lat,
+                            'target_lon': target_lon,
+                            'road_name': row.get('road_name', row.get('name', 'Unknown Road')),
+                            'highway_type': row.get('highway_type', row.get('highway', 'unclassified')),
+                            'id_hash': row.get('id_hash', f"{row['source']}_{row['target']}")
+                        })
+                        
+                        if len(edges) >= limit:
+                            break
+            
+            logger.debug(f"Found {len(edges)} edges in area [{min_lat:.4f}, {max_lat:.4f}] x [{min_lng:.4f}, {max_lng:.4f}]")
+            return edges
+            
+        except Exception as e:
+            logger.error(f"Error getting edges in area: {e}")
+            return []
 
 # Test function
 if __name__ == "__main__":
+    pass
+
     pass

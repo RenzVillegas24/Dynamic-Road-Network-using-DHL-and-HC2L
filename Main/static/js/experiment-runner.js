@@ -534,23 +534,38 @@ const ExperimentRunner = {
         // Get settings from UI
         const threadCount = document.getElementById('experiment-thread-count')?.checked ? 9 : 3;
 
-        // Route mode
+        // Preset type (standard or scenario)
+        const presetType = document.querySelector('input[name="experiment-preset-type"]:checked')?.value || 'standard';
+
+        // Route mode (only for standard preset)
         const routeMode = document.querySelector('input[name="experiment-route-mode"]:checked')?.value || 'preset';
 
-        // Determine if preset mode (includes both preset types)
-        const isPreset = routeMode === 'preset' || routeMode === 'same_batch_preset';
+        // Determine if preset mode
+        const isPreset = presetType === 'scenario' || routeMode === 'preset' || routeMode === 'same_batch_preset';
 
-        // Routes per batch
-        const routesPerBatch = parseInt(document.getElementById('experiment-routes-per-batch')?.value || 1000);
+        // Configure based on preset type
+        let trials, batchesPerTrial, routesPerBatch, disruptionMode;
+        
+        if (presetType === 'scenario') {
+            // Scenario preset: 3 categories × 10 routes × 10 scenarios × 3 severities = 900 simulations
+            // Each thread handles one category (short/medium/long) with 300 simulations
+            trials = 3;  // 3 route categories (each handled by a separate thread)
+            batchesPerTrial = 30;  // 10 scenarios × 3 severities
+            routesPerBatch = 10;   // 10 routes per category
+            disruptionMode = 'scenario';  // Special mode for scenario-based disruptions
+        } else {
+            // Standard preset: 3 trials × 3 batches × N routes
+            trials = 3;
+            batchesPerTrial = 3;
+            routesPerBatch = parseInt(document.getElementById('experiment-routes-per-batch')?.value || 1000);
+            disruptionMode = document.querySelector('input[name="experiment-disruption-mode"]:checked')?.value || 'preset';
+        }
 
-        // Disruption mode
-        const disruptionMode = document.querySelector('input[name="experiment-disruption-mode"]:checked')?.value || 'preset';
-
-        // Severity range
+        // Severity range (only for standard preset)
         const severityMin = parseFloat(document.getElementById('experiment-severity-min')?.value || 0.1);
         const severityMax = parseFloat(document.getElementById('experiment-severity-max')?.value || 0.9);
 
-        // Flow:Incident ratio
+        // Flow:Incident ratio (only for standard preset)
         const ratioFlow = parseInt(document.getElementById('experiment-ratio-flow')?.value || 95);
         const ratioIncident = parseInt(document.getElementById('experiment-ratio-incident')?.value || 5);
 
@@ -560,12 +575,14 @@ const ExperimentRunner = {
 
         return {
             is_preset: isPreset,
+            preset_type: presetType,
             thread_count: threadCount,
-            trials: 3,
-            batches_per_trial: 3,
+            trials: trials,
+            batches_per_trial: batchesPerTrial,
             routes_per_batch: routesPerBatch,
+            routes_per_category: presetType === 'scenario' ? 10 : routesPerBatch,
             algorithms: ['DHL', 'HC2L'],
-            route_mode: routeMode,
+            route_mode: presetType === 'scenario' ? 'scenario' : routeMode,
             disruption_mode: disruptionMode,
             disruption_settings: {
                 ratio_flow: ratioFlow,
@@ -1271,6 +1288,63 @@ const ExperimentRunner = {
             randomSettings.classList.toggle('hidden', mode !== 'random');
         }
 
+        // Refresh icons
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    },
+
+    updatePresetUI() {
+        const presetType = document.querySelector('input[name="experiment-preset-type"]:checked')?.value || 'standard';
+        
+        // Show/hide preset info sections
+        const standardInfo = document.getElementById('preset-info-standard');
+        const scenarioInfo = document.getElementById('preset-info-scenario');
+        
+        if (standardInfo) {
+            standardInfo.classList.toggle('hidden', presetType !== 'standard');
+        }
+        if (scenarioInfo) {
+            scenarioInfo.classList.toggle('hidden', presetType !== 'scenario');
+        }
+        
+        // Show/hide configuration sections
+        const standardConfig = document.getElementById('experiment-standard-config');
+        const scenarioConfig = document.getElementById('experiment-scenario-config');
+        
+        if (standardConfig) {
+            standardConfig.classList.toggle('hidden', presetType !== 'standard');
+        }
+        if (scenarioConfig) {
+            scenarioConfig.classList.toggle('hidden', presetType !== 'scenario');
+        }
+        
+        // Hide Disruption Configuration and Tau Settings for scenario preset
+        const disruptionConfig = document.getElementById('experiment-disruption-config');
+        const tauConfig = document.getElementById('experiment-tau-config');
+        
+        if (disruptionConfig) {
+            disruptionConfig.classList.toggle('hidden', presetType === 'scenario');
+        }
+        if (tauConfig) {
+            tauConfig.classList.toggle('hidden', presetType === 'scenario');
+        }
+        
+        // Update settings
+        if (presetType === 'scenario') {
+            // Scenario preset: 3 categories × 10 routes × 10 scenarios × 3 severities = 900 simulations
+            this.settings.trials = 3;  // 3 route categories (short, medium, long)
+            this.settings.batchesPerTrial = 30;  // 10 scenarios × 3 severities
+            this.settings.routesPerBatch = 10;   // 10 routes per category
+        } else {
+            // Standard preset: 3 trials × 3 batches × 1000 routes = 9000 simulations
+            this.settings.trials = 3;
+            this.settings.batchesPerTrial = 3;
+            this.settings.routesPerBatch = 1000;
+        }
+        
+        console.log(`🔄 Preset changed to: ${presetType}`);
+        
         // Refresh icons
         if (typeof lucide !== 'undefined') {
             lucide.createIcons();

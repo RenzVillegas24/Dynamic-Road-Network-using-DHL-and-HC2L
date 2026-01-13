@@ -60,6 +60,7 @@ from console_formatter import get_logger
 # Import shared road network utilities (no HTTP calls needed)
 from road_network_utils import (
     generate_routes_with_snap_data,
+    generate_routes_by_distance_category,
     snap_location_to_edge_data,
     get_random_road_points_data
 )
@@ -86,6 +87,135 @@ from experiment_metrics_collector import (
 
 # Get logger instance
 logger = get_logger("ExperimentRunner")
+
+
+# ============================================================================
+# EXPERIMENT PRESET DEFINITIONS
+# ============================================================================
+
+# Preset Types
+PRESET_STANDARD = "standard"  # 3 trials × 3 batches × 1000 routes
+PRESET_SCENARIO = "scenario"  # 1 trial × 30 routes × 10 scenarios × 3 severity levels
+
+# Route Distance Categories (in km)
+ROUTE_CATEGORIES = {
+    "short": {"min": 0, "max": 5.0, "count": 10},      # < 5.0 km
+    "medium": {"min": 5.0, "max": 10.0, "count": 10},  # 5.0 – 10.0 km  
+    "long": {"min": 10.0, "max": float('inf'), "count": 10}  # > 10.0 km
+}
+
+# Disruption Scenarios (DS1-DS10)
+DISRUPTION_SCENARIOS = {
+    "DS1": {
+        "name": "Accident + Congestion + Road Closure",
+        "incident_types": ["accident", "roadClosure"],
+        "flow_disruption": True,  # Congestion
+        "description": "Major accident causing congestion and road closure"
+    },
+    "DS2": {
+        "name": "Construction + Lane Restriction + Congestion",
+        "incident_types": ["construction", "laneRestriction"],
+        "flow_disruption": True,
+        "description": "Construction zone with lane restrictions and traffic backup"
+    },
+    "DS3": {
+        "name": "Accident + Disabled Vehicle + Congestion",
+        "incident_types": ["accident", "disabledVehicle"],
+        "flow_disruption": True,
+        "description": "Accident with disabled vehicle causing congestion"
+    },
+    "DS4": {
+        "name": "Road Closure + Road Hazard + Construction",
+        "incident_types": ["roadClosure", "roadHazard", "construction"],
+        "flow_disruption": False,
+        "description": "Multiple infrastructure-related incidents"
+    },
+    "DS5": {
+        "name": "Congestion + Disabled Vehicle + Lane Restriction",
+        "incident_types": ["disabledVehicle", "laneRestriction"],
+        "flow_disruption": True,
+        "description": "Traffic disruption from disabled vehicle and lane restrictions"
+    },
+    "DS6": {
+        "name": "Accident + Weather + Congestion",
+        "incident_types": ["accident", "weather"],
+        "flow_disruption": True,
+        "description": "Weather-related accident causing congestion"
+    },
+    "DS7": {
+        "name": "Construction + Planned Event + Lane Restriction",
+        "incident_types": ["construction", "plannedEvent", "laneRestriction"],
+        "flow_disruption": False,
+        "description": "Scheduled construction and event causing restrictions"
+    },
+    "DS8": {
+        "name": "Accident + Road Closure + Road Hazard",
+        "incident_types": ["accident", "roadClosure", "roadHazard"],
+        "flow_disruption": False,
+        "description": "Severe accident with road closure and hazards"
+    },
+    "DS9": {
+        "name": "Congestion + Weather + Mass Transit Event",
+        "incident_types": ["weather", "massTransit"],
+        "flow_disruption": True,
+        "description": "Weather affecting traffic and mass transit"
+    },
+    "DS10": {
+        "name": "Accident + Construction + Congestion",
+        "incident_types": ["accident", "construction"],
+        "flow_disruption": True,
+        "description": "Accident at construction zone causing severe congestion"
+    }
+}
+
+# Severity Levels
+SEVERITY_LEVELS = {
+    "light": {
+        "name": "Light",
+        "jam_factor_range": (2.0, 4.0),    # Low congestion
+        "severity_range": (0.1, 0.3),       # 10-30% impact
+        "closure_probability": 0.0          # No road closures
+    },
+    "medium": {
+        "name": "Medium",
+        "jam_factor_range": (4.0, 7.0),    # Moderate congestion
+        "severity_range": (0.3, 0.6),       # 30-60% impact
+        "closure_probability": 0.1          # 10% chance of closure
+    },
+    "heavy": {
+        "name": "Heavy",
+        "jam_factor_range": (7.0, 10.0),   # Severe congestion
+        "severity_range": (0.6, 1.0),       # 60-100% impact
+        "closure_probability": 0.3          # 30% chance of closure
+    }
+}
+
+# Preset Configurations
+EXPERIMENT_PRESETS = {
+    PRESET_STANDARD: {
+        "name": "Standard Experiment (3×3×1000)",
+        "description": "3 trials × 3 batches × 1000 routes = 9,000 simulations per algorithm",
+        "trials": 3,
+        "batches_per_trial": 3,
+        "routes_per_batch": 1000,
+        "total_simulations": 9000,  # per algorithm
+        "route_generation": "random",  # Random route generation
+        "disruption_generation": "random"  # Random disruption generation
+    },
+    PRESET_SCENARIO: {
+        "name": "Scenario Experiment (10×10×3×3)",
+        "description": "3 categories × 10 routes × 10 scenarios × 3 severity levels = 900 simulations per algorithm",
+        "trials": 3,              # 3 route categories (short, medium, long) - each handled by a thread
+        "batches_per_trial": 30,  # 10 scenarios × 3 severity levels = 30 disruption cases per route
+        "routes_per_batch": 10,   # 10 routes per category
+        "routes_per_category": 10,  # Routes per category (short/medium/long)
+        "scenarios_per_route": 10,  # DS1-DS10
+        "severity_levels": 3,       # Light, Medium, Heavy
+        "total_simulations": 900,   # 3 × 10 × 10 × 3 per algorithm
+        "route_generation": "by_distance",  # Routes categorized by HC2L distance
+        "disruption_generation": "scenario"  # Specific scenario-based disruptions
+    }
+}
 
 
 # ============================================================================
@@ -301,7 +431,7 @@ class DisruptionCacheManager:
     def __init__(self, base_path: Path, is_preset: bool = True, disruption_mode: str = "preset", disruption_settings: Dict = None):
         self.base_path = base_path
         self.is_preset = is_preset
-        self.disruption_mode = disruption_mode  # "preset", "variety_preset", or "random"
+        self.disruption_mode = disruption_mode  # "preset", "variety_preset", "scenario", or "random"
         self.disruption_settings = disruption_settings or {
             "ratio_flow": 95,
             "ratio_incident": 5,
@@ -347,6 +477,40 @@ class DisruptionCacheManager:
         
         Returns dict with speed_range, jam_factor_range, allow_closure, closure_prob
         """
+        if self.disruption_mode == "scenario":
+            # Scenario preset mode - determine severity level by batch index
+            severity_idx = batch_idx % 3  # 0=light, 1=medium, 2=heavy
+            severity_levels = {
+                0: {  # Light
+                    "speed_min": 30,
+                    "speed_max": 60,
+                    "jam_factor_min": 0,
+                    "jam_factor_max": 2,
+                    "allow_closure": False,
+                    "closure_prob": 0,
+                    "severity_range": (0.1, 0.3)
+                },
+                1: {  # Medium
+                    "speed_min": 15,
+                    "speed_max": 30,
+                    "jam_factor_min": 2,
+                    "jam_factor_max": 5,
+                    "allow_closure": False,
+                    "closure_prob": 0.1,
+                    "severity_range": (0.3, 0.6)
+                },
+                2: {  # Heavy
+                    "speed_min": 5,
+                    "speed_max": 15,
+                    "jam_factor_min": 5,
+                    "jam_factor_max": 10,
+                    "allow_closure": True,
+                    "closure_prob": 0.3,
+                    "severity_range": (0.6, 0.9)
+                }
+            }
+            return severity_levels[severity_idx]
+        
         if self.disruption_mode != "variety_preset":
             # Use standard severity range from settings
             severity_min = self.disruption_settings.get("severity_min", 0.1)
@@ -398,6 +562,15 @@ class DisruptionCacheManager:
             level_names = ["light", "medium", "heavy"]
             level = level_names[batch_idx % 3]  # Cycle through levels for batches
             set_name = f"set_{level}_route_{route_idx}"
+        elif self.disruption_mode == "scenario":
+            # Scenario preset: Format is set_scenario_ds{num}_{severity}_route_{idx}
+            # batch_idx encodes: scenario (0-9) * 3 + severity (0=light, 1=medium, 2=heavy)
+            scenario_idx = batch_idx // 3
+            severity_idx = batch_idx % 3
+            scenario_num = scenario_idx + 1  # DS1 to DS10
+            severity_names = ["light", "medium", "heavy"]
+            severity = severity_names[severity_idx]
+            set_name = f"set_scenario_ds{scenario_num}_{severity}_route_{route_idx}"
         elif self.is_preset:
             # Preset format: set_batch_X_route_Y
             set_name = f"set_batch_{batch_idx}_route_{route_idx}"
@@ -487,6 +660,17 @@ class DisruptionCacheManager:
             ratio_flow = self.disruption_settings.get("ratio_flow", 95)
             ratio_incident = self.disruption_settings.get("ratio_incident", 5)
             
+            # For scenario mode, check if flow disruption should be generated
+            if self.disruption_mode == "scenario":
+                scenario_idx = batch_idx // 3
+                scenario_id = f"DS{scenario_idx + 1}"
+                scenario_def = DISRUPTION_SCENARIOS.get(scenario_id, {})
+                has_flow_disruption = scenario_def.get("flow_disruption", False)
+                if not has_flow_disruption:
+                    # Only generate incidents, no flow disruptions
+                    ratio_flow = 0
+                    ratio_incident = 100
+            
             # Get edges for disruption generation
             edges = self._get_matched_edges()
             if not edges:
@@ -524,8 +708,8 @@ class DisruptionCacheManager:
                     continue
                 used_edges.add(edge_key)
                 
-                # Use level_params for variety_preset mode
-                if self.disruption_mode == "variety_preset":
+                # Use level_params for variety_preset mode or scenario mode
+                if self.disruption_mode == "variety_preset" or self.disruption_mode == "scenario":
                     # Generate speed and jam factor based on level
                     flow_speed = random.uniform(level_params['speed_min'], level_params['speed_max'])
                     jam_factor = random.uniform(level_params['jam_factor_min'], level_params['jam_factor_max'])
@@ -557,17 +741,27 @@ class DisruptionCacheManager:
             
             # Generate incident disruptions
             incident_rows = []
-            base_incident_types = [
-                "accident", 
-                "construction", 
-                "disabledVehicle", 
-                "massTransit", 
-                "plannedEvent", 
-                "roadHazard", 
-                "weather", 
-                "laneRestriction", 
-                "other",
-            ]
+            
+            # Get incident types based on disruption mode
+            if self.disruption_mode == "scenario":
+                # Get scenario from batch_idx
+                scenario_idx = batch_idx // 3
+                scenario_id = f"DS{scenario_idx + 1}"
+                scenario_def = DISRUPTION_SCENARIOS.get(scenario_id, {})
+                incident_types = scenario_def.get("incident_types", ["accident", "roadHazard"])
+            else:
+                # Standard incident types for non-scenario modes
+                incident_types = [
+                    "accident", 
+                    "construction", 
+                    "disabledVehicle", 
+                    "massTransit", 
+                    "plannedEvent", 
+                    "roadHazard", 
+                    "weather", 
+                    "laneRestriction", 
+                    "other",
+                ]
             
             for edge in edges:
                 if len(incident_rows) >= incident_count:
@@ -579,7 +773,7 @@ class DisruptionCacheManager:
                 used_edges.add(edge_key)
                 
                 # Determine incident properties based on level_params
-                if self.disruption_mode == "variety_preset":
+                if self.disruption_mode == "variety_preset" or self.disruption_mode == "scenario":
                     severity_min, severity_max = level_params['severity_range']
                     severity = random.uniform(severity_min, severity_max)
                     # Determine if road should be closed
@@ -600,11 +794,22 @@ class DisruptionCacheManager:
                 else:
                     criticality = 'minor'
                 
-                # Select incident type: roadClosure only for jam_factor >= 9.5 AND criticality == 'major'
+                # Select incident type based on jam_factor
+                # Jam Factor Ranges by Incident Type (matching C++ API and system standard):
+                # - roadClosure: 9.5-10.0 (critical - impassable)
+                # - accident: 5.0-9.0 (high severity)
+                # - roadHazard: 4.0-7.0 (high-medium severity)
+                # - construction: 2.5-5.0 (medium severity)
+                # - disabledVehicle: 2.0-4.0 (medium-low severity)
+                # - laneRestriction: 2.0-4.0 (medium-low severity)
+                # - weather: 1.5-4.0 (low-medium severity)
+                # - plannedEvent: 1.5-3.0 (low-medium severity)
+                # - massTransit: 1.2-2.5 (low severity)
+                # - other: 1.3-3.0 (low-medium severity)
                 if jam_factor >= 9.5 and criticality == 'major':
                     incident_type = 'roadClosure'
                 else:
-                    incident_type = random.choice(base_incident_types)
+                    incident_type = random.choice(incident_types)
                 
                 incident_rows.append({
                     'source': edge.get('source'),
@@ -936,9 +1141,11 @@ class ExperimentRunner:
         logger.info(f"Preset path: {self.preset_path}")
         logger.info(f"Temporary path: {self.temporary_path}")
     
-    def _ensure_preset_config(self, experiment_id: str = None, route_mode: str = "preset"):
-        """Ensure preset configuration exists based on route_mode"""
-        if route_mode == "same_batch_preset":
+    def _ensure_preset_config(self, experiment_id: str = None, route_mode: str = "preset", preset_type: str = None):
+        """Ensure preset configuration exists based on route_mode and preset_type"""
+        if preset_type == PRESET_SCENARIO:
+            self._ensure_scenario_preset_config(experiment_id)
+        elif route_mode == "same_batch_preset":
             self._ensure_same_batch_preset_config(experiment_id)
         else:
             self._ensure_different_batch_preset_config(experiment_id)
@@ -1055,6 +1262,262 @@ class ExperimentRunner:
             if experiment_id:
                 self._emit_preset_progress(experiment_id, "error", f"Failed to save preset: {str(e)}", 0)
     
+    def _ensure_scenario_preset_config(self, experiment_id: str = None):
+        """
+        Ensure ExperimentPresetScenario.json exists with:
+        - 30 routes categorized by distance (10 short, 10 medium, 10 long)
+        - Pre-defined disruption scenarios (DS1-DS10)
+        - 3 severity levels (Light, Medium, Heavy)
+        
+        Total: 30 routes × 10 scenarios × 3 severities = 900 simulations per algorithm
+        """
+        preset_file = self.preset_path / "ExperimentPresetScenario.json"
+        
+        if preset_file.exists():
+            logger.info("ExperimentPresetScenario.json already exists")
+            if experiment_id:
+                self._emit_preset_progress(experiment_id, "loading", "Loading scenario preset...", 25)
+                self._emit_preset_progress(experiment_id, "loading_complete", "Scenario preset loaded", 100)
+            return
+        
+        logger.info("Creating ExperimentPresetScenario.json with distance-categorized routes...")
+        
+        if not self.hc2l_router:
+            logger.error("HC2L router not available for distance calculation")
+            if experiment_id:
+                self._emit_preset_progress(experiment_id, "error", "HC2L router not available", 0)
+            return
+        
+        if experiment_id:
+            self._emit_preset_progress(experiment_id, "creating", "Generating distance-categorized routes...", 10)
+        
+        # Progress callback for WebSocket updates
+        def progress_callback(completed, total, category, distance_km):
+            if experiment_id:
+                progress_pct = 10 + int((completed / total) * 70)  # 10% to 80%
+                self._emit_preset_progress(
+                    experiment_id, 
+                    "creating", 
+                    f"Found {category} route ({distance_km:.1f} km) - {completed}/{total}",
+                    progress_pct
+                )
+        
+        # Generate routes by distance category
+        categorized_routes = generate_routes_by_distance_category(
+            categories=ROUTE_CATEGORIES,
+            hc2l_router=self.hc2l_router,
+            node_mapper=self.node_mapper,
+            progress_callback=progress_callback
+        )
+        
+        # Flatten routes into a list with category info
+        all_routes = []
+        for category, routes in categorized_routes.items():
+            for route in routes:
+                route["category"] = category
+                all_routes.append(route)
+        
+        if len(all_routes) < 30:
+            logger.warning(f"Only generated {len(all_routes)} routes, expected 30")
+        
+        if experiment_id:
+            self._emit_preset_progress(experiment_id, "creating", "Saving scenario preset...", 90)
+        
+        # Create scenario preset configuration
+        scenario_preset = {
+            "id": "scenario",
+            "name": "Scenario Experiment (10×10×3×3)",
+            "description": "3 categories × 10 routes × 10 scenarios × 3 severities = 900 simulations per algorithm",
+            "preset_type": PRESET_SCENARIO,
+            "generation_mode": "scenario",
+            "algorithms": ["DHL", "HC2L"],
+            "trials": 3,  # 3 route categories (short, medium, long) - each handled by a thread
+            "routes_per_category": 10,
+            "scenarios_per_route": 10,
+            "severity_levels": 3,
+            "total_simulations": 900,  # per algorithm (3 categories × 10 routes × 10 scenarios × 3 severities)
+            "route_categories": {
+                "short": {"min_km": 0, "max_km": 5.0, "count": len(categorized_routes.get("short", []))},
+                "medium": {"min_km": 5.0, "max_km": 10.0, "count": len(categorized_routes.get("medium", []))},
+                "long": {"min_km": 10.0, "max_km": None, "count": len(categorized_routes.get("long", []))}  # null for infinity
+            },
+            "disruption_scenarios": DISRUPTION_SCENARIOS,
+            "severity_levels_config": SEVERITY_LEVELS,
+            "routes": all_routes,
+            "created_at": datetime.now().isoformat(),
+            "last_modified": datetime.now().isoformat()
+        }
+        
+        try:
+            with open(preset_file, 'w') as f:
+                json.dump(scenario_preset, f, indent=2)
+            
+            logger.success(f"Created ExperimentPresetScenario.json with {len(all_routes)} distance-categorized routes")
+            
+            if experiment_id:
+                self._emit_preset_progress(experiment_id, "creating_complete", "Scenario preset created", 100)
+        except Exception as e:
+            logger.error(f"Failed to create ExperimentPresetScenario.json: {e}")
+            if experiment_id:
+                self._emit_preset_progress(experiment_id, "error", f"Failed to save: {str(e)}", 0)
+    
+    def _generate_scenario_disruption(self, route_idx: int, scenario_id: str, severity_level: str, route_data: Dict) -> Path:
+        """
+        Generate a specific disruption set for a scenario experiment.
+        
+        Args:
+            route_idx: Route index (0-29)
+            scenario_id: Scenario ID (DS1-DS10)
+            severity_level: Severity level (light, medium, heavy)
+            route_data: Route data with start/end coordinates
+            
+        Returns:
+            Path to the generated disruption directory
+        """
+        import csv
+        import random
+        from datetime import timedelta
+        
+        scenario = DISRUPTION_SCENARIOS.get(scenario_id)
+        severity = SEVERITY_LEVELS.get(severity_level)
+        
+        if not scenario or not severity:
+            logger.error(f"Invalid scenario {scenario_id} or severity {severity_level}")
+            return None
+        
+        # Create disruption directory with format: set_scenario_ds*_route_*
+        # Extract scenario number from DS1, DS2, etc.
+        scenario_num = scenario_id.lower().replace('ds', '')
+        set_name = f"set_scenario_ds{scenario_num}_{severity_level}_route_{route_idx}"
+        disruption_path = self.preset_path / "disruptions" / set_name
+        
+        if disruption_path.exists():
+            return disruption_path
+            
+        flow_dir = disruption_path / "flow"
+        incident_dir = disruption_path / "incidents"
+        flow_dir.mkdir(parents=True, exist_ok=True)
+        incident_dir.mkdir(parents=True, exist_ok=True)
+        
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        
+        # Get nearby edges for disruption placement
+        if not self.road_mapper:
+            logger.error("Road mapper not available")
+            return None
+        
+        # Get edges near the route
+        start = route_data.get("start", {})
+        end = route_data.get("end", {})
+        
+        # Sample edges from the network for disruption
+        edges = self.road_mapper.get_edges_in_area(
+            min_lat=min(start.get("pin_lat", 0), end.get("pin_lat", 0)) - 0.05,
+            max_lat=max(start.get("pin_lat", 0), end.get("pin_lat", 0)) + 0.05,
+            min_lng=min(start.get("pin_lng", 0), end.get("pin_lng", 0)) - 0.05,
+            max_lng=max(start.get("pin_lng", 0), end.get("pin_lng", 0)) + 0.05,
+            limit=100
+        )
+        
+        if not edges:
+            # Fallback to random edges
+            from road_network_utils import _get_available_matched_edges
+            all_edges = _get_available_matched_edges()
+            edges = random.sample(all_edges, min(100, len(all_edges)))
+        
+        # Generate flow disruptions if scenario has congestion
+        flow_rows = []
+        if scenario.get("flow_disruption"):
+            jam_min, jam_max = severity["jam_factor_range"]
+            for edge in edges[:50]:  # Use up to 50 edges for flow
+                jam_factor = random.uniform(jam_min, jam_max)
+                free_flow = random.uniform(40, 80)  # km/h
+                current_speed = free_flow * (1 - jam_factor / 10)  # Reduced speed
+                
+                flow_rows.append({
+                    'id_hash': edge.get('id_hash', f'flow_{len(flow_rows)}'),
+                    'source_lat': edge.get('source_lat'),
+                    'source_lon': edge.get('source_lon'),
+                    'target_lat': edge.get('target_lat'),
+                    'target_lon': edge.get('target_lon'),
+                    'source': edge.get('source'),
+                    'target': edge.get('target'),
+                    'flow_speed_kph': max(5, current_speed),
+                    'flow_free_flow_kph': free_flow,
+                    'flow_jam_factor': jam_factor,
+                    'flow_confidence': random.uniform(0.7, 1.0),
+                    'flow_traversability': 'open' if jam_factor < 9 else 'closed',
+                    'highway_type': edge.get('highway_type', 'primary'),
+                    'road_name': edge.get('road_name', 'Unknown Road')
+                })
+        
+        # Generate incident disruptions based on scenario incident types
+        incident_rows = []
+        incident_types = scenario.get("incident_types", [])
+        sev_min, sev_max = severity["severity_range"]
+        closure_prob = severity["closure_probability"]
+        
+        for i, edge in enumerate(edges[50:]):  # Use remaining edges for incidents
+            if i >= len(incident_types) * 5:  # Generate ~5 incidents per type
+                break
+                
+            incident_type = incident_types[i % len(incident_types)]
+            incident_severity = random.uniform(sev_min, sev_max)
+            
+            # Determine criticality
+            if incident_severity > 0.7:
+                criticality = 'critical'
+            elif incident_severity > 0.4:
+                criticality = 'major'
+            else:
+                criticality = 'minor'
+            
+            # Road closure based on probability and severity
+            road_closed = random.random() < closure_prob and incident_severity > 0.5
+            
+            incident_rows.append({
+                'source': edge.get('source'),
+                'target': edge.get('target'),
+                'source_lat': edge.get('source_lat'),
+                'source_lon': edge.get('source_lon'),
+                'target_lat': edge.get('target_lat'),
+                'target_lon': edge.get('target_lon'),
+                'incident_id': f'{scenario_id}_{severity_level}_{route_idx}_{i}',
+                'incident_type': incident_type,
+                'incident_criticality': criticality,
+                'incident_description': f'{scenario["name"]} - {severity["name"]} severity',
+                'incident_road_closed': road_closed,
+                'incident_start_time': datetime.now().isoformat() + 'Z',
+                'incident_end_time': (datetime.now() + timedelta(hours=3)).isoformat() + 'Z',
+                'highway_type': edge.get('highway_type', 'primary'),
+                'road_name': edge.get('road_name', 'Unknown Road')
+            })
+        
+        # Write flow CSV
+        flow_file = flow_dir / f'flow_{timestamp}.csv'
+        if flow_rows:
+            with open(flow_file, 'w', newline='') as f:
+                writer = csv.DictWriter(f, fieldnames=flow_rows[0].keys())
+                writer.writeheader()
+                writer.writerows(flow_rows)
+        else:
+            with open(flow_file, 'w', newline='') as f:
+                f.write('id_hash,source_lat,source_lon,target_lat,target_lon,source,target,flow_speed_kph,flow_free_flow_kph,flow_jam_factor,flow_confidence,flow_traversability,highway_type,road_name\n')
+        
+        # Write incident CSV
+        incident_file = incident_dir / f'incident_{timestamp}.csv'
+        if incident_rows:
+            with open(incident_file, 'w', newline='') as f:
+                writer = csv.DictWriter(f, fieldnames=incident_rows[0].keys())
+                writer.writeheader()
+                writer.writerows(incident_rows)
+        else:
+            with open(incident_file, 'w', newline='') as f:
+                f.write('source,target,source_lat,source_lon,target_lat,target_lon,incident_id,incident_type,incident_criticality,incident_description,incident_road_closed,incident_start_time,incident_end_time,highway_type,road_name\n')
+        
+        logger.debug(f"Generated scenario disruption: {set_name}")
+        return disruption_path
+
     def _generate_preset_routes(self, count, experiment_id=None):
         """
         Generate routes with full snap data for C++ API.
@@ -1275,13 +1738,16 @@ class ExperimentRunner:
             config = progress._config
             is_preset = config.get("is_preset", True)
             route_mode = config.get("route_mode", "preset")
+            preset_type = config.get("preset_type", PRESET_STANDARD)
             
             # Ensure preset configuration exists (with progress tracking)
             if is_preset:
-                self._ensure_preset_config(experiment_id, route_mode)
+                self._ensure_preset_config(experiment_id, route_mode, preset_type)
                 
-                # Load routes from appropriate preset file based on route_mode
-                if route_mode == "same_batch_preset":
+                # Load routes from appropriate preset file based on preset_type/route_mode
+                if preset_type == PRESET_SCENARIO:
+                    preset_file = self.preset_path / "ExperimentPresetScenario.json"
+                elif route_mode == "same_batch_preset":
                     preset_file = self.preset_path / "ExperimentPresetSameBatch.json"
                 else:
                     preset_file = self.preset_path / "ExperimentPreset.json"
@@ -1294,6 +1760,13 @@ class ExperimentRunner:
                             if "routes" not in config or not config["routes"]:
                                 config["routes"] = preset_data.get("routes", [])
                                 config["generation_mode"] = preset_data.get("generation_mode", "different_batch")
+                                config["preset_type"] = preset_data.get("preset_type", preset_type)
+                                
+                                # Load scenario-specific configuration
+                                if preset_type == PRESET_SCENARIO:
+                                    config["disruption_scenarios"] = preset_data.get("disruption_scenarios", DISRUPTION_SCENARIOS)
+                                    config["severity_levels_config"] = preset_data.get("severity_levels_config", SEVERITY_LEVELS)
+                                
                                 logger.success(f"Loaded {len(config['routes'])} routes from preset (mode: {config['generation_mode']})")
                     except Exception as e:
                         logger.error(f"Failed to load preset routes: {e}")
@@ -1656,18 +2129,29 @@ class ExperimentRunner:
     
     def _calculate_total_routes(self, config: Dict) -> int:
         """Calculate total number of routes to process"""
-        trials = config.get("trials", 3)
-        batches_per_trial = config.get("batches_per_trial", 3)
-        routes_per_batch = config.get("routes_per_batch", 1000)
+        preset_type = config.get("preset_type", PRESET_STANDARD)
         algorithms = config.get("algorithms", ["DHL", "HC2L"])
         
-        return trials * batches_per_trial * routes_per_batch * len(algorithms)
+        if preset_type == PRESET_SCENARIO:
+            # Scenario mode: 3 categories × 10 routes × 10 scenarios × 3 severities × algorithms
+            routes_per_category = config.get("routes_per_category", 10)
+            scenarios = 10  # DS1-DS10
+            severities = 3  # light, medium, heavy
+            categories = 3  # short, medium, long
+            return categories * routes_per_category * scenarios * severities * len(algorithms)
+        else:
+            # Standard mode: trials × batches × routes × algorithms
+            trials = config.get("trials", 3)
+            batches_per_trial = config.get("batches_per_trial", 3)
+            routes_per_batch = config.get("routes_per_batch", 1000)
+            return trials * batches_per_trial * routes_per_batch * len(algorithms)
     
     def _start_worker_threads(self, experiment_id: str, config: Dict, 
                               base_path: Path, results_path: Path):
         """Start worker threads for experiment execution"""
         progress = self.experiments[experiment_id]
         thread_count = progress.thread_count
+        preset_type = config.get("preset_type", PRESET_STANDARD)
         
         trials = config.get("trials", 3)
         batches_per_trial = config.get("batches_per_trial", 3)
@@ -1676,7 +2160,23 @@ class ExperimentRunner:
         
         threads = []
         
-        if thread_count == 3:
+        # Scenario mode: 3 threads for 3 route categories (short, medium, long)
+        # Each thread runs 10 routes × 10 scenarios × 3 severities = 300 simulations
+        if preset_type == PRESET_SCENARIO:
+            route_categories = ["short", "medium", "long"]
+            for category_idx, category in enumerate(route_categories):
+                thread_id = f"thread_{category_idx}"
+                thread = threading.Thread(
+                    target=self._scenario_worker_thread,
+                    args=(experiment_id, thread_id, category_idx, category,
+                          config, base_path, results_path),
+                    daemon=True,
+                    name=f"scenario_{category}_{experiment_id}"
+                )
+                thread.start()
+                threads.append(thread)
+                logger.info(f"Started scenario thread for category '{category}' ({thread_id})")
+        elif thread_count == 3:
             # Default mode: one thread per trial
             for trial_idx in range(trials):
                 thread_id = f"thread_{trial_idx}"
@@ -1741,9 +2241,17 @@ class ExperimentRunner:
             collector = self.metrics_collectors[experiment_id]
             routes = config.get("routes", [])
             routes_per_batch = config.get("routes_per_batch", 1000)
+            preset_type = config.get("preset_type", PRESET_STANDARD)
             
-            # Limit to routes_per_batch routes (we only compare one batch's worth)
-            routes_to_compare = routes[:routes_per_batch]
+            # For scenario mode, compare ALL routes (30 routes across 3 categories)
+            # Each route is compared once (baseline without disruptions)
+            if preset_type == PRESET_SCENARIO:
+                routes_to_compare = routes  # All 30 routes
+                logger.info(f"Scenario mode: Comparing all {len(routes_to_compare)} routes (3 categories × 10 routes)")
+            else:
+                # Standard mode: Limit to routes_per_batch routes
+                routes_to_compare = routes[:routes_per_batch]
+            
             total_routes = len(routes_to_compare)
             
             if total_routes == 0:
@@ -2595,6 +3103,340 @@ class ExperimentRunner:
                     
                     self._broadcast_progress(experiment_id)
     
+    def _scenario_worker_thread(self, experiment_id: str, thread_id: str,
+                                 category_idx: int, category: str,
+                                 config: Dict, base_path: Path, results_path: Path):
+        """
+        Worker thread for scenario mode that processes one route category.
+        
+        Each thread handles:
+        - One route category (short, medium, or long)
+        - 10 routes per category
+        - 10 disruption scenarios (DS1-DS10) per route
+        - 3 severity levels (light, medium, heavy) per scenario
+        - Total: 10 × 10 × 3 = 300 simulations per thread
+        
+        Args:
+            experiment_id: Experiment identifier
+            thread_id: Thread identifier (thread_0, thread_1, thread_2)
+            category_idx: Category index (0=short, 1=medium, 2=long)
+            category: Category name ("short", "medium", "long")
+            config: Experiment configuration
+            base_path: Base path for experiment data
+            results_path: Path for saving results
+        """
+        try:
+            progress = self.experiments[experiment_id]
+            thread_progress = progress.threads[thread_id]
+            
+            algorithms = config.get("algorithms", ["DHL", "HC2L"])
+            tau_settings = config.get("tau_settings", {})
+            routes = config.get("routes", [])
+            
+            # Filter routes for this category
+            category_routes = [r for r in routes if r.get("category") == category]
+            
+            if not category_routes:
+                logger.warning(f"No routes found for category '{category}' in thread {thread_id}")
+                thread_progress.status = "error"
+                thread_progress.error_message = f"No routes for category '{category}'"
+                self._broadcast_progress(experiment_id)
+                return
+            
+            routes_per_category = len(category_routes)
+            scenarios = list(DISRUPTION_SCENARIOS.keys())  # DS1 to DS10
+            severity_levels = list(SEVERITY_LEVELS.keys())  # light, medium, heavy
+            
+            # Total simulations for this thread: routes × scenarios × severities × algorithms
+            total_simulations = routes_per_category * len(scenarios) * len(severity_levels) * len(algorithms)
+            
+            # Update thread progress
+            thread_progress.status = "running"
+            thread_progress.total_routes = total_simulations
+            thread_progress.trial_number = f"{category.capitalize()}"  # Use category as trial name
+            
+            logger.info(f"Thread {thread_id} starting: {routes_per_category} {category} routes × {len(scenarios)} scenarios × {len(severity_levels)} severities × {len(algorithms)} algorithms = {total_simulations} simulations")
+            
+            # Get disruption cache
+            cache = self.disruption_caches.get(experiment_id)
+            
+            # Process routes
+            start_time = time.time()
+            completed = 0
+            
+            for route_idx, route_data in enumerate(category_routes):
+                if self.stop_events[experiment_id].is_set():
+                    break
+                
+                thread_progress.batch_number = f"Route {route_idx + 1}/{routes_per_category}"
+                
+                for scenario_idx, scenario_id in enumerate(scenarios):
+                    if self.stop_events[experiment_id].is_set():
+                        break
+                    
+                    scenario_info = DISRUPTION_SCENARIOS[scenario_id]
+                    
+                    for severity_idx, severity_level in enumerate(severity_levels):
+                        if self.stop_events[experiment_id].is_set():
+                            break
+                        
+                        # Wait if paused
+                        self.pause_events[experiment_id].wait()
+                        
+                        # Compute batch_idx for disruption cache: encodes scenario and severity
+                        # batch_idx = scenario_idx * 3 + severity_idx
+                        batch_idx = scenario_idx * 3 + severity_idx
+                        
+                        # Load disruption (lazy generation)
+                        disruption_data = None
+                        if cache:
+                            disruption_data = cache.load_disruption(batch_idx, route_idx, thread_id)
+                        
+                        # Update progress with current scenario info
+                        severity_info = SEVERITY_LEVELS[severity_level]
+                        thread_progress.current_disruption_level = severity_info["name"]
+                        thread_progress.current_disruption = f"{scenario_id}_{severity_level}_route_{route_idx}"
+                        
+                        for algorithm in algorithms:
+                            if self.stop_events[experiment_id].is_set():
+                                break
+                            
+                            thread_progress.algorithm = algorithm
+                            thread_progress.current_route_index = completed
+                            thread_progress.route_progress = f"{completed + 1}/{total_simulations}"
+                            
+                            # Execute route computation with scenario-specific route data
+                            result = self._execute_route(
+                                experiment_id, thread_id, category_idx, batch_idx, route_idx,
+                                algorithm, tau_settings, disruption_data, config,
+                                route_override=route_data  # Pass specific route data
+                            )
+                            
+                            # Record metrics
+                            if experiment_id in self.metrics_collectors:
+                                metrics_collector = self.metrics_collectors[experiment_id]
+                                
+                                # Add scenario metadata to result
+                                result["scenario_id"] = scenario_id
+                                result["scenario_name"] = scenario_info["name"]
+                                result["severity_level"] = severity_level
+                                result["route_category"] = category
+                                
+                                record = metrics_collector.record_route_metric(
+                                    trial=category_idx,  # Use category index as trial
+                                    batch=batch_idx,
+                                    route=route_idx,
+                                    algorithm=algorithm,
+                                    api_result=result,
+                                    disruption_data=disruption_data
+                                )
+                            
+                            # Update progress
+                            completed += 1
+                            thread_progress.current_route_index = completed
+                            thread_progress.percentage = (completed / total_simulations) * 100
+                            
+                            # Calculate throughput
+                            elapsed = time.time() - start_time
+                            if elapsed > 0:
+                                thread_progress.routes_per_minute = (completed / elapsed) * 60
+                                remaining_simulations = total_simulations - completed
+                                remaining_time = remaining_simulations / (completed / elapsed)
+                                thread_progress.estimated_time_remaining = self._format_time(remaining_time)
+                            
+                            # Get route node information from result
+                            route_coords = result.get("route_coords", {})
+                            start_node = route_coords.get("start_node", 0)
+                            end_node = route_coords.get("end_node", 0)
+                            start_edge_target = route_coords.get("start_edge_target", 0)
+                            end_edge_target = route_coords.get("end_edge_target", 0)
+                            
+                            # Get road names for start and end nodes
+                            start_road_name = "Unknown Road"
+                            end_road_name = "Unknown Road"
+                            
+                            if self.road_mapper:
+                                try:
+                                    start_road_name = self.road_mapper.get_road_name(start_node, start_edge_target)
+                                    end_road_name = self.road_mapper.get_road_name(end_node, end_edge_target)
+                                except Exception as e:
+                                    logger.debug(f"Error getting road names: {e}")
+                            
+                            # Update query phase with accumulated statistics
+                            query_time = result.get("query_phase", {}).get("query_time_ms", 0)
+                            label_size = result.get("summary", {}).get("label_size", 0)
+                            labeling_time = result.get("summary", {}).get("labeling_time_ms", 0)
+                            
+                            # Track success/failure
+                            accuracy = result.get("accuracy", {})
+                            if accuracy.get("is_correct", False):
+                                thread_progress.successful_routes += 1
+                            else:
+                                thread_progress.failed_routes += 1
+                            
+                            # Update running averages (only for successful routes)
+                            if accuracy.get("is_correct", False):
+                                current_count = thread_progress.successful_routes
+                                if current_count > 0:
+                                    thread_progress.avg_query_time_ms = (
+                                        (thread_progress.avg_query_time_ms * (current_count - 1) + query_time) / current_count
+                                    )
+                                    thread_progress.avg_labeling_time_ms = (
+                                        (thread_progress.avg_labeling_time_ms * (current_count - 1) + labeling_time) / current_count
+                                    )
+                                    thread_progress.avg_labeling_size_mb = (
+                                        (thread_progress.avg_labeling_size_mb * (current_count - 1) + label_size) / current_count
+                                    )
+                            
+                            distance_km = result.get("summary", {}).get("distance_km", 0)
+                            actual_eta = result.get("summary", {}).get("actual_eta", "")
+                            
+                            # Initialize query history if not exists
+                            if not hasattr(thread_progress, 'query_times'):
+                                thread_progress.query_times = []
+                                thread_progress.label_sizes = []
+                            
+                            # Add to query history
+                            thread_progress.query_times.append(query_time)
+                            thread_progress.label_sizes.append(label_size)
+                            
+                            # Calculate statistics from accumulated data
+                            if thread_progress.query_times:
+                                import statistics
+                                thread_progress.query_phase = {
+                                    "algorithm": algorithm,
+                                    "query_time_ms": query_time,
+                                    "avg_query_time_ms": statistics.mean(thread_progress.query_times),
+                                    "min_query_time_ms": min(thread_progress.query_times),
+                                    "max_query_time_ms": max(thread_progress.query_times),
+                                    "std_dev": statistics.stdev(thread_progress.query_times) if len(thread_progress.query_times) > 1 else 0,
+                                    "p95_latency_ms": sorted(thread_progress.query_times)[int(len(thread_progress.query_times) * 0.95)] if len(thread_progress.query_times) > 1 else query_time,
+                                    "queries_count": len(thread_progress.query_times)
+                                }
+                            else:
+                                thread_progress.query_phase = result.get("query_phase", {})
+                            
+                            # Update last result with route information
+                            last_result = result.get("summary", {})
+                            last_result["start_node"] = start_node
+                            last_result["end_node"] = end_node
+                            last_result["start_road_name"] = start_road_name
+                            last_result["end_road_name"] = end_road_name
+                            last_result["scenario"] = scenario_id
+                            last_result["severity"] = severity_level
+                            last_result["category"] = category
+                            thread_progress.last_result = last_result
+                            thread_progress.update_phase = result.get("update_phase", {})
+                            
+                            # Update results history (limit to 5)
+                            thread_progress.results_history.append({
+                                "query_number": completed,
+                                "timestamp": datetime.now().isoformat(),
+                                "start_node": start_node,
+                                "end_node": end_node,
+                                "start_road_name": start_road_name,
+                                "end_road_name": end_road_name,
+                                "scenario": scenario_id,
+                                "severity": severity_level,
+                                "category": category,
+                                "algorithm": algorithm,
+                                "query_time_ms": query_time,
+                                "distance_km": distance_km,
+                                "actual_eta": actual_eta
+                            })
+                            if len(thread_progress.results_history) > 5:
+                                thread_progress.results_history.pop(0)
+                            
+                            # Update overall progress
+                            progress.completed_routes = sum(
+                                t.current_route_index for t in progress.threads.values()
+                            )
+                            thread_task_percentage = (progress.completed_routes / progress.total_routes) * 90
+                            progress.overall_percentage = thread_task_percentage + progress.finalization_percentage
+                            
+                            # Broadcast update
+                            self._broadcast_progress(experiment_id)
+            
+            # Thread completed - use lock to ensure atomic completion checking
+            with self.completion_locks[experiment_id]:
+                thread_progress.status = "completed"
+                thread_progress.percentage = 100.0
+                
+                # Mark this thread as completed
+                self.completed_threads[experiment_id].add(thread_id)
+                
+                logger.success(f"Scenario thread {thread_id} ({category}) completed for experiment {experiment_id} ({len(self.completed_threads[experiment_id])}/{len(progress.threads)} threads done)")
+                
+                # Check if all threads completed (atomic check)
+                all_threads_done = len(self.completed_threads[experiment_id]) == len(progress.threads)
+                
+                if all_threads_done:
+                    logger.info(f"All scenario threads completed for {experiment_id}, finalizing...")
+                    
+                    # Set status to finalizing
+                    progress.status = "finalizing"
+                    progress.finalization_phase = "Computing results..."
+                    progress.finalization_percentage = 0.0
+                    progress.overall_percentage = 90.0
+                    
+                    self._broadcast_progress(experiment_id)
+                    
+                    # Save results
+                    result_file = self._save_final_results(experiment_id, progress)
+                    
+                    if result_file and result_file.exists():
+                        progress.status = "completed"
+                        progress.finalization_phase = "Results saved successfully"
+                        progress.finalization_percentage = 10.0
+                        progress.overall_percentage = 100.0
+                        progress.end_time = time.time()
+                        logger.success(f"✓ Scenario experiment {experiment_id} completed - results ready at {result_file}")
+                    else:
+                        progress.status = "error"
+                        progress.finalization_phase = "Failed to save results file"
+                        progress.error_message = "Results file could not be saved or verified"
+                        progress.end_time = time.time()
+                        logger.error(f"✗ Scenario experiment {experiment_id} failed: results file not saved")
+                    
+                    self._broadcast_progress(experiment_id)
+                else:
+                    self._broadcast_progress(experiment_id)
+                    
+        except Exception as e:
+            logger.error(f"Error in scenario worker thread {thread_id} ({category}): {e}")
+            logger.error(traceback.format_exc())
+            
+            with self.completion_locks.get(experiment_id, threading.Lock()):
+                if experiment_id in self.experiments:
+                    progress = self.experiments[experiment_id]
+                    thread_progress = progress.threads.get(thread_id)
+                    if thread_progress:
+                        thread_progress.status = "error"
+                        thread_progress.error_message = str(e)
+                    
+                    if experiment_id in self.completed_threads:
+                        self.completed_threads[experiment_id].add(thread_id)
+                        
+                        all_threads_done = len(self.completed_threads[experiment_id]) == len(progress.threads)
+                        if all_threads_done and progress.status == "running":
+                            logger.warning(f"All scenario threads completed for {experiment_id} (some with errors), finalizing...")
+                            
+                            progress.status = "finalizing"
+                            progress.finalization_phase = "Computing results (with errors)..."
+                            progress.finalization_percentage = 0.0
+                            progress.overall_percentage = 90.0
+                            self._broadcast_progress(experiment_id)
+                            
+                            self._save_final_results(experiment_id, progress)
+                            
+                            progress.status = "completed"
+                            progress.finalization_percentage = 10.0
+                            progress.overall_percentage = 100.0
+                            progress.end_time = time.time()
+                            self._broadcast_progress(experiment_id)
+                    
+                    self._broadcast_progress(experiment_id)
+
     def _compute_dijkstra_ground_truth(self, experiment_id: str, batch_idx: int, 
                                        route_idx: int, route_coords: Dict,
                                        disruption_path: str) -> Optional[float]:
@@ -2687,9 +3529,14 @@ class ExperimentRunner:
     def _execute_route(self, experiment_id: str, thread_id: str,
                        trial_idx: int, batch_idx: int, route_idx: int,
                        algorithm: str, tau_settings: Dict,
-                       disruption_data: Optional[Dict], config: Dict) -> Dict:
+                       disruption_data: Optional[Dict], config: Dict,
+                       route_override: Optional[Dict] = None) -> Dict:
         """
         Execute a single route computation.
+        
+        Args:
+            route_override: Optional route data to use instead of config routes
+                           (used in scenario mode with pre-defined routes)
         
         Returns:
             Dict containing route result with all metrics
@@ -2699,8 +3546,11 @@ class ExperimentRunner:
         # Generate tau value based on settings
         tau = self._generate_tau(tau_settings, trial_idx, route_idx)
         
-        # Get route coordinates (from preset or generate random)
-        route_coords = self._get_route_coordinates(config, route_idx)
+        # Get route coordinates (from override, preset, or generate random)
+        if route_override:
+            route_coords = self._get_route_coordinates_from_data(route_override)
+        else:
+            route_coords = self._get_route_coordinates(config, route_idx)
         
         result = {
             "experiment_id": experiment_id,
@@ -3310,6 +4160,41 @@ class ExperimentRunner:
             }
         }
     
+    def _get_route_coordinates_from_data(self, route_data: Dict) -> Dict:
+        """
+        Extract route coordinates from a pre-defined route data dictionary.
+        Used in scenario mode where routes are passed directly.
+        
+        Args:
+            route_data: Route data dictionary with start/end coordinates
+            
+        Returns:
+            Dict with start and end coordinate objects
+        """
+        start_data = route_data.get("start", {})
+        end_data = route_data.get("end", {})
+        
+        return {
+            "start": {
+                "lat": start_data.get("pin_lat", start_data.get("snap_lat", start_data.get("lat", 14.65))),
+                "lng": start_data.get("pin_lng", start_data.get("snap_lng", start_data.get("lng", 121.05))),
+                "snap_lat": start_data.get("snap_lat", start_data.get("pin_lat", start_data.get("lat", 14.65))),
+                "snap_lng": start_data.get("snap_lng", start_data.get("pin_lng", start_data.get("lng", 121.05))),
+                "edge_source": start_data.get("edge_source", 0),
+                "edge_target": start_data.get("edge_target", 0),
+                "edge_oneway": start_data.get("edge_oneway", 0)
+            },
+            "end": {
+                "lat": end_data.get("pin_lat", end_data.get("snap_lat", end_data.get("lat", 14.66))),
+                "lng": end_data.get("pin_lng", end_data.get("snap_lng", end_data.get("lng", 121.06))),
+                "snap_lat": end_data.get("snap_lat", end_data.get("pin_lat", end_data.get("lat", 14.66))),
+                "snap_lng": end_data.get("snap_lng", end_data.get("pin_lng", end_data.get("lng", 121.06))),
+                "edge_source": end_data.get("edge_source", 0),
+                "edge_target": end_data.get("edge_target", 0),
+                "edge_oneway": end_data.get("edge_oneway", 0)
+            }
+        }
+
     # def _save_progress(self, experiment_id: str, results_path: Path):
     #     """Save progress to progress.json file"""
     #     progress = self.experiments.get(experiment_id)

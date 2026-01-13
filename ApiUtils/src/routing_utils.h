@@ -551,22 +551,61 @@ inline double get_highway_speed(const string& highway_type) {
 /**
  * Get incident severity multiplier based on incident type
  * Higher multiplier = route around this incident more aggressively
+ * 
+ * Valid incident types (matching system standard):
+ * - accident, construction, disabledVehicle, massTransit, plannedEvent
+ * - roadHazard, weather, laneRestriction, roadClosure, other
+ * - congestion (from flow disruptions)
+ * 
+ * Jam Factor Ranges by Incident Type:
+ * - roadClosure: 9.5-10.0 (critical - impassable)
+ * - accident: 5.0-9.0 (high severity)
+ * - roadHazard: 4.0-7.0 (high-medium severity)
+ * - construction: 2.5-5.0 (medium severity)
+ * - disabledVehicle: 2.0-4.0 (medium-low severity)
+ * - laneRestriction: 2.0-4.0 (medium-low severity)
+ * - weather: 1.5-4.0 (low-medium severity)
+ * - plannedEvent: 1.5-3.0 (low-medium severity)
+ * - massTransit: 1.2-2.5 (low severity)
+ * - congestion: 1.8-7.0 (varies by traffic level)
+ * - other: 1.3-3.0 (low-medium severity)
  */
 inline double get_incident_severity(const string& incident_type) {
     static const map<string, double> severities = {
-        {"closure", 999.0},             // Impassable - effectively infinite cost
-        {"road-closure", 999.0},        // User-reported road closure
-        {"road_closure", 999.0},        // Alternative format
-        {"accident", 5.0},              // Major incident - avoid heavily
-        {"construction", 2.5},          // Work zone - avoid moderately
-        {"congestion", 1.8},            // Heavy traffic - avoid if alternatives exist
+        // Standard incident types (camelCase)
+        {"roadClosure", 999.0},         // Impassable - effectively infinite cost (jam: 9.5-10.0)
+        {"accident", 5.0},              // Major incident - avoid heavily (jam: 5.0-9.0)
+        {"roadHazard", 3.5},            // Road hazard - high avoidance (jam: 4.0-7.0)
+        {"construction", 2.5},          // Work zone - moderate avoidance (jam: 2.5-5.0)
+        {"disabledVehicle", 2.0},       // Disabled vehicle - moderate avoidance (jam: 2.0-4.0)
+        {"laneRestriction", 2.0},       // Lane restriction - moderate avoidance (jam: 2.0-4.0)
+        {"weather", 1.8},               // Weather impact - minor avoidance (jam: 1.5-4.0)
+        {"congestion", 1.8},            // Heavy traffic - avoid if alternatives exist (jam: 1.8-7.0)
+        {"plannedEvent", 1.6},          // Planned event - minor avoidance (jam: 1.5-3.0)
+        {"massTransit", 1.3},           // Mass transit event - slight avoidance (jam: 1.2-2.5)
+        {"other", 1.5},                 // Other incident - slight avoidance (jam: 1.3-3.0)
+        
+        // Legacy/alternative formats (for backward compatibility)
+        {"closure", 999.0},             // Alternative: roadClosure
+        {"road-closure", 999.0},        // Alternative: roadClosure
+        {"road_closure", 999.0},        // Alternative: roadClosure
+        {"hazard", 3.5},                // Alternative: roadHazard
+        {"disabled", 2.0},              // Alternative: disabledVehicle
+        {"disabledvehicle", 2.0},       // Alternative: disabledVehicle
+        {"lanerestriction", 2.0},       // Alternative: laneRestriction
+        {"masstransit", 1.3},           // Alternative: massTransit
+        {"plannedevent", 1.6},          // Alternative: plannedEvent
+        {"roadhazard", 3.5},            // Alternative: roadHazard
+        
+        // Traffic severity levels (from flow data)
         {"heavy_traffic", 1.6},         // Heavy congestion
         {"moderate_traffic", 1.3},      // Moderate congestion
-        {"weather", 1.5},               // Weather impact - minor avoidance
         {"light_traffic", 1.1},         // Light congestion
+        
+        // Generic/fallback types
         {"user-incident", 2.0},         // Generic user-reported incident
         {"traffic", 1.5},               // Generic traffic incident
-        {"hazard", 3.0},                // Road hazard
+        {"incident", 1.8},              // Generic incident
         {"unknown", 1.3}                // Default - slight avoidance
     };
     

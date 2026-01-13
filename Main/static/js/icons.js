@@ -63,14 +63,30 @@ const IconRegistry = {
   'bell': 'bell',
   'alert': 'alert-octagon',
   
-  // Disruptions
+  // Disruptions - Standard incident types
+  // Valid incident types: accident, construction, disabledVehicle, massTransit, 
+  // plannedEvent, roadHazard, weather, laneRestriction, roadClosure, other, congestion
   'disruption': 'alert-triangle',
   'incident': 'siren',
-  'construction': 'construction',
   'accident': 'car-front',
-  'closure': 'ban',
+  'construction': 'construction',
+  'disabledVehicle': 'wrench',
+  'disabled-vehicle': 'wrench',
+  'massTransit': 'bus',
+  'mass-transit': 'bus',
+  'plannedEvent': 'calendar',
+  'planned-event': 'calendar',
+  'roadHazard': 'skull',
+  'road-hazard': 'skull',
   'hazard': 'skull',
   'weather': 'cloud-rain',
+  'laneRestriction': 'octagon',
+  'lane-restriction': 'octagon',
+  'roadClosure': 'ban',
+  'road-closure': 'ban',
+  'closure': 'ban',
+  'congestion': 'traffic-cone',
+  'other': 'help-circle',
   'event': 'calendar',
   
   // Severity
