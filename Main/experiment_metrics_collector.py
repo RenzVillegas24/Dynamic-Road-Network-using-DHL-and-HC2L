@@ -1744,14 +1744,15 @@ class ExperimentMetricsCollector:
                 logger.error(f"Error recording scenario metric: {e}")
                 return {"error": str(e)}
     
-    def export_scenario_csvs(self) -> Dict[str, Path]:
-        """Export scenario-specific CSV files"""
-        csv_paths = {}
+    def export_scenario_summary_csv(self) -> Path:
+        """
+        Export Scenario Summary Results CSV.
+        Per-simulation incident counts with scenario metadata.
+        """
+        csv_path = self.results_path / "summary_results.csv"
         
-        # Summary CSV
-        summary_path = self.results_path / "summary_results.csv"
         with self.csv_lock:
-            with open(summary_path, 'w', newline='') as f:
+            with open(csv_path, 'w', newline='') as f:
                 writer = csv.DictWriter(f, fieldnames=CSV_HEADERS_SCENARIO_SUMMARY)
                 writer.writeheader()
                 for record in self.scenario_records:
@@ -1772,12 +1773,19 @@ class ExperimentMetricsCollector:
                         "num_lane_restriction": record.get("num_lane_restriction", 0),
                         "num_other": record.get("num_other", 0),
                     })
-        csv_paths["summary"] = summary_path
         
-        # Accuracy CSV
-        accuracy_path = self.results_path / "accuracy_results.csv"
+        logger.info(f"Exported scenario summary CSV: {csv_path} ({len(self.scenario_records)} rows)")
+        return csv_path
+    
+    def export_scenario_accuracy_csv(self) -> Path:
+        """
+        Export Scenario Accuracy Results CSV.
+        Per-simulation accuracy metrics with scenario metadata.
+        """
+        csv_path = self.results_path / "accuracy_results.csv"
+        
         with self.csv_lock:
-            with open(accuracy_path, 'w', newline='') as f:
+            with open(csv_path, 'w', newline='') as f:
                 writer = csv.DictWriter(f, fieldnames=CSV_HEADERS_SCENARIO_ACCURACY)
                 writer.writeheader()
                 for record in self.scenario_records:
@@ -1795,12 +1803,19 @@ class ExperimentMetricsCollector:
                         "relative_error": record.get("relative_error", 0),
                         "is_correct": record.get("is_correct", False),
                     })
-        csv_paths["accuracy"] = accuracy_path
         
-        # Performance CSV
-        performance_path = self.results_path / "performance_results.csv"
+        logger.info(f"Exported scenario accuracy CSV: {csv_path} ({len(self.scenario_records)} rows)")
+        return csv_path
+    
+    def export_scenario_performance_csv(self) -> Path:
+        """
+        Export Scenario Performance Results CSV.
+        Per-simulation performance metrics with scenario metadata.
+        """
+        csv_path = self.results_path / "performance_results.csv"
+        
         with self.csv_lock:
-            with open(performance_path, 'w', newline='') as f:
+            with open(csv_path, 'w', newline='') as f:
                 writer = csv.DictWriter(f, fieldnames=CSV_HEADERS_SCENARIO_PERFORMANCE)
                 writer.writeheader()
                 for record in self.scenario_records:
@@ -1821,13 +1836,20 @@ class ExperimentMetricsCollector:
                         "threshold_rebuild_time_ms": 0,
                         "total_rebuilds": 0,
                     })
-        csv_paths["performance"] = performance_path
         
-        # Construction CSV - per route_category construction data
-        construction_path = self.results_path / "construction_results.csv"
+        logger.info(f"Exported scenario performance CSV: {csv_path} ({len(self.scenario_records)} rows)")
+        return csv_path
+    
+    def export_scenario_construction_csv(self) -> Path:
+        """
+        Export Scenario Construction CSV.
+        Per route_category construction data.
+        """
+        csv_path = self.results_path / "construction_results.csv"
         construction_data = self._compute_scenario_construction_aggregations()
+        
         with self.csv_lock:
-            with open(construction_path, 'w', newline='') as f:
+            with open(csv_path, 'w', newline='') as f:
                 writer = csv.DictWriter(f, fieldnames=CSV_HEADERS_SCENARIO_CONSTRUCTION)
                 writer.writeheader()
                 for row in construction_data.get("per_category", []):
@@ -1837,13 +1859,21 @@ class ExperimentMetricsCollector:
                         "construction_time_ms": row.get("construction_time_ms"),
                         "initial_label_size_mb": row.get("initial_label_size_mb"),
                     })
-        csv_paths["construction"] = construction_path
         
-        # Updates CSV - per route_category updates data
-        updates_path = self.results_path / "updates_results.csv"
+        total_rows = len(construction_data.get("per_category", []))
+        logger.info(f"Exported scenario construction CSV: {csv_path} ({total_rows} rows)")
+        return csv_path
+    
+    def export_scenario_updates_csv(self) -> Path:
+        """
+        Export Scenario Updates CSV.
+        Per route_category updates data.
+        """
+        csv_path = self.results_path / "updates_results.csv"
         updates_data = self._compute_scenario_updates_aggregations()
+        
         with self.csv_lock:
-            with open(updates_path, 'w', newline='') as f:
+            with open(csv_path, 'w', newline='') as f:
                 writer = csv.DictWriter(f, fieldnames=CSV_HEADERS_SCENARIO_UPDATES)
                 writer.writeheader()
                 for row in updates_data.get("per_category", []):
@@ -1855,9 +1885,31 @@ class ExperimentMetricsCollector:
                         "label_size_change_pct": row.get("label_size_change_pct"),
                         "query_avg_ms": row.get("query_avg_ms"),
                     })
-        csv_paths["updates"] = updates_path
         
-        logger.info(f"Exported scenario CSVs to: {self.results_path}")
+        total_rows = len(updates_data.get("per_category", []))
+        logger.info(f"Exported scenario updates CSV: {csv_path} ({total_rows} rows)")
+        return csv_path
+    
+    def export_scenario_csvs(self) -> Dict[str, Path]:
+        """
+        Export all scenario-specific CSV files.
+        Calls individual export methods for each CSV type.
+        
+        Returns:
+            Dict mapping tab name to CSV file path
+        """
+        logger.info("Exporting all scenario CSV files...")
+        
+        csv_paths = {
+            "summary": self.export_scenario_summary_csv(),
+            "accuracy": self.export_scenario_accuracy_csv(),
+            "performance": self.export_scenario_performance_csv(),
+            "construction": self.export_scenario_construction_csv(),
+            "updates": self.export_scenario_updates_csv(),
+            "similarity": self.export_similarity_csv()  # Similarity uses standard export
+        }
+        
+        logger.info(f"All scenario CSVs exported to: {self.results_path}")
         return csv_paths
     
     def _compute_summary(self) -> Dict:

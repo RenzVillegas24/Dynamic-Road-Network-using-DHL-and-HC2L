@@ -3960,39 +3960,39 @@ class ExperimentRunner:
             
             csv_files = {}
             
-            if is_scenario:
-                # Scenario mode: Use scenario-specific export
-                progress.finalization_phase = "Phase 1/3: Exporting scenario CSV files..."
+            # Export CSV files individually with progress updates
+            # Both scenario and standard modes now use individual exports for granular progress
+            csv_exports = [
+                ("summary", "summary_results.csv", 10),
+                ("accuracy", "accuracy_results.csv", 20),
+                ("construction", "construction_results.csv", 30),
+                ("updates", "updates_results.csv", 40),
+                ("performance", "performance_results.csv", 50),
+                ("similarity", "similarity_results.csv", 60)
+            ]
+            
+            for csv_name, csv_filename, percent in csv_exports:
+                progress.finalization_phase = f"Phase 1/3: Exporting {csv_filename}..."
+                progress.finalization_percentage = percent / 10.0  # Scale to 0-10%
+                progress.overall_percentage = 90.0 + (progress.finalization_percentage * 0.6)  # 0-60% of 10%
                 self._broadcast_progress(experiment_id)
                 
-                csv_files = collector.export_scenario_csvs()
-                logger.info(f"✓ Exported scenario CSV files")
-                
-                # Also export standard files for backward compatibility
-                csv_files["summary_standard"] = collector.export_summary_csv()
-                csv_files["accuracy_standard"] = collector.export_accuracy_csv()
-                csv_files["construction_standard"] = collector.export_construction_csv()
-                csv_files["updates_standard"] = collector.export_updates_csv()
-                csv_files["performance_standard"] = collector.export_performance_csv()
-                csv_files["similarity_standard"] = collector.export_similarity_csv()
-                logger.info(f"✓ Exported standard CSV files for backward compatibility")
-            else:
-                # Standard mode: Export each CSV file individually with progress updates
-                csv_exports = [
-                    ("summary", "summary_results.csv", 10),
-                    ("accuracy", "accuracy_results.csv", 20),
-                    ("construction", "construction_results.csv", 30),
-                    ("updates", "updates_results.csv", 40),
-                    ("performance", "performance_results.csv", 50),
-                    ("similarity", "similarity_results.csv", 60)
-                ]
-                
-                for csv_name, csv_filename, percent in csv_exports:
-                    progress.finalization_phase = f"Phase 1/3: Exporting {csv_filename}..."
-                    progress.finalization_percentage = percent / 10.0  # Scale to 0-10%
-                    progress.overall_percentage = 90.0 + (progress.finalization_percentage * 0.6)  # 0-60% of 10%
-                    self._broadcast_progress(experiment_id)
-                    
+                if is_scenario:
+                    # Use scenario-specific export methods
+                    if csv_name == "summary":
+                        csv_files[csv_name] = collector.export_scenario_summary_csv()
+                    elif csv_name == "accuracy":
+                        csv_files[csv_name] = collector.export_scenario_accuracy_csv()
+                    elif csv_name == "construction":
+                        csv_files[csv_name] = collector.export_scenario_construction_csv()
+                    elif csv_name == "updates":
+                        csv_files[csv_name] = collector.export_scenario_updates_csv()
+                    elif csv_name == "performance":
+                        csv_files[csv_name] = collector.export_scenario_performance_csv()
+                    elif csv_name == "similarity":
+                        csv_files[csv_name] = collector.export_similarity_csv()  # Similarity uses standard
+                else:
+                    # Use standard export methods
                     if csv_name == "summary":
                         csv_files[csv_name] = collector.export_summary_csv()
                     elif csv_name == "accuracy":
@@ -4005,8 +4005,8 @@ class ExperimentRunner:
                         csv_files[csv_name] = collector.export_performance_csv()
                     elif csv_name == "similarity":
                         csv_files[csv_name] = collector.export_similarity_csv()
-                    
-                    logger.info(f"✓ Exported {csv_filename}")
+                
+                logger.info(f"✓ Exported {csv_filename} ({'scenario' if is_scenario else 'standard'} mode)")
             
             # ============================================================================
             # Phase 2: Generating JSON results (60-90%)
