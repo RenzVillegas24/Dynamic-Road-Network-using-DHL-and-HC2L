@@ -4451,8 +4451,11 @@ const ExperimentRunner = {
                             <div class="flex items-center justify-between">
                                 <h5 class="font-bold text-slate-900 flex items-center gap-2 mb-0">
                                     <i data-lucide="database" class="w-4 h-4"></i>
-                                    All Route Data (<span id="comprehensive-total-count">${pagination.total_rows}</span> records)
+                                    All Route Data
                                 </h5>
+                                <div class="text-xs text-gray-500 font-medium">
+                                    <span id="comprehensive-total-count">${pagination.total_rows}</span> records
+                                </div>
                             </div>
                         </div>
                         <div class="overflow-x-auto max-h-[600px]">
@@ -4560,7 +4563,7 @@ const ExperimentRunner = {
             <div class="grid grid-cols-3 w-full items-center">
                 <!-- Left: Export button (anchored left) -->
                 <div>
-                    <button onclick="event.stopPropagation(); ExperimentRunner.exportCSV('comprehensive', 'all')"
+                    <button onclick="event.stopPropagation(); ExperimentRunner.exportCSV('comprehensive', 'per-route')"
                     class="btn btn--success btn--xs hover:shadow-md transition-all">
                     <i data-lucide="download" class="w-3 h-3"></i> Export CSV
                     </button>
