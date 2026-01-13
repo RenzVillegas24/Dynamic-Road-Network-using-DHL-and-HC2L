@@ -1732,8 +1732,17 @@ const ExperimentRunner = {
         const accuracyStats = data.accuracy_stats || {};
         const performanceStats = data.performance_stats || {};
         const graphData = data.graph_data || {};
+        const metadata = data.metadata || {};
+        
+        // Detect scenario mode from metadata or config
+        const isScenarioMode = metadata.preset_type === 'scenario' || 
+                               config.preset_type === 'scenario' ||
+                               summary.preset_type === 'scenario';
+        
+        // Store scenario mode flag for later use
+        this.isScenarioMode = isScenarioMode;
 
-        // Update summary cards with new format
+        // Update summary cards with new format (handles both standard and scenario modes)
         this.updateResultsSummary({
             total_trials: config.trials || summary.total_trials || 3,
             total_batches: config.batches || summary.total_batches || 3,
@@ -1741,26 +1750,40 @@ const ExperimentRunner = {
             summary: {
                 avg_memory_dhl_mb: performanceStats.dhl?.avg_label_size_mb || 0,
                 avg_memory_hc2l_mb: performanceStats.dhc2l?.avg_label_size_mb || 0
-            }
+            },
+            // Scenario-specific fields
+            is_scenario: isScenarioMode,
+            route_categories: summary.route_categories || 3,
+            routes_per_category: summary.routes_per_category || config.routes_per_category || 10,
+            total_scenarios: summary.total_scenarios || 10,
+            severity_levels: summary.severity_levels || 3,
+            total_simulations: summary.total_simulations || config.total_simulations || 900,
+            completed_simulations: summary.completed_simulations || 0
         });
 
         // Populate tabs with computed data from graph_data and stats
         // Note: Detailed per-route data is in CSV files, here we show aggregated summaries
 
-        // Summary tab: Show batch-level aggregates from graph_data
-        this.populateSummaryTabFromGraphData(graphData);
-
-        // Accuracy tab: Show accuracy statistics
-        this.populateAccuracyTabFromStats(accuracyStats);
-
-        // Construction tab: Show construction summary
-        this.populateConstructionFromStats(performanceStats);
-
-        // Updates tab: Show update performance from graph_data
-        this.populateUpdatesFromGraphData(graphData);
-
-        // Performance tab: Show algorithm comparison
-        this.populatePerformanceComparison(performanceStats);
+        if (isScenarioMode) {
+            // Scenario mode: Show category-based and scenario-based aggregates
+            this.populateScenarioSummaryTab(data.aggregated_data?.summary);
+            this.populateScenarioAccuracyTab(data.aggregated_data?.accuracy, accuracyStats);
+            this.populateScenarioPerformanceTab(data.aggregated_data?.performance, performanceStats);
+            // Construction and Updates tabs: Use the same data structure
+            this.populateConstructionFromStats(performanceStats);
+            this.populateUpdatesFromGraphData(graphData);
+        } else {
+            // Standard mode: Show batch-level aggregates from graph_data
+            this.populateSummaryTabFromGraphData(graphData);
+            // Accuracy tab: Show accuracy statistics
+            this.populateAccuracyTabFromStats(accuracyStats);
+            // Construction tab: Show construction summary
+            this.populateConstructionFromStats(performanceStats);
+            // Updates tab: Show update performance from graph_data
+            this.populateUpdatesFromGraphData(graphData);
+            // Performance tab: Show algorithm comparison
+            this.populatePerformanceComparison(performanceStats);
+        }
 
         // Similarity tab: Note that detailed data is in CSV
         this.populateSimilarityPlaceholder();
@@ -1786,10 +1809,46 @@ const ExperimentRunner = {
         const routesPerBatchEl = document.getElementById('result-routes-per-batch');
         const avgMemoryDhlEl = document.getElementById('result-avg-memory-dhl');
         const avgMemoryHc2lEl = document.getElementById('result-avg-memory-hc2l');
-
-        if (trialsEl) trialsEl.textContent = data.total_trials || 3;
-        if (batchesEl) batchesEl.textContent = data.total_batches || 3;
-        if (routesPerBatchEl) routesPerBatchEl.textContent = data.routes_per_batch || 1000;
+        
+        // Get label elements
+        const trialsLabelEl = document.getElementById('result-trials-label');
+        const batchesLabelEl = document.getElementById('result-batches-label');
+        const routesLabelEl = document.getElementById('result-routes-label');
+        const trialsDescEl = document.getElementById('result-trials-desc');
+        const batchesDescEl = document.getElementById('result-batches-desc');
+        const routesDescEl = document.getElementById('result-routes-desc');
+        
+        if (data.is_scenario) {
+            // Scenario mode: Update labels and values for scenario-specific display
+            if (trialsEl) trialsEl.textContent = data.route_categories || 3;
+            if (batchesEl) batchesEl.textContent = data.total_simulations || 900;
+            if (routesPerBatchEl) routesPerBatchEl.textContent = data.routes_per_category || 10;
+            
+            // Update labels for scenario mode
+            if (trialsLabelEl) trialsLabelEl.innerHTML = 'Route<br>Categories';
+            if (batchesLabelEl) batchesLabelEl.innerHTML = 'Total<br>Simulations';
+            if (routesLabelEl) routesLabelEl.innerHTML = 'Routes per<br>Category';
+            
+            // Update descriptions for scenario mode
+            if (trialsDescEl) trialsDescEl.textContent = 'Short, Medium, Long';
+            if (batchesDescEl) batchesDescEl.textContent = `${data.total_scenarios || 10} scenarios × ${data.severity_levels || 3} severities × ${data.route_categories || 3} categories`;
+            if (routesDescEl) routesDescEl.textContent = 'Routes per length category';
+        } else {
+            // Standard mode: Original behavior
+            if (trialsEl) trialsEl.textContent = data.total_trials || 3;
+            if (batchesEl) batchesEl.textContent = data.total_batches || 3;
+            if (routesPerBatchEl) routesPerBatchEl.textContent = data.routes_per_batch || 1000;
+            
+            // Reset labels for standard mode
+            if (trialsLabelEl) trialsLabelEl.innerHTML = 'Total<br>Trials';
+            if (batchesLabelEl) batchesLabelEl.innerHTML = 'Configured<br>Batches';
+            if (routesLabelEl) routesLabelEl.innerHTML = 'Routes per<br>Batch';
+            
+            // Reset descriptions for standard mode
+            if (trialsDescEl) trialsDescEl.textContent = 'Experiment repetitions';
+            if (batchesDescEl) batchesDescEl.textContent = 'Update batches per trial';
+            if (routesDescEl) routesDescEl.textContent = 'Queries per batch';
+        }
 
         // Display average memory usage in the summary card
         const summary = data.summary || {};
@@ -2532,7 +2591,18 @@ const ExperimentRunner = {
         const container = document.getElementById('result-summary-container');
         if (!container || !this.resultsData) return;
 
-        // Use pre-calculated aggregations from backend (NO CSV FETCHING)
+        // Check if scenario mode
+        const isScenario = this.resultsData.configuration?.preset_type === 'scenario' || 
+                          this.resultsData.configuration?.is_scenario === true;
+
+        if (isScenario) {
+            // Use scenario-specific aggregations (same path, different structure)
+            const scenarioAggregated = this.resultsData.aggregated_data?.summary;
+            this.populateScenarioSummaryTab(scenarioAggregated);
+            return;
+        }
+
+        // Standard mode: Use pre-calculated aggregations from backend (NO CSV FETCHING)
         const aggregated = this.resultsData.aggregated_data?.summary;
         if (!aggregated) {
             container.innerHTML = `
@@ -2642,6 +2712,326 @@ const ExperimentRunner = {
             'heavy': 'bg-red-100 text-red-700'
         };
         return classes[level] || 'bg-gray-100 text-gray-700';
+    },
+    
+    getCategoryBadgeClass(category) {
+        const classes = {
+            'short': 'bg-blue-100 text-blue-700',
+            'medium': 'bg-purple-100 text-purple-700',
+            'long': 'bg-orange-100 text-orange-700'
+        };
+        return classes[category] || 'bg-gray-100 text-gray-700';
+    },
+    
+    // =========================================================================
+    // SCENARIO MODE: Tab population methods
+    // =========================================================================
+    
+    populateScenarioSummaryTab(aggregatedSummary) {
+        const container = document.getElementById('result-summary-container');
+        if (!container) return;
+        
+        if (!aggregatedSummary) {
+            container.innerHTML = `
+                <div class="text-center py-8 text-gray-600">
+                    <i data-lucide="alert-circle" class="w-12 h-12 mx-auto mb-2 text-gray-400"></i>
+                    <p class="font-semibold mb-2">No scenario summary data available</p>
+                </div>
+            `;
+            return;
+        }
+        
+        const { per_category, per_scenario, per_severity } = aggregatedSummary;
+        
+        container.innerHTML = `
+            <!-- Per-Category Data -->
+            <div class="bg-white rounded-xl border border-blue-200 overflow-hidden shadow-sm">
+                <div class="bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 border-b border-blue-200 flex items-center justify-between">
+                    <h5 class="font-bold text-blue-900 flex items-center gap-2 mb-0">
+                        <i data-lucide="ruler" class="w-4 h-4"></i>
+                        Simulations Per Route Category
+                    </h5>
+                    <button onclick="ExperimentRunner.exportCSV('summary', 'per-category')"
+                        class="btn btn--primary btn--xs hover:shadow-md transition-all">
+                        <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-blue-50 border-b border-blue-200">
+                            <tr>
+                                <th class="text-left p-3 font-semibold text-blue-700">Category</th>
+                                <th class="text-right p-3 font-semibold text-blue-700">Simulations</th>
+                                <th class="text-right p-3 font-semibold text-blue-700">Accidents</th>
+                                <th class="text-right p-3 font-semibold text-blue-700">Construction</th>
+                                <th class="text-right p-3 font-semibold text-blue-700">Congestion</th>
+                                <th class="text-right p-3 font-semibold text-blue-700">Road Closure</th>
+                                <th class="text-right p-3 font-semibold text-blue-700">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            ${(per_category || []).map(row => `
+                                <tr class="hover:bg-blue-50 transition-colors">
+                                    <td class="p-3"><span class="px-2 py-1 rounded text-xs font-medium ${this.getCategoryBadgeClass(row.category)}">${row.category}</span></td>
+                                    <td class="p-3 text-right font-mono">${row.simulations}</td>
+                                    <td class="p-3 text-right font-mono">${row.accident}</td>
+                                    <td class="p-3 text-right font-mono">${row.construction}</td>
+                                    <td class="p-3 text-right font-mono">${row.congestion}</td>
+                                    <td class="p-3 text-right font-mono">${row.roadClosure || 0}</td>
+                                    <td class="p-3 text-right font-mono font-bold">${row.total}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Per-Scenario Data -->
+            <div class="bg-white rounded-xl border border-purple-200 overflow-hidden shadow-sm mt-4">
+                <div class="bg-gradient-to-r from-purple-50 to-pink-50 px-4 py-3 border-b border-purple-200 flex items-center justify-between">
+                    <h5 class="font-bold text-purple-900 flex items-center gap-2 mb-0">
+                        <i data-lucide="layers" class="w-4 h-4"></i>
+                        Simulations Per Disruption Scenario
+                    </h5>
+                    <button onclick="ExperimentRunner.exportCSV('summary', 'per-scenario')"
+                        class="btn btn--purple btn--xs hover:shadow-md transition-all">
+                        <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-purple-50 border-b border-purple-200">
+                            <tr>
+                                <th class="text-left p-3 font-semibold text-purple-700">Scenario</th>
+                                <th class="text-right p-3 font-semibold text-purple-700">Simulations</th>
+                                <th class="text-right p-3 font-semibold text-purple-700">Accidents</th>
+                                <th class="text-right p-3 font-semibold text-purple-700">Construction</th>
+                                <th class="text-right p-3 font-semibold text-purple-700">Congestion</th>
+                                <th class="text-right p-3 font-semibold text-purple-700">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            ${(per_scenario || []).map(row => `
+                                <tr class="hover:bg-purple-50 transition-colors">
+                                    <td class="p-3 font-medium">${row.scenario}</td>
+                                    <td class="p-3 text-right font-mono">${row.simulations}</td>
+                                    <td class="p-3 text-right font-mono">${row.accident}</td>
+                                    <td class="p-3 text-right font-mono">${row.construction}</td>
+                                    <td class="p-3 text-right font-mono">${row.congestion}</td>
+                                    <td class="p-3 text-right font-mono font-bold">${row.total}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Per-Severity Data -->
+            <div class="bg-white rounded-xl border border-amber-200 overflow-hidden shadow-sm mt-4">
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 px-4 py-3 border-b border-amber-200 flex items-center justify-between">
+                    <h5 class="font-bold text-amber-900 flex items-center gap-2 mb-0">
+                        <i data-lucide="thermometer" class="w-4 h-4"></i>
+                        Simulations Per Severity Level
+                    </h5>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-amber-50 border-b border-amber-200">
+                            <tr>
+                                <th class="text-left p-3 font-semibold text-amber-700">Severity</th>
+                                <th class="text-right p-3 font-semibold text-amber-700">Simulations</th>
+                                <th class="text-right p-3 font-semibold text-amber-700">Avg Query Time (ms)</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            ${(per_severity || []).map(row => `
+                                <tr class="hover:bg-amber-50 transition-colors">
+                                    <td class="p-3"><span class="px-2 py-1 rounded text-xs font-medium ${this.getLevelBadgeClass(row.severity)}">${row.severity}</span></td>
+                                    <td class="p-3 text-right font-mono">${row.simulations}</td>
+                                    <td class="p-3 text-right font-mono">${row.avg_query_time_ms?.toFixed(3) || '--'}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+        
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    },
+    
+    populateScenarioAccuracyTab(aggregatedAccuracy, accuracyStats) {
+        // Update accuracy summary cards
+        const rateEl = document.getElementById('accuracy-rate-value');
+        const correctEl = document.getElementById('accuracy-correct-value');
+        const errorEl = document.getElementById('accuracy-error-value');
+        
+        if (rateEl && accuracyStats) rateEl.textContent = `${(accuracyStats.accuracy_rate * 100).toFixed(1)}%`;
+        if (correctEl && accuracyStats) correctEl.textContent = `${accuracyStats.correct_routes || 0} / ${accuracyStats.total_routes || 0}`;
+        if (errorEl && accuracyStats) errorEl.textContent = `${(accuracyStats.avg_relative_error * 100).toFixed(2)}%`;
+        
+        const container = document.getElementById('result-accuracy-container');
+        if (!container || !aggregatedAccuracy) return;
+        
+        const { per_category, per_scenario } = aggregatedAccuracy;
+        
+        container.innerHTML = `
+            <!-- Per-Category Accuracy -->
+            <div class="bg-white rounded-xl border border-blue-200 overflow-hidden shadow-sm">
+                <div class="bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 border-b border-blue-200 flex items-center justify-between">
+                    <h5 class="font-bold text-blue-900 flex items-center gap-2 mb-0">
+                        <i data-lucide="check-circle" class="w-4 h-4"></i>
+                        Accuracy Per Route Category
+                    </h5>
+                    <button onclick="ExperimentRunner.exportCSV('accuracy', 'per-category')"
+                        class="btn btn--primary btn--xs hover:shadow-md transition-all">
+                        <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-blue-50 border-b border-blue-200">
+                            <tr>
+                                <th class="text-left p-3 font-semibold text-blue-700">Category</th>
+                                <th class="text-right p-3 font-semibold text-blue-700">Total</th>
+                                <th class="text-right p-3 font-semibold text-blue-700">Correct</th>
+                                <th class="text-right p-3 font-semibold text-blue-700">Accuracy Rate</th>
+                                <th class="text-right p-3 font-semibold text-blue-700">Avg Error</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            ${(per_category || []).map(row => `
+                                <tr class="hover:bg-blue-50 transition-colors">
+                                    <td class="p-3"><span class="px-2 py-1 rounded text-xs font-medium ${this.getCategoryBadgeClass(row.category)}">${row.category}</span></td>
+                                    <td class="p-3 text-right font-mono">${row.total}</td>
+                                    <td class="p-3 text-right font-mono">${row.correct}</td>
+                                    <td class="p-3 text-right font-mono font-bold">${(row.accuracy_rate * 100).toFixed(1)}%</td>
+                                    <td class="p-3 text-right font-mono">${(row.avg_relative_error * 100).toFixed(2)}%</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Per-Scenario Accuracy -->
+            <div class="bg-white rounded-xl border border-purple-200 overflow-hidden shadow-sm mt-4">
+                <div class="bg-gradient-to-r from-purple-50 to-pink-50 px-4 py-3 border-b border-purple-200 flex items-center justify-between">
+                    <h5 class="font-bold text-purple-900 flex items-center gap-2 mb-0">
+                        <i data-lucide="target" class="w-4 h-4"></i>
+                        Accuracy Per Scenario
+                    </h5>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-purple-50 border-b border-purple-200">
+                            <tr>
+                                <th class="text-left p-3 font-semibold text-purple-700">Scenario</th>
+                                <th class="text-right p-3 font-semibold text-purple-700">Total</th>
+                                <th class="text-right p-3 font-semibold text-purple-700">Correct</th>
+                                <th class="text-right p-3 font-semibold text-purple-700">Accuracy Rate</th>
+                                <th class="text-right p-3 font-semibold text-purple-700">Avg Error</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            ${(per_scenario || []).map(row => `
+                                <tr class="hover:bg-purple-50 transition-colors">
+                                    <td class="p-3 font-medium">${row.scenario}</td>
+                                    <td class="p-3 text-right font-mono">${row.total}</td>
+                                    <td class="p-3 text-right font-mono">${row.correct}</td>
+                                    <td class="p-3 text-right font-mono font-bold">${(row.accuracy_rate * 100).toFixed(1)}%</td>
+                                    <td class="p-3 text-right font-mono">${(row.avg_relative_error * 100).toFixed(2)}%</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+        
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    },
+    
+    populateScenarioPerformanceTab(aggregatedPerformance, performanceStats) {
+        // Update performance summary cards
+        const container = document.getElementById('result-performance-container');
+        if (!container || !aggregatedPerformance) return;
+        
+        const { per_category, per_severity } = aggregatedPerformance;
+        
+        container.innerHTML = `
+            <!-- Per-Category Performance -->
+            <div class="bg-white rounded-xl border border-blue-200 overflow-hidden shadow-sm">
+                <div class="bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 border-b border-blue-200 flex items-center justify-between">
+                    <h5 class="font-bold text-blue-900 flex items-center gap-2 mb-0">
+                        <i data-lucide="zap" class="w-4 h-4"></i>
+                        Performance Per Route Category
+                    </h5>
+                    <button onclick="ExperimentRunner.exportCSV('performance', 'per-category')"
+                        class="btn btn--primary btn--xs hover:shadow-md transition-all">
+                        <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-blue-50 border-b border-blue-200">
+                            <tr>
+                                <th class="text-left p-3 font-semibold text-blue-700">Category</th>
+                                <th class="text-right p-3 font-semibold text-blue-700">Simulations</th>
+                                <th class="text-right p-3 font-semibold text-blue-700">Avg Distance (km)</th>
+                                <th class="text-right p-3 font-semibold text-blue-700">Avg Query Time (ms)</th>
+                                <th class="text-right p-3 font-semibold text-blue-700">Avg Label Size (MB)</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            ${(per_category || []).map(row => `
+                                <tr class="hover:bg-blue-50 transition-colors">
+                                    <td class="p-3"><span class="px-2 py-1 rounded text-xs font-medium ${this.getCategoryBadgeClass(row.category)}">${row.category}</span></td>
+                                    <td class="p-3 text-right font-mono">${row.simulations}</td>
+                                    <td class="p-3 text-right font-mono">${row.avg_distance_km?.toFixed(2) || '--'}</td>
+                                    <td class="p-3 text-right font-mono font-bold">${row.avg_query_time_ms?.toFixed(3) || '--'}</td>
+                                    <td class="p-3 text-right font-mono">${row.avg_label_size_mb?.toFixed(4) || '--'}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Per-Severity Performance -->
+            <div class="bg-white rounded-xl border border-amber-200 overflow-hidden shadow-sm mt-4">
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 px-4 py-3 border-b border-amber-200 flex items-center justify-between">
+                    <h5 class="font-bold text-amber-900 flex items-center gap-2 mb-0">
+                        <i data-lucide="activity" class="w-4 h-4"></i>
+                        Performance Per Severity Level
+                    </h5>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-amber-50 border-b border-amber-200">
+                            <tr>
+                                <th class="text-left p-3 font-semibold text-amber-700">Severity</th>
+                                <th class="text-right p-3 font-semibold text-amber-700">Simulations</th>
+                                <th class="text-right p-3 font-semibold text-amber-700">Avg Query Time (ms)</th>
+                                <th class="text-right p-3 font-semibold text-amber-700">Avg Label Size (MB)</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            ${(per_severity || []).map(row => `
+                                <tr class="hover:bg-amber-50 transition-colors">
+                                    <td class="p-3"><span class="px-2 py-1 rounded text-xs font-medium ${this.getLevelBadgeClass(row.severity)}">${row.severity}</span></td>
+                                    <td class="p-3 text-right font-mono">${row.simulations}</td>
+                                    <td class="p-3 text-right font-mono font-bold">${row.avg_query_time_ms?.toFixed(3) || '--'}</td>
+                                    <td class="p-3 text-right font-mono">${row.avg_label_size_mb?.toFixed(4) || '--'}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+        
+        if (typeof lucide !== 'undefined') lucide.createIcons();
     },
 
     populateAccuracyTabFromStats(accuracyStats) {

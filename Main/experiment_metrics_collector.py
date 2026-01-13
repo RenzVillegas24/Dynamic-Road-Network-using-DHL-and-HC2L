@@ -141,6 +141,37 @@ CSV_HEADERS_SIMILARITY = [
     "frechet_distance_m", "fd_rating", "ttd_rating"
 ]
 
+# ============================================================================
+# SCENARIO PRESET CSV HEADERS (for 1 route × 10 scenarios × 3 severities × 3 categories)
+# These replace trial-based headers with route_category and scenario_id
+# ============================================================================
+
+# Scenario Summary - Incidents per route category/scenario
+CSV_HEADERS_SCENARIO_SUMMARY = [
+    "route_category", "route_id", "scenario_id", "severity_level",
+    "num_accident", "num_construction", "num_congestion", 
+    "num_disabled_vehicle", "num_mass_transit_event", "num_planned_event",
+    "num_road_hazard", "num_road_closure", "num_weather",
+    "num_lane_restriction", "num_other"
+]
+
+# Scenario Accuracy - per simulation accuracy
+CSV_HEADERS_SCENARIO_ACCURACY = [
+    "route_category", "route_id", "scenario_id", "severity_level",
+    "source_node", "target_node", "route_distance_km",
+    "dhc2l_distance", "dijkstra_distance", 
+    "distance_error", "relative_error", "is_correct"
+]
+
+# Scenario Performance - per simulation performance
+CSV_HEADERS_SCENARIO_PERFORMANCE = [
+    "route_category", "route_id", "scenario_id", "severity_level",
+    "source_node", "target_node", "route_distance_km",
+    "algorithm", "initial_labeling_time_ms", "query_time_ms", 
+    "label_size_mb", "peak_label_size_mb", "lazy_update_time_ms", 
+    "threshold_rebuild_time_ms", "total_rebuilds"
+]
+
 
 class DisruptionLevel(Enum):
     """Disruption level categories"""
@@ -516,6 +547,7 @@ class ExperimentMetricsCollector:
     - Pre-computed CSV exports for each GUI tab
     - Accuracy-first gating for performance metrics
     - Minimal JSON configuration output
+    - Scenario mode support (1 route × 10 scenarios × 3 severities × 3 categories)
     """
     
     def __init__(self, 
@@ -523,7 +555,8 @@ class ExperimentMetricsCollector:
                  trials: int = 3, 
                  batches: int = 3, 
                  routes_per_batch: int = 1000,
-                 tolerance: float = DEFAULT_TOLERANCE):
+                 tolerance: float = DEFAULT_TOLERANCE,
+                 preset_type: str = "standard"):
         """
         Initialize the metrics collector.
         
@@ -533,12 +566,23 @@ class ExperimentMetricsCollector:
             batches: Number of batches per trial  
             routes_per_batch: Number of routes per batch
             tolerance: Accuracy tolerance threshold (default 5%)
+            preset_type: "standard" or "scenario" for different output formats
         """
         self.results_path = Path(results_path)
         self.trials = trials
         self.batches = batches
         self.routes_per_batch = routes_per_batch
         self.tolerance = tolerance
+        self.preset_type = preset_type
+        self.is_scenario_mode = preset_type == "scenario"
+        
+        # Scenario-specific settings
+        if self.is_scenario_mode:
+            self.route_categories = ["short", "medium", "long"]
+            self.routes_per_category = 10
+            self.scenarios = ["DS1", "DS2", "DS3", "DS4", "DS5", "DS6", "DS7", "DS8", "DS9", "DS10"]
+            self.severity_levels = ["light", "medium", "heavy"]
+            self.total_simulations = 900  # 3 categories × 10 routes × 10 scenarios × 3 severities
         
         # Create results directory
         self.results_path.mkdir(parents=True, exist_ok=True)
@@ -546,6 +590,9 @@ class ExperimentMetricsCollector:
         # Thread-safe locks
         self.lock = threading.Lock()
         self.csv_lock = threading.Lock()
+        
+        # Scenario metrics storage
+        self.scenario_records: List[Dict] = []  # For scenario mode
         
         # ====================================================================
         # METRICS STORAGE - Lists for CSV export
@@ -667,6 +714,8 @@ class ExperimentMetricsCollector:
         3. Compute accuracy metrics (both algorithms)
         4. Extract and record performance metrics (always recorded)
         
+        For scenario mode, also stores in scenario_records list.
+        
         Args:
             trial: Trial index (0-based)
             batch: Batch index (0-based)
@@ -680,6 +729,17 @@ class ExperimentMetricsCollector:
         """
         with self.lock:
             try:
+                # Check if scenario mode and extract scenario metadata from api_result
+                is_scenario = self.is_scenario_mode
+                scenario_metadata = None
+                if is_scenario:
+                    scenario_metadata = {
+                        "route_category": api_result.get("route_category", "unknown"),
+                        "scenario_id": api_result.get("scenario_id", "unknown"),
+                        "severity_level": api_result.get("severity_level", "unknown"),
+                        "route_id": route + 1
+                    }
+                
                 # Normalize algorithm name - accept both "HC2L" and "HC2L"
                 alg = normalize_algorithm_name(algorithm)
                 is_hc2l = is_hc2l_algorithm(algorithm)
@@ -821,6 +881,46 @@ class ExperimentMetricsCollector:
                 # ============================================================
                 if batch == 0 and route == 0:
                     self._record_construction_from_result(trial, alg, api_result, record)
+                
+                # ============================================================
+                # STEP 5: SCENARIO MODE - Store in scenario_records
+                # ============================================================
+                if is_scenario and scenario_metadata and is_hc2l:
+                    # Only record HC2L in scenario mode (skip DHL)
+                    scenario_record = {
+                        "route_category": scenario_metadata["route_category"],
+                        "route_id": scenario_metadata["route_id"],
+                        "scenario_id": scenario_metadata["scenario_id"],
+                        "severity_level": scenario_metadata["severity_level"],
+                        "source_node": record.source_node,
+                        "target_node": record.target_node,
+                        "route_distance_km": api_result.get("route_distance_km", 0),
+                        "dhc2l_distance": record.accuracy.dhc2l_distance if record.accuracy else 0,
+                        "dijkstra_distance": record.accuracy.dijkstra_distance if record.accuracy else 0,
+                        "distance_error": record.accuracy.distance_error if record.accuracy else 0,
+                        "relative_error": record.accuracy.relative_error if record.accuracy else 0,
+                        "is_correct": record.accuracy.is_correct if record.accuracy else False,
+                        "query_time_ms": record.performance.query_response_time_ms if record.performance else 0,
+                        "label_size_mb": record.performance.labeling_size_mb if record.performance else 0,
+                    }
+                    
+                    # Add incident counts from disruption_data
+                    if record.incident_summary:
+                        scenario_record.update({
+                            "num_accident": record.incident_summary.num_accident,
+                            "num_construction": record.incident_summary.num_construction,
+                            "num_congestion": record.incident_summary.num_congestion,
+                            "num_disabled_vehicle": record.incident_summary.num_disabled_vehicle,
+                            "num_mass_transit_event": record.incident_summary.num_mass_transit_event,
+                            "num_planned_event": record.incident_summary.num_planned_event,
+                            "num_road_hazard": record.incident_summary.num_road_hazard,
+                            "num_road_closure": record.incident_summary.num_road_closure,
+                            "num_weather": record.incident_summary.num_weather,
+                            "num_lane_restriction": record.incident_summary.num_lane_restriction,
+                            "num_other": record.incident_summary.num_other,
+                        })
+                    
+                    self.scenario_records.append(scenario_record)
                 
                 return record
                 
@@ -1161,6 +1261,7 @@ class ExperimentMetricsCollector:
         """
         Generate comprehensive JSON results file with pre-calculated aggregations.
         All per-trial and per-batch averages are computed in backend.
+        For scenario mode, outputs scenario-specific aggregations.
         
         Args:
             experiment_config: Optional experiment configuration to include
@@ -1170,33 +1271,72 @@ class ExperimentMetricsCollector:
         """
         json_path = self.results_path / "experiment_results.json"
         
-        results = {
-            "metadata": {
-                "generated_at": datetime.now().isoformat(),
-                "version": "3.0",
-                "format": "pre_calculated_aggregations"
-            },
-            "configuration": experiment_config or self._get_default_config(),
-            "summary": self._compute_summary(),
-            "accuracy_stats": self._compute_accuracy_stats(),
-            "performance_stats": self._compute_performance_stats(),
-            "aggregated_data": {
-                "summary": self._compute_summary_aggregations(),
-                "accuracy": self._compute_accuracy_aggregations(),
-                "construction": self._compute_construction_aggregations(),
-                "updates": self._compute_updates_aggregations(),
-                "performance": self._compute_performance_aggregations()
-            },
-            "graph_data": self._compute_graph_data(),
-            "csv_files": {
-                "summary": "summary_results.csv",
-                "accuracy": "accuracy_results.csv",
-                "construction": "construction_results.csv",
-                "updates": "updates_results.csv",
-                "performance": "performance_results.csv",
-                "similarity": "similarity_results.csv"
+        config = experiment_config or self._get_default_config()
+        
+        # Add preset_type to config if not present
+        if "preset_type" not in config:
+            config["preset_type"] = self.preset_type
+        
+        if self.is_scenario_mode:
+            # Scenario mode JSON structure
+            results = {
+                "metadata": {
+                    "generated_at": datetime.now().isoformat(),
+                    "version": "3.0",
+                    "format": "scenario_aggregations",
+                    "preset_type": "scenario"
+                },
+                "configuration": config,
+                "summary": self._compute_scenario_summary(),
+                "accuracy_stats": self._compute_accuracy_stats(),
+                "performance_stats": self._compute_performance_stats(),
+                "aggregated_data": {
+                    "summary": self._compute_scenario_summary_aggregations(),
+                    "accuracy": self._compute_scenario_accuracy_aggregations(),
+                    "construction": self._compute_construction_aggregations(),  # Include construction data
+                    "updates": self._compute_updates_aggregations(),  # Include updates data
+                    "performance": self._compute_scenario_performance_aggregations()
+                },
+                "graph_data": self._compute_graph_data(),
+                "csv_files": {
+                    "summary": "scenario_summary_results.csv",
+                    "accuracy": "scenario_accuracy_results.csv",
+                    "construction": "construction_results.csv",
+                    "updates": "updates_results.csv",
+                    "performance": "scenario_performance_results.csv",
+                    "similarity": "similarity_results.csv"
+                }
             }
-        }
+        else:
+            # Standard mode JSON structure
+            results = {
+                "metadata": {
+                    "generated_at": datetime.now().isoformat(),
+                    "version": "3.0",
+                    "format": "pre_calculated_aggregations",
+                    "preset_type": "standard"
+                },
+                "configuration": config,
+                "summary": self._compute_summary(),
+                "accuracy_stats": self._compute_accuracy_stats(),
+                "performance_stats": self._compute_performance_stats(),
+                "aggregated_data": {
+                    "summary": self._compute_summary_aggregations(),
+                    "accuracy": self._compute_accuracy_aggregations(),
+                    "construction": self._compute_construction_aggregations(),
+                    "updates": self._compute_updates_aggregations(),
+                    "performance": self._compute_performance_aggregations()
+                },
+                "graph_data": self._compute_graph_data(),
+                "csv_files": {
+                    "summary": "summary_results.csv",
+                    "accuracy": "accuracy_results.csv",
+                    "construction": "construction_results.csv",
+                    "updates": "updates_results.csv",
+                    "performance": "performance_results.csv",
+                    "similarity": "similarity_results.csv"
+                }
+            }
         
         with open(json_path, 'w') as f:
             json.dump(results, f, indent=2, default=str)
@@ -1211,8 +1351,323 @@ class ExperimentMetricsCollector:
             "batches": self.batches,
             "routes_per_batch": self.routes_per_batch,
             "tolerance": self.tolerance,
-            "algorithms": ["DHL", "HC2L"]
+            "algorithms": ["DHL", "HC2L"],
+            "preset_type": self.preset_type
         }
+    
+    def _compute_scenario_summary(self) -> Dict:
+        """Compute summary statistics for scenario mode"""
+        with self.lock:
+            total_completed = len(self.scenario_records)
+            total_expected = self.total_simulations if self.is_scenario_mode else 900
+            
+            # Count by category
+            category_counts = {"short": 0, "medium": 0, "long": 0}
+            for record in self.scenario_records:
+                cat = record.get("route_category", "unknown")
+                if cat in category_counts:
+                    category_counts[cat] += 1
+            
+            return {
+                "preset_type": "scenario",
+                "route_categories": 3,
+                "routes_per_category": self.routes_per_category if self.is_scenario_mode else 10,
+                "total_scenarios": 10,
+                "severity_levels": 3,
+                "total_simulations": total_expected,
+                "completed_simulations": total_completed,
+                "completion_pct": round(total_completed / total_expected * 100, 2) if total_expected > 0 else 0,
+                "category_counts": category_counts,
+                "total_similarity_comparisons": len(self.similarity_records)
+            }
+    
+    def _compute_scenario_summary_aggregations(self) -> Dict:
+        """Compute scenario-specific aggregations for the summary tab"""
+        with self.lock:
+            # Aggregate by route category
+            per_category = []
+            for category in ["short", "medium", "long"]:
+                cat_records = [r for r in self.scenario_records if r.get("route_category") == category]
+                if cat_records:
+                    incident_counts = {
+                        "accident": sum(r.get("num_accident", 0) for r in cat_records),
+                        "construction": sum(r.get("num_construction", 0) for r in cat_records),
+                        "congestion": sum(r.get("num_congestion", 0) for r in cat_records),
+                        "roadClosure": sum(r.get("num_road_closure", 0) for r in cat_records),
+                        "other": sum(r.get("num_other", 0) for r in cat_records),
+                    }
+                    per_category.append({
+                        "category": category,
+                        "simulations": len(cat_records),
+                        **incident_counts,
+                        "total": sum(incident_counts.values())
+                    })
+            
+            # Aggregate by scenario ID
+            per_scenario = []
+            for scenario in self.scenarios if self.is_scenario_mode else [f"DS{i}" for i in range(1, 11)]:
+                sc_records = [r for r in self.scenario_records if r.get("scenario_id") == scenario]
+                if sc_records:
+                    incident_counts = {
+                        "accident": sum(r.get("num_accident", 0) for r in sc_records),
+                        "construction": sum(r.get("num_construction", 0) for r in sc_records),
+                        "congestion": sum(r.get("num_congestion", 0) for r in sc_records),
+                        "roadClosure": sum(r.get("num_road_closure", 0) for r in sc_records),
+                        "other": sum(r.get("num_other", 0) for r in sc_records),
+                    }
+                    per_scenario.append({
+                        "scenario": scenario,
+                        "simulations": len(sc_records),
+                        **incident_counts,
+                        "total": sum(incident_counts.values())
+                    })
+            
+            # Aggregate by severity level
+            per_severity = []
+            for severity in ["light", "medium", "heavy"]:
+                sev_records = [r for r in self.scenario_records if r.get("severity_level") == severity]
+                if sev_records:
+                    avg_query_time = sum(r.get("query_time_ms", 0) for r in sev_records) / len(sev_records)
+                    per_severity.append({
+                        "severity": severity,
+                        "simulations": len(sev_records),
+                        "avg_query_time_ms": round(avg_query_time, 3)
+                    })
+            
+            return {
+                "per_category": per_category,
+                "per_scenario": per_scenario,
+                "per_severity": per_severity
+            }
+    
+    def _compute_scenario_accuracy_aggregations(self) -> Dict:
+        """Compute accuracy aggregations for scenario mode (by category and scenario)"""
+        with self.lock:
+            # By category
+            per_category = []
+            for category in ["short", "medium", "long"]:
+                cat_records = [r for r in self.scenario_records if r.get("route_category") == category]
+                if cat_records:
+                    correct = sum(1 for r in cat_records if r.get("is_correct", False))
+                    avg_error = sum(r.get("relative_error", 0) for r in cat_records) / len(cat_records)
+                    per_category.append({
+                        "category": category,
+                        "total": len(cat_records),
+                        "correct": correct,
+                        "accuracy_rate": round(correct / len(cat_records), 4) if len(cat_records) > 0 else 0,
+                        "avg_relative_error": round(avg_error, 6)
+                    })
+            
+            # By scenario
+            per_scenario = []
+            for scenario in self.scenarios if self.is_scenario_mode else [f"DS{i}" for i in range(1, 11)]:
+                sc_records = [r for r in self.scenario_records if r.get("scenario_id") == scenario]
+                if sc_records:
+                    correct = sum(1 for r in sc_records if r.get("is_correct", False))
+                    avg_error = sum(r.get("relative_error", 0) for r in sc_records) / len(sc_records)
+                    per_scenario.append({
+                        "scenario": scenario,
+                        "total": len(sc_records),
+                        "correct": correct,
+                        "accuracy_rate": round(correct / len(sc_records), 4) if len(sc_records) > 0 else 0,
+                        "avg_relative_error": round(avg_error, 6)
+                    })
+            
+            return {
+                "per_category": per_category,
+                "per_scenario": per_scenario
+            }
+    
+    def _compute_scenario_performance_aggregations(self) -> Dict:
+        """Compute performance aggregations for scenario mode"""
+        with self.lock:
+            # By category
+            per_category = []
+            for category in ["short", "medium", "long"]:
+                cat_records = [r for r in self.scenario_records if r.get("route_category") == category]
+                if cat_records:
+                    avg_query = sum(r.get("query_time_ms", 0) for r in cat_records) / len(cat_records)
+                    avg_label = sum(r.get("label_size_mb", 0) for r in cat_records) / len(cat_records)
+                    avg_distance = sum(r.get("route_distance_km", 0) for r in cat_records) / len(cat_records)
+                    per_category.append({
+                        "category": category,
+                        "simulations": len(cat_records),
+                        "avg_distance_km": round(avg_distance, 2),
+                        "avg_query_time_ms": round(avg_query, 3),
+                        "avg_label_size_mb": round(avg_label, 4)
+                    })
+            
+            # By severity
+            per_severity = []
+            for severity in ["light", "medium", "heavy"]:
+                sev_records = [r for r in self.scenario_records if r.get("severity_level") == severity]
+                if sev_records:
+                    avg_query = sum(r.get("query_time_ms", 0) for r in sev_records) / len(sev_records)
+                    avg_label = sum(r.get("label_size_mb", 0) for r in sev_records) / len(sev_records)
+                    per_severity.append({
+                        "severity": severity,
+                        "simulations": len(sev_records),
+                        "avg_query_time_ms": round(avg_query, 3),
+                        "avg_label_size_mb": round(avg_label, 4)
+                    })
+            
+            return {
+                "per_category": per_category,
+                "per_severity": per_severity
+            }
+    
+    def record_scenario_metric(self, 
+                               route_category: str,
+                               route_id: int,
+                               scenario_id: str,
+                               severity_level: str,
+                               api_result: Dict,
+                               route_distance_km: float = 0.0,
+                               disruption_data: Optional[Dict] = None) -> Dict:
+        """
+        Record metrics for a single scenario simulation.
+        
+        Args:
+            route_category: "short", "medium", or "long"
+            route_id: Route ID within category (1-10)
+            scenario_id: Scenario ID (DS1-DS10)
+            severity_level: "light", "medium", or "heavy"
+            api_result: Result from C++ API call
+            route_distance_km: Pre-computed route distance
+            disruption_data: Optional disruption data for incident summary
+            
+        Returns:
+            Complete scenario record dictionary
+        """
+        with self.lock:
+            try:
+                # Extract metrics from API result
+                metrics = api_result.get("metrics", {})
+                summary = api_result.get("summary", {})
+                query_phase = api_result.get("query_phase", {})
+                gps_mapping = api_result.get("gps_mapping", {})
+                
+                # Compute accuracy
+                dhc2l_dist = float(metrics.get("calculated_distance_meters", 0))
+                dijkstra_dist = float(metrics.get("dijkstra_distance_meter", 0))
+                distance_error = dhc2l_dist - dijkstra_dist if dijkstra_dist > 0 else 0
+                relative_error = abs(distance_error) / dijkstra_dist if dijkstra_dist > 0 else 0
+                is_correct = relative_error <= self.tolerance
+                
+                # Get incident counts from disruption data
+                incident_summary = IncidentSummary.from_disruption_data(disruption_data) if disruption_data else IncidentSummary()
+                
+                record = {
+                    "route_category": route_category,
+                    "route_id": route_id,
+                    "scenario_id": scenario_id,
+                    "severity_level": severity_level,
+                    "source_node": gps_mapping.get("start_node", 0),
+                    "target_node": gps_mapping.get("dest_node", 0),
+                    "route_distance_km": route_distance_km,
+                    "dhc2l_distance": dhc2l_dist,
+                    "dijkstra_distance": dijkstra_dist,
+                    "distance_error": distance_error,
+                    "relative_error": relative_error,
+                    "is_correct": is_correct,
+                    "query_time_ms": float(query_phase.get("query_time_ms", 0) or summary.get("query_time_ms", 0) or 0),
+                    "label_size_mb": float(summary.get("label_size", 0) or 0),
+                    "num_accident": incident_summary.num_accident,
+                    "num_construction": incident_summary.num_construction,
+                    "num_congestion": incident_summary.num_congestion,
+                    "num_road_closure": incident_summary.num_road_closure,
+                    "num_other": incident_summary.num_other,
+                    "timestamp": datetime.now().isoformat()
+                }
+                
+                self.scenario_records.append(record)
+                return record
+                
+            except Exception as e:
+                logger.error(f"Error recording scenario metric: {e}")
+                return {"error": str(e)}
+    
+    def export_scenario_csvs(self) -> Dict[str, Path]:
+        """Export scenario-specific CSV files"""
+        csv_paths = {}
+        
+        # Summary CSV
+        summary_path = self.results_path / "scenario_summary_results.csv"
+        with self.csv_lock:
+            with open(summary_path, 'w', newline='') as f:
+                writer = csv.DictWriter(f, fieldnames=CSV_HEADERS_SCENARIO_SUMMARY)
+                writer.writeheader()
+                for record in self.scenario_records:
+                    writer.writerow({
+                        "route_category": record.get("route_category"),
+                        "route_id": record.get("route_id"),
+                        "scenario_id": record.get("scenario_id"),
+                        "severity_level": record.get("severity_level"),
+                        "num_accident": record.get("num_accident", 0),
+                        "num_construction": record.get("num_construction", 0),
+                        "num_congestion": record.get("num_congestion", 0),
+                        "num_disabled_vehicle": record.get("num_disabled_vehicle", 0),
+                        "num_mass_transit_event": record.get("num_mass_transit_event", 0),
+                        "num_planned_event": record.get("num_planned_event", 0),
+                        "num_road_hazard": record.get("num_road_hazard", 0),
+                        "num_road_closure": record.get("num_road_closure", 0),
+                        "num_weather": record.get("num_weather", 0),
+                        "num_lane_restriction": record.get("num_lane_restriction", 0),
+                        "num_other": record.get("num_other", 0),
+                    })
+        csv_paths["summary"] = summary_path
+        
+        # Accuracy CSV
+        accuracy_path = self.results_path / "scenario_accuracy_results.csv"
+        with self.csv_lock:
+            with open(accuracy_path, 'w', newline='') as f:
+                writer = csv.DictWriter(f, fieldnames=CSV_HEADERS_SCENARIO_ACCURACY)
+                writer.writeheader()
+                for record in self.scenario_records:
+                    writer.writerow({
+                        "route_category": record.get("route_category"),
+                        "route_id": record.get("route_id"),
+                        "scenario_id": record.get("scenario_id"),
+                        "severity_level": record.get("severity_level"),
+                        "source_node": record.get("source_node"),
+                        "target_node": record.get("target_node"),
+                        "route_distance_km": record.get("route_distance_km", 0),
+                        "dhc2l_distance": record.get("dhc2l_distance", 0),
+                        "dijkstra_distance": record.get("dijkstra_distance", 0),
+                        "distance_error": record.get("distance_error", 0),
+                        "relative_error": record.get("relative_error", 0),
+                        "is_correct": record.get("is_correct", False),
+                    })
+        csv_paths["accuracy"] = accuracy_path
+        
+        # Performance CSV
+        performance_path = self.results_path / "scenario_performance_results.csv"
+        with self.csv_lock:
+            with open(performance_path, 'w', newline='') as f:
+                writer = csv.DictWriter(f, fieldnames=CSV_HEADERS_SCENARIO_PERFORMANCE)
+                writer.writeheader()
+                for record in self.scenario_records:
+                    writer.writerow({
+                        "route_category": record.get("route_category"),
+                        "route_id": record.get("route_id"),
+                        "scenario_id": record.get("scenario_id"),
+                        "severity_level": record.get("severity_level"),
+                        "source_node": record.get("source_node"),
+                        "target_node": record.get("target_node"),
+                        "route_distance_km": record.get("route_distance_km", 0),
+                        "algorithm": "HC2L",
+                        "initial_labeling_time_ms": 0,  # Not tracked per simulation
+                        "query_time_ms": record.get("query_time_ms", 0),
+                        "label_size_mb": record.get("label_size_mb", 0),
+                        "peak_label_size_mb": record.get("label_size_mb", 0),
+                        "lazy_update_time_ms": 0,
+                        "threshold_rebuild_time_ms": 0,
+                        "total_rebuilds": 0,
+                    })
+        csv_paths["performance"] = performance_path
+        
+        logger.info(f"Exported scenario CSVs to: {self.results_path}")
+        return csv_paths
     
     def _compute_summary(self) -> Dict:
         """Compute overall summary statistics"""
@@ -1363,8 +1818,11 @@ class ExperimentMetricsCollector:
         """
         logger.info("Finalizing experiment results...")
         
-        # Export all CSVs
-        csv_paths = self.export_all_csvs()
+        # Export CSVs based on mode
+        if self.is_scenario_mode:
+            csv_paths = self.export_scenario_csvs()
+        else:
+            csv_paths = self.export_all_csvs()
         
         # Generate JSON
         json_path = self.generate_results_json(experiment_config)
