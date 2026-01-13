@@ -207,7 +207,38 @@ CSV_HEADERS_SCENARIO_COMPREHENSIVE = [
     "disruption_num_accident",
     # Algorithm performance
     "algorithm_labeling_time_ms", "algorithm_label_size_mb",
-    "algorithm_query_response_time_ms",
+    "algorithm_hc2l_query_response_time_ms", "algorithm_dhl_query_response_time_ms",
+    "algorithm_here_query_response_time_ms",
+    "algorithm_here_travel_time_sec", "algorithm_dhc2l_travel_time_sec",
+    "algorithm_dhl_travel_time_sec",
+    "algorithm_here_distance_km", "algorithm_dhc2l_distance_km",
+    "algorithm_dhl_distance_km",
+    "algorithm_frechet_distance_km",
+    "algorithm_is_correct"
+]
+
+# Standard Comprehensive - All simulation data in a single row per route/trial/batch
+CSV_HEADERS_STANDARD_COMPREHENSIVE = [
+    # Route identification
+    "route_id", "route_trial", "route_batch",
+    "route_start_lat", "route_start_lon",
+    "route_end_lat", "route_end_lon",
+    "route_start_edge_source", "route_start_edge_target",
+    "route_end_edge_source", "route_end_edge_target",
+    "route_start_name", "route_end_name",
+    # Disruption level
+    "disruption_level",
+    # Incident counts
+    "disruption_num_road_closure", "disruption_num_road_hazard",
+    "disruption_num_construction", "disruption_num_congestion",
+    "disruption_num_disabled_vehicle", "disruption_num_mass_transit_event",
+    "disruption_num_planned_event", "disruption_num_weather",
+    "disruption_num_lane_restriction", "disruption_num_other",
+    "disruption_num_accident",
+    # Algorithm performance
+    "algorithm_labeling_time_ms", "algorithm_label_size_mb",
+    "algorithm_hc2l_query_response_time_ms", "algorithm_dhl_query_response_time_ms",
+    "algorithm_here_query_response_time_ms",
     "algorithm_here_travel_time_sec", "algorithm_dhc2l_travel_time_sec",
     "algorithm_dhl_travel_time_sec",
     "algorithm_here_distance_km", "algorithm_dhc2l_distance_km",
@@ -930,6 +961,9 @@ class ExperimentMetricsCollector:
                 # STEP 5: SCENARIO MODE - Store in scenario_records for BOTH algorithms
                 # ============================================================
                 if is_scenario and scenario_metadata:
+                    # Extract travel time (ETA) from metrics
+                    eta_seconds = float(metrics.get("eta_seconds", 0) or 0)
+                    
                     # Record BOTH DHL and HC2L in scenario mode
                     scenario_record = {
                         "algorithm": alg,  # "DHL" or "HC2L"
@@ -951,6 +985,8 @@ class ExperimentMetricsCollector:
                         "labeling_time_ms": record.performance.labeling_time_ms if record.performance else 0,
                         "lazy_update_time_ms": record.performance.lazy_update_time_ms if record.performance else 0,
                         "peak_label_size_mb": record.performance.peak_label_size_mb if record.performance else 0,
+                        # Travel time from ETA calculation
+                        "travel_time_sec": eta_seconds,
                         # Route info for comprehensive CSV
                         "route_info": api_result.get("route_info", {}),
                     }
@@ -1283,6 +1319,162 @@ class ExperimentMetricsCollector:
         logger.info(f"Exported similarity CSV: {csv_path} ({len(self.similarity_records)} rows)")
         return csv_path
     
+    def export_standard_comprehensive_csv(self) -> Path:
+        """
+        Export Standard Comprehensive CSV.
+        Aggregates DHL and HC2L data into single rows per route/trial/batch.
+        
+        For standard preset: Uses route_trial and route_batch instead of scenario fields.
+        Each row contains metrics from both DHL and HC2L algorithms, plus HERE comparison data.
+        """
+        csv_path = self.results_path / "comprehensive_results.csv"
+        
+        with self.csv_lock:
+            # Build lookup from similarity_records for HERE data
+            # Key: (trial, batch, route) -> {here_travel_time_sec, here_distance_km, frechet_distance_km}
+            similarity_by_route = {}
+            for sim_record in self.similarity_records:
+                key = (sim_record.batch_id, sim_record.route_id)
+                similarity_by_route[key] = {
+                    "here_travel_time_sec": sim_record.similarity.here_travel_time_min * 60,
+                    "here_distance_km": sim_record.similarity.here_distance_km,
+                    "frechet_distance_km": sim_record.similarity.frechet_distance_m / 1000,
+                }
+            
+            # Group records by (trial_id, batch_id, query_id) - merge DHL and HC2L
+            grouped_records = {}
+            
+            # Add HC2L records
+            for record in self.route_records_dhc2l:
+                key = (record.trial_id, record.batch_id, record.query_id)
+                if key not in grouped_records:
+                    grouped_records[key] = {"DHL": None, "HC2L": None, "record": None}
+                grouped_records[key]["HC2L"] = record
+                grouped_records[key]["record"] = record  # Use for common data
+            
+            # Add DHL records
+            for record in self.route_records_dhl:
+                key = (record.trial_id, record.batch_id, record.query_id)
+                if key not in grouped_records:
+                    grouped_records[key] = {"DHL": None, "HC2L": None, "record": None}
+                grouped_records[key]["DHL"] = record
+                if not grouped_records[key]["record"]:
+                    grouped_records[key]["record"] = record
+            
+            with open(csv_path, 'w', newline='') as f:
+                writer = csv.DictWriter(f, fieldnames=CSV_HEADERS_STANDARD_COMPREHENSIVE)
+                writer.writeheader()
+                
+                for key, algo_records in grouped_records.items():
+                    trial_id, batch_id, query_id = key
+                    
+                    hc2l_record = algo_records.get("HC2L")
+                    dhl_record = algo_records.get("DHL")
+                    primary_record = algo_records.get("record")
+                    
+                    if not primary_record:
+                        continue
+                    
+                    # Look up HERE data from similarity_records
+                    sim_key = (batch_id, query_id)
+                    sim_data = similarity_by_route.get(sim_key, {})
+                    
+                    # Get HERE values from similarity data
+                    here_travel_time_sec = sim_data.get("here_travel_time_sec", 0)
+                    here_distance_km = sim_data.get("here_distance_km", 0)
+                    frechet_distance_km = sim_data.get("frechet_distance_km", 0)
+                    
+                    # Get HC2L values
+                    hc2l_distance_km = 0
+                    hc2l_travel_time_sec = 0
+                    hc2l_query_time_ms = 0
+                    if hc2l_record and hc2l_record.accuracy:
+                        hc2l_distance_km = hc2l_record.accuracy.dhc2l_distance / 1000
+                    if hc2l_record and hc2l_record.performance:
+                        hc2l_query_time_ms = hc2l_record.performance.query_response_time_ms
+                    
+                    # Get DHL values
+                    dhl_distance_km = 0
+                    dhl_travel_time_sec = 0
+                    dhl_query_time_ms = 0
+                    if dhl_record and dhl_record.accuracy:
+                        dhl_distance_km = dhl_record.accuracy.dhc2l_distance / 1000
+                    if dhl_record and dhl_record.performance:
+                        dhl_query_time_ms = dhl_record.performance.query_response_time_ms
+                    
+                    # Get incident summary
+                    incident_summary = primary_record.incident_summary
+                    
+                    # Accuracy from HC2L only
+                    is_correct = hc2l_record.accuracy.is_correct if (hc2l_record and hc2l_record.accuracy) else False
+                    
+                    # Average labeling time
+                    hc2l_labeling = hc2l_record.performance.labeling_time_ms if (hc2l_record and hc2l_record.performance) else 0
+                    dhl_labeling = dhl_record.performance.labeling_time_ms if (dhl_record and dhl_record.performance) else 0
+                    avg_labeling_time_ms = (hc2l_labeling + dhl_labeling) / 2 if (hc2l_labeling + dhl_labeling) > 0 else 0
+                    
+                    hc2l_label_size = hc2l_record.performance.labeling_size_mb if (hc2l_record and hc2l_record.performance) else 0
+                    dhl_label_size = dhl_record.performance.labeling_size_mb if (dhl_record and dhl_record.performance) else 0
+                    avg_label_size_mb = (hc2l_label_size + dhl_label_size) / 2 if (hc2l_label_size + dhl_label_size) > 0 else 0
+                    
+                    writer.writerow({
+                        # Route identification
+                        "route_id": query_id,
+                        "route_trial": trial_id,
+                        "route_batch": batch_id,
+                        "route_start_lat": 0,  # Not available in standard mode RouteMetricsRecord
+                        "route_start_lon": 0,
+                        "route_end_lat": 0,
+                        "route_end_lon": 0,
+                        "route_start_edge_source": primary_record.source_node,
+                        "route_start_edge_target": 0,
+                        "route_end_edge_source": primary_record.target_node,
+                        "route_end_edge_target": 0,
+                        "route_start_name": "",
+                        "route_end_name": "",
+                        
+                        # Disruption level
+                        "disruption_level": primary_record.disruption_level,
+                        
+                        # Incident counts
+                        "disruption_num_road_closure": incident_summary.num_road_closure if incident_summary else 0,
+                        "disruption_num_road_hazard": incident_summary.num_road_hazard if incident_summary else 0,
+                        "disruption_num_construction": incident_summary.num_construction if incident_summary else 0,
+                        "disruption_num_congestion": incident_summary.num_congestion if incident_summary else 0,
+                        "disruption_num_disabled_vehicle": incident_summary.num_disabled_vehicle if incident_summary else 0,
+                        "disruption_num_mass_transit_event": incident_summary.num_mass_transit_event if incident_summary else 0,
+                        "disruption_num_planned_event": incident_summary.num_planned_event if incident_summary else 0,
+                        "disruption_num_weather": incident_summary.num_weather if incident_summary else 0,
+                        "disruption_num_lane_restriction": incident_summary.num_lane_restriction if incident_summary else 0,
+                        "disruption_num_other": incident_summary.num_other if incident_summary else 0,
+                        "disruption_num_accident": incident_summary.num_accident if incident_summary else 0,
+                        
+                        # Algorithm performance
+                        "algorithm_labeling_time_ms": round(avg_labeling_time_ms, 2),
+                        "algorithm_label_size_mb": round(avg_label_size_mb, 5),
+                        "algorithm_hc2l_query_response_time_ms": round(hc2l_query_time_ms, 3),
+                        "algorithm_dhl_query_response_time_ms": round(dhl_query_time_ms, 3),
+                        "algorithm_here_query_response_time_ms": 0,
+                        
+                        # Travel times
+                        "algorithm_here_travel_time_sec": round(here_travel_time_sec, 2),
+                        "algorithm_dhc2l_travel_time_sec": round(hc2l_travel_time_sec, 2),
+                        "algorithm_dhl_travel_time_sec": round(dhl_travel_time_sec, 2),
+                        
+                        # Distances
+                        "algorithm_here_distance_km": round(here_distance_km, 3),
+                        "algorithm_dhc2l_distance_km": round(hc2l_distance_km, 3),
+                        "algorithm_dhl_distance_km": round(dhl_distance_km, 3),
+                        
+                        # Quality metrics
+                        "algorithm_frechet_distance_km": round(frechet_distance_km, 3),
+                        "algorithm_is_correct": is_correct,
+                    })
+            
+            total_rows = len(grouped_records)
+            logger.info(f"Exported standard comprehensive CSV: {csv_path} ({total_rows} rows)")
+            return csv_path
+    
     def export_all_csvs(self) -> Dict[str, Path]:
         """
         Export all CSV files for GUI tabs.
@@ -1298,7 +1490,8 @@ class ExperimentMetricsCollector:
             "construction": self.export_construction_csv(),
             "updates": self.export_updates_csv(),
             "performance": self.export_performance_csv(),
-            "similarity": self.export_similarity_csv()
+            "similarity": self.export_similarity_csv(),
+            "comprehensive": self.export_standard_comprehensive_csv()
         }
         
         logger.info(f"All CSVs exported to: {self.results_path}")
@@ -1344,8 +1537,8 @@ class ExperimentMetricsCollector:
                 "aggregated_data": {
                     "summary": self._compute_scenario_summary_aggregations(),
                     "accuracy": self._compute_scenario_accuracy_aggregations(),
-                    "construction": self._compute_scenario_construction_aggregations(),  # Scenario-specific construction data
-                    "updates": self._compute_scenario_updates_aggregations(),  # Scenario-specific updates data
+                    "construction": self._compute_scenario_construction_aggregations(),
+                    "updates": self._compute_scenario_updates_aggregations(),
                     "performance": self._compute_scenario_performance_aggregations()
                 },
                 "graph_data": self._compute_graph_data(),
@@ -1355,7 +1548,8 @@ class ExperimentMetricsCollector:
                     "construction": "construction_results.csv",
                     "updates": "updates_results.csv",
                     "performance": "performance_results.csv",
-                    "similarity": "similarity_results.csv"
+                    "similarity": "similarity_results.csv",
+                    "comprehensive": "comprehensive_results.csv"
                 }
             }
         else:
@@ -1385,7 +1579,8 @@ class ExperimentMetricsCollector:
                     "construction": "construction_results.csv",
                     "updates": "updates_results.csv",
                     "performance": "performance_results.csv",
-                    "similarity": "similarity_results.csv"
+                    "similarity": "similarity_results.csv",
+                    "comprehensive": "comprehensive_results.csv"
                 }
             }
         
@@ -2158,7 +2353,7 @@ class ExperimentMetricsCollector:
         
         with self.csv_lock:
             # Build lookup from similarity_records for HERE data
-            # Key: route_id -> {here_travel_time_sec, here_distance_km, frechet_distance_km, dhc2l_distance_km, dhc2l_travel_time_sec}
+            # Key: route_id -> {here_travel_time_sec, here_distance_km, frechet_distance_km, here_query_time_ms}
             similarity_by_route = {}
             for sim_record in self.similarity_records:
                 route_id = sim_record.route_id
@@ -2166,8 +2361,6 @@ class ExperimentMetricsCollector:
                     "here_travel_time_sec": sim_record.similarity.here_travel_time_min * 60,  # Convert min to sec
                     "here_distance_km": sim_record.similarity.here_distance_km,
                     "frechet_distance_km": sim_record.similarity.frechet_distance_m / 1000,  # Convert m to km
-                    "dhc2l_baseline_distance_km": sim_record.similarity.dhc2l_distance_km,
-                    "dhc2l_baseline_travel_time_sec": sim_record.similarity.dhc2l_travel_time_min * 60,
                 }
             
             # Group scenario_records by (route_category, route_id, scenario_id, severity_level)
@@ -2203,23 +2396,24 @@ class ExperimentMetricsCollector:
                     # Look up HERE data from similarity_records by route_id
                     sim_data = similarity_by_route.get(route_id, {})
                     
-                    # Get HERE values
+                    # Get HERE values from similarity data
                     here_travel_time_sec = sim_data.get("here_travel_time_sec", 0)
                     here_distance_km = sim_data.get("here_distance_km", 0)
                     frechet_distance_km = sim_data.get("frechet_distance_km", 0)
                     
-                    # Get HC2L values - use disrupted distance from scenario record
-                    # Distance is stored in meters (dhc2l_distance), convert to km
-                    hc2l_distance_m = float(hc2l_record.get("dhc2l_distance", 0)) if hc2l_record else 0
+                    # Get HC2L values from scenario record (thread run data)
+                    hc2l_distance_m = float(hc2l_record.get("dhc2l_distance", 0) or 0) if hc2l_record else 0
                     hc2l_distance_km = hc2l_distance_m / 1000 if hc2l_distance_m > 0 else 0
-                    # Travel time from similarity (baseline, as disrupted time isn't computed)
-                    hc2l_travel_time_sec = sim_data.get("dhc2l_baseline_travel_time_sec", 0)
+                    # Travel time from thread run (eta_seconds stored as travel_time_sec)
+                    hc2l_travel_time_sec = float(hc2l_record.get("travel_time_sec", 0) or 0) if hc2l_record else 0
+                    hc2l_query_time_ms = float(hc2l_record.get("query_time_ms", 0) or 0) if hc2l_record else 0
                     
-                    # Get DHL values - use disrupted distance from scenario record
-                    dhl_distance_m = float(dhl_record.get("dhc2l_distance", 0)) if dhl_record else 0
+                    # Get DHL values from scenario record (thread run data)
+                    dhl_distance_m = float(dhl_record.get("dhc2l_distance", 0) or 0) if dhl_record else 0
                     dhl_distance_km = dhl_distance_m / 1000 if dhl_distance_m > 0 else 0
-                    # DHL doesn't provide travel time
-                    dhl_travel_time_sec = 0
+                    # Travel time from thread run (eta_seconds stored as travel_time_sec)
+                    dhl_travel_time_sec = float(dhl_record.get("travel_time_sec", 0) or 0) if dhl_record else 0
+                    dhl_query_time_ms = float(dhl_record.get("query_time_ms", 0) or 0) if dhl_record else 0
                     
                     # Get incident counts (same for both algorithms, use any available)
                     incident_record = hc2l_record if hc2l_record else dhl_record
@@ -2227,7 +2421,7 @@ class ExperimentMetricsCollector:
                     # Accuracy from HC2L only (DHL doesn't compute accuracy against Dijkstra)
                     is_correct = hc2l_record.get("is_correct", False) if hc2l_record else False
                     
-                    # Average labeling time and query time from both algorithms
+                    # Average labeling time from both algorithms
                     hc2l_labeling = float(hc2l_record.get("labeling_time_ms", 0) or 0) if hc2l_record else 0
                     dhl_labeling = float(dhl_record.get("labeling_time_ms", 0) or 0) if dhl_record else 0
                     avg_labeling_time_ms = (hc2l_labeling + dhl_labeling) / 2 if (hc2l_labeling + dhl_labeling) > 0 else 0
@@ -2236,9 +2430,8 @@ class ExperimentMetricsCollector:
                     dhl_label_size = float(dhl_record.get("label_size_mb", 0) or 0) if dhl_record else 0
                     avg_label_size_mb = (hc2l_label_size + dhl_label_size) / 2 if (hc2l_label_size + dhl_label_size) > 0 else 0
                     
-                    hc2l_query = float(hc2l_record.get("query_time_ms", 0) or 0) if hc2l_record else 0
-                    dhl_query = float(dhl_record.get("query_time_ms", 0) or 0) if dhl_record else 0
-                    avg_query_time_ms = (hc2l_query + dhl_query) / 2 if (hc2l_query + dhl_query) > 0 else 0
+                    # HERE doesn't provide query time in experiments - set to 0
+                    here_query_time_ms = 0
                     
                     writer.writerow({
                         # Route identification
@@ -2276,9 +2469,12 @@ class ExperimentMetricsCollector:
                         # Algorithm performance (averaged from both)
                         "algorithm_labeling_time_ms": round(avg_labeling_time_ms, 2),
                         "algorithm_label_size_mb": round(avg_label_size_mb, 5),
-                        "algorithm_query_response_time_ms": round(avg_query_time_ms, 3),
+                        # Split query times for each algorithm
+                        "algorithm_hc2l_query_response_time_ms": round(hc2l_query_time_ms, 3),
+                        "algorithm_dhl_query_response_time_ms": round(dhl_query_time_ms, 3),
+                        "algorithm_here_query_response_time_ms": round(here_query_time_ms, 3),
                         
-                        # Travel times
+                        # Travel times (from thread runs)
                         "algorithm_here_travel_time_sec": round(here_travel_time_sec, 2),
                         "algorithm_dhc2l_travel_time_sec": round(hc2l_travel_time_sec, 2),
                         "algorithm_dhl_travel_time_sec": round(dhl_travel_time_sec, 2),

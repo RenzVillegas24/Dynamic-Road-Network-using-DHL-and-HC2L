@@ -1619,92 +1619,11 @@
                 <p class="text-xs text-gray-500 mt-0.5">Complete route, disruption, and algorithm metrics</p>
               </div>
             </div>
-            <button onclick="ExperimentRunner.exportCSV('comprehensive', 'all')"
-              class="btn btn--success btn--xs hover:shadow-md transition-all">
-              <i data-lucide="download" class="w-3 h-3"></i> Export CSV
-            </button>
           </div>
 
-          <!-- Comprehensive Data Summary Cards -->
-          <div class="grid grid-cols-4 gap-3">
-            <div class="bg-gradient-to-br from-slate-50 to-gray-50 rounded-lg p-3 border border-slate-200">
-              <p class="text-xs text-slate-600 font-medium">Total Records</p>
-              <p id="comprehensive-total-records" class="text-2xl font-bold text-slate-700">--</p>
-            </div>
-            <div class="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-lg p-3 border border-blue-200">
-              <p class="text-xs text-blue-600 font-medium">Algorithms</p>
-              <p id="comprehensive-algorithms" class="text-2xl font-bold text-blue-700">--</p>
-            </div>
-            <div class="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-3 border border-green-200">
-              <p class="text-xs text-green-600 font-medium">Route Categories</p>
-              <p id="comprehensive-categories" class="text-2xl font-bold text-green-700">--</p>
-            </div>
-            <div class="bg-gradient-to-br from-amber-50 to-orange-50 rounded-lg p-3 border border-amber-200">
-              <p class="text-xs text-amber-600 font-medium">Severity Levels</p>
-              <p id="comprehensive-severity-levels" class="text-2xl font-bold text-amber-700">--</p>
-            </div>
-          </div>
-
-          <!-- Per-Route Comprehensive Data -->
-          <div class="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-4">
-            <div class="flex items-center justify-between mb-3">
-              <div class="flex items-center gap-2">
-                <button onclick="ExperimentRunner.togglePerRouteTable('comprehensive')" 
-                        class="flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-slate-900">
-                  <i data-lucide="chevron-right" id="comprehensive-toggle-icon" class="w-4 h-4 transition-transform"></i>
-                  <span>View All Route Data</span>
-                </button>
-              </div>
-              <div class="flex items-center gap-2">
-                <button onclick="ExperimentRunner.exportCSV('comprehensive', 'per-route')"
-                  class="btn btn--primary btn--xs hover:shadow-md transition-all">
-                  <i data-lucide="download" class="w-3 h-3"></i> Export CSV
-                </button>
-                <span id="comprehensive-data-count" class="text-xs text-gray-500">-- records</span>
-              </div>
-            </div>
-
-            <div id="comprehensive-per-route-container" class="hidden">
-              <div class="overflow-x-auto max-h-[600px]">
-                <table class="w-full text-xs">
-                  <thead id="comprehensive-table-header" class="bg-slate-50 border-b border-slate-200 sticky top-0">
-                    <tr>
-                      <th class="text-center p-2 font-semibold text-slate-700">Route</th>
-                      <th class="text-center p-2 font-semibold text-slate-700">Category</th>
-                      <th class="text-center p-2 font-semibold text-slate-700">Scenario</th>
-                      <th class="text-center p-2 font-semibold text-slate-700">Severity</th>
-                      <th class="text-right p-2 font-semibold text-slate-700">Start Lat</th>
-                      <th class="text-right p-2 font-semibold text-slate-700">Start Lon</th>
-                      <th class="text-right p-2 font-semibold text-slate-700">End Lat</th>
-                      <th class="text-right p-2 font-semibold text-slate-700">End Lon</th>
-                      <th class="text-right p-2 font-semibold text-slate-700">Disruptions</th>
-                      <th class="text-right p-2 font-semibold text-slate-700">Disruption Types</th>
-                      <th class="text-right p-2 font-semibold text-slate-700">HC2L Dist (km)</th>
-                      <th class="text-right p-2 font-semibold text-slate-700">DHL Dist (km)</th>
-                      <th class="text-right p-2 font-semibold text-slate-700">HERE Dist (km)</th>
-                      <th class="text-right p-2 font-semibold text-slate-700">HC2L Time (s)</th>
-                      <th class="text-right p-2 font-semibold text-slate-700">DHL Time (s)</th>
-                      <th class="text-right p-2 font-semibold text-slate-700">HERE Time (s)</th>
-                      <th class="text-right p-2 font-semibold text-slate-700">Accuracy</th>
-                      <th class="text-right p-2 font-semibold text-slate-700">Fréchet (km)</th>
-                      <th class="text-right p-2 font-semibold text-slate-700">Avg Query (ms)</th>
-                    </tr>
-                  </thead>
-                  <tbody id="comprehensive-per-route-tbody" class="divide-y divide-gray-100">
-                    <tr><td colspan="19" class="text-center py-4 text-gray-500">Click to load data</td></tr>
-                  </tbody>
-                </table>
-              </div>
-              <!-- Pagination -->
-              <div id="comprehensive-pagination" class="flex justify-center items-center gap-4 mt-4 py-2 border-t border-gray-100">
-                <button onclick="ExperimentRunner.loadMorePerRouteData('comprehensive')" 
-                        id="comprehensive-load-more-btn" 
-                        class="btn btn--ghost btn--sm">
-                  <i data-lucide="chevron-down" class="w-4 h-4"></i> Load More
-                </button>
-                <span id="comprehensive-page-info" class="text-xs text-gray-500">Page 1</span>
-              </div>
-            </div>
+          <!-- Comprehensive Data Table Container -->
+          <div id="comprehensive-data-container">
+            <p class="text-center text-gray-500 py-8 font-medium">Loading comprehensive data...</p>
           </div>
         </div>
       </div>

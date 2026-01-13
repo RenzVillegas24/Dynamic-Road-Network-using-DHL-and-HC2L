@@ -1826,6 +1826,9 @@ const ExperimentRunner = {
 
         // Similarity tab: Note that detailed data is in CSV
         this.populateSimilarityPlaceholder();
+        
+        // Comprehensive tab: Load all route data
+        this.loadAndDisplayComprehensiveData();
 
         // Populate graphs with graph_data
         this.populateGraphs(graphData);
@@ -4375,6 +4378,174 @@ const ExperimentRunner = {
         if (!data || data.length === 0) return 0;
         const sum = data.reduce((acc, row) => acc + (parseFloat(row[field]) || 0), 0);
         return sum / data.length;
+    },
+
+    // =========================================================================
+    // COMPREHENSIVE DATA LOADING
+    // =========================================================================
+    
+    /**
+     * Load and display comprehensive data (similar to similarity tab)
+     */
+    async loadAndDisplayComprehensiveData() {
+        const container = document.getElementById('comprehensive-data-container');
+        if (!container) return;
+
+        if (!this.currentResultId) {
+            container.innerHTML = `
+                <div class="text-center py-8 text-gray-600">
+                    <i data-lucide="alert-circle" class="w-12 h-12 mx-auto mb-2 text-gray-400"></i>
+                    <p class="font-semibold mb-2">No experiment results loaded</p>
+                </div>
+            `;
+            return;
+        }
+
+        // Show loading state
+        container.innerHTML = `
+            <div class="text-center py-8">
+                <div class="animate-spin w-8 h-8 border-3 border-slate-500 border-t-transparent rounded-full mx-auto mb-3"></div>
+                <p class="text-gray-600">Loading comprehensive data...</p>
+            </div>
+        `;
+
+        try {
+            const url = `/api/experiment/results/${this.currentResultId}/csv/comprehensive/data?page=1&limit=100`;
+            const response = await fetch(url);
+            const result = await response.json();
+
+            if (!result.success || !result.data || result.data.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-12 text-gray-600">
+                        <i data-lucide="file-spreadsheet" class="w-16 h-16 mx-auto mb-3 text-gray-400"></i>
+                        <p class="font-semibold text-lg mb-2">Comprehensive Route Data</p>
+                        <p class="text-sm text-gray-500 mb-4">Complete route metrics available in CSV export</p>
+                        <button onclick="ExperimentRunner.exportCSV('comprehensive', 'all')" class="btn btn--primary">
+                            <i data-lucide="download" class="w-4 h-4"></i> Download Comprehensive CSV
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+
+            // Detect if scenario or standard mode based on data columns
+            const isScenario = result.data[0].hasOwnProperty('disruption_scenario_id');
+            
+            // Render comprehensive table
+            container.innerHTML = `
+                <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                    <div class="bg-gradient-to-r from-slate-50 to-gray-50 px-4 py-3 border-b border-slate-200">
+                        <div class="flex items-center justify-between">
+                            <h5 class="font-bold text-slate-900 flex items-center gap-2 mb-0">
+                                <i data-lucide="database" class="w-4 h-4"></i>
+                                All Route Data (${result.total || result.data.length} records)
+                            </h5>
+                            <button onclick="ExperimentRunner.exportCSV('comprehensive', 'all')" class="btn btn--success btn--xs">
+                                <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+                            </button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto max-h-[600px]">
+                        <table class="w-full text-xs">
+                            <thead class="bg-slate-50 border-b border-slate-200 sticky top-0">
+                                <tr>
+                                    ${isScenario ? `
+                                        <th class="text-center p-2 font-semibold text-slate-700">Route</th>
+                                        <th class="text-center p-2 font-semibold text-slate-700">Category</th>
+                                        <th class="text-center p-2 font-semibold text-slate-700">Scenario</th>
+                                        <th class="text-center p-2 font-semibold text-slate-700">Severity</th>
+                                    ` : `
+                                        <th class="text-center p-2 font-semibold text-slate-700">Route</th>
+                                        <th class="text-center p-2 font-semibold text-slate-700">Trial</th>
+                                        <th class="text-center p-2 font-semibold text-slate-700">Batch</th>
+                                        <th class="text-center p-2 font-semibold text-slate-700">Level</th>
+                                    `}
+                                    <th class="text-right p-2 font-semibold text-slate-700">HC2L Dist (km)</th>
+                                    <th class="text-right p-2 font-semibold text-slate-700">DHL Dist (km)</th>
+                                    <th class="text-right p-2 font-semibold text-slate-700">HERE Dist (km)</th>
+                                    <th class="text-right p-2 font-semibold text-slate-700">HC2L Time (s)</th>
+                                    <th class="text-right p-2 font-semibold text-slate-700">DHL Time (s)</th>
+                                    <th class="text-right p-2 font-semibold text-slate-700">HERE Time (s)</th>
+                                    <th class="text-right p-2 font-semibold text-slate-700">HC2L Query (ms)</th>
+                                    <th class="text-right p-2 font-semibold text-slate-700">DHL Query (ms)</th>
+                                    <th class="text-center p-2 font-semibold text-slate-700">Accuracy</th>
+                                    <th class="text-right p-2 font-semibold text-slate-700">Fréchet (km)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="comprehensive-table-tbody" class="divide-y divide-gray-100">
+                                ${result.data.map(row => {
+                                    const isCorrect = row.algorithm_is_correct === 'True' || row.algorithm_is_correct === true;
+                                    
+                                    return `
+                                        <tr class="hover:bg-slate-50 transition-colors">
+                                            ${isScenario ? `
+                                                <td class="p-2 text-center font-mono">${row.route_id || ''}</td>
+                                                <td class="p-2 text-center"><span class="px-2 py-0.5 rounded text-xs font-medium ${this.getCategoryBadgeClass(row.route_length_category)}">${row.route_length_category || ''}</span></td>
+                                                <td class="p-2 text-center">${row.disruption_scenario_id || ''}</td>
+                                                <td class="p-2 text-center"><span class="px-2 py-0.5 rounded text-xs ${this.getLevelBadgeClass(row.disruption_severity_level)}">${row.disruption_severity_level || ''}</span></td>
+                                            ` : `
+                                                <td class="p-2 text-center font-mono">${row.route_id || ''}</td>
+                                                <td class="p-2 text-center">${row.route_trial || ''}</td>
+                                                <td class="p-2 text-center">${row.route_batch || ''}</td>
+                                                <td class="p-2 text-center"><span class="px-2 py-0.5 rounded text-xs ${this.getLevelBadgeClass(row.disruption_level)}">${row.disruption_level || ''}</span></td>
+                                            `}
+                                            <td class="p-2 text-right font-mono">${parseFloat(row.algorithm_dhc2l_distance_km || 0).toFixed(3)}</td>
+                                            <td class="p-2 text-right font-mono">${parseFloat(row.algorithm_dhl_distance_km || 0).toFixed(3)}</td>
+                                            <td class="p-2 text-right font-mono">${parseFloat(row.algorithm_here_distance_km || 0).toFixed(3)}</td>
+                                            <td class="p-2 text-right font-mono">${parseFloat(row.algorithm_dhc2l_travel_time_sec || 0).toFixed(1)}</td>
+                                            <td class="p-2 text-right font-mono">${parseFloat(row.algorithm_dhl_travel_time_sec || 0).toFixed(1)}</td>
+                                            <td class="p-2 text-right font-mono">${parseFloat(row.algorithm_here_travel_time_sec || 0).toFixed(1)}</td>
+                                            <td class="p-2 text-right font-mono">${parseFloat(row.algorithm_hc2l_query_response_time_ms || 0).toFixed(3)}</td>
+                                            <td class="p-2 text-right font-mono">${parseFloat(row.algorithm_dhl_query_response_time_ms || 0).toFixed(3)}</td>
+                                            <td class="p-2 text-center">
+                                                <span class="px-2 py-0.5 rounded text-xs ${isCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">
+                                                    ${isCorrect ? 'Pass' : 'Fail'}
+                                                </span>
+                                            </td>
+                                            <td class="p-2 text-right font-mono">${parseFloat(row.algorithm_frechet_distance_km || 0).toFixed(3)}</td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Pagination Footer -->
+                    <div class="bg-gradient-to-r from-slate-50 to-gray-50 px-4 py-3 border-t border-slate-200">
+                        <div class="flex items-center justify-between">
+                            <div class="text-sm text-slate-600">
+                                Showing ${result.data.length} of ${result.total || result.data.length} records
+                            </div>
+                            <div class="flex items-center gap-2">
+                                ${result.has_more ? `
+                                    <button onclick="ExperimentRunner.loadMoreComprehensiveData()" 
+                                            id="comprehensive-load-more-btn" 
+                                            class="btn btn--ghost btn--sm">
+                                        <i data-lucide="chevron-down" class="w-4 h-4"></i> Load More
+                                    </button>
+                                ` : ''}
+                                <span class="text-xs text-slate-500">Page ${result.page || 1}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Refresh Lucide icons
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+
+        } catch (error) {
+            console.error('Error loading comprehensive data:', error);
+            container.innerHTML = `
+                <div class="text-center py-8 text-red-600">
+                    <i data-lucide="alert-circle" class="w-12 h-12 mx-auto mb-2"></i>
+                    <p class="font-semibold mb-2">Error loading comprehensive data</p>
+                    <p class="text-sm text-gray-600">${error.message}</p>
+                </div>
+            `;
+        }
     },
 
     // =========================================================================
