@@ -2348,20 +2348,29 @@ class ExperimentMetricsCollector:
         
         Uses similarity_records for HERE travel time, HERE distance, and Frechet distance
         since these values are from HC2L vs HERE comparisons (baseline without disruptions).
+        
+        Note: similarity_records use global route_id (1-30) while scenario_records use
+        local route_id (1-10) per category. We must map (category, local_id) to global_id:
+          - short: global_id = local_id (1-10)
+          - medium: global_id = local_id + 10 (11-20)
+          - long: global_id = local_id + 20 (21-30)
         """
         csv_path = self.results_path / "comprehensive_results.csv"
         
         with self.csv_lock:
             # Build lookup from similarity_records for HERE data
-            # Key: route_id -> {here_travel_time_sec, here_distance_km, frechet_distance_km, here_query_time_ms}
+            # Key: global_route_id -> {here_travel_time_sec, here_distance_km, frechet_distance_km}
             similarity_by_route = {}
             for sim_record in self.similarity_records:
-                route_id = sim_record.route_id
+                route_id = sim_record.route_id  # This is global route_id (1-30)
                 similarity_by_route[route_id] = {
                     "here_travel_time_sec": sim_record.similarity.here_travel_time_min * 60,  # Convert min to sec
                     "here_distance_km": sim_record.similarity.here_distance_km,
                     "frechet_distance_km": sim_record.similarity.frechet_distance_m / 1000,  # Convert m to km
                 }
+            
+            # Category offset mapping for converting local route_id to global route_id
+            category_offsets = {"short": 0, "medium": 10, "long": 20}
             
             # Group scenario_records by (route_category, route_id, scenario_id, severity_level)
             grouped_records = {}
@@ -2389,12 +2398,17 @@ class ExperimentMetricsCollector:
                     hc2l_record = algo_records.get("HC2L") or {}
                     dhl_record = algo_records.get("DHL") or {}
                     
+                    # Compute global route_id for similarity lookup
+                    # local route_id (1-10) + category offset = global route_id (1-30)
+                    offset = category_offsets.get(route_category, 0)
+                    global_route_id = route_id + offset
+                    
+                    # Look up HERE data from similarity_records using global route_id
+                    sim_data = similarity_by_route.get(global_route_id, {})
+                    
                     # Use HC2L record as primary for route_info (both should have same route)
                     primary_record = hc2l_record if hc2l_record else dhl_record
                     route_info = primary_record.get("route_info", {}) if primary_record else {}
-                    
-                    # Look up HERE data from similarity_records by route_id
-                    sim_data = similarity_by_route.get(route_id, {})
                     
                     # Get HERE values from similarity data
                     here_travel_time_sec = sim_data.get("here_travel_time_sec", 0)
