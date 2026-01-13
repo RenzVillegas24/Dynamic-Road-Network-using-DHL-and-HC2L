@@ -172,6 +172,17 @@ CSV_HEADERS_SCENARIO_PERFORMANCE = [
     "threshold_rebuild_time_ms", "total_rebuilds"
 ]
 
+# Scenario Construction - per route_category construction performance
+CSV_HEADERS_SCENARIO_CONSTRUCTION = [
+    "route_category", "algorithm", "construction_time_ms", "initial_label_size_mb"
+]
+
+# Scenario Updates - per route_category update performance
+CSV_HEADERS_SCENARIO_UPDATES = [
+    "route_category", "algorithm", "lazy_update_time_ms",
+    "peak_label_size_mb", "label_size_change_pct", "query_avg_ms"
+]
+
 
 class DisruptionLevel(Enum):
     """Disruption level categories"""
@@ -1293,17 +1304,17 @@ class ExperimentMetricsCollector:
                 "aggregated_data": {
                     "summary": self._compute_scenario_summary_aggregations(),
                     "accuracy": self._compute_scenario_accuracy_aggregations(),
-                    "construction": self._compute_construction_aggregations(),  # Include construction data
-                    "updates": self._compute_updates_aggregations(),  # Include updates data
+                    "construction": self._compute_scenario_construction_aggregations(),  # Scenario-specific construction data
+                    "updates": self._compute_scenario_updates_aggregations(),  # Scenario-specific updates data
                     "performance": self._compute_scenario_performance_aggregations()
                 },
                 "graph_data": self._compute_graph_data(),
                 "csv_files": {
-                    "summary": "scenario_summary_results.csv",
-                    "accuracy": "scenario_accuracy_results.csv",
+                    "summary": "summary_results.csv",
+                    "accuracy": "accuracy_results.csv",
                     "construction": "construction_results.csv",
                     "updates": "updates_results.csv",
-                    "performance": "scenario_performance_results.csv",
+                    "performance": "performance_results.csv",
                     "similarity": "similarity_results.csv"
                 }
             }
@@ -1393,7 +1404,13 @@ class ExperimentMetricsCollector:
                         "accident": sum(r.get("num_accident", 0) for r in cat_records),
                         "construction": sum(r.get("num_construction", 0) for r in cat_records),
                         "congestion": sum(r.get("num_congestion", 0) for r in cat_records),
-                        "roadClosure": sum(r.get("num_road_closure", 0) for r in cat_records),
+                        "disabled_vehicle": sum(r.get("num_disabled_vehicle", 0) for r in cat_records),
+                        "mass_transit": sum(r.get("num_mass_transit_event", 0) for r in cat_records),
+                        "planned_event": sum(r.get("num_planned_event", 0) for r in cat_records),
+                        "road_hazard": sum(r.get("num_road_hazard", 0) for r in cat_records),
+                        "road_closure": sum(r.get("num_road_closure", 0) for r in cat_records),
+                        "weather": sum(r.get("num_weather", 0) for r in cat_records),
+                        "lane_restriction": sum(r.get("num_lane_restriction", 0) for r in cat_records),
                         "other": sum(r.get("num_other", 0) for r in cat_records),
                     }
                     per_category.append({
@@ -1412,7 +1429,13 @@ class ExperimentMetricsCollector:
                         "accident": sum(r.get("num_accident", 0) for r in sc_records),
                         "construction": sum(r.get("num_construction", 0) for r in sc_records),
                         "congestion": sum(r.get("num_congestion", 0) for r in sc_records),
-                        "roadClosure": sum(r.get("num_road_closure", 0) for r in sc_records),
+                        "disabled_vehicle": sum(r.get("num_disabled_vehicle", 0) for r in sc_records),
+                        "mass_transit": sum(r.get("num_mass_transit_event", 0) for r in sc_records),
+                        "planned_event": sum(r.get("num_planned_event", 0) for r in sc_records),
+                        "road_hazard": sum(r.get("num_road_hazard", 0) for r in sc_records),
+                        "road_closure": sum(r.get("num_road_closure", 0) for r in sc_records),
+                        "weather": sum(r.get("num_weather", 0) for r in sc_records),
+                        "lane_restriction": sum(r.get("num_lane_restriction", 0) for r in sc_records),
                         "other": sum(r.get("num_other", 0) for r in sc_records),
                     }
                     per_scenario.append({
@@ -1516,6 +1539,140 @@ class ExperimentMetricsCollector:
                 "per_severity": per_severity
             }
     
+    def _compute_scenario_construction_aggregations(self) -> Dict:
+        """Pre-calculate construction aggregations for scenario mode (by category)"""
+        # Map trial index to category name
+        categories = ["short", "medium", "long"]
+        per_category_dhl = []
+        per_category_hc2l = []
+        
+        for trial in range(min(self.trials, 3)):  # Max 3 categories
+            category = categories[trial] if trial < len(categories) else f"Category {trial + 1}"
+            
+            if self.construction_recorded_dhl[trial]:
+                per_category_dhl.append({
+                    "category": category,
+                    "algorithm": "DHL",
+                    "construction_time_ms": round(float(self.construction_time_dhl[trial]), 2),
+                    "initial_label_size_mb": round(float(self.initial_label_size_dhl[trial]), 5)
+                })
+            
+            if self.construction_recorded_dhc2l[trial]:
+                per_category_hc2l.append({
+                    "category": category,
+                    "algorithm": "HC2L",
+                    "construction_time_ms": round(float(self.construction_time_dhc2l[trial]), 2),
+                    "initial_label_size_mb": round(float(self.initial_label_size_dhc2l[trial]), 5)
+                })
+        
+        # Compute overall averages per algorithm
+        avg_dhl = {
+            "algorithm": "DHL",
+            "avg_construction_time_ms": round(float(np.mean([d["construction_time_ms"] for d in per_category_dhl])), 2) if per_category_dhl else 0,
+            "avg_label_size_mb": round(float(np.mean([d["initial_label_size_mb"] for d in per_category_dhl])), 5) if per_category_dhl else 0
+        }
+        
+        avg_hc2l = {
+            "algorithm": "HC2L",
+            "avg_construction_time_ms": round(float(np.mean([d["construction_time_ms"] for d in per_category_hc2l])), 2) if per_category_hc2l else 0,
+            "avg_label_size_mb": round(float(np.mean([d["initial_label_size_mb"] for d in per_category_hc2l])), 5) if per_category_hc2l else 0
+        }
+        
+        return {
+            "per_category": per_category_dhl + per_category_hc2l,
+            "averages": [avg_dhl, avg_hc2l]
+        }
+    
+    def _compute_scenario_updates_aggregations(self) -> Dict:
+        """Pre-calculate updates aggregations for scenario mode (by category and scenario)"""
+        categories = ["short", "medium", "long"]
+        per_category = []
+        per_scenario = []
+        
+        # Per-category data
+        for trial in range(min(self.trials, 3)):  # Max 3 categories
+            category = categories[trial] if trial < len(categories) else f"Category {trial + 1}"
+            
+            # Aggregate across all batches (scenarios) for this category (trial)
+            dhc2l_lazy_times = []
+            dhc2l_query_times = []
+            dhl_lazy_times = []
+            dhl_query_times = []
+            peak_label_dhc2l = 0
+            peak_label_dhl = 0
+            initial_label_dhc2l = float(self.initial_label_size_dhc2l[trial])
+            initial_label_dhl = float(self.initial_label_size_dhl[trial])
+            
+            for batch in range(self.batches):
+                dhc2l_lazy_times.extend(self._batch_lazy_times_dhc2l[trial][batch])
+                dhc2l_query_times.extend(self._batch_query_times_dhc2l[trial][batch])
+                dhl_lazy_times.extend(self._batch_lazy_times_dhl[trial][batch])
+                dhl_query_times.extend(self._batch_query_times_dhl[trial][batch])
+                peak_label_dhc2l = max(peak_label_dhc2l, float(self.peak_label_size_dhc2l[trial, batch]))
+                peak_label_dhl = max(peak_label_dhl, float(self.peak_label_size_dhl[trial, batch]))
+            
+            # HC2L entry for this category
+            if dhc2l_query_times:
+                label_change_pct = ((peak_label_dhc2l - initial_label_dhc2l) / initial_label_dhc2l * 100) if initial_label_dhc2l > 0 else 0
+                per_category.append({
+                    "category": category,
+                    "algorithm": "HC2L",
+                    "lazy_update_time_ms": round(float(np.mean(dhc2l_lazy_times)), 3) if dhc2l_lazy_times else 0,
+                    "peak_label_size_mb": round(peak_label_dhc2l, 5),
+                    "label_size_change_pct": round(label_change_pct, 1),
+                    "query_avg_ms": round(float(np.mean(dhc2l_query_times)), 3)
+                })
+            
+            # DHL entry for this category
+            if dhl_query_times:
+                label_change_pct = ((peak_label_dhl - initial_label_dhl) / initial_label_dhl * 100) if initial_label_dhl > 0 else 0
+                per_category.append({
+                    "category": category,
+                    "algorithm": "DHL",
+                    "lazy_update_time_ms": round(float(np.mean(dhl_lazy_times)), 3) if dhl_lazy_times else 0,
+                    "peak_label_size_mb": round(peak_label_dhl, 5),
+                    "label_size_change_pct": round(label_change_pct, 1),
+                    "query_avg_ms": round(float(np.mean(dhl_query_times)), 3)
+                })
+        
+        # Per-scenario data (aggregate by scenario across all categories)
+        scenarios = self.scenarios if self.is_scenario_mode else [f"DS{i}" for i in range(1, 11)]
+        for scenario_idx, scenario in enumerate(scenarios):
+            # Each scenario runs across all categories (trials)
+            # Scenarios repeat every 10 batches (10 scenarios × 3 severities = 30 batches)
+            dhc2l_query_times = []
+            dhl_query_times = []
+            
+            for trial in range(min(self.trials, 3)):
+                for batch in range(self.batches):
+                    # Determine which scenario this batch represents
+                    # batch = (severity * 10) + scenario_index, or similar mapping
+                    batch_scenario_idx = batch % 10
+                    if batch_scenario_idx == scenario_idx:
+                        dhc2l_query_times.extend(self._batch_query_times_dhc2l[trial][batch])
+                        dhl_query_times.extend(self._batch_query_times_dhl[trial][batch])
+            
+            if dhc2l_query_times:
+                per_scenario.append({
+                    "scenario": scenario,
+                    "algorithm": "HC2L",
+                    "simulations": len(dhc2l_query_times),
+                    "query_avg_ms": round(float(np.mean(dhc2l_query_times)), 3)
+                })
+            
+            if dhl_query_times:
+                per_scenario.append({
+                    "scenario": scenario,
+                    "algorithm": "DHL",
+                    "simulations": len(dhl_query_times),
+                    "query_avg_ms": round(float(np.mean(dhl_query_times)), 3)
+                })
+        
+        return {
+            "per_category": per_category,
+            "per_scenario": per_scenario
+        }
+    
     def record_scenario_metric(self, 
                                route_category: str,
                                route_id: int,
@@ -1592,7 +1749,7 @@ class ExperimentMetricsCollector:
         csv_paths = {}
         
         # Summary CSV
-        summary_path = self.results_path / "scenario_summary_results.csv"
+        summary_path = self.results_path / "summary_results.csv"
         with self.csv_lock:
             with open(summary_path, 'w', newline='') as f:
                 writer = csv.DictWriter(f, fieldnames=CSV_HEADERS_SCENARIO_SUMMARY)
@@ -1618,7 +1775,7 @@ class ExperimentMetricsCollector:
         csv_paths["summary"] = summary_path
         
         # Accuracy CSV
-        accuracy_path = self.results_path / "scenario_accuracy_results.csv"
+        accuracy_path = self.results_path / "accuracy_results.csv"
         with self.csv_lock:
             with open(accuracy_path, 'w', newline='') as f:
                 writer = csv.DictWriter(f, fieldnames=CSV_HEADERS_SCENARIO_ACCURACY)
@@ -1641,7 +1798,7 @@ class ExperimentMetricsCollector:
         csv_paths["accuracy"] = accuracy_path
         
         # Performance CSV
-        performance_path = self.results_path / "scenario_performance_results.csv"
+        performance_path = self.results_path / "performance_results.csv"
         with self.csv_lock:
             with open(performance_path, 'w', newline='') as f:
                 writer = csv.DictWriter(f, fieldnames=CSV_HEADERS_SCENARIO_PERFORMANCE)
@@ -1665,6 +1822,40 @@ class ExperimentMetricsCollector:
                         "total_rebuilds": 0,
                     })
         csv_paths["performance"] = performance_path
+        
+        # Construction CSV - per route_category construction data
+        construction_path = self.results_path / "construction_results.csv"
+        construction_data = self._compute_scenario_construction_aggregations()
+        with self.csv_lock:
+            with open(construction_path, 'w', newline='') as f:
+                writer = csv.DictWriter(f, fieldnames=CSV_HEADERS_SCENARIO_CONSTRUCTION)
+                writer.writeheader()
+                for row in construction_data.get("per_category", []):
+                    writer.writerow({
+                        "route_category": row.get("category"),
+                        "algorithm": row.get("algorithm"),
+                        "construction_time_ms": row.get("construction_time_ms"),
+                        "initial_label_size_mb": row.get("initial_label_size_mb"),
+                    })
+        csv_paths["construction"] = construction_path
+        
+        # Updates CSV - per route_category updates data
+        updates_path = self.results_path / "updates_results.csv"
+        updates_data = self._compute_scenario_updates_aggregations()
+        with self.csv_lock:
+            with open(updates_path, 'w', newline='') as f:
+                writer = csv.DictWriter(f, fieldnames=CSV_HEADERS_SCENARIO_UPDATES)
+                writer.writeheader()
+                for row in updates_data.get("per_category", []):
+                    writer.writerow({
+                        "route_category": row.get("category"),
+                        "algorithm": row.get("algorithm"),
+                        "lazy_update_time_ms": row.get("lazy_update_time_ms"),
+                        "peak_label_size_mb": row.get("peak_label_size_mb"),
+                        "label_size_change_pct": row.get("label_size_change_pct"),
+                        "query_avg_ms": row.get("query_avg_ms"),
+                    })
+        csv_paths["updates"] = updates_path
         
         logger.info(f"Exported scenario CSVs to: {self.results_path}")
         return csv_paths
@@ -1848,8 +2039,8 @@ class ExperimentMetricsCollector:
         # Per-trial data (each trial-batch combination)
         for trial in range(self.trials):
             for batch in range(self.batches):
-                # Find matching incident summary (incident_summaries is a dict with (trial, batch) keys)
-                batch_key = (trial + 1, batch + 1)
+                # Find matching incident summary (incident_summaries uses 0-based keys from record_route_metric)
+                batch_key = (trial, batch)  # 0-based to match how they're stored
                 if batch_key in self.incident_summaries:
                     summary = self.incident_summaries[batch_key]
                     per_trial.append({
@@ -1859,6 +2050,14 @@ class ExperimentMetricsCollector:
                         "accident": summary.num_accident,
                         "construction": summary.num_construction,
                         "congestion": summary.num_congestion,
+                        "disabled_vehicle": summary.num_disabled_vehicle,
+                        "mass_transit": summary.num_mass_transit_event,
+                        "planned_event": summary.num_planned_event,
+                        "road_hazard": summary.num_road_hazard,
+                        "road_closure": summary.num_road_closure,
+                        "weather": summary.num_weather,
+                        "lane_restriction": summary.num_lane_restriction,
+                        "other": summary.num_other,
                         "total": (summary.num_accident + summary.num_construction + 
                                  summary.num_congestion + summary.num_disabled_vehicle +
                                  summary.num_mass_transit_event + summary.num_planned_event +
@@ -1869,13 +2068,21 @@ class ExperimentMetricsCollector:
         
         # Per-batch averages (average across trials for each batch)
         for batch in range(self.batches):
-            # Get all summaries for this batch from the dictionary
+            # Get all summaries for this batch from the dictionary (0-based keys)
             batch_summaries = [summary for (trial_id, batch_id), summary in self.incident_summaries.items() 
-                              if batch_id == batch + 1]
+                              if batch_id == batch]  # 0-based comparison
             if batch_summaries:
                 avg_accident = np.mean([s.num_accident for s in batch_summaries])
                 avg_construction = np.mean([s.num_construction for s in batch_summaries])
                 avg_congestion = np.mean([s.num_congestion for s in batch_summaries])
+                avg_disabled_vehicle = np.mean([s.num_disabled_vehicle for s in batch_summaries])
+                avg_mass_transit = np.mean([s.num_mass_transit_event for s in batch_summaries])
+                avg_planned_event = np.mean([s.num_planned_event for s in batch_summaries])
+                avg_road_hazard = np.mean([s.num_road_hazard for s in batch_summaries])
+                avg_road_closure = np.mean([s.num_road_closure for s in batch_summaries])
+                avg_weather = np.mean([s.num_weather for s in batch_summaries])
+                avg_lane_restriction = np.mean([s.num_lane_restriction for s in batch_summaries])
+                avg_other = np.mean([s.num_other for s in batch_summaries])
                 avg_total = np.mean([
                     s.num_accident + s.num_construction + s.num_congestion +
                     s.num_disabled_vehicle + s.num_mass_transit_event + s.num_planned_event +
@@ -1890,6 +2097,14 @@ class ExperimentMetricsCollector:
                     "accident": round(float(avg_accident), 1),
                     "construction": round(float(avg_construction), 1),
                     "congestion": round(float(avg_congestion), 1),
+                    "disabled_vehicle": round(float(avg_disabled_vehicle), 1),
+                    "mass_transit": round(float(avg_mass_transit), 1),
+                    "planned_event": round(float(avg_planned_event), 1),
+                    "road_hazard": round(float(avg_road_hazard), 1),
+                    "road_closure": round(float(avg_road_closure), 1),
+                    "weather": round(float(avg_weather), 1),
+                    "lane_restriction": round(float(avg_lane_restriction), 1),
+                    "other": round(float(avg_other), 1),
                     "total": round(float(avg_total), 1)
                 })
         

@@ -2640,6 +2640,14 @@ const ExperimentRunner = {
                                 <th class="text-right p-3 font-semibold text-green-700">Accidents</th>
                                 <th class="text-right p-3 font-semibold text-green-700">Construction</th>
                                 <th class="text-right p-3 font-semibold text-green-700">Congestion</th>
+                                <th class="text-right p-3 font-semibold text-green-700">Disabled Vehicle</th>
+                                <th class="text-right p-3 font-semibold text-green-700">Mass Transit</th>
+                                <th class="text-right p-3 font-semibold text-green-700">Planned Event</th>
+                                <th class="text-right p-3 font-semibold text-green-700">Road Hazard</th>
+                                <th class="text-right p-3 font-semibold text-green-700">Road Closure</th>
+                                <th class="text-right p-3 font-semibold text-green-700">Weather</th>
+                                <th class="text-right p-3 font-semibold text-green-700">Lane Restriction</th>
+                                <th class="text-right p-3 font-semibold text-green-700">Other</th>
                                 <th class="text-right p-3 font-semibold text-green-700">Total</th>
                             </tr>
                         </thead>
@@ -2652,6 +2660,14 @@ const ExperimentRunner = {
                                     <td class="p-3 text-right font-mono">${row.accident}</td>
                                     <td class="p-3 text-right font-mono">${row.construction}</td>
                                     <td class="p-3 text-right font-mono">${row.congestion}</td>
+                                    <td class="p-3 text-right font-mono">${row.disabled_vehicle || 0}</td>
+                                    <td class="p-3 text-right font-mono">${row.mass_transit || 0}</td>
+                                    <td class="p-3 text-right font-mono">${row.planned_event || 0}</td>
+                                    <td class="p-3 text-right font-mono">${row.road_hazard || 0}</td>
+                                    <td class="p-3 text-right font-mono">${row.road_closure || 0}</td>
+                                    <td class="p-3 text-right font-mono">${row.weather || 0}</td>
+                                    <td class="p-3 text-right font-mono">${row.lane_restriction || 0}</td>
+                                    <td class="p-3 text-right font-mono">${row.other || 0}</td>
                                     <td class="p-3 text-right font-mono font-bold">${row.total}</td>
                                 </tr>
                             `).join('')}
@@ -2681,6 +2697,14 @@ const ExperimentRunner = {
                                 <th class="text-right p-3 font-semibold text-teal-700">Avg Accidents</th>
                                 <th class="text-right p-3 font-semibold text-teal-700">Avg Construction</th>
                                 <th class="text-right p-3 font-semibold text-teal-700">Avg Congestion</th>
+                                <th class="text-right p-3 font-semibold text-teal-700">Avg Disabled Vehicle</th>
+                                <th class="text-right p-3 font-semibold text-teal-700">Avg Mass Transit</th>
+                                <th class="text-right p-3 font-semibold text-teal-700">Avg Planned Event</th>
+                                <th class="text-right p-3 font-semibold text-teal-700">Avg Road Hazard</th>
+                                <th class="text-right p-3 font-semibold text-teal-700">Avg Road Closure</th>
+                                <th class="text-right p-3 font-semibold text-teal-700">Avg Weather</th>
+                                <th class="text-right p-3 font-semibold text-teal-700">Avg Lane Restriction</th>
+                                <th class="text-right p-3 font-semibold text-teal-700">Avg Other</th>
                                 <th class="text-right p-3 font-semibold text-teal-700">Avg Total</th>
                             </tr>
                         </thead>
@@ -2692,6 +2716,14 @@ const ExperimentRunner = {
                                     <td class="p-3 text-right font-mono">${row.accident}</td>
                                     <td class="p-3 text-right font-mono">${row.construction}</td>
                                     <td class="p-3 text-right font-mono">${row.congestion}</td>
+                                    <td class="p-3 text-right font-mono">${row.disabled_vehicle || 0}</td>
+                                    <td class="p-3 text-right font-mono">${row.mass_transit || 0}</td>
+                                    <td class="p-3 text-right font-mono">${row.planned_event || 0}</td>
+                                    <td class="p-3 text-right font-mono">${row.road_hazard || 0}</td>
+                                    <td class="p-3 text-right font-mono">${row.road_closure || 0}</td>
+                                    <td class="p-3 text-right font-mono">${row.weather || 0}</td>
+                                    <td class="p-3 text-right font-mono">${row.lane_restriction || 0}</td>
+                                    <td class="p-3 text-right font-mono">${row.other || 0}</td>
                                     <td class="p-3 text-right font-mono font-bold">${row.total}</td>
                                 </tr>
                             `).join('')}
@@ -2765,7 +2797,14 @@ const ExperimentRunner = {
                                 <th class="text-right p-3 font-semibold text-blue-700">Accidents</th>
                                 <th class="text-right p-3 font-semibold text-blue-700">Construction</th>
                                 <th class="text-right p-3 font-semibold text-blue-700">Congestion</th>
+                                <th class="text-right p-3 font-semibold text-blue-700">Disabled Vehicle</th>
+                                <th class="text-right p-3 font-semibold text-blue-700">Mass Transit</th>
+                                <th class="text-right p-3 font-semibold text-blue-700">Planned Event</th>
+                                <th class="text-right p-3 font-semibold text-blue-700">Road Hazard</th>
                                 <th class="text-right p-3 font-semibold text-blue-700">Road Closure</th>
+                                <th class="text-right p-3 font-semibold text-blue-700">Weather</th>
+                                <th class="text-right p-3 font-semibold text-blue-700">Lane Restriction</th>
+                                <th class="text-right p-3 font-semibold text-blue-700">Other</th>
                                 <th class="text-right p-3 font-semibold text-blue-700">Total</th>
                             </tr>
                         </thead>
@@ -2774,10 +2813,17 @@ const ExperimentRunner = {
                                 <tr class="hover:bg-blue-50 transition-colors">
                                     <td class="p-3"><span class="px-2 py-1 rounded text-xs font-medium ${this.getCategoryBadgeClass(row.category)}">${row.category}</span></td>
                                     <td class="p-3 text-right font-mono">${row.simulations}</td>
-                                    <td class="p-3 text-right font-mono">${row.accident}</td>
-                                    <td class="p-3 text-right font-mono">${row.construction}</td>
-                                    <td class="p-3 text-right font-mono">${row.congestion}</td>
-                                    <td class="p-3 text-right font-mono">${row.roadClosure || 0}</td>
+                                    <td class="p-3 text-right font-mono">${row.accident || 0}</td>
+                                    <td class="p-3 text-right font-mono">${row.construction || 0}</td>
+                                    <td class="p-3 text-right font-mono">${row.congestion || 0}</td>
+                                    <td class="p-3 text-right font-mono">${row.disabled_vehicle || 0}</td>
+                                    <td class="p-3 text-right font-mono">${row.mass_transit || 0}</td>
+                                    <td class="p-3 text-right font-mono">${row.planned_event || 0}</td>
+                                    <td class="p-3 text-right font-mono">${row.road_hazard || 0}</td>
+                                    <td class="p-3 text-right font-mono">${row.road_closure || 0}</td>
+                                    <td class="p-3 text-right font-mono">${row.weather || 0}</td>
+                                    <td class="p-3 text-right font-mono">${row.lane_restriction || 0}</td>
+                                    <td class="p-3 text-right font-mono">${row.other || 0}</td>
                                     <td class="p-3 text-right font-mono font-bold">${row.total}</td>
                                 </tr>
                             `).join('')}
@@ -2807,6 +2853,14 @@ const ExperimentRunner = {
                                 <th class="text-right p-3 font-semibold text-purple-700">Accidents</th>
                                 <th class="text-right p-3 font-semibold text-purple-700">Construction</th>
                                 <th class="text-right p-3 font-semibold text-purple-700">Congestion</th>
+                                <th class="text-right p-3 font-semibold text-purple-700">Disabled Vehicle</th>
+                                <th class="text-right p-3 font-semibold text-purple-700">Mass Transit</th>
+                                <th class="text-right p-3 font-semibold text-purple-700">Planned Event</th>
+                                <th class="text-right p-3 font-semibold text-purple-700">Road Hazard</th>
+                                <th class="text-right p-3 font-semibold text-purple-700">Road Closure</th>
+                                <th class="text-right p-3 font-semibold text-purple-700">Weather</th>
+                                <th class="text-right p-3 font-semibold text-purple-700">Lane Restriction</th>
+                                <th class="text-right p-3 font-semibold text-purple-700">Other</th>
                                 <th class="text-right p-3 font-semibold text-purple-700">Total</th>
                             </tr>
                         </thead>
@@ -2815,9 +2869,17 @@ const ExperimentRunner = {
                                 <tr class="hover:bg-purple-50 transition-colors">
                                     <td class="p-3 font-medium">${row.scenario}</td>
                                     <td class="p-3 text-right font-mono">${row.simulations}</td>
-                                    <td class="p-3 text-right font-mono">${row.accident}</td>
-                                    <td class="p-3 text-right font-mono">${row.construction}</td>
-                                    <td class="p-3 text-right font-mono">${row.congestion}</td>
+                                    <td class="p-3 text-right font-mono">${row.accident || 0}</td>
+                                    <td class="p-3 text-right font-mono">${row.construction || 0}</td>
+                                    <td class="p-3 text-right font-mono">${row.congestion || 0}</td>
+                                    <td class="p-3 text-right font-mono">${row.disabled_vehicle || 0}</td>
+                                    <td class="p-3 text-right font-mono">${row.mass_transit || 0}</td>
+                                    <td class="p-3 text-right font-mono">${row.planned_event || 0}</td>
+                                    <td class="p-3 text-right font-mono">${row.road_hazard || 0}</td>
+                                    <td class="p-3 text-right font-mono">${row.road_closure || 0}</td>
+                                    <td class="p-3 text-right font-mono">${row.weather || 0}</td>
+                                    <td class="p-3 text-right font-mono">${row.lane_restriction || 0}</td>
+                                    <td class="p-3 text-right font-mono">${row.other || 0}</td>
                                     <td class="p-3 text-right font-mono font-bold">${row.total}</td>
                                 </tr>
                             `).join('')}
@@ -3175,84 +3237,165 @@ const ExperimentRunner = {
         }
 
         try {
-            // Get pre-calculated aggregations from loaded results
-            const perTrial = this.resultsData.aggregated_data.construction.per_trial;
-            const perBatch = this.resultsData.aggregated_data.construction.per_batch;
+            // Check if this is scenario mode
+            const isScenarioMode = this.resultsData?.metadata?.preset_type === 'scenario';
+            
+            if (isScenarioMode) {
+                // Scenario mode: display per_category and averages
+                const perCategory = this.resultsData.aggregated_data.construction.per_category || [];
+                const averages = this.resultsData.aggregated_data.construction.averages || [];
 
-            // Render aggregated tables
-            container.innerHTML = `
-                <!-- Per-Trial Averages -->
-                <div class="bg-white rounded-xl border border-purple-200 overflow-hidden shadow-sm">
-                    <div class="bg-gradient-to-r from-purple-50 to-indigo-50 px-4 py-3 border-b border-purple-200 flex items-center justify-between">
-                        <h5 class="font-bold text-purple-900 flex items-center gap-2 mb-0">
-                            <i data-lucide="layers" class="w-4 h-4"></i>
-                            Averages Per Trial
-                        </h5>
-                        <button onclick="ExperimentRunner.exportCSV('construction', 'per-trial')"
-                            class="btn btn--success btn--xs hover:shadow-md transition-all">
-                            <i data-lucide="download" class="w-3 h-3"></i> Export CSV
-                        </button>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm">
-                            <thead class="bg-purple-50 border-b border-purple-200">
-                                <tr>
-                                    <th class="text-left p-3 font-semibold text-purple-700">Trial</th>
-                                    <th class="text-left p-3 font-semibold text-purple-700">Algorithm</th>
-                                    <th class="text-right p-3 font-semibold text-purple-700">Construction Time (ms)</th>
-                                    <th class="text-right p-3 font-semibold text-purple-700">Label Size (MB)</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-100">
-                                ${perTrial.map(row => `
-                                    <tr class="hover:bg-purple-50 transition-colors ${row.algorithm === 'HC2L' ? 'bg-purple-50' : ''}">
-                                        <td class="p-3">T${row.trial}</td>
-                                        <td class="p-3"><span class="px-2 py-1 rounded text-xs font-bold ${row.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">${row.algorithm}</span></td>
-                                        <td class="p-3 text-right font-mono">${row.construction_time_ms}</td>
-                                        <td class="p-3 text-right font-mono">${row.initial_label_size_mb}</td>
+                container.innerHTML = `
+                    <!-- Per-Category Averages -->
+                    <div class="bg-white rounded-xl border border-purple-200 overflow-hidden shadow-sm">
+                        <div class="bg-gradient-to-r from-purple-50 to-indigo-50 px-4 py-3 border-b border-purple-200 flex items-center justify-between">
+                            <h5 class="font-bold text-purple-900 flex items-center gap-2 mb-0">
+                                <i data-lucide="layers" class="w-4 h-4"></i>
+                                Construction Per Route Category
+                            </h5>
+                            <button onclick="ExperimentRunner.exportCSV('construction', 'per-category')"
+                                class="btn btn--success btn--xs hover:shadow-md transition-all">
+                                <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-purple-50 border-b border-purple-200">
+                                    <tr>
+                                        <th class="text-left p-3 font-semibold text-purple-700">Route Category</th>
+                                        <th class="text-left p-3 font-semibold text-purple-700">Algorithm</th>
+                                        <th class="text-right p-3 font-semibold text-purple-700">Construction Time (ms)</th>
+                                        <th class="text-right p-3 font-semibold text-purple-700">Label Size (MB)</th>
                                     </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100">
+                                    ${perCategory.map(row => `
+                                        <tr class="hover:bg-purple-50 transition-colors ${row.algorithm === 'HC2L' ? 'bg-purple-50' : ''}">
+                                            <td class="p-3 capitalize">${row.category}</td>
+                                            <td class="p-3"><span class="px-2 py-1 rounded text-xs font-bold ${row.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">${row.algorithm}</span></td>
+                                            <td class="p-3 text-right font-mono">${row.construction_time_ms}</td>
+                                            <td class="p-3 text-right font-mono">${row.initial_label_size_mb}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                </div>
-                
-                <!-- Per-Batch Averages -->
-                <div class="bg-white rounded-xl border border-indigo-200 overflow-hidden shadow-sm">
-                    <div class="bg-gradient-to-r from-indigo-50 to-purple-50 px-4 py-3 border-b border-indigo-200 flex items-center justify-between">
-                        <h5 class="font-bold text-indigo-900 flex items-center gap-2 mb-0">
-                            <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
-                            Averages Per Batch
-                        </h5>
-                        <button onclick="ExperimentRunner.exportCSV('construction', 'per-batch')"
-                            class="btn btn--success btn--xs hover:shadow-md transition-all">
-                            <i data-lucide="download" class="w-3 h-3"></i> Export CSV
-                        </button>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm">
-                            <thead class="bg-indigo-50 border-b border-indigo-200">
-                                <tr>
-                                    <th class="text-left p-3 font-semibold text-indigo-700">Batch</th>
-                                    <th class="text-left p-3 font-semibold text-indigo-700">Algorithm</th>
-                                    <th class="text-right p-3 font-semibold text-indigo-700">Avg Construction Time (ms)</th>
-                                    <th class="text-right p-3 font-semibold text-indigo-700">Avg Label Size (MB)</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-100">
-                                ${perBatch.map(row => `
-                                    <tr class="hover:bg-indigo-50 transition-colors ${row.algorithm === 'HC2L' ? 'bg-indigo-50' : ''}">
-                                        <td class="p-3">Batch ${row.batch}</td>
-                                        <td class="p-3"><span class="px-2 py-1 rounded text-xs font-bold ${row.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">${row.algorithm}</span></td>
-                                        <td class="p-3 text-right font-mono">${row.avg_construction_time_ms}</td>
-                                        <td class="p-3 text-right font-mono">${row.avg_label_size_mb}</td>
+                    
+                    <!-- Overall Averages -->
+                    <div class="bg-white rounded-xl border border-indigo-200 overflow-hidden shadow-sm">
+                        <div class="bg-gradient-to-r from-indigo-50 to-purple-50 px-4 py-3 border-b border-indigo-200 flex items-center justify-between">
+                            <h5 class="font-bold text-indigo-900 flex items-center gap-2 mb-0">
+                                <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+                                Overall Averages
+                            </h5>
+                            <button onclick="ExperimentRunner.exportCSV('construction', 'averages')"
+                                class="btn btn--success btn--xs hover:shadow-md transition-all">
+                                <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-indigo-50 border-b border-indigo-200">
+                                    <tr>
+                                        <th class="text-left p-3 font-semibold text-indigo-700">Algorithm</th>
+                                        <th class="text-right p-3 font-semibold text-indigo-700">Avg Construction Time (ms)</th>
+                                        <th class="text-right p-3 font-semibold text-indigo-700">Avg Label Size (MB)</th>
                                     </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100">
+                                    ${averages.map(row => `
+                                        <tr class="hover:bg-indigo-50 transition-colors ${row.algorithm === 'HC2L' ? 'bg-indigo-50' : ''}">
+                                            <td class="p-3"><span class="px-2 py-1 rounded text-xs font-bold ${row.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">${row.algorithm}</span></td>
+                                            <td class="p-3 text-right font-mono">${row.avg_construction_time_ms}</td>
+                                            <td class="p-3 text-right font-mono">${row.avg_label_size_mb}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                </div>
-            `;
+                `;
+            } else {
+                // Standard mode: display per_trial and per_batch
+                const perTrial = this.resultsData.aggregated_data.construction.per_trial;
+                const perBatch = this.resultsData.aggregated_data.construction.per_batch;
+
+                // Render aggregated tables
+                container.innerHTML = `
+                    <!-- Per-Trial Averages -->
+                    <div class="bg-white rounded-xl border border-purple-200 overflow-hidden shadow-sm">
+                        <div class="bg-gradient-to-r from-purple-50 to-indigo-50 px-4 py-3 border-b border-purple-200 flex items-center justify-between">
+                            <h5 class="font-bold text-purple-900 flex items-center gap-2 mb-0">
+                                <i data-lucide="layers" class="w-4 h-4"></i>
+                                Averages Per Trial
+                            </h5>
+                            <button onclick="ExperimentRunner.exportCSV('construction', 'per-trial')"
+                                class="btn btn--success btn--xs hover:shadow-md transition-all">
+                                <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-purple-50 border-b border-purple-200">
+                                    <tr>
+                                        <th class="text-left p-3 font-semibold text-purple-700">Trial</th>
+                                        <th class="text-left p-3 font-semibold text-purple-700">Algorithm</th>
+                                        <th class="text-right p-3 font-semibold text-purple-700">Construction Time (ms)</th>
+                                        <th class="text-right p-3 font-semibold text-purple-700">Label Size (MB)</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100">
+                                    ${perTrial.map(row => `
+                                        <tr class="hover:bg-purple-50 transition-colors ${row.algorithm === 'HC2L' ? 'bg-purple-50' : ''}">
+                                            <td class="p-3">T${row.trial}</td>
+                                            <td class="p-3"><span class="px-2 py-1 rounded text-xs font-bold ${row.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">${row.algorithm}</span></td>
+                                            <td class="p-3 text-right font-mono">${row.construction_time_ms}</td>
+                                            <td class="p-3 text-right font-mono">${row.initial_label_size_mb}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- Per-Batch Averages -->
+                    <div class="bg-white rounded-xl border border-indigo-200 overflow-hidden shadow-sm">
+                        <div class="bg-gradient-to-r from-indigo-50 to-purple-50 px-4 py-3 border-b border-indigo-200 flex items-center justify-between">
+                            <h5 class="font-bold text-indigo-900 flex items-center gap-2 mb-0">
+                                <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+                                Averages Per Batch
+                            </h5>
+                            <button onclick="ExperimentRunner.exportCSV('construction', 'per-batch')"
+                                class="btn btn--success btn--xs hover:shadow-md transition-all">
+                                <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-indigo-50 border-b border-indigo-200">
+                                    <tr>
+                                        <th class="text-left p-3 font-semibold text-indigo-700">Batch</th>
+                                        <th class="text-left p-3 font-semibold text-indigo-700">Algorithm</th>
+                                        <th class="text-right p-3 font-semibold text-indigo-700">Avg Construction Time (ms)</th>
+                                        <th class="text-right p-3 font-semibold text-indigo-700">Avg Label Size (MB)</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100">
+                                    ${perBatch.map(row => `
+                                        <tr class="hover:bg-indigo-50 transition-colors ${row.algorithm === 'HC2L' ? 'bg-indigo-50' : ''}">
+                                            <td class="p-3">Batch ${row.batch}</td>
+                                            <td class="p-3"><span class="px-2 py-1 rounded text-xs font-bold ${row.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">${row.algorithm}</span></td>
+                                            <td class="p-3 text-right font-mono">${row.avg_construction_time_ms}</td>
+                                            <td class="p-3 text-right font-mono">${row.avg_label_size_mb}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            }
 
             // Refresh Lucide icons
             if (typeof lucide !== 'undefined') {
@@ -3283,104 +3426,194 @@ const ExperimentRunner = {
             return;
         }
 
-        // Get pre-calculated aggregations
-        const perTrial = this.resultsData.aggregated_data.updates.per_trial;
-        const perBatch = this.resultsData.aggregated_data.updates.per_batch;
+        // Check if this is scenario mode
+        const isScenarioMode = this.resultsData?.metadata?.preset_type === 'scenario';
+        
+        if (isScenarioMode) {
+            // Scenario mode: display per_category and per_scenario
+            const perCategory = this.resultsData.aggregated_data.updates.per_category || [];
+            const perScenario = this.resultsData.aggregated_data.updates.per_scenario || [];
 
-        container.innerHTML = `
-            <!-- Averages Section -->
-            <div class="space-y-4">
-                <!-- Per-Trial Averages -->
-                <div class="bg-white rounded-xl border border-indigo-200 overflow-hidden shadow-sm">
-                    <div class="bg-gradient-to-r from-indigo-50 to-purple-50 px-4 py-3 border-b border-indigo-200 flex items-center justify-between">
-                        <h5 class="font-bold text-indigo-900 flex items-center gap-2 mb-0">
-                            <i data-lucide="layers" class="w-4 h-4"></i>
-                            Averages Per Trial
-                        </h5>
-                        <button onclick="ExperimentRunner.exportCSV('updates', 'per-trial')"
-                            class="btn btn--success btn--xs hover:shadow-md transition-all">
-                            <i data-lucide="download" class="w-3 h-3"></i> Export CSV
-                        </button>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm">
-                            <thead class="bg-indigo-50 border-b border-indigo-200">
-                                <tr>
-                                    <th class="text-left p-3 font-semibold text-indigo-700">Trial</th>
-                                    <th class="text-left p-3 font-semibold text-indigo-700">Batch</th>
-                                    <th class="text-left p-3 font-semibold text-indigo-700">Algorithm</th>
-                                    <th class="text-center p-3 font-semibold text-indigo-700">Disruption Level</th>
-                                    <th class="text-right p-3 font-semibold text-indigo-700">Lazy Update (ms)</th>
-                                    <th class="text-right p-3 font-semibold text-indigo-700">Threshold Rebuild (ms)</th>
-                                    <th class="text-right p-3 font-semibold text-indigo-700">Peak Label (MB)</th>
-                                    <th class="text-right p-3 font-semibold text-indigo-700">% Size Change</th>
-                                    <th class="text-right p-3 font-semibold text-indigo-700">Query Avg (ms)</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-100">
-                                ${perTrial.map(row => `
-                                    <tr class="hover:bg-indigo-50 transition-colors">
-                                        <td class="p-3">T${row.trial}</td>
-                                        <td class="p-3">B${row.batch}</td>
-                                        <td class="p-3"><span class="px-2 py-1 rounded text-xs font-bold ${row.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">${row.algorithm}</span></td>
-                                        <td class="p-3 text-center"><span class="px-2 py-1 rounded text-xs font-medium ${this.getLevelBadgeClass(row.level)}">${row.level}</span></td>
-                                        <td class="p-3 text-right font-mono">${row.lazy_update_time_ms}</td>
-                                        <td class="p-3 text-right font-mono">${row.threshold_rebuild_time_ms}</td>
-                                        <td class="p-3 text-right font-mono">${row.peak_label_size_mb}</td>
-                                        <td class="p-3 text-right font-mono text-${row.label_size_change_pct >= 0 ? 'green' : 'red'}-600">${row.label_size_change_pct > 0 ? '+' : ''}${row.label_size_change_pct}%</td>
-                                        <td class="p-3 text-right font-mono">${row.query_avg_ms}</td>
+            container.innerHTML = `
+                <!-- Averages Section -->
+                <div class="space-y-4">
+                    <!-- Per-Category Updates -->
+                    <div class="bg-white rounded-xl border border-indigo-200 overflow-hidden shadow-sm">
+                        <div class="bg-gradient-to-r from-indigo-50 to-purple-50 px-4 py-3 border-b border-indigo-200 flex items-center justify-between">
+                            <h5 class="font-bold text-indigo-900 flex items-center gap-2 mb-0">
+                                <i data-lucide="layers" class="w-4 h-4"></i>
+                                Updates Per Route Category
+                            </h5>
+                            <button onclick="ExperimentRunner.exportCSV('updates', 'per-category')"
+                                class="btn btn--success btn--xs hover:shadow-md transition-all">
+                                <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-indigo-50 border-b border-indigo-200">
+                                    <tr>
+                                        <th class="text-left p-3 font-semibold text-indigo-700">Route Category</th>
+                                        <th class="text-left p-3 font-semibold text-indigo-700">Algorithm</th>
+                                        <th class="text-right p-3 font-semibold text-indigo-700">Lazy Update (ms)</th>
+                                        <th class="text-right p-3 font-semibold text-indigo-700">Peak Label (MB)</th>
+                                        <th class="text-right p-3 font-semibold text-indigo-700">% Size Change</th>
+                                        <th class="text-right p-3 font-semibold text-indigo-700">Query Avg (ms)</th>
                                     </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100">
+                                    ${perCategory.map(row => `
+                                        <tr class="hover:bg-indigo-50 transition-colors">
+                                            <td class="p-3 capitalize">${row.category}</td>
+                                            <td class="p-3"><span class="px-2 py-1 rounded text-xs font-bold ${row.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">${row.algorithm}</span></td>
+                                            <td class="p-3 text-right font-mono">${row.lazy_update_time_ms}</td>
+                                            <td class="p-3 text-right font-mono">${row.peak_label_size_mb}</td>
+                                            <td class="p-3 text-right font-mono text-${row.label_size_change_pct >= 0 ? 'green' : 'red'}-600">${row.label_size_change_pct > 0 ? '+' : ''}${row.label_size_change_pct}%</td>
+                                            <td class="p-3 text-right font-mono">${row.query_avg_ms}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- Per-Scenario Updates -->
+                    <div class="bg-white rounded-xl border border-purple-200 overflow-hidden shadow-sm">
+                        <div class="bg-gradient-to-r from-purple-50 to-pink-50 px-4 py-3 border-b border-purple-200 flex items-center justify-between">
+                            <h5 class="font-bold text-purple-900 flex items-center gap-2 mb-0">
+                                <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+                                Updates Per Scenario
+                            </h5>
+                            <button onclick="ExperimentRunner.exportCSV('updates', 'per-scenario')"
+                                class="btn btn--success btn--xs hover:shadow-md transition-all">
+                                <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-purple-50 border-b border-purple-200">
+                                    <tr>
+                                        <th class="text-left p-3 font-semibold text-purple-700">Scenario</th>
+                                        <th class="text-left p-3 font-semibold text-purple-700">Algorithm</th>
+                                        <th class="text-right p-3 font-semibold text-purple-700">Simulations</th>
+                                        <th class="text-right p-3 font-semibold text-purple-700">Query Avg (ms)</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100">
+                                    ${perScenario.map(row => `
+                                        <tr class="hover:bg-purple-50 transition-colors">
+                                            <td class="p-3">${row.scenario}</td>
+                                            <td class="p-3"><span class="px-2 py-1 rounded text-xs font-bold ${row.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">${row.algorithm}</span></td>
+                                            <td class="p-3 text-right font-mono">${row.simulations}</td>
+                                            <td class="p-3 text-right font-mono">${row.query_avg_ms}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
-                
-                <!-- Per-Batch Averages -->
-                <div class="bg-white rounded-xl border border-purple-200 overflow-hidden shadow-sm">
-                    <div class="bg-gradient-to-r from-purple-50 to-pink-50 px-4 py-3 border-b border-purple-200 flex items-center justify-between">
-                        <h5 class="font-bold text-purple-900 flex items-center gap-2 mb-0">
-                            <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
-                            Averages Per Batch
-                        </h5>
-                        <button onclick="ExperimentRunner.exportCSV('updates', 'per-batch')"
-                            class="btn btn--success btn--xs hover:shadow-md transition-all">
-                            <i data-lucide="download" class="w-3 h-3"></i> Export CSV
-                        </button>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm">
-                            <thead class="bg-purple-50 border-b border-purple-200">
-                                <tr>
-                                    <th class="text-left p-3 font-semibold text-purple-700">Batch</th>
-                                    <th class="text-left p-3 font-semibold text-purple-700">Algorithm</th>
-                                    <th class="text-center p-3 font-semibold text-purple-700">Disruption Level</th>
-                                    <th class="text-right p-3 font-semibold text-purple-700">Lazy Update (ms)</th>
-                                    <th class="text-right p-3 font-semibold text-purple-700">Threshold Rebuild (ms)</th>
-                                    <th class="text-right p-3 font-semibold text-purple-700">Peak Label (MB)</th>
-                                    <th class="text-right p-3 font-semibold text-purple-700">% Size Change</th>
-                                    <th class="text-right p-3 font-semibold text-purple-700">Query Avg (ms)</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-100">
-                                ${perBatch.map(row => `
-                                    <tr class="hover:bg-purple-50 transition-colors">
-                                        <td class="p-3">Batch ${row.batch}</td>
-                                        <td class="p-3"><span class="px-2 py-1 rounded text-xs font-bold ${row.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">${row.algorithm}</span></td>
-                                        <td class="p-3 text-center"><span class="px-2 py-1 rounded text-xs font-medium ${this.getLevelBadgeClass(row.level)}">${row.level}</span></td>
-                                        <td class="p-3 text-right font-mono">${row.lazy_update_time_ms}</td>
-                                        <td class="p-3 text-right font-mono">${row.threshold_rebuild_time_ms}</td>
-                                        <td class="p-3 text-right font-mono">${row.peak_label_size_mb}</td>
-                                        <td class="p-3 text-right font-mono text-${row.label_size_change_pct >= 0 ? 'green' : 'red'}-600">${row.label_size_change_pct > 0 ? '+' : ''}${row.label_size_change_pct}%</td>
-                                        <td class="p-3 text-right font-mono">${row.query_avg_ms}</td>
+            `;
+        } else {
+            // Standard mode: display per_trial and per_batch
+            const perTrial = this.resultsData.aggregated_data.updates.per_trial;
+            const perBatch = this.resultsData.aggregated_data.updates.per_batch;
+
+            container.innerHTML = `
+                <!-- Averages Section -->
+                <div class="space-y-4">
+                    <!-- Per-Trial Averages -->
+                    <div class="bg-white rounded-xl border border-indigo-200 overflow-hidden shadow-sm">
+                        <div class="bg-gradient-to-r from-indigo-50 to-purple-50 px-4 py-3 border-b border-indigo-200 flex items-center justify-between">
+                            <h5 class="font-bold text-indigo-900 flex items-center gap-2 mb-0">
+                                <i data-lucide="layers" class="w-4 h-4"></i>
+                                Averages Per Trial
+                            </h5>
+                            <button onclick="ExperimentRunner.exportCSV('updates', 'per-trial')"
+                                class="btn btn--success btn--xs hover:shadow-md transition-all">
+                                <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-indigo-50 border-b border-indigo-200">
+                                    <tr>
+                                        <th class="text-left p-3 font-semibold text-indigo-700">Trial</th>
+                                        <th class="text-left p-3 font-semibold text-indigo-700">Batch</th>
+                                        <th class="text-left p-3 font-semibold text-indigo-700">Algorithm</th>
+                                        <th class="text-center p-3 font-semibold text-indigo-700">Disruption Level</th>
+                                        <th class="text-right p-3 font-semibold text-indigo-700">Lazy Update (ms)</th>
+                                        <th class="text-right p-3 font-semibold text-indigo-700">Threshold Rebuild (ms)</th>
+                                        <th class="text-right p-3 font-semibold text-indigo-700">Peak Label (MB)</th>
+                                        <th class="text-right p-3 font-semibold text-indigo-700">% Size Change</th>
+                                        <th class="text-right p-3 font-semibold text-indigo-700">Query Avg (ms)</th>
                                     </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100">
+                                    ${perTrial.map(row => `
+                                        <tr class="hover:bg-indigo-50 transition-colors">
+                                            <td class="p-3">T${row.trial}</td>
+                                            <td class="p-3">B${row.batch}</td>
+                                            <td class="p-3"><span class="px-2 py-1 rounded text-xs font-bold ${row.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">${row.algorithm}</span></td>
+                                            <td class="p-3 text-center"><span class="px-2 py-1 rounded text-xs font-medium ${this.getLevelBadgeClass(row.level)}">${row.level}</span></td>
+                                            <td class="p-3 text-right font-mono">${row.lazy_update_time_ms}</td>
+                                            <td class="p-3 text-right font-mono">${row.threshold_rebuild_time_ms}</td>
+                                            <td class="p-3 text-right font-mono">${row.peak_label_size_mb}</td>
+                                            <td class="p-3 text-right font-mono text-${row.label_size_change_pct >= 0 ? 'green' : 'red'}-600">${row.label_size_change_pct > 0 ? '+' : ''}${row.label_size_change_pct}%</td>
+                                            <td class="p-3 text-right font-mono">${row.query_avg_ms}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- Per-Batch Averages -->
+                    <div class="bg-white rounded-xl border border-purple-200 overflow-hidden shadow-sm">
+                        <div class="bg-gradient-to-r from-purple-50 to-pink-50 px-4 py-3 border-b border-purple-200 flex items-center justify-between">
+                            <h5 class="font-bold text-purple-900 flex items-center gap-2 mb-0">
+                                <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+                                Averages Per Batch
+                            </h5>
+                            <button onclick="ExperimentRunner.exportCSV('updates', 'per-batch')"
+                                class="btn btn--success btn--xs hover:shadow-md transition-all">
+                                <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-purple-50 border-b border-purple-200">
+                                    <tr>
+                                        <th class="text-left p-3 font-semibold text-purple-700">Batch</th>
+                                        <th class="text-left p-3 font-semibold text-purple-700">Algorithm</th>
+                                        <th class="text-center p-3 font-semibold text-purple-700">Disruption Level</th>
+                                        <th class="text-right p-3 font-semibold text-purple-700">Lazy Update (ms)</th>
+                                        <th class="text-right p-3 font-semibold text-purple-700">Threshold Rebuild (ms)</th>
+                                        <th class="text-right p-3 font-semibold text-purple-700">Peak Label (MB)</th>
+                                        <th class="text-right p-3 font-semibold text-purple-700">% Size Change</th>
+                                        <th class="text-right p-3 font-semibold text-purple-700">Query Avg (ms)</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100">
+                                    ${perBatch.map(row => `
+                                        <tr class="hover:bg-purple-50 transition-colors">
+                                            <td class="p-3">Batch ${row.batch}</td>
+                                            <td class="p-3"><span class="px-2 py-1 rounded text-xs font-bold ${row.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">${row.algorithm}</span></td>
+                                            <td class="p-3 text-center"><span class="px-2 py-1 rounded text-xs font-medium ${this.getLevelBadgeClass(row.level)}">${row.level}</span></td>
+                                            <td class="p-3 text-right font-mono">${row.lazy_update_time_ms}</td>
+                                            <td class="p-3 text-right font-mono">${row.threshold_rebuild_time_ms}</td>
+                                            <td class="p-3 text-right font-mono">${row.peak_label_size_mb}</td>
+                                            <td class="p-3 text-right font-mono text-${row.label_size_change_pct >= 0 ? 'green' : 'red'}-600">${row.label_size_change_pct > 0 ? '+' : ''}${row.label_size_change_pct}%</td>
+                                            <td class="p-3 text-right font-mono">${row.query_avg_ms}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
-            </div>
-        `;
+            `;
+        }
 
         // Refresh Lucide icons
         if (typeof lucide !== 'undefined') {
