@@ -428,10 +428,11 @@ class DisruptionCacheManager:
     PRELOAD_THRESHOLD = 0.8  # Preload next chunk at 80% completion
     GENERATION_BATCH_SIZE = 10  # Generate disruptions in batches of 10
     
-    def __init__(self, base_path: Path, is_preset: bool = True, disruption_mode: str = "preset", disruption_settings: Dict = None):
+    def __init__(self, base_path: Path, is_preset: bool = True, disruption_mode: str = "preset", disruption_settings: Dict = None, disruption_count: int = 1000):
         self.base_path = base_path
         self.is_preset = is_preset
         self.disruption_mode = disruption_mode  # "preset", "variety_preset", "scenario", or "random"
+        self.disruption_count = disruption_count  # Custom disruption count (default 1000)
         self.disruption_settings = disruption_settings or {
             "ratio_flow": 95,
             "ratio_incident": 5,
@@ -557,11 +558,12 @@ class DisruptionCacheManager:
         
     def get_disruption_path(self, batch_idx: int, route_idx: int) -> Path:
         """Get path to disruption set based on preset/temporary mode and disruption_mode"""
+        # Determine base set name
         if self.disruption_mode == "variety_preset":
             # Variety preset: Use light/medium/heavy based on batch index
             level_names = ["light", "medium", "heavy"]
             level = level_names[batch_idx % 3]  # Cycle through levels for batches
-            set_name = f"set_{level}_route_{route_idx}"
+            base_name = f"set_{level}_route_{route_idx}"
         elif self.disruption_mode == "scenario":
             # Scenario preset: Format is set_scenario_ds{num}_{severity}_route_{idx}
             # batch_idx encodes: scenario (0-9) * 3 + severity (0=light, 1=medium, 2=heavy)
@@ -570,13 +572,20 @@ class DisruptionCacheManager:
             scenario_num = scenario_idx + 1  # DS1 to DS10
             severity_names = ["light", "medium", "heavy"]
             severity = severity_names[severity_idx]
-            set_name = f"set_scenario_ds{scenario_num}_{severity}_route_{route_idx}"
+            base_name = f"set_scenario_ds{scenario_num}_{severity}_route_{route_idx}"
         elif self.is_preset:
             # Preset format: set_batch_X_route_Y
-            set_name = f"set_batch_{batch_idx}_route_{route_idx}"
+            base_name = f"set_batch_{batch_idx}_route_{route_idx}"
         else:
             # Temporary format: set_trial_X_route_Y
-            set_name = f"set_trial_{batch_idx}_route_{route_idx}"
+            base_name = f"set_trial_{batch_idx}_route_{route_idx}"
+        
+        # Add custom count suffix if not default (1000)
+        if self.disruption_count != 1000:
+            set_name = f"{base_name}_cnt_{self.disruption_count}"
+        else:
+            set_name = base_name
+            
         return self.base_path / "disruptions" / set_name
     
     def load_disruption(self, batch_idx: int, route_idx: int, thread_id: str) -> Optional[Dict]:
@@ -660,14 +669,18 @@ class DisruptionCacheManager:
             ratio_flow = self.disruption_settings.get("ratio_flow", 95)
             ratio_incident = self.disruption_settings.get("ratio_incident", 5)
             
-            # For scenario mode, check if flow disruption should be generated
+            # For scenario mode, override ratio based on scenario definition
             if self.disruption_mode == "scenario":
                 scenario_idx = batch_idx // 3
                 scenario_id = f"DS{scenario_idx + 1}"
                 scenario_def = DISRUPTION_SCENARIOS.get(scenario_id, {})
                 has_flow_disruption = scenario_def.get("flow_disruption", False)
-                if not has_flow_disruption:
-                    # Only generate incidents, no flow disruptions
+                if has_flow_disruption:
+                    # Scenario has congestion: 1/3 flow (congestion), 2/3 incidents
+                    ratio_flow = 33
+                    ratio_incident = 67
+                else:
+                    # No congestion: 0% flow, 100% incidents
                     ratio_flow = 0
                     ratio_incident = 100
             
@@ -677,8 +690,8 @@ class DisruptionCacheManager:
                 logger.warning("No matched edges available for disruption generation")
                 return
             
-            # Calculate counts based on ratio (total should be 1000 disruptions per batch)
-            total_disruptions = 1000
+            # Calculate counts based on ratio (using custom disruption count)
+            total_disruptions = self.disruption_count
             total_ratio = ratio_flow + ratio_incident
             flow_count = int((ratio_flow / total_ratio) * total_disruptions)
             incident_count = total_disruptions - flow_count
@@ -1703,11 +1716,13 @@ class ExperimentRunner:
                 "severity_min": 0.1,
                 "severity_max": 0.9
             })
+            disruption_count = config.get("disruption_count", 1000)
             self.disruption_caches[experiment_id] = DisruptionCacheManager(
                 base_path, 
                 is_preset=is_preset,
                 disruption_mode=disruption_mode,
-                disruption_settings=disruption_settings
+                disruption_settings=disruption_settings,
+                disruption_count=disruption_count
             )
             
             # Initialize control events

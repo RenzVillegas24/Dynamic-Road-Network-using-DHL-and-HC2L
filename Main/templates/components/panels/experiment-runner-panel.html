@@ -254,21 +254,33 @@
               <div class="flex-1">
                 <label class="form-group__label text-xs text-amber-700">Flow %</label>
                 <input type="number" id="experiment-ratio-flow" value="95" min="0" max="100"
-                  onchange="document.getElementById('experiment-ratio-incident').value = 100 - this.value"
+                  onchange="document.getElementById('experiment-ratio-incident').value = 100 - this.value; ExperimentRunner.updateDisruptionTotal()"
                   class="form-input text-center font-semibold">
               </div>
               <span class="text-gray-400 font-bold text-xl pt-4">:</span>
               <div class="flex-1">
                 <label class="form-group__label text-xs text-orange-700">Incident %</label>
                 <input type="number" id="experiment-ratio-incident" value="5" min="0" max="100"
-                  onchange="document.getElementById('experiment-ratio-flow').value = 100 - this.value"
+                  onchange="document.getElementById('experiment-ratio-flow').value = 100 - this.value; ExperimentRunner.updateDisruptionTotal()"
                   class="form-input text-center font-semibold">
               </div>
             </div>
-            <p class="text-xs text-muted mt-1">Total: 1,000 disruptions (950 flow + 50 incidents at 95:5)</p>
+            <p class="text-xs text-muted mt-1" id="experiment-disruption-total">Total: 1,000 disruptions (950 flow + 50 incidents at 95:5)</p>
+          </div>
+
+          <!-- Custom Disruption Count -->
+          <div class="border-t border-amber-200 pt-3">
+            <label class="form-group__label">Custom Disruption Count</label>
+            <div class="flex items-center gap-3">
+              <input type="number" id="experiment-disruption-count" value="1000" min="1" max="10000" step="100"
+                oninput="ExperimentRunner.updateDisruptionTotal()"
+                class="form-input flex-1">
+              <span class="badge badge--warning whitespace-nowrap">disruptions</span>
+            </div>
+            <p class="text-xs text-gray-500 mt-1">Total disruptions per batch (affects folder naming: set_*_route_*_cnt_&lt;number&gt;)</p>
           </div>
         </div>
-      </div><!-- End of experiment-standard-config -->
+      </div><!-- End of experiment-disruption-config -->
 
       <!-- Scenario Preset Configuration (hidden by default) -->
       <div id="experiment-scenario-config" class="hidden space-y-4">
@@ -353,6 +365,30 @@
               <div class="flex items-start gap-2 p-2 bg-orange-50 rounded">
                 <span class="badge badge--warning text-[10px]">DS10</span>
                 <span>Accident + Construction + Congestion</span>
+              </div>
+            </div>
+            
+            <!-- Custom Disruption Count for Scenarios -->
+            <div class="border-t border-orange-200 pt-3 mt-3">
+              <label class="form-group__label">Custom Disruption Count</label>
+              <div class="flex items-center gap-3">
+                <input type="number" id="experiment-scenario-disruption-count" value="1000" min="1" max="10000" step="100"
+                  class="form-input flex-1">
+                <span class="badge badge--warning whitespace-nowrap">disruptions</span>
+              </div>
+              <p class="text-xs text-gray-500 mt-1">Total disruptions per scenario (affects folder naming: set_scenario_*_*_route_*_cnt_&lt;number&gt;)</p>
+            </div>
+            
+            <!-- Flow:Incident Ratio Info for Scenarios -->
+            <div class="border-t border-orange-200 pt-3 mt-3">
+              <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <h5 class="text-xs font-bold text-blue-800 mb-2">📊 Flow : Incident Ratio (Auto-determined)</h5>
+                <div class="text-xs text-blue-700 space-y-1">
+                  <p><strong>Scenarios with Congestion (DS1, DS2, DS3, DS5, DS6, DS9, DS10):</strong></p>
+                  <p class="ml-3">• 33% Flow (Congestion) : 67% Incidents</p>
+                  <p class="mt-2"><strong>Scenarios without Congestion (DS4, DS7, DS8):</strong></p>
+                  <p class="ml-3">• 0% Flow : 100% Incidents</p>
+                </div>
               </div>
             </div>
           </div>

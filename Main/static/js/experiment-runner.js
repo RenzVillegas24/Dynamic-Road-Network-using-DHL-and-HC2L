@@ -569,6 +569,11 @@ const ExperimentRunner = {
         const ratioFlow = parseInt(document.getElementById('experiment-ratio-flow')?.value || 95);
         const ratioIncident = parseInt(document.getElementById('experiment-ratio-incident')?.value || 5);
 
+        // Custom disruption count
+        const disruptionCount = presetType === 'scenario'
+            ? parseInt(document.getElementById('experiment-scenario-disruption-count')?.value || 1000)
+            : parseInt(document.getElementById('experiment-disruption-count')?.value || 1000);
+
         // Tau settings
         const tauMode = document.querySelector('input[name="experiment-tau-mode"]:checked')?.value || 'random';
         const tauScope = document.querySelector('input[name="experiment-tau-scope"]:checked')?.value || 'per-trial-route';
@@ -584,6 +589,7 @@ const ExperimentRunner = {
             algorithms: ['DHL', 'HC2L'],
             route_mode: presetType === 'scenario' ? 'scenario' : routeMode,
             disruption_mode: disruptionMode,
+            disruption_count: disruptionCount,
             disruption_settings: {
                 ratio_flow: ratioFlow,
                 ratio_incident: ratioIncident,
@@ -1327,6 +1333,9 @@ const ExperimentRunner = {
         }
         // Tau Settings are now shown for both standard and scenario presets
         
+        // Update Flow:Incident ratio display based on preset type
+        this.updateFlowIncidentRatioForPreset(presetType);
+        
         // Update settings
         if (presetType === 'scenario') {
             // Scenario preset: 3 categories × 10 routes × 10 scenarios × 3 severities = 900 simulations
@@ -1348,6 +1357,32 @@ const ExperimentRunner = {
         }
     },
 
+    updateFlowIncidentRatioForPreset(presetType) {
+        const flowInput = document.getElementById('experiment-ratio-flow');
+        const incidentInput = document.getElementById('experiment-ratio-incident');
+        
+        if (!flowInput || !incidentInput) return;
+        
+        if (presetType === 'scenario') {
+            // For scenario preset, show info message that ratio is determined by scenario
+            flowInput.value = 0;
+            incidentInput.value = 100;
+            flowInput.disabled = true;
+            incidentInput.disabled = true;
+            flowInput.title = "Ratio is automatically determined by disruption scenario (33:67 if congestion present, 0:100 otherwise)";
+            incidentInput.title = "Ratio is automatically determined by disruption scenario (33:67 if congestion present, 0:100 otherwise)";
+        } else {
+            // For standard preset, reset to default 95:5 and enable editing
+            flowInput.value = 95;
+            incidentInput.value = 5;
+            flowInput.disabled = false;
+            incidentInput.disabled = false;
+            flowInput.title = "";
+            incidentInput.title = "";
+            this.updateDisruptionTotal();
+        }
+    },
+
     updateDisruptionModeUI() {
         const mode = document.querySelector('input[name="experiment-disruption-mode"]:checked')?.value || 'preset';
 
@@ -1362,6 +1397,20 @@ const ExperimentRunner = {
         if (typeof lucide !== 'undefined') {
             lucide.createIcons();
         }
+    },
+
+    updateDisruptionTotal() {
+        const totalEl = document.getElementById('experiment-disruption-total');
+        if (!totalEl) return;
+
+        const disruptionCount = parseInt(document.getElementById('experiment-disruption-count')?.value || 1000);
+        const flowPercent = parseInt(document.getElementById('experiment-ratio-flow')?.value || 95);
+        const incidentPercent = parseInt(document.getElementById('experiment-ratio-incident')?.value || 5);
+
+        const flowCount = Math.round(disruptionCount * flowPercent / 100);
+        const incidentCount = Math.round(disruptionCount * incidentPercent / 100);
+
+        totalEl.textContent = `Total: ${disruptionCount.toLocaleString()} disruptions (${flowCount.toLocaleString()} flow + ${incidentCount.toLocaleString()} incidents at ${flowPercent}:${incidentPercent})`;
     },
 
     updateThreadCountDisplay() {
