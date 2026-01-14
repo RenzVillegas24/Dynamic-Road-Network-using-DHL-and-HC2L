@@ -4191,6 +4191,9 @@ class ExperimentRunner:
             for csv_name, csv_path in csv_files.items():
                 logger.success(f"  - CSV ({csv_name}): {csv_path.name}")
             
+            # Clear CSV cache for this result since new files were written
+            clear_csv_cache(experiment_id)
+            
             return json_path
             
         except Exception as e:
@@ -5362,6 +5365,25 @@ def _add_numeric_averages(agg_dict, rows):
         agg_dict['accuracy_rate'] = round(correct_count / len(rows), 4) if rows else 0
 
 
+def clear_csv_cache(result_id=None):
+    """
+    Clear the CSV row count cache.
+    If result_id is provided, only clear cache for that result.
+    Otherwise, clear the entire cache.
+    """
+    if not hasattr(get_result_csv_data, '_row_count_cache'):
+        return
+    
+    if result_id:
+        # Clear only cache entries for this result
+        keys_to_delete = [k for k in get_result_csv_data._row_count_cache.keys() if k.startswith(f"{result_id}_")]
+        for key in keys_to_delete:
+            del get_result_csv_data._row_count_cache[key]
+    else:
+        # Clear entire cache
+        get_result_csv_data._row_count_cache.clear()
+
+
 @experiment_bp.route('/results/<result_id>/csv/<csv_type>/data', methods=['GET'])
 def get_result_csv_data(result_id, csv_type):
     """
@@ -5418,30 +5440,74 @@ def get_result_csv_data(result_id, csv_type):
         filter_batch = request.args.get('filter_batch')
         filter_algorithm = request.args.get('filter_algorithm')
         
-        # Read CSV file
-        all_rows = []
+        # Check if filters are applied
+        has_filters = bool(filter_trial or filter_batch or filter_algorithm)
+        
+        # Optimized pagination: Only read the rows we need
         headers = []
-        with open(csv_path, 'r', newline='') as f:
-            reader = csv_module.DictReader(f)
-            headers = reader.fieldnames or []
-            for row in reader:
-                # Apply filters if specified
-                if filter_trial and str(row.get('trial_id', '')) != filter_trial:
-                    continue
-                if filter_batch and str(row.get('batch_id', '')) != filter_batch:
-                    continue
-                if filter_algorithm and row.get('algorithm', '').upper() != filter_algorithm.upper():
-                    continue
-                all_rows.append(row)
+        page_data = []
+        total_rows = 0
+        
+        if has_filters:
+            # With filters, we need to scan all rows (but only once)
+            all_rows = []
+            with open(csv_path, 'r', newline='') as f:
+                reader = csv_module.DictReader(f)
+                headers = reader.fieldnames or []
+                for row in reader:
+                    # Apply filters
+                    if filter_trial and str(row.get('trial_id', '')) != filter_trial:
+                        continue
+                    if filter_batch and str(row.get('batch_id', '')) != filter_batch:
+                        continue
+                    if filter_algorithm and row.get('algorithm', '').upper() != filter_algorithm.upper():
+                        continue
+                    all_rows.append(row)
+            
+            total_rows = len(all_rows)
+            start_idx = (page - 1) * limit
+            end_idx = min(start_idx + limit, total_rows)
+            page_data = all_rows[start_idx:end_idx]
+        else:
+            # No filters: Use efficient line-by-line reading
+            # Only read the specific page we need
+            from itertools import islice
+            
+            start_idx = (page - 1) * limit
+            
+            with open(csv_path, 'r', newline='') as f:
+                reader = csv_module.DictReader(f)
+                headers = reader.fieldnames or []
+                
+                # Skip to start of requested page
+                # Read exactly 'limit' rows (or until EOF)
+                rows_to_skip = start_idx
+                rows_to_read = limit
+                
+                # Skip rows before the requested page
+                for _ in islice(reader, rows_to_skip):
+                    pass
+                
+                # Read only the rows for this page
+                for row in islice(reader, rows_to_read):
+                    page_data.append(row)
+            
+            # For total count, use fast line counting
+            # Cache this in a dict to avoid re-counting on every request
+            cache_key = f"{result_id}_{csv_type}_total"
+            if not hasattr(get_result_csv_data, '_row_count_cache'):
+                get_result_csv_data._row_count_cache = {}
+            
+            if cache_key in get_result_csv_data._row_count_cache:
+                total_rows = get_result_csv_data._row_count_cache[cache_key]
+            else:
+                # Fast line counting (only done once, then cached)
+                with open(csv_path, 'r') as f:
+                    total_rows = sum(1 for _ in f) - 1  # -1 for header
+                get_result_csv_data._row_count_cache[cache_key] = total_rows
         
         # Calculate pagination
-        total_rows = len(all_rows)
         total_pages = max(1, (total_rows + limit - 1) // limit)
-        start_idx = (page - 1) * limit
-        end_idx = min(start_idx + limit, total_rows)
-        
-        # Get page data
-        page_data = all_rows[start_idx:end_idx]
         
         return jsonify({
             "success": True,
@@ -5480,6 +5546,9 @@ def delete_saved_result(result_id):
         
         # Delete folder and all contents recursively (shutil already imported at top)
         shutil.rmtree(exp_folder)
+        
+        # Clear CSV cache for this deleted result
+        clear_csv_cache(result_id)
         
         logger.info(f"Deleted experiment result folder: {exp_folder}")
         

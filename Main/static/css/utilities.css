@@ -415,16 +415,17 @@
 .bg-purple-900 { background-color: #581c87; }
 
 /* Tailwind Pink Backgrounds */
-.bg-pink-50 { background-color: #fdf2f8; }
-.bg-pink-100 { background-color: #fce7f3; }
-.bg-pink-200 { background-color: #fbcfe8; }
-.bg-pink-300 { background-color: #f9a8d4; }
-.bg-pink-400 { background-color: #f472b6; }
-.bg-pink-500 { background-color: #ec4899; }
-.bg-pink-600 { background-color: #db2777; }
-.bg-pink-700 { background-color: #be185d; }
-.bg-pink-800 { background-color: #9d174d; }
-.bg-pink-900 { background-color: #831843; }  
+.bg-pink-50, .bg-rose-50 { background-color: #fdf2f8; }
+.bg-pink-100, .bg-rose-100 { background-color: #fce7f3; }
+.bg-pink-200, .bg-rose-200 { background-color: #fbcfe8; }
+.bg-pink-300, .bg-rose-300 { background-color: #f9a8d4; }
+.bg-pink-400, .bg-rose-400 { background-color: #f472b6; }
+.bg-pink-500, .bg-rose-500 { background-color: #ec4899; }
+.bg-pink-600, .bg-rose-600 { background-color: #db2777; }
+.bg-pink-700, .bg-rose-700 { background-color: #be185d; }
+.bg-pink-800, .bg-rose-800 { background-color: #9d174d; }
+.bg-pink-900, .bg-rose-900 { background-color: #831843; }  
+
 
 
 /* =====================
