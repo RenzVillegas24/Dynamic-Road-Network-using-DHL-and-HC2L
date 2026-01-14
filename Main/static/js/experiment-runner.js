@@ -5840,7 +5840,9 @@ const ExperimentRunner = {
         performance: { page: 1, loaded: false, loading: false },
         similarity: { page: 1, loaded: false, loading: false },
         comprehensive: { page: 1, loaded: false, loading: false },
-        labeling: { page: 1, loaded: false, loading: false }
+        labeling: { page: 1, loaded: false, loading: false },
+        'injected-disruptions': { page: 1, loaded: false, loading: false },
+        'system-labels': { page: 1, loaded: false, loading: false }
     },
 
     /**
@@ -6280,6 +6282,54 @@ const ExperimentRunner = {
                 }).join('');
                 break;
 
+            case 'injected-disruptions':
+                // Injected disruptions from HERE API
+                tbody.innerHTML = data.map(row => {
+                    const critBadge = row.incident_criticality === 'critical' ? 'bg-red-100 text-red-700' : 
+                                      row.incident_criticality === 'major' ? 'bg-orange-100 text-orange-700' : 'bg-yellow-100 text-yellow-700';
+                    return `
+                    <tr class="hover:bg-rose-50 text-xs">
+                        <td class="p-2 font-mono">${row.route_id || ''}</td>
+                        <td class="p-2">${row.scenario_id || ''}</td>
+                        <td class="p-2"><span class="px-2 py-0.5 rounded text-xs ${this.getLevelBadgeClass(row.severity_level)}">${row.severity_level || ''}</span></td>
+                        <td class="p-2"><span class="px-2 py-0.5 rounded text-xs font-medium ${this.getCategoryBadgeClass(row.route_category)}">${row.route_category || ''}</span></td>
+                        <td class="p-2 text-right font-mono">${row.edge_source || ''}</td>
+                        <td class="p-2 text-right font-mono">${row.edge_target || ''}</td>
+                        <td class="p-2">${row.incident_type || ''}</td>
+                        <td class="p-2"><span class="px-2 py-0.5 rounded text-xs ${critBadge}">${row.incident_criticality || ''}</span></td>
+                        <td class="p-2 text-right font-mono">${parseFloat(row.jam_factor || 0).toFixed(1)}</td>
+                        <td class="p-2">${row.road_name || ''}</td>
+                    </tr>
+                `;
+                }).join('');
+                // Update count badge
+                const injectedCount = document.getElementById('injected-disruptions-count');
+                if (injectedCount) injectedCount.textContent = data.length;
+                break;
+
+            case 'system-labels':
+                // System-detected labels from HC2L/DHL algorithms
+                tbody.innerHTML = data.map(row => {
+                    const algBadge = row.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700';
+                    return `
+                    <tr class="hover:bg-indigo-50 text-xs">
+                        <td class="p-2 font-mono">${row.route_id || ''}</td>
+                        <td class="p-2">${row.scenario_id || ''}</td>
+                        <td class="p-2"><span class="px-2 py-0.5 rounded text-xs ${this.getLevelBadgeClass(row.severity_level)}">${row.severity_level || ''}</span></td>
+                        <td class="p-2 text-center"><span class="px-2 py-0.5 rounded text-xs font-medium ${algBadge}">${row.algorithm || ''}</span></td>
+                        <td class="p-2 text-right font-mono">${row.edge_source || ''}</td>
+                        <td class="p-2 text-right font-mono">${row.edge_target || ''}</td>
+                        <td class="p-2">${row.detected_label || ''}</td>
+                        <td class="p-2 text-center">${row.is_road_closed === 'True' || row.is_road_closed === true ? '🔴' : '⚪'}</td>
+                        <td class="p-2 text-center">${row.was_detected === 'True' || row.was_detected === true ? '✓' : '✗'}</td>
+                    </tr>
+                `;
+                }).join('');
+                // Update count badge
+                const sysLabelsCount = document.getElementById('system-labels-count');
+                if (sysLabelsCount) sysLabelsCount.textContent = data.length;
+                break;
+
             default:
                 // Generic rendering
                 if (data.length > 0 && headers) {
@@ -6314,7 +6364,9 @@ const ExperimentRunner = {
             'performance': ['Category', 'Scenario', 'Severity', 'Route', 'Algorithm', 'Query (ms)', 'Label (MB)', 'Lazy (ms)', 'Rebuilds'],
             'similarity': ['Batch', 'Route', 'OD Pair', 'HC2L Dist', 'HERE Dist', 'Deviation', 'Fréchet', 'Rating'],
             'comprehensive': ['Route', 'Category', 'Scenario', 'Severity', 'Start Lat', 'Start Lon', 'End Lat', 'End Lon', 'Disruptions', 'Types', 'HC2L Dist', 'DHL Dist', 'HERE Dist', 'HC2L Time', 'DHL Time', 'HERE Time', 'Accuracy', 'Fréchet', 'Query'],
-            'labeling': ['Route', 'Category', 'Scenario', 'Severity', 'Algorithm', 'Edges', 'Nodes', 'Dirty', 'Repaired', 'Accuracy']
+            'labeling': ['Route', 'Category', 'Scenario', 'Severity', 'Algorithm', 'Edges', 'Nodes', 'Dirty', 'Repaired', 'Accuracy'],
+            'injected-disruptions': ['Route', 'Scenario', 'Severity', 'Category', 'Source', 'Target', 'Type', 'Criticality', 'Jam Factor', 'Road Name'],
+            'system-labels': ['Route', 'Scenario', 'Severity', 'Algorithm', 'Source', 'Target', 'Label', 'Closed', 'Detected']
         };
         
         // Define headers for standard mode
@@ -6325,7 +6377,9 @@ const ExperimentRunner = {
             'updates': ['Trial', 'Batch', 'Algorithm', 'Lazy (ms)', 'Peak (MB)', 'Size Δ%', 'Query (ms)'],
             'performance': ['Trial', 'Batch', 'Level', 'Route', 'Algorithm', 'Query (ms)', 'Label (MB)', 'Lazy (ms)', 'Rebuilds'],
             'similarity': ['Batch', 'Route', 'OD Pair', 'HC2L Dist', 'HERE Dist', 'Deviation', 'Fréchet', 'Rating'],
-            'comprehensive': ['Route', 'Category', 'Scenario', 'Severity', 'Start Lat', 'Start Lon', 'End Lat', 'End Lon', 'Disruptions', 'Types', 'HC2L Dist', 'DHL Dist', 'HERE Dist', 'HC2L Time', 'DHL Time', 'HERE Time', 'Accuracy', 'Fréchet', 'Query']
+            'comprehensive': ['Route', 'Category', 'Scenario', 'Severity', 'Start Lat', 'Start Lon', 'End Lat', 'End Lon', 'Disruptions', 'Types', 'HC2L Dist', 'DHL Dist', 'HERE Dist', 'HC2L Time', 'DHL Time', 'HERE Time', 'Accuracy', 'Fréchet', 'Query'],
+            'injected-disruptions': ['Route', 'Scenario', 'Severity', 'Category', 'Source', 'Target', 'Type', 'Criticality', 'Jam Factor', 'Road Name'],
+            'system-labels': ['Route', 'Scenario', 'Severity', 'Algorithm', 'Source', 'Target', 'Label', 'Closed', 'Detected']
         };
         
         const colorClasses = {
@@ -6335,7 +6389,10 @@ const ExperimentRunner = {
             'updates': 'text-indigo-700',
             'performance': 'text-emerald-700',
             'similarity': 'text-amber-700',
-            'comprehensive': 'text-slate-700'
+            'comprehensive': 'text-slate-700',
+            'labeling': 'text-pink-700',
+            'injected-disruptions': 'text-rose-700',
+            'system-labels': 'text-indigo-700'
         };
         
         const bgClasses = {
@@ -6345,7 +6402,10 @@ const ExperimentRunner = {
             'updates': 'bg-indigo-50 border-indigo-200',
             'performance': 'bg-emerald-50 border-emerald-200',
             'similarity': 'bg-amber-50 border-amber-200',
-            'comprehensive': 'bg-slate-50 border-slate-200'
+            'comprehensive': 'bg-slate-50 border-slate-200',
+            'labeling': 'bg-pink-50 border-pink-200',
+            'injected-disruptions': 'bg-rose-50 border-rose-200',
+            'system-labels': 'bg-indigo-50 border-indigo-200'
         };
         
         const headers = isScenario ? scenarioHeaders[csvType] : standardHeaders[csvType];

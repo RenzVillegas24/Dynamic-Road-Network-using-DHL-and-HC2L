@@ -1122,9 +1122,6 @@ class ExperimentRunner:
         self.preset_path.mkdir(parents=True, exist_ok=True)
         self.temporary_path.mkdir(parents=True, exist_ok=True)
         
-        # Auto-create ExperimentPreset.json if it doesn't exist
-        self._ensure_preset_config()
-        
         # Router references (will be set by init function)
         self.hc2l_router = None
         self.dhl_router = None
@@ -1140,6 +1137,7 @@ class ExperimentRunner:
         logger.success("ExperimentRunner initialized")
         logger.info(f"Preset path: {self.preset_path}")
         logger.info(f"Temporary path: {self.temporary_path}")
+        logger.info("Note: Preset routes will be generated on-demand when starting experiments")
     
     def _ensure_preset_config(self, experiment_id: str = None, route_mode: str = "preset", preset_type: str = None):
         """Ensure preset configuration exists based on route_mode and preset_type"""
@@ -1160,6 +1158,14 @@ class ExperimentRunner:
             if experiment_id:
                 self._emit_preset_progress(experiment_id, "loading", "Loading preset configuration...", 25)
                 self._emit_preset_progress(experiment_id, "loading_complete", "Preset loaded successfully", 100)
+            return
+        
+        # Check if node_mapper is initialized
+        if self.node_mapper is None:
+            error_msg = "Cannot generate preset routes: node_mapper not initialized. Call set_routers() first."
+            logger.error(error_msg)
+            if experiment_id:
+                self._emit_preset_progress(experiment_id, "error", error_msg, 0)
             return
         
         logger.info("Creating default ExperimentPreset.json with 3000 pre-generated routes...")
@@ -1216,6 +1222,14 @@ class ExperimentRunner:
             if experiment_id:
                 self._emit_preset_progress(experiment_id, "loading", "Loading same batch preset configuration...", 25)
                 self._emit_preset_progress(experiment_id, "loading_complete", "Preset loaded successfully", 100)
+            return
+        
+        # Check if node_mapper is initialized
+        if self.node_mapper is None:
+            error_msg = "Cannot generate preset routes: node_mapper not initialized. Call set_routers() first."
+            logger.error(error_msg)
+            if experiment_id:
+                self._emit_preset_progress(experiment_id, "error", error_msg, 0)
             return
         
         logger.info("Creating ExperimentPresetSameBatch.json with 1000 pre-generated routes...")
@@ -1282,10 +1296,19 @@ class ExperimentRunner:
         
         logger.info("Creating ExperimentPresetScenario.json with distance-categorized routes...")
         
+        # Check if routers and node_mapper are initialized
         if not self.hc2l_router:
-            logger.error("HC2L router not available for distance calculation")
+            error_msg = "HC2L router not available for distance calculation"
+            logger.error(error_msg)
             if experiment_id:
-                self._emit_preset_progress(experiment_id, "error", "HC2L router not available", 0)
+                self._emit_preset_progress(experiment_id, "error", error_msg, 0)
+            return
+        
+        if self.node_mapper is None:
+            error_msg = "Cannot generate preset routes: node_mapper not initialized. Call set_routers() first."
+            logger.error(error_msg)
+            if experiment_id:
+                self._emit_preset_progress(experiment_id, "error", error_msg, 0)
             return
         
         if experiment_id:
@@ -3969,6 +3992,11 @@ class ExperimentRunner:
         
         # Store GPS mapping for source/target nodes
         result["gps_mapping"] = api_result.get("gps_mapping", {})
+        
+        # Store lazy_hc2l and dhl_update_info for labeling data collection
+        # This passes the raw API data through for record_labeling_data to use
+        result["lazy_hc2l"] = lazy_hc2l
+        result["dhl_update_info"] = dhl_update_info
         
         # Store success flag
         result["success"] = True
