@@ -1319,16 +1319,13 @@ const ExperimentRunner = {
             scenarioConfig.classList.toggle('hidden', presetType !== 'scenario');
         }
         
-        // Hide Disruption Configuration and Tau Settings for scenario preset
+        // Hide Disruption Configuration for scenario preset (but keep Tau Settings visible)
         const disruptionConfig = document.getElementById('experiment-disruption-config');
-        const tauConfig = document.getElementById('experiment-tau-config');
         
         if (disruptionConfig) {
             disruptionConfig.classList.toggle('hidden', presetType === 'scenario');
         }
-        if (tauConfig) {
-            tauConfig.classList.toggle('hidden', presetType === 'scenario');
-        }
+        // Tau Settings are now shown for both standard and scenario presets
         
         // Update settings
         if (presetType === 'scenario') {
