@@ -1807,6 +1807,7 @@ const ExperimentRunner = {
             // Scenario mode: Show category-based and scenario-based aggregates
             this.populateScenarioSummaryTab(data.aggregated_data?.summary);
             this.populateScenarioAccuracyTab(data.aggregated_data?.accuracy, accuracyStats);
+            this.populateScenarioLabelingTab(data.aggregated_data?.labeling);
             this.populateScenarioPerformanceTab(data.aggregated_data?.performance, performanceStats);
             // Construction and Updates tabs: Use the same data structure
             this.populateConstructionFromStats(performanceStats);
@@ -3173,6 +3174,214 @@ const ExperimentRunner = {
                                     <td class="p-3 text-right font-mono font-bold">${((row.avg_relative_error || 0) * 100).toFixed(2)}%</td>
                                 </tr>
                             `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+        
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    },
+    
+    populateScenarioLabelingTab(aggregatedLabeling) {
+        const container = document.getElementById('result-labeling-container');
+        if (!container) return;
+        
+        if (!aggregatedLabeling) {
+            container.innerHTML = '<p class="text-center text-gray-500 py-8">No labeling data available</p>';
+            return;
+        }
+        
+        const { per_category, per_scenario, per_severity, averages } = aggregatedLabeling;
+        
+        // Build per-category rows
+        const categoryRows = (per_category || []).map(row => {
+            const categoryBadge = this.getCategoryBadgeClass(row.category);
+            const algBadge = row.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700';
+            return '<tr class="hover:bg-pink-50 transition-colors">' +
+                '<td class="p-3"><span class="px-2 py-1 rounded text-xs font-medium ' + categoryBadge + '">' + row.category + '</span></td>' +
+                '<td class="p-3 text-center"><span class="px-2 py-1 rounded text-xs font-medium font-bold ' + algBadge + '">' + row.algorithm + '</span></td>' +
+                '<td class="p-3 text-right font-mono">' + (row.simulations || 0) + '</td>' +
+                '<td class="p-3 text-right font-mono">' + (row.total_disrupted_edges || 0) + '</td>' +
+                '<td class="p-3 text-right font-mono">' + (row.total_disrupted_nodes || 0) + '</td>' +
+                '<td class="p-3 text-right font-mono">' + (row.dirty_nodes_marked || 0) + '</td>' +
+                '<td class="p-3 text-right font-mono">' + (row.nodes_repaired || 0) + '</td>' +
+                '<td class="p-3 text-right font-mono font-bold">' + (row.avg_labeling_accuracy_pct || 0).toFixed(1) + '%</td>' +
+                '</tr>';
+        }).join('');
+        
+        // Build per-scenario rows
+        const scenarioRows = (per_scenario || []).map(row => {
+            const algBadge = row.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700';
+            return '<tr class="hover:bg-purple-50 transition-colors">' +
+                '<td class="p-3 font-medium">' + row.scenario + '</td>' +
+                '<td class="p-3 text-center"><span class="px-2 py-1 rounded text-xs font-medium font-bold ' + algBadge + '">' + row.algorithm + '</span></td>' +
+                '<td class="p-3 text-right font-mono">' + (row.simulations || 0) + '</td>' +
+                '<td class="p-3 text-right font-mono">' + (row.total_disrupted_edges || 0) + '</td>' +
+                '<td class="p-3 text-right font-mono">' + (row.total_disrupted_nodes || 0) + '</td>' +
+                '<td class="p-3 text-right font-mono">' + (row.dirty_nodes_marked || 0) + '</td>' +
+                '<td class="p-3 text-right font-mono">' + (row.nodes_repaired || 0) + '</td>' +
+                '<td class="p-3 text-right font-mono font-bold">' + (row.avg_labeling_accuracy_pct || 0).toFixed(1) + '%</td>' +
+                '</tr>';
+        }).join('');
+        
+        // Build per-severity rows
+        const severityRows = (per_severity || []).map(row => {
+            const severityBadge = this.getLevelBadgeClass(row.severity);
+            const algBadge = row.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700';
+            return '<tr class="hover:bg-amber-50 transition-colors">' +
+                '<td class="p-3"><span class="px-2 py-1 rounded text-xs font-medium ' + severityBadge + '">' + row.severity + '</span></td>' +
+                '<td class="p-3 text-center"><span class="px-2 py-1 rounded text-xs font-medium font-bold ' + algBadge + '">' + row.algorithm + '</span></td>' +
+                '<td class="p-3 text-right font-mono">' + (row.simulations || 0) + '</td>' +
+                '<td class="p-3 text-right font-mono">' + (row.total_disrupted_edges || 0) + '</td>' +
+                '<td class="p-3 text-right font-mono">' + (row.total_disrupted_nodes || 0) + '</td>' +
+                '<td class="p-3 text-right font-mono">' + (row.dirty_nodes_marked || 0) + '</td>' +
+                '<td class="p-3 text-right font-mono">' + (row.nodes_repaired || 0) + '</td>' +
+                '<td class="p-3 text-right font-mono font-bold">' + (row.avg_labeling_accuracy_pct || 0).toFixed(1) + '%</td>' +
+                '</tr>';
+        }).join('');
+        
+        // Build averages rows
+        const averagesRows = (averages || []).map(row => {
+            const algBadge = row.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700';
+            return '<tr class="hover:bg-green-50 transition-colors">' +
+                '<td class="p-3"><span class="px-2 py-1 rounded text-xs font-medium font-bold ' + algBadge + '">' + row.algorithm + '</span></td>' +
+                '<td class="p-3 text-right font-mono font-bold">' + (row.total_simulations || 0) + '</td>' +
+                '<td class="p-3 text-right font-mono">' + (row.total_disrupted_edges || 0) + '</td>' +
+                '<td class="p-3 text-right font-mono">' + (row.total_disrupted_nodes || 0) + '</td>' +
+                '<td class="p-3 text-right font-mono">' + (row.dirty_nodes_marked || 0) + '</td>' +
+                '<td class="p-3 text-right font-mono">' + (row.nodes_repaired || 0) + '</td>' +
+                '<td class="p-3 text-right font-mono font-bold">' + (row.avg_labeling_accuracy_pct || 0).toFixed(1) + '%</td>' +
+                '</tr>';
+        }).join('');
+        
+        container.innerHTML = `
+            <!-- Per-Category Labeling Accuracy -->
+            <div class="bg-white rounded-xl border border-pink-200 overflow-hidden shadow-sm">
+                <div class="bg-gradient-to-r from-pink-50 to-rose-50 px-4 py-3 border-b border-pink-200 flex items-center justify-between">
+                    <h5 class="font-bold text-pink-900 flex items-center gap-2 mb-0">
+                        <i data-lucide="tag" class="w-4 h-4"></i>
+                        Labeling Accuracy Per Route Category
+                    </h5>
+                    <button onclick="ExperimentRunner.exportCSV('labeling', 'per-category')"
+                        class="btn btn--pink btn--xs hover:shadow-md transition-all">
+                        <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-pink-50 border-b border-pink-200">
+                            <tr>
+                                <th class="text-left p-3 font-semibold text-pink-700">Category</th>
+                                <th class="text-center p-3 font-semibold text-pink-700">Algorithm</th>
+                                <th class="text-right p-3 font-semibold text-pink-700">Simulations</th>
+                                <th class="text-right p-3 font-semibold text-pink-700">Disrupted Edges</th>
+                                <th class="text-right p-3 font-semibold text-pink-700">Disrupted Nodes</th>
+                                <th class="text-right p-3 font-semibold text-pink-700">Dirty Marked</th>
+                                <th class="text-right p-3 font-semibold text-pink-700">Nodes Repaired</th>
+                                <th class="text-right p-3 font-semibold text-pink-700">Accuracy %</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            ${categoryRows}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Per-Scenario Labeling Accuracy -->
+            <div class="bg-white rounded-xl border border-purple-200 overflow-hidden shadow-sm mt-4">
+                <div class="bg-gradient-to-r from-purple-50 to-violet-50 px-4 py-3 border-b border-purple-200 flex items-center justify-between">
+                    <h5 class="font-bold text-purple-900 flex items-center gap-2 mb-0">
+                        <i data-lucide="target" class="w-4 h-4"></i>
+                        Labeling Accuracy Per Scenario
+                    </h5>
+                    <button onclick="ExperimentRunner.exportCSV('labeling', 'per-scenario')"
+                        class="btn btn--purple btn--xs hover:shadow-md transition-all">
+                        <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-purple-50 border-b border-purple-200">
+                            <tr>
+                                <th class="text-left p-3 font-semibold text-purple-700">Scenario</th>
+                                <th class="text-center p-3 font-semibold text-purple-700">Algorithm</th>
+                                <th class="text-right p-3 font-semibold text-purple-700">Simulations</th>
+                                <th class="text-right p-3 font-semibold text-purple-700">Disrupted Edges</th>
+                                <th class="text-right p-3 font-semibold text-purple-700">Disrupted Nodes</th>
+                                <th class="text-right p-3 font-semibold text-purple-700">Dirty Marked</th>
+                                <th class="text-right p-3 font-semibold text-purple-700">Nodes Repaired</th>
+                                <th class="text-right p-3 font-semibold text-purple-700">Accuracy %</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            ${scenarioRows}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Per-Severity Labeling Accuracy -->
+            <div class="bg-white rounded-xl border border-amber-200 overflow-hidden shadow-sm mt-4">
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 px-4 py-3 border-b border-amber-200 flex items-center justify-between">
+                    <h5 class="font-bold text-amber-900 flex items-center gap-2 mb-0">
+                        <i data-lucide="thermometer" class="w-4 h-4"></i>
+                        Labeling Accuracy Per Severity Level
+                    </h5>
+                    <button onclick="ExperimentRunner.exportCSV('labeling', 'per-severity')"
+                        class="btn btn--warning btn--xs hover:shadow-md transition-all">
+                        <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-amber-50 border-b border-amber-200">
+                            <tr>
+                                <th class="text-left p-3 font-semibold text-amber-700">Severity</th>
+                                <th class="text-center p-3 font-semibold text-amber-700">Algorithm</th>
+                                <th class="text-right p-3 font-semibold text-amber-700">Simulations</th>
+                                <th class="text-right p-3 font-semibold text-amber-700">Disrupted Edges</th>
+                                <th class="text-right p-3 font-semibold text-amber-700">Disrupted Nodes</th>
+                                <th class="text-right p-3 font-semibold text-amber-700">Dirty Marked</th>
+                                <th class="text-right p-3 font-semibold text-amber-700">Nodes Repaired</th>
+                                <th class="text-right p-3 font-semibold text-amber-700">Accuracy %</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            ${severityRows}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Algorithm Averages -->
+            <div class="bg-white rounded-xl border border-green-200 overflow-hidden shadow-sm mt-4">
+                <div class="bg-gradient-to-r from-green-50 to-emerald-50 px-4 py-3 border-b border-green-200 flex items-center justify-between">
+                    <h5 class="font-bold text-green-900 flex items-center gap-2 mb-0">
+                        <i data-lucide="bar-chart" class="w-4 h-4"></i>
+                        Algorithm Averages
+                    </h5>
+                    <button onclick="ExperimentRunner.exportCSV('labeling', 'averages')"
+                        class="btn btn--success btn--xs hover:shadow-md transition-all">
+                        <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-green-50 border-b border-green-200">
+                            <tr>
+                                <th class="text-left p-3 font-semibold text-green-700">Algorithm</th>
+                                <th class="text-right p-3 font-semibold text-green-700">Total Simulations</th>
+                                <th class="text-right p-3 font-semibold text-green-700">Total Edges</th>
+                                <th class="text-right p-3 font-semibold text-green-700">Total Nodes</th>
+                                <th class="text-right p-3 font-semibold text-green-700">Dirty Marked</th>
+                                <th class="text-right p-3 font-semibold text-green-700">Repaired</th>
+                                <th class="text-right p-3 font-semibold text-green-700">Avg Accuracy %</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            ${averagesRows}
                         </tbody>
                     </table>
                 </div>
@@ -5630,7 +5839,8 @@ const ExperimentRunner = {
         updates: { page: 1, loaded: false, loading: false },
         performance: { page: 1, loaded: false, loading: false },
         similarity: { page: 1, loaded: false, loading: false },
-        comprehensive: { page: 1, loaded: false, loading: false }
+        comprehensive: { page: 1, loaded: false, loading: false },
+        labeling: { page: 1, loaded: false, loading: false }
     },
 
     /**
@@ -6049,6 +6259,27 @@ const ExperimentRunner = {
                 }).join('');
                 break;
 
+            case 'labeling':
+                // Labeling accuracy - always scenario mode
+                tbody.innerHTML = data.map(row => {
+                    const algBadge = row.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700';
+                    return `
+                    <tr class="hover:bg-pink-50 text-xs">
+                        <td class="p-2 font-mono">${row.route_id || ''}</td>
+                        <td class="p-2"><span class="px-2 py-0.5 rounded text-xs font-medium ${this.getCategoryBadgeClass(row.route_category)}">${row.route_category || ''}</span></td>
+                        <td class="p-2">${row.scenario_id || ''}</td>
+                        <td class="p-2"><span class="px-2 py-0.5 rounded text-xs ${this.getLevelBadgeClass(row.severity_level)}">${row.severity_level || ''}</span></td>
+                        <td class="p-2 text-center"><span class="px-2 py-0.5 rounded text-xs font-medium ${algBadge}">${row.algorithm || ''}</span></td>
+                        <td class="p-2 text-right font-mono">${row.total_disrupted_edges || 0}</td>
+                        <td class="p-2 text-right font-mono">${row.total_disrupted_nodes || 0}</td>
+                        <td class="p-2 text-right font-mono">${row.dirty_nodes_marked || 0}</td>
+                        <td class="p-2 text-right font-mono">${row.nodes_repaired || 0}</td>
+                        <td class="p-2 text-right font-mono font-bold">${parseFloat(row.labeling_accuracy_pct || 0).toFixed(1)}%</td>
+                    </tr>
+                `;
+                }).join('');
+                break;
+
             default:
                 // Generic rendering
                 if (data.length > 0 && headers) {
@@ -6082,7 +6313,8 @@ const ExperimentRunner = {
             'updates': ['Category', 'Algorithm', 'Lazy (ms)', 'Peak (MB)', 'Size Δ%', 'Query (ms)'],
             'performance': ['Category', 'Scenario', 'Severity', 'Route', 'Algorithm', 'Query (ms)', 'Label (MB)', 'Lazy (ms)', 'Rebuilds'],
             'similarity': ['Batch', 'Route', 'OD Pair', 'HC2L Dist', 'HERE Dist', 'Deviation', 'Fréchet', 'Rating'],
-            'comprehensive': ['Route', 'Category', 'Scenario', 'Severity', 'Start Lat', 'Start Lon', 'End Lat', 'End Lon', 'Disruptions', 'Types', 'HC2L Dist', 'DHL Dist', 'HERE Dist', 'HC2L Time', 'DHL Time', 'HERE Time', 'Accuracy', 'Fréchet', 'Query']
+            'comprehensive': ['Route', 'Category', 'Scenario', 'Severity', 'Start Lat', 'Start Lon', 'End Lat', 'End Lon', 'Disruptions', 'Types', 'HC2L Dist', 'DHL Dist', 'HERE Dist', 'HC2L Time', 'DHL Time', 'HERE Time', 'Accuracy', 'Fréchet', 'Query'],
+            'labeling': ['Route', 'Category', 'Scenario', 'Severity', 'Algorithm', 'Edges', 'Nodes', 'Dirty', 'Repaired', 'Accuracy']
         };
         
         // Define headers for standard mode

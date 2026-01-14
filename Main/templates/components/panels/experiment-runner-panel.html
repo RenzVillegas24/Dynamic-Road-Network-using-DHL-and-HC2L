@@ -963,6 +963,14 @@
                   <span class="nav-select__title">Accuracy</span>
                 </div>
               </label>
+              <!-- Labeling Tab (NEW - Disruption Node Labeling Accuracy) -->
+              <label class="nav-select__option" data-color="pink">
+                <input type="radio" name="result-main-tab" value="labeling" onchange="ExperimentRunner.showResultTab('labeling')">
+                <div class="nav-select__icon"><i data-lucide="tag" class="w-4 h-4"></i></div>
+                <div class="nav-select__content">
+                  <span class="nav-select__title">Labeling</span>
+                </div>
+              </label>
               <label class="nav-select__option" data-color="purple">
                 <input type="radio" name="result-main-tab" value="construction" checked onchange="ExperimentRunner.showResultTab('construction')">
                 <div class="nav-select__icon"><i data-lucide="hammer" class="w-4 h-4"></i></div>
@@ -1160,6 +1168,77 @@
                   </thead>
                   <tbody id="accuracy-per-route-tbody" class="divide-y divide-gray-100">
                     <tr><td colspan="8" class="text-center py-4 text-gray-500">Click to load data</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Labeling Tab Content (NEW - Disruption Node Labeling Accuracy) -->
+        <div id="result-tab-labeling" data-result-tab-content class="hidden space-y-4">
+          <div class="flex items-center justify-between bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl px-5 py-4 border border-gray-200">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 bg-pink-100 rounded-lg flex items-center justify-center">
+                <i data-lucide="tag" class="w-5 h-5 text-pink-600"></i>
+              </div>
+              <div>
+                <h4 class="font-bold text-gray-800 text-sm mb-1">Disruption Node Labeling Accuracy</h4>
+                <p class="text-xs text-gray-500 mt-0.5">Injected disruptions vs System-detected labels</p>
+              </div>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="ExperimentRunner.exportCSV('labeling', 'all')"
+                class="btn btn--success btn--xs hover:shadow-md transition-all">
+                <i data-lucide="download" class="w-3 h-3"></i> Export Results
+              </button>
+              <button onclick="ExperimentRunner.exportCSV('injected-disruptions', 'all')"
+                class="btn btn--pink btn--xs hover:shadow-md transition-all">
+                <i data-lucide="download" class="w-3 h-3"></i> Injected
+              </button>
+              <button onclick="ExperimentRunner.exportCSV('system-labels', 'all')"
+                class="btn btn--indigo btn--xs hover:shadow-md transition-all">
+                <i data-lucide="download" class="w-3 h-3"></i> System Labels
+              </button>
+            </div>
+          </div>
+          
+          <!-- Aggregated Labeling Data -->
+          <div id="result-labeling-container" class="space-y-3">
+            <p class="text-center text-gray-500 py-8 font-medium">No data yet</p>
+          </div>
+          
+          <!-- Per-Route Labeling Data (Expandable) -->
+          <div class="border border-pink-200 rounded-xl overflow-hidden">
+            <button onclick="ExperimentRunner.togglePerRouteTable('labeling')" 
+              class="w-full flex items-center justify-between px-4 py-3 bg-gradient-to-r from-pink-50 to-rose-50 hover:from-pink-100 hover:to-rose-100 transition-colors">
+              <span class="flex items-center gap-2 text-sm font-medium text-pink-700">
+                <i data-lucide="table" class="w-4 h-4"></i>
+                View Per-Route Labeling Data
+              </span>
+              <div class="flex items-center gap-2">
+                <i data-lucide="chevron-down" class="w-4 h-4 text-pink-600"></i>
+              </div>
+            </button>
+            <div id="labeling-per-route-container" class="hidden">
+              <div class="overflow-x-auto max-h-96">
+                <table class="w-full text-xs">
+                  <thead class="bg-pink-50 border-b border-pink-200 sticky top-0">
+                    <tr>
+                      <th class="text-left p-2 font-semibold text-pink-700">Route</th>
+                      <th class="text-left p-2 font-semibold text-pink-700">Category</th>
+                      <th class="text-left p-2 font-semibold text-pink-700">Scenario</th>
+                      <th class="text-left p-2 font-semibold text-pink-700">Severity</th>
+                      <th class="text-center p-2 font-semibold text-pink-700">Algorithm</th>
+                      <th class="text-right p-2 font-semibold text-pink-700">Edges</th>
+                      <th class="text-right p-2 font-semibold text-pink-700">Nodes</th>
+                      <th class="text-right p-2 font-semibold text-pink-700">Dirty</th>
+                      <th class="text-right p-2 font-semibold text-pink-700">Repaired</th>
+                      <th class="text-right p-2 font-semibold text-pink-700">Accuracy</th>
+                    </tr>
+                  </thead>
+                  <tbody id="labeling-per-route-tbody" class="divide-y divide-gray-100">
+                    <tr><td colspan="10" class="text-center py-4 text-gray-500">Click to load data</td></tr>
                   </tbody>
                 </table>
               </div>

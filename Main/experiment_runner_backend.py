@@ -3269,6 +3269,48 @@ class ExperimentRunner:
                                     api_result=result,
                                     disruption_data=disruption_data
                                 )
+                                
+                                # Record labeling data for Labeling tab
+                                # Build disruption_edges from flow + incidents
+                                disruption_edges = []
+                                if disruption_data:
+                                    # Add flow disruptions
+                                    for flow in disruption_data.get("flow", []):
+                                        disruption_edges.append({
+                                            "source": flow.get("source", 0),
+                                            "target": flow.get("target", 0),
+                                            "incident_type": "congestion",
+                                            "incident_criticality": "minor" if flow.get("jam_factor", 0) < 4 else ("major" if flow.get("jam_factor", 0) < 7 else "critical"),
+                                            "jam_factor": flow.get("jam_factor", 0),
+                                            "road_name": "Unknown Road",
+                                            "incident_road_closed": False
+                                        })
+                                    # Add incident disruptions
+                                    for incident in disruption_data.get("incidents", []):
+                                        disruption_edges.append({
+                                            "source": incident.get("source", 0),
+                                            "target": incident.get("target", 0),
+                                            "incident_type": incident.get("incident_type", "unknown"),
+                                            "incident_criticality": {1: "minor", 2: "major", 3: "critical"}.get(incident.get("criticality", 1), "minor"),
+                                            "jam_factor": 10.0 if incident.get("road_closed", False) else 5.0,
+                                            "road_name": "Unknown Road",
+                                            "incident_road_closed": incident.get("road_closed", False)
+                                        })
+                                
+                                # Get lazy_hc2l and dhl_update info from result
+                                lazy_hc2l_info = result.get("lazy_hc2l", {})
+                                dhl_update_info = result.get("dhl_update_info", {})
+                                
+                                metrics_collector.record_labeling_data(
+                                    route_id=route_idx + 1,  # 1-indexed
+                                    route_category=category,
+                                    scenario_id=scenario_id,
+                                    severity_level=severity_level,
+                                    algorithm=algorithm,
+                                    disruption_edges=disruption_edges,
+                                    lazy_hc2l_info=lazy_hc2l_info,
+                                    dhl_update_info=dhl_update_info
+                                )
                             
                             # Update progress
                             completed += 1
@@ -3999,18 +4041,21 @@ class ExperimentRunner:
             # Export CSV files individually with progress updates
             # Both scenario and standard modes now use individual exports for granular progress
             csv_exports = [
-                ("summary", "summary_results.csv", 8),
-                ("accuracy", "accuracy_results.csv", 16),
-                ("construction", "construction_results.csv", 24),
-                ("updates", "updates_results.csv", 32),
-                ("performance", "performance_results.csv", 40),
-                ("similarity", "similarity_results.csv", 48),
-                ("comprehensive", "comprehensive_results.csv", 60)  # Comprehensive CSV (scenario only)
+                ("summary", "summary_results.csv", 6),
+                ("accuracy", "accuracy_results.csv", 12),
+                ("construction", "construction_results.csv", 18),
+                ("updates", "updates_results.csv", 24),
+                ("performance", "performance_results.csv", 30),
+                ("similarity", "similarity_results.csv", 36),
+                ("comprehensive", "comprehensive_results.csv", 42),  # Comprehensive CSV (scenario only)
+                ("labeling", "labeling_results.csv", 48),  # Labeling CSV (scenario only)
+                ("injected_disruptions", "injected_disruptions.csv", 54),  # Injected disruptions (scenario only)
+                ("system_labels", "system_labels.csv", 60)  # System labels (scenario only)
             ]
             
             for csv_name, csv_filename, percent in csv_exports:
-                # Skip comprehensive export for non-scenario mode
-                if csv_name == "comprehensive" and not is_scenario:
+                # Skip comprehensive/labeling exports for non-scenario mode
+                if csv_name in ["comprehensive", "labeling", "injected_disruptions", "system_labels"] and not is_scenario:
                     continue
                     
                 progress.finalization_phase = f"Phase 1/3: Exporting {csv_filename}..."
@@ -4034,6 +4079,12 @@ class ExperimentRunner:
                         csv_files[csv_name] = collector.export_similarity_csv()  # Similarity uses standard
                     elif csv_name == "comprehensive":
                         csv_files[csv_name] = collector.export_scenario_comprehensive_csv()
+                    elif csv_name == "labeling":
+                        csv_files[csv_name] = collector.export_labeling_results_csv()
+                    elif csv_name == "injected_disruptions":
+                        csv_files[csv_name] = collector.export_injected_disruptions_csv()
+                    elif csv_name == "system_labels":
+                        csv_files[csv_name] = collector.export_system_labels_csv()
                 else:
                     # Use standard export methods
                     if csv_name == "summary":
@@ -4663,7 +4714,10 @@ def download_result_csv(result_id, csv_type):
         'updates': 'updates_results.csv',
         'performance': 'performance_results.csv',
         'similarity': 'similarity_results.csv',
-        'comprehensive': 'comprehensive_results.csv'
+        'comprehensive': 'comprehensive_results.csv',
+        'labeling': 'labeling_results.csv',
+        'injected-disruptions': 'injected_disruptions.csv',
+        'system-labels': 'system_labels.csv'
     }
     
     if csv_type not in csv_files:
@@ -4730,7 +4784,10 @@ def export_all_result_files(result_id):
         'updates': 'updates_results.csv',
         'performance': 'performance_results.csv',
         'similarity': 'similarity_results.csv',
-        'comprehensive': 'comprehensive_results.csv'
+        'comprehensive': 'comprehensive_results.csv',
+        'labeling': 'labeling_results.csv',
+        'injected-disruptions': 'injected_disruptions.csv',
+        'system-labels': 'system_labels.csv'
     }
     
     try:
@@ -4879,7 +4936,10 @@ def export_result_csv(result_id, csv_type):
         'updates': 'updates_results.csv',
         'performance': 'performance_results.csv',
         'similarity': 'similarity_results.csv',
-        'comprehensive': 'comprehensive_results.csv'
+        'comprehensive': 'comprehensive_results.csv',
+        'labeling': 'labeling_results.csv',
+        'injected-disruptions': 'injected_disruptions.csv',
+        'system-labels': 'system_labels.csv'
     }
     
     if csv_type not in csv_files:
@@ -5307,7 +5367,10 @@ def get_result_csv_data(result_id, csv_type):
         'updates': 'updates_results.csv',
         'performance': 'performance_results.csv',
         'similarity': 'similarity_results.csv',
-        'comprehensive': 'comprehensive_results.csv'
+        'comprehensive': 'comprehensive_results.csv',
+        'labeling': 'labeling_results.csv',
+        'injected-disruptions': 'injected_disruptions.csv',
+        'system-labels': 'system_labels.csv'
     }
     
     if csv_type not in csv_files:

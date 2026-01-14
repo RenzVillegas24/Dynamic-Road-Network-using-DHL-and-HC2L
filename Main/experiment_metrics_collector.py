@@ -247,6 +247,36 @@ CSV_HEADERS_STANDARD_COMPREHENSIVE = [
     "algorithm_is_correct"
 ]
 
+# ============================================================================
+# LABELING TAB CSV HEADERS - Disruption Node Labeling Accuracy
+# ============================================================================
+
+# Labeling Results - Per-route labeling accuracy metrics
+CSV_HEADERS_LABELING_RESULTS = [
+    "route_id", "route_category", "scenario_id", "severity_level",
+    "algorithm",
+    "total_disrupted_edges", "total_disrupted_nodes",
+    "dirty_nodes_marked", "nodes_repaired",
+    "labeling_accuracy_pct"
+]
+
+# Injected Disruptions - Ground truth (what was injected)
+CSV_HEADERS_INJECTED_DISRUPTIONS = [
+    "route_id", "route_category", "scenario_id", "severity_level",
+    "edge_source", "edge_target",
+    "incident_type", "incident_criticality", "jam_factor",
+    "road_name"
+]
+
+# System Labels - What the system detected/labeled
+CSV_HEADERS_SYSTEM_LABELS = [
+    "route_id", "route_category", "scenario_id", "severity_level",
+    "algorithm",
+    "edge_source", "edge_target",
+    "detected_label", "is_road_closed",
+    "was_detected"
+]
+
 
 class DisruptionLevel(Enum):
     """Disruption level categories"""
@@ -706,6 +736,16 @@ class ExperimentMetricsCollector:
         # Similarity records (HERE vs HC2L)
         self.similarity_records: List[SimilarityRecord] = []
         
+        # ====================================================================
+        # LABELING ACCURACY STORAGE - For Labeling Tab
+        # ====================================================================
+        # Per-route labeling accuracy records
+        self.labeling_records: List[Dict] = []
+        # Ground truth - injected disruption edges
+        self.injected_disruptions: List[Dict] = []
+        # System detected labels
+        self.system_labels: List[Dict] = []
+        
         # Incident summaries per batch (trial -> batch -> IncidentSummary)
         self.incident_summaries: Dict[Tuple[int, int], IncidentSummary] = {}
         
@@ -1132,6 +1172,116 @@ class ExperimentMetricsCollector:
             except Exception as e:
                 logger.error(f"Error recording similarity: {e}")
                 return SimilarityRecord()
+    
+    def record_labeling_data(self,
+                             route_id: int,
+                             route_category: str,
+                             scenario_id: str,
+                             severity_level: str,
+                             algorithm: str,
+                             disruption_edges: List[Dict],
+                             lazy_hc2l_info: Dict = None,
+                             dhl_update_info: Dict = None):
+        """
+        Record labeling accuracy data for a route.
+        
+        Tracks:
+        - Injected disruptions (ground truth - edges that were disrupted)
+        - System labels (what the algorithm detected/labeled)
+        - Per-route labeling accuracy metrics
+        
+        Args:
+            route_id: Route identifier
+            route_category: "short", "medium", or "long"
+            scenario_id: Scenario identifier (e.g., "DS1")
+            severity_level: "light", "medium", or "heavy"
+            algorithm: "HC2L" or "DHL"
+            disruption_edges: List of dicts with edge disruption data
+                              Each dict has: source, target, incident_type, criticality, jam_factor, road_name
+            lazy_hc2l_info: HC2L algorithm output with dirty_nodes_marked, nodes_repaired
+            dhl_update_info: DHL algorithm output with nodes_updated
+        """
+        with self.lock:
+            try:
+                # Count total disrupted edges and nodes
+                total_disrupted_edges = len(disruption_edges)
+                # Each edge affects 2 nodes (source and target)
+                unique_nodes = set()
+                for edge in disruption_edges:
+                    unique_nodes.add(edge.get('source'))
+                    unique_nodes.add(edge.get('target'))
+                total_disrupted_nodes = len(unique_nodes)
+                
+                # Extract system detection metrics based on algorithm
+                dirty_nodes_marked = 0
+                nodes_repaired = 0
+                
+                if algorithm.upper() == "HC2L" and lazy_hc2l_info:
+                    dirty_nodes_marked = lazy_hc2l_info.get("dirty_nodes_marked", 0)
+                    nodes_repaired = lazy_hc2l_info.get("nodes_repaired", 0)
+                elif algorithm.upper() == "DHL" and dhl_update_info:
+                    nodes_repaired = dhl_update_info.get("nodes_updated", 0)
+                    dirty_nodes_marked = nodes_repaired  # DHL doesn't use dirty marking
+                
+                # Calculate labeling accuracy
+                # Accuracy = min(1.0, nodes_repaired / total_disrupted_nodes) * 100
+                # If no nodes were disrupted, accuracy is 100%
+                if total_disrupted_nodes > 0:
+                    labeling_accuracy_pct = min(1.0, nodes_repaired / total_disrupted_nodes) * 100
+                else:
+                    labeling_accuracy_pct = 100.0
+                
+                # Record per-route labeling result
+                labeling_record = {
+                    "route_id": route_id,
+                    "route_category": route_category,
+                    "scenario_id": scenario_id,
+                    "severity_level": severity_level,
+                    "algorithm": algorithm.upper(),
+                    "total_disrupted_edges": total_disrupted_edges,
+                    "total_disrupted_nodes": total_disrupted_nodes,
+                    "dirty_nodes_marked": dirty_nodes_marked,
+                    "nodes_repaired": nodes_repaired,
+                    "labeling_accuracy_pct": round(labeling_accuracy_pct, 2)
+                }
+                self.labeling_records.append(labeling_record)
+                
+                # Record injected disruptions (ground truth)
+                for edge in disruption_edges:
+                    injected_record = {
+                        "route_id": route_id,
+                        "route_category": route_category,
+                        "scenario_id": scenario_id,
+                        "severity_level": severity_level,
+                        "edge_source": edge.get('source', 0),
+                        "edge_target": edge.get('target', 0),
+                        "incident_type": edge.get('incident_type', 'unknown'),
+                        "incident_criticality": edge.get('incident_criticality', 'minor'),
+                        "jam_factor": edge.get('jam_factor', 0.0),
+                        "road_name": edge.get('road_name', 'Unknown Road')
+                    }
+                    self.injected_disruptions.append(injected_record)
+                    
+                    # Record system labels for each edge
+                    # Since we know disruptions were applied, the system should have detected them
+                    system_record = {
+                        "route_id": route_id,
+                        "route_category": route_category,
+                        "scenario_id": scenario_id,
+                        "severity_level": severity_level,
+                        "algorithm": algorithm.upper(),
+                        "edge_source": edge.get('source', 0),
+                        "edge_target": edge.get('target', 0),
+                        "detected_label": edge.get('incident_type', 'unknown'),
+                        "is_road_closed": edge.get('incident_road_closed', False),
+                        "was_detected": True  # Edges were processed, so they were detected
+                    }
+                    self.system_labels.append(system_record)
+                
+                logger.debug(f"Recorded labeling data: route={route_id}, edges={total_disrupted_edges}, nodes={total_disrupted_nodes}, accuracy={labeling_accuracy_pct:.1f}%")
+                
+            except Exception as e:
+                logger.error(f"Error recording labeling data: {e}")
     
     def record_jam_factor(self, trial: int, batch: int, jam_factor: float):
         """Record jam factor for graph data"""
@@ -1580,7 +1730,8 @@ class ExperimentMetricsCollector:
                     "accuracy": self._compute_scenario_accuracy_aggregations(),
                     "construction": self._compute_scenario_construction_aggregations(),
                     "updates": self._compute_scenario_updates_aggregations(),
-                    "performance": self._compute_scenario_performance_aggregations()
+                    "performance": self._compute_scenario_performance_aggregations(),
+                    "labeling": self._compute_scenario_labeling_aggregations()
                 },
                 "graph_data": self._compute_graph_data(),
                 "csv_files": {
@@ -1590,7 +1741,10 @@ class ExperimentMetricsCollector:
                     "updates": "updates_results.csv",
                     "performance": "performance_results.csv",
                     "similarity": "similarity_results.csv",
-                    "comprehensive": "comprehensive_results.csv"
+                    "comprehensive": "comprehensive_results.csv",
+                    "labeling": "labeling_results.csv",
+                    "injected_disruptions": "injected_disruptions.csv",
+                    "system_labels": "system_labels.csv"
                 }
             }
         else:
@@ -1853,6 +2007,114 @@ class ExperimentMetricsCollector:
                     "accuracy_rate": round(total_correct / len(hc2l_records), 4) if len(hc2l_records) > 0 else 0,
                     "avg_relative_error": round(avg_error, 6)
                 })
+            
+            return {
+                "per_category": per_category,
+                "per_scenario": per_scenario,
+                "per_severity": per_severity,
+                "averages": averages
+            }
+    
+    def _compute_scenario_labeling_aggregations(self) -> Dict:
+        """
+        Compute labeling accuracy aggregations for scenario mode.
+        
+        Returns aggregations by:
+        - per_category: Labeling accuracy by route length category
+        - per_scenario: Labeling accuracy by disruption scenario
+        - per_severity: Labeling accuracy by severity level
+        - averages: Overall algorithm averages
+        """
+        with self.lock:
+            # By category (includes both algorithms)
+            per_category = []
+            for category in ["short", "medium", "long"]:
+                for algorithm in ["DHL", "HC2L"]:
+                    cat_records = [r for r in self.labeling_records 
+                                   if r.get("route_category") == category and r.get("algorithm") == algorithm]
+                    if cat_records:
+                        avg_accuracy = sum(r.get("labeling_accuracy_pct", 0) for r in cat_records) / len(cat_records)
+                        total_edges = sum(r.get("total_disrupted_edges", 0) for r in cat_records)
+                        total_nodes = sum(r.get("total_disrupted_nodes", 0) for r in cat_records)
+                        total_dirty = sum(r.get("dirty_nodes_marked", 0) for r in cat_records)
+                        total_repaired = sum(r.get("nodes_repaired", 0) for r in cat_records)
+                        per_category.append({
+                            "category": category,
+                            "algorithm": algorithm,
+                            "simulations": len(cat_records),
+                            "total_disrupted_edges": total_edges,
+                            "total_disrupted_nodes": total_nodes,
+                            "dirty_nodes_marked": total_dirty,
+                            "nodes_repaired": total_repaired,
+                            "avg_labeling_accuracy_pct": round(avg_accuracy, 2)
+                        })
+            
+            # By scenario (includes both algorithms)
+            per_scenario = []
+            scenarios = self.scenarios if self.is_scenario_mode else [f"DS{i}" for i in range(1, 11)]
+            for scenario in scenarios:
+                for algorithm in ["DHL", "HC2L"]:
+                    sc_records = [r for r in self.labeling_records 
+                                  if r.get("scenario_id") == scenario and r.get("algorithm") == algorithm]
+                    if sc_records:
+                        avg_accuracy = sum(r.get("labeling_accuracy_pct", 0) for r in sc_records) / len(sc_records)
+                        total_edges = sum(r.get("total_disrupted_edges", 0) for r in sc_records)
+                        total_nodes = sum(r.get("total_disrupted_nodes", 0) for r in sc_records)
+                        total_dirty = sum(r.get("dirty_nodes_marked", 0) for r in sc_records)
+                        total_repaired = sum(r.get("nodes_repaired", 0) for r in sc_records)
+                        per_scenario.append({
+                            "scenario": scenario,
+                            "algorithm": algorithm,
+                            "simulations": len(sc_records),
+                            "total_disrupted_edges": total_edges,
+                            "total_disrupted_nodes": total_nodes,
+                            "dirty_nodes_marked": total_dirty,
+                            "nodes_repaired": total_repaired,
+                            "avg_labeling_accuracy_pct": round(avg_accuracy, 2)
+                        })
+            
+            # By severity level (includes both algorithms)
+            per_severity = []
+            for severity in ["light", "medium", "heavy"]:
+                for algorithm in ["DHL", "HC2L"]:
+                    sev_records = [r for r in self.labeling_records 
+                                   if r.get("severity_level") == severity and r.get("algorithm") == algorithm]
+                    if sev_records:
+                        avg_accuracy = sum(r.get("labeling_accuracy_pct", 0) for r in sev_records) / len(sev_records)
+                        total_edges = sum(r.get("total_disrupted_edges", 0) for r in sev_records)
+                        total_nodes = sum(r.get("total_disrupted_nodes", 0) for r in sev_records)
+                        total_dirty = sum(r.get("dirty_nodes_marked", 0) for r in sev_records)
+                        total_repaired = sum(r.get("nodes_repaired", 0) for r in sev_records)
+                        per_severity.append({
+                            "severity": severity,
+                            "algorithm": algorithm,
+                            "simulations": len(sev_records),
+                            "total_disrupted_edges": total_edges,
+                            "total_disrupted_nodes": total_nodes,
+                            "dirty_nodes_marked": total_dirty,
+                            "nodes_repaired": total_repaired,
+                            "avg_labeling_accuracy_pct": round(avg_accuracy, 2)
+                        })
+            
+            # Algorithm averages
+            averages = []
+            for algorithm in ["DHL", "HC2L"]:
+                alg_records = [r for r in self.labeling_records if r.get("algorithm") == algorithm]
+                if alg_records:
+                    avg_accuracy = sum(r.get("labeling_accuracy_pct", 0) for r in alg_records) / len(alg_records)
+                    total_edges = sum(r.get("total_disrupted_edges", 0) for r in alg_records)
+                    total_nodes = sum(r.get("total_disrupted_nodes", 0) for r in alg_records)
+                    total_dirty = sum(r.get("dirty_nodes_marked", 0) for r in alg_records)
+                    total_repaired = sum(r.get("nodes_repaired", 0) for r in alg_records)
+                    averages.append({
+                        "algorithm": algorithm,
+                        "total_simulations": len(alg_records),
+                        "total_disrupted_edges": total_edges,
+                        "total_disrupted_nodes": total_nodes,
+                        "dirty_nodes_marked": total_dirty,
+                        "nodes_repaired": total_repaired,
+                        "avg_labeling_accuracy_pct": round(avg_accuracy, 2)
+                    })
             
             return {
                 "per_category": per_category,
@@ -2585,6 +2847,66 @@ class ExperimentMetricsCollector:
             logger.info(f"Exported scenario comprehensive CSV: {csv_path} ({total_rows} rows)")
             return csv_path
     
+    def export_labeling_results_csv(self) -> Path:
+        """
+        Export Labeling Results CSV - Per-route labeling accuracy metrics.
+        
+        Returns:
+            Path to the exported CSV file
+        """
+        csv_path = self.results_path / "labeling_results.csv"
+        
+        with self.csv_lock:
+            with open(csv_path, 'w', newline='') as f:
+                writer = csv.DictWriter(f, fieldnames=CSV_HEADERS_LABELING_RESULTS)
+                writer.writeheader()
+                
+                for record in self.labeling_records:
+                    writer.writerow(record)
+            
+            logger.info(f"Exported labeling results CSV: {csv_path} ({len(self.labeling_records)} rows)")
+            return csv_path
+    
+    def export_injected_disruptions_csv(self) -> Path:
+        """
+        Export Injected Disruptions CSV - Ground truth of what was injected.
+        
+        Returns:
+            Path to the exported CSV file
+        """
+        csv_path = self.results_path / "injected_disruptions.csv"
+        
+        with self.csv_lock:
+            with open(csv_path, 'w', newline='') as f:
+                writer = csv.DictWriter(f, fieldnames=CSV_HEADERS_INJECTED_DISRUPTIONS)
+                writer.writeheader()
+                
+                for record in self.injected_disruptions:
+                    writer.writerow(record)
+            
+            logger.info(f"Exported injected disruptions CSV: {csv_path} ({len(self.injected_disruptions)} rows)")
+            return csv_path
+    
+    def export_system_labels_csv(self) -> Path:
+        """
+        Export System Labels CSV - What the system detected/labeled.
+        
+        Returns:
+            Path to the exported CSV file
+        """
+        csv_path = self.results_path / "system_labels.csv"
+        
+        with self.csv_lock:
+            with open(csv_path, 'w', newline='') as f:
+                writer = csv.DictWriter(f, fieldnames=CSV_HEADERS_SYSTEM_LABELS)
+                writer.writeheader()
+                
+                for record in self.system_labels:
+                    writer.writerow(record)
+            
+            logger.info(f"Exported system labels CSV: {csv_path} ({len(self.system_labels)} rows)")
+            return csv_path
+    
     def export_scenario_csvs(self) -> Dict[str, Path]:
         """
         Export all scenario-specific CSV files.
@@ -2602,7 +2924,11 @@ class ExperimentMetricsCollector:
             "construction": self.export_scenario_construction_csv(),
             "updates": self.export_scenario_updates_csv(),
             "similarity": self.export_similarity_csv(),  # Similarity uses standard export
-            "comprehensive": self.export_scenario_comprehensive_csv()
+            "comprehensive": self.export_scenario_comprehensive_csv(),
+            # Labeling tab CSVs
+            "labeling": self.export_labeling_results_csv(),
+            "injected_disruptions": self.export_injected_disruptions_csv(),
+            "system_labels": self.export_system_labels_csv()
         }
         
         logger.info(f"All scenario CSVs exported to: {self.results_path}")
