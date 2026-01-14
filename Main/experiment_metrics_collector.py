@@ -370,8 +370,33 @@ class AccuracyMetrics:
     
     @staticmethod
     def compute(dhc2l_distance: float, dijkstra_distance: float, 
-                tolerance: float = DEFAULT_TOLERANCE) -> "AccuracyMetrics":
-        """Compute accuracy metrics from distances"""
+                tolerance: float = DEFAULT_TOLERANCE,
+                query_time_ms: float = None) -> "AccuracyMetrics":
+        """
+        Compute accuracy metrics from distances.
+        
+        Args:
+            dhc2l_distance: Distance from HC2L/DHL algorithm (in meters)
+            dijkstra_distance: Distance from Dijkstra (in meters)
+            tolerance: Tolerance for relative error
+            query_time_ms: Query response time in milliseconds (optional)
+                          If provided and distance is 0, check if it's a failed query
+        
+        Returns:
+            AccuracyMetrics instance with is_correct flag
+        """
+        # Check for zero-result failure: if distance and time are both 0, 
+        # this indicates a failed query/experiment
+        if dhc2l_distance == 0 and query_time_ms is not None and query_time_ms == 0:
+            return AccuracyMetrics(
+                dhc2l_distance=0.0,
+                dijkstra_distance=dijkstra_distance,
+                distance_error=-dijkstra_distance,
+                relative_error=float('inf') if dijkstra_distance > 0 else 0.0,
+                is_correct=False,  # Failed experiment
+                tolerance=tolerance
+            )
+        
         if dijkstra_distance <= 0:
             return AccuracyMetrics(
                 dhc2l_distance=dhc2l_distance,
@@ -848,13 +873,19 @@ class ExperimentMetricsCollector:
                 # ============================================================
                 metrics = api_result.get("metrics", {})
                 
+                # Extract query time early for accuracy validation
+                summary = api_result.get("summary", {})
+                query_phase = api_result.get("query_phase", {})
+                query_time = float(query_phase.get("query_time_ms", 0) or 
+                                  summary.get("query_time_ms", 0) or 0)
+                
                 if is_hc2l:
                     # HC2L/DHC2L: Extract distances from API result
                     dhc2l_dist = float(metrics.get("calculated_distance_meters", 0))
                     dijkstra_dist = float(metrics.get("dijkstra_distance_meter", 0))
                     
                     record.accuracy = AccuracyMetrics.compute(
-                        dhc2l_dist, dijkstra_dist, self.tolerance
+                        dhc2l_dist, dijkstra_dist, self.tolerance, query_time
                     )
                     
                     # Store in numpy arrays
@@ -869,7 +900,7 @@ class ExperimentMetricsCollector:
                     dijkstra_dist = float(metrics.get("dijkstra_distance_meter", 0))
                     
                     record.accuracy = AccuracyMetrics.compute(
-                        dhl_dist, dijkstra_dist, self.tolerance
+                        dhl_dist, dijkstra_dist, self.tolerance, query_time
                     )
                     
                     # Store in numpy arrays
@@ -882,12 +913,7 @@ class ExperimentMetricsCollector:
                 # ============================================================
                 # STEP 2: PERFORMANCE EXTRACTION (ALWAYS for both algorithms)
                 # ============================================================
-                summary = api_result.get("summary", {})
-                query_phase = api_result.get("query_phase", {})
                 update_phase = api_result.get("update_phase", {})
-                
-                query_time = float(query_phase.get("query_time_ms", 0) or 
-                                  summary.get("query_time_ms", 0) or 0)
                 label_size = float(summary.get("label_size", 0) or 0)
                 lazy_time = float(update_phase.get("lazy_update_time_ms", 0) or 0)
                 threshold_rebuild = float(update_phase.get("threshold_rebuild_time_ms", 0) or 0)
@@ -1409,6 +1435,19 @@ class ExperimentMetricsCollector:
                     
                     # Accuracy from HC2L only
                     is_correct = hc2l_record.accuracy.is_correct if (hc2l_record and hc2l_record.accuracy) else False
+                    
+                    # CRITICAL: Check if both HC2L and DHL returned 0 distance and 0 time
+                    # This indicates a failed experiment and should override is_correct
+                    hc2l_failed = (hc2l_distance_km == 0 and hc2l_travel_time_sec == 0)
+                    dhl_failed = (dhl_distance_km == 0 and dhl_travel_time_sec == 0)
+                    
+                    if hc2l_failed and dhl_failed:
+                        # Both algorithms failed - mark as incorrect
+                        is_correct = False
+                        logger.debug(
+                            f"Standard experiment failed: Trial {trial_id}, Batch {batch_id}, "
+                            f"Query {query_id} - Both HC2L and DHL returned 0 distance and 0 time"
+                        )
                     
                     # Average labeling time
                     hc2l_labeling = hc2l_record.performance.labeling_time_ms if (hc2l_record and hc2l_record.performance) else 0
@@ -2460,6 +2499,19 @@ class ExperimentMetricsCollector:
                     
                     # Accuracy from HC2L only (DHL doesn't compute accuracy against Dijkstra)
                     is_correct = hc2l_record.get("is_correct", False) if hc2l_record else False
+                    
+                    # CRITICAL: Check if both HC2L and DHL returned 0 distance and 0 time
+                    # This indicates a failed experiment and should override is_correct
+                    hc2l_failed = (hc2l_distance_m == 0 and hc2l_travel_time_sec == 0)
+                    dhl_failed = (dhl_distance_m == 0 and dhl_travel_time_sec == 0)
+                    
+                    if hc2l_failed and dhl_failed:
+                        # Both algorithms failed - mark as incorrect
+                        is_correct = False
+                        logger.debug(
+                            f"ExperimentPreset failed: Route {route_id}, Scenario {scenario_id}, "
+                            f"Severity {severity_level} - Both HC2L and DHL returned 0 distance and 0 time"
+                        )
                     
                     # Average labeling time from both algorithms
                     hc2l_labeling = float(hc2l_record.get("labeling_time_ms", 0) or 0) if hc2l_record else 0
@@ -3516,7 +3568,8 @@ def create_metrics_collector(results_path: Path,
 
 def compute_accuracy(dhc2l_distance: float, 
                     dijkstra_distance: float,
-                    tolerance: float = DEFAULT_TOLERANCE) -> AccuracyMetrics:
+                    tolerance: float = DEFAULT_TOLERANCE,
+                    query_time_ms: float = None) -> AccuracyMetrics:
     """
     Convenience function to compute accuracy metrics.
     
@@ -3524,8 +3577,9 @@ def compute_accuracy(dhc2l_distance: float,
         dhc2l_distance: Distance from HC2L algorithm
         dijkstra_distance: Distance from Dijkstra reference
         tolerance: Accuracy tolerance (default 5%)
+        query_time_ms: Query response time in milliseconds (optional)
         
     Returns:
         AccuracyMetrics instance
     """
-    return AccuracyMetrics.compute(dhc2l_distance, dijkstra_distance, tolerance)
+    return AccuracyMetrics.compute(dhc2l_distance, dijkstra_distance, tolerance, query_time_ms)
