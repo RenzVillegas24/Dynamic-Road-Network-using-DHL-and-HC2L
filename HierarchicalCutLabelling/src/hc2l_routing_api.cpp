@@ -649,7 +649,8 @@ void output_json_response(bool success, const string& error_message = "",
                          size_t initial_index_size = 0,
                          bool index_was_rebuilt = false,
                          size_t current_index_size = 0,
-                         const MemoryUsageTracker* memory_tracker = nullptr) {
+                         const MemoryUsageTracker* memory_tracker = nullptr,
+                         size_t nodes_dirtied_this_query = 0) {
     
     cout << "{" << endl;
     cout << "  \"success\": " << (success ? "true" : "false") << "," << endl;
@@ -822,9 +823,11 @@ void output_json_response(bool success, const string& error_message = "",
         
         if (lazy_state != nullptr) {
             cout << "    \"dirty_nodes_marked\": " << lazy_state->dirty_labels.size() << "," << endl;
+            cout << "    \"nodes_dirtied_this_query\": " << nodes_dirtied_this_query << "," << endl;
             cout << "    \"total_updates\": " << lazy_state->update_count << "," << endl;
         } else {
             cout << "    \"dirty_nodes_marked\": 0," << endl;
+            cout << "    \"nodes_dirtied_this_query\": 0," << endl;
             cout << "    \"total_updates\": 0," << endl;
         }
         
@@ -1702,6 +1705,10 @@ int main(int argc, char* argv[]) {
         map<pair<NodeID, NodeID>, IncidentInfo> incident_data;
         cerr << "✅ LazyHC2L state initialized" << endl;
         
+        // Track nodes dirtied specifically for THIS query's disruptions
+        size_t dirty_nodes_before = lazy_state.dirty_labels.size();
+        size_t nodes_dirtied_this_query = 0;
+        
         if (use_disruptions) {
             cerr << "🔧 Processing disruptions from: " << disruption_file << endl;
             cerr << "   Tau threshold: " << tau_threshold << endl;
@@ -1892,6 +1899,10 @@ int main(int argc, char* argv[]) {
                 cerr << "   - Strategy: " << update_strategy << endl;
                 cerr << "   - Dirty nodes: " << lazy_state.dirty_labels.size() << endl;
                 cerr << "   - Flow segments: " << flow_data.size() << endl;
+                
+                // Calculate nodes dirtied by THIS query's disruptions
+                nodes_dirtied_this_query = lazy_state.dirty_labels.size() - dirty_nodes_before;
+                cerr << "   - Nodes dirtied this query: " << nodes_dirtied_this_query << endl;
                 
                 // ================================================================
                 // CRITICAL: Rebuild HC2L labels if immediate updates occurred
@@ -2379,7 +2390,7 @@ int main(int argc, char* argv[]) {
                            dirty_nodes_on_path, lazy_repair_time_ms, nodes_repaired,
                            cache_hit, flow_data, alternatives, incident_data,
                            peak_index_size, initial_index_size, index_was_rebuilt,
-                           current_index_size, &memory_tracker);
+                           current_index_size, &memory_tracker, nodes_dirtied_this_query);
         
         // Print optimization statistics to stderr
         cerr << endl;

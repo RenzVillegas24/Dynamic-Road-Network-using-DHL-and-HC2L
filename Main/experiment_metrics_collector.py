@@ -1198,7 +1198,7 @@ class ExperimentMetricsCollector:
             algorithm: "HC2L" or "DHL"
             disruption_edges: List of dicts with edge disruption data
                               Each dict has: source, target, incident_type, criticality, jam_factor, road_name
-            lazy_hc2l_info: HC2L algorithm output with dirty_nodes_marked, nodes_repaired
+            lazy_hc2l_info: HC2L algorithm output with nodes_dirtied_this_query, nodes_repaired
             dhl_update_info: DHL algorithm output with nodes_updated
         """
         with self.lock:
@@ -1217,19 +1217,35 @@ class ExperimentMetricsCollector:
                 nodes_repaired = 0
                 
                 if algorithm.upper() == "HC2L" and lazy_hc2l_info:
-                    dirty_nodes_marked = lazy_hc2l_info.get("dirty_nodes_marked", 0)
+                    # Use nodes_dirtied_this_query for per-query dirty count (not cumulative dirty_nodes_marked)
+                    dirty_nodes_marked = lazy_hc2l_info.get("nodes_dirtied_this_query", 0)
+                    # Fall back to dirty_nodes_marked if nodes_dirtied_this_query not available
+                    if dirty_nodes_marked == 0:
+                        dirty_nodes_marked = lazy_hc2l_info.get("dirty_nodes_marked", 0)
                     nodes_repaired = lazy_hc2l_info.get("nodes_repaired", 0)
                 elif algorithm.upper() == "DHL" and dhl_update_info:
+                    # DHL does immediate full updates - nodes_updated is the count of affected nodes
                     nodes_repaired = dhl_update_info.get("nodes_updated", 0)
-                    dirty_nodes_marked = nodes_repaired  # DHL doesn't use dirty marking
+                    dirty_nodes_marked = nodes_repaired  # DHL doesn't use lazy marking, all nodes are updated immediately
                 
                 # Calculate labeling accuracy
-                # Accuracy = min(1.0, nodes_repaired / total_disrupted_nodes) * 100
-                # If no nodes were disrupted, accuracy is 100%
-                if total_disrupted_nodes > 0:
-                    labeling_accuracy_pct = min(1.0, nodes_repaired / total_disrupted_nodes) * 100
+                # For HC2L: Accuracy = nodes_repaired / nodes_dirtied_this_query
+                #   (how many of the newly dirtied nodes were actually repaired)
+                # For DHL: Accuracy is based on nodes_updated vs disrupted nodes
+                #   (DHL always does immediate full update)
+                if algorithm.upper() == "HC2L":
+                    # HC2L accuracy: repaired / dirtied (nodes that needed repair vs actually repaired)
+                    if dirty_nodes_marked > 0:
+                        labeling_accuracy_pct = min(1.0, nodes_repaired / dirty_nodes_marked) * 100
+                    else:
+                        labeling_accuracy_pct = 100.0  # No nodes needed repair
                 else:
-                    labeling_accuracy_pct = 100.0
+                    # DHL accuracy: nodes_updated / total_disrupted_nodes
+                    # Since DHL does immediate full update, this should typically be >= 100%
+                    if total_disrupted_nodes > 0:
+                        labeling_accuracy_pct = min(1.0, nodes_repaired / total_disrupted_nodes) * 100
+                    else:
+                        labeling_accuracy_pct = 100.0
                 
                 # Record per-route labeling result
                 labeling_record = {
