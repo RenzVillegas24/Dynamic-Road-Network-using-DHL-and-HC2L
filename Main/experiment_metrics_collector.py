@@ -449,6 +449,7 @@ class SimilarityMetrics:
     frechet_distance_m: float = 0.0
     fd_rating: str = "N/A"
     ttd_rating: str = "N/A"
+    here_query_time_ms: float = 0.0  # HERE API query response time
     
     def to_dict(self) -> Dict:
         return asdict(self)
@@ -1087,7 +1088,8 @@ class ExperimentMetricsCollector:
                         here_end_road=comparison_data.get('end_road_here', ''),
                         frechet_distance_m=float(comparison_data.get('frechet_distance_m', 0)),
                         fd_rating=comparison_data.get('fd_rating', 'N/A'),
-                        ttd_rating=comparison_data.get('ttd_rating', 'N/A')
+                        ttd_rating=comparison_data.get('ttd_rating', 'N/A'),
+                        here_query_time_ms=float(comparison_data.get('query_time_ms_here', 0))
                     )
                 )
                 
@@ -1832,6 +1834,8 @@ class ExperimentMetricsCollector:
                     if cat_records:
                         avg_query = sum((r.get("query_time_ms") or 0) for r in cat_records) / len(cat_records)
                         avg_label = sum((r.get("label_size_mb") or 0) for r in cat_records) / len(cat_records)
+                        avg_peak_label = sum((r.get("peak_label_size_mb") or 0) for r in cat_records) / len(cat_records)
+                        avg_lazy_update = sum((r.get("lazy_update_time_ms") or 0) for r in cat_records) / len(cat_records)
                         avg_distance = sum((r.get("route_distance_km") or 0) for r in cat_records) / len(cat_records)
                         per_category.append({
                             "category": category,
@@ -1839,7 +1843,9 @@ class ExperimentMetricsCollector:
                             "simulations": len(cat_records),
                             "avg_distance_km": round(avg_distance, 2),
                             "avg_query_time_ms": round(avg_query, 3),
-                            "avg_label_size_mb": round(avg_label, 4)
+                            "avg_label_size_mb": round(avg_label, 4),
+                            "avg_peak_label_size_mb": round(avg_peak_label, 4),
+                            "avg_lazy_update_time_ms": round(avg_lazy_update, 3)
                         })
             
             # By severity and algorithm
@@ -1851,12 +1857,16 @@ class ExperimentMetricsCollector:
                     if sev_records:
                         avg_query = sum((r.get("query_time_ms") or 0) for r in sev_records) / len(sev_records)
                         avg_label = sum((r.get("label_size_mb") or 0) for r in sev_records) / len(sev_records)
+                        avg_peak_label = sum((r.get("peak_label_size_mb") or 0) for r in sev_records) / len(sev_records)
+                        avg_lazy_update = sum((r.get("lazy_update_time_ms") or 0) for r in sev_records) / len(sev_records)
                         per_severity.append({
                             "severity": severity,
                             "algorithm": algorithm,
                             "simulations": len(sev_records),
                             "avg_query_time_ms": round(avg_query, 3),
-                            "avg_label_size_mb": round(avg_label, 4)
+                            "avg_label_size_mb": round(avg_label, 4),
+                            "avg_peak_label_size_mb": round(avg_peak_label, 4),
+                            "avg_lazy_update_time_ms": round(avg_lazy_update, 3)
                         })
             
             # By scenario and algorithm
@@ -1868,12 +1878,16 @@ class ExperimentMetricsCollector:
                     if sc_records:
                         avg_query = sum((r.get("query_time_ms") or 0) for r in sc_records) / len(sc_records)
                         avg_label = sum((r.get("label_size_mb") or 0) for r in sc_records) / len(sc_records)
+                        avg_peak_label = sum((r.get("peak_label_size_mb") or 0) for r in sc_records) / len(sc_records)
+                        avg_lazy_update = sum((r.get("lazy_update_time_ms") or 0) for r in sc_records) / len(sc_records)
                         per_scenario.append({
                             "scenario": scenario,
                             "algorithm": algorithm,
                             "simulations": len(sc_records),
                             "avg_query_time_ms": round(avg_query, 3),
-                            "avg_label_size_mb": round(avg_label, 4)
+                            "avg_label_size_mb": round(avg_label, 4),
+                            "avg_peak_label_size_mb": round(avg_peak_label, 4),
+                            "avg_lazy_update_time_ms": round(avg_lazy_update, 3)
                         })
             
             # Algorithm averages (DHL and HC2L)
@@ -1883,12 +1897,16 @@ class ExperimentMetricsCollector:
                 if algo_records:
                     avg_query = sum((r.get("query_time_ms") or 0) for r in algo_records) / len(algo_records)
                     avg_label = sum((r.get("label_size_mb") or 0) for r in algo_records) / len(algo_records)
+                    avg_peak_label = sum((r.get("peak_label_size_mb") or 0) for r in algo_records) / len(algo_records)
+                    avg_lazy_update = sum((r.get("lazy_update_time_ms") or 0) for r in algo_records) / len(algo_records)
                     avg_distance = sum((r.get("route_distance_km") or 0) for r in algo_records) / len(algo_records)
                     averages.append({
                         "algorithm": algorithm,
                         "total_simulations": len(algo_records),
                         "avg_query_time_ms": round(avg_query, 3),
                         "avg_label_size_mb": round(avg_label, 4),
+                        "avg_peak_label_size_mb": round(avg_peak_label, 4),
+                        "avg_lazy_update_time_ms": round(avg_lazy_update, 3),
                         "avg_distance_km": round(avg_distance, 2)
                     })
             
@@ -2414,6 +2432,14 @@ class ExperimentMetricsCollector:
                     here_travel_time_sec = sim_data.get("here_travel_time_sec", 0)
                     here_distance_km = sim_data.get("here_distance_km", 0)
                     frechet_distance_km = sim_data.get("frechet_distance_km", 0)
+                    
+                    # Get HERE query time from similarity record (stored in milliseconds)
+                    # Find the matching similarity record to get HERE query time
+                    here_query_time_ms = 0
+                    for sim_record in self.similarity_records:
+                        if sim_record.route_id == global_route_id:
+                            here_query_time_ms = float(sim_record.similarity.here_query_time_ms or 0)
+                            break
                     
                     # Get HC2L values from scenario record (thread run data)
                     hc2l_distance_m = float(hc2l_record.get("dhc2l_distance", 0) or 0) if hc2l_record else 0

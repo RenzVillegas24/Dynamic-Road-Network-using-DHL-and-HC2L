@@ -2815,7 +2815,7 @@ const ExperimentRunner = {
             return;
         }
         
-        const { per_category, per_scenario, per_severity } = aggregatedSummary;
+        const { per_category, per_scenario, per_severity, averages } = aggregatedSummary;
         
         container.innerHTML = `
             <!-- Per-Category Data -->
@@ -2835,6 +2835,7 @@ const ExperimentRunner = {
                         <thead class="bg-blue-50 border-b border-blue-200">
                             <tr>
                                 <th class="text-left p-3 font-semibold text-blue-700">Category</th>
+                                <th class="text-center p-3 font-semibold text-blue-700">Algorithm</th>
                                 <th class="text-right p-3 font-semibold text-blue-700">Simulations</th>
                                 <th class="text-right p-3 font-semibold text-blue-700">Accidents</th>
                                 <th class="text-right p-3 font-semibold text-blue-700">Construction</th>
@@ -2854,6 +2855,7 @@ const ExperimentRunner = {
                             ${(per_category || []).map(row => `
                                 <tr class="hover:bg-blue-50 transition-colors">
                                     <td class="p-3"><span class="px-2 py-1 rounded text-xs font-medium ${this.getCategoryBadgeClass(row.category)}">${row.category}</span></td>
+                                    <td class="p-3 text-center"><span class="px-2 py-1 rounded text-xs font-medium ${row.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">${row.algorithm}</span></td>
                                     <td class="p-3 text-right font-mono">${row.simulations}</td>
                                     <td class="p-3 text-right font-mono">${row.accident || 0}</td>
                                     <td class="p-3 text-right font-mono">${row.construction || 0}</td>
@@ -2891,6 +2893,7 @@ const ExperimentRunner = {
                         <thead class="bg-purple-50 border-b border-purple-200">
                             <tr>
                                 <th class="text-left p-3 font-semibold text-purple-700">Scenario</th>
+                                <th class="text-center p-3 font-semibold text-purple-700">Algorithm</th>
                                 <th class="text-right p-3 font-semibold text-purple-700">Simulations</th>
                                 <th class="text-right p-3 font-semibold text-purple-700">Accidents</th>
                                 <th class="text-right p-3 font-semibold text-purple-700">Construction</th>
@@ -2910,6 +2913,7 @@ const ExperimentRunner = {
                             ${(per_scenario || []).map(row => `
                                 <tr class="hover:bg-purple-50 transition-colors">
                                     <td class="p-3 font-medium">${row.scenario}</td>
+                                    <td class="p-3 text-center"><span class="px-2 py-1 rounded text-xs font-medium ${row.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">${row.algorithm}</span></td>
                                     <td class="p-3 text-right font-mono">${row.simulations}</td>
                                     <td class="p-3 text-right font-mono">${row.accident || 0}</td>
                                     <td class="p-3 text-right font-mono">${row.construction || 0}</td>
@@ -2947,6 +2951,7 @@ const ExperimentRunner = {
                         <thead class="bg-amber-50 border-b border-amber-200">
                             <tr>
                                 <th class="text-left p-3 font-semibold text-amber-700">Severity</th>
+                                <th class="text-center p-3 font-semibold text-amber-700">Algorithm</th>
                                 <th class="text-right p-3 font-semibold text-amber-700">Simulations</th>
                                 <th class="text-right p-3 font-semibold text-amber-700">Avg Query Time (ms)</th>
                             </tr>
@@ -2955,8 +2960,45 @@ const ExperimentRunner = {
                             ${(per_severity || []).map(row => `
                                 <tr class="hover:bg-amber-50 transition-colors">
                                     <td class="p-3"><span class="px-2 py-1 rounded text-xs font-medium ${this.getLevelBadgeClass(row.severity)}">${row.severity}</span></td>
+                                    <td class="p-3 text-center"><span class="px-2 py-1 rounded text-xs font-medium ${row.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">${row.algorithm}</span></td>
                                     <td class="p-3 text-right font-mono">${row.simulations}</td>
                                     <td class="p-3 text-right font-mono">${row.avg_query_time_ms?.toFixed(3) || '--'}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Algorithm Averages -->
+            <div class="bg-white rounded-xl border border-green-200 overflow-hidden shadow-sm mt-4">
+                <div class="bg-gradient-to-r from-green-50 to-emerald-50 px-4 py-3 border-b border-green-200 flex items-center justify-between">
+                    <h5 class="font-bold text-green-900 flex items-center gap-2 mb-0">
+                        <i data-lucide="bar-chart" class="w-4 h-4"></i>
+                        Algorithm Averages
+                    </h5>
+                    <button onclick="ExperimentRunner.exportCSV('summary', 'averages')"
+                        class="btn btn--success btn--xs hover:shadow-md transition-all">
+                        <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-green-50 border-b border-green-200">
+                            <tr>
+                                <th class="text-left p-3 font-semibold text-green-700">Algorithm</th>
+                                <th class="text-right p-3 font-semibold text-green-700">Total Simulations</th>
+                                <th class="text-right p-3 font-semibold text-green-700">Avg Query Time (ms)</th>
+                                <th class="text-right p-3 font-semibold text-green-700">Total Incidents</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            ${(averages || []).map(row => `
+                                <tr class="hover:bg-green-50 transition-colors">
+                                    <td class="p-3"><span class="px-2 py-1 rounded text-xs font-medium font-bold ${row.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">${row.algorithm}</span></td>
+                                    <td class="p-3 text-right font-mono font-bold">${row.total_simulations || 0}</td>
+                                    <td class="p-3 text-right font-mono font-bold">${row.avg_query_time_ms?.toFixed(3) || '--'}</td>
+                                    <td class="p-3 text-right font-mono font-bold">${row.total_incidents || 0}</td>
                                 </tr>
                             `).join('')}
                         </tbody>
@@ -3124,7 +3166,7 @@ const ExperimentRunner = {
                         <tbody class="divide-y divide-gray-100">
                             ${(averages || []).map(row => `
                                 <tr class="hover:bg-green-50 transition-colors">
-                                    <td class="p-3 font-medium font-bold">${row.algorithm}</td>
+                                    <td class="p-3"><span class="px-2 py-1 rounded text-xs font-medium font-bold ${row.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">${row.algorithm}</span></td>
                                     <td class="p-3 text-right font-mono font-bold">${row.total_simulations || 0}</td>
                                     <td class="p-3 text-right font-mono font-bold">${row.total_correct || 0}</td>
                                     <td class="p-3 text-right font-mono font-bold">${((row.accuracy_rate || 0) * 100).toFixed(1)}%</td>
@@ -3165,20 +3207,24 @@ const ExperimentRunner = {
                         <thead class="bg-blue-50 border-b border-blue-200">
                             <tr>
                                 <th class="text-left p-3 font-semibold text-blue-700">Category</th>
+                                <th class="text-center p-3 font-semibold text-blue-700">Algorithm</th>
                                 <th class="text-right p-3 font-semibold text-blue-700">Simulations</th>
-                                <th class="text-right p-3 font-semibold text-blue-700">Avg Distance (km)</th>
                                 <th class="text-right p-3 font-semibold text-blue-700">Avg Query Time (ms)</th>
                                 <th class="text-right p-3 font-semibold text-blue-700">Avg Label Size (MB)</th>
+                                <th class="text-right p-3 font-semibold text-blue-700">Avg Peak Label (MB)</th>
+                                <th class="text-right p-3 font-semibold text-blue-700">Avg Lazy Update (ms)</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
                             ${(per_category || []).map(row => `
                                 <tr class="hover:bg-blue-50 transition-colors">
                                     <td class="p-3"><span class="px-2 py-1 rounded text-xs font-medium ${this.getCategoryBadgeClass(row.category)}">${row.category}</span></td>
+                                    <td class="p-3 text-center"><span class="px-2 py-1 rounded text-xs font-medium ${row.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">${row.algorithm}</span></td>
                                     <td class="p-3 text-right font-mono">${row.simulations}</td>
-                                    <td class="p-3 text-right font-mono">${row.avg_distance_km?.toFixed(2) || '--'}</td>
                                     <td class="p-3 text-right font-mono font-bold">${row.avg_query_time_ms?.toFixed(3) || '--'}</td>
                                     <td class="p-3 text-right font-mono">${row.avg_label_size_mb?.toFixed(4) || '--'}</td>
+                                    <td class="p-3 text-right font-mono">${row.avg_peak_label_size_mb?.toFixed(4) || '--'}</td>
+                                    <td class="p-3 text-right font-mono">${row.avg_lazy_update_time_ms?.toFixed(3) || '--'}</td>
                                 </tr>
                             `).join('')}
                         </tbody>
@@ -3203,16 +3249,24 @@ const ExperimentRunner = {
                         <thead class="bg-purple-50 border-b border-purple-200">
                             <tr>
                                 <th class="text-left p-3 font-semibold text-purple-700">Scenario</th>
+                                <th class="text-center p-3 font-semibold text-purple-700">Algorithm</th>
                                 <th class="text-right p-3 font-semibold text-purple-700">Simulations</th>
                                 <th class="text-right p-3 font-semibold text-purple-700">Avg Query Time (ms)</th>
+                                <th class="text-right p-3 font-semibold text-purple-700">Avg Label Size (MB)</th>
+                                <th class="text-right p-3 font-semibold text-purple-700">Avg Peak Label (MB)</th>
+                                <th class="text-right p-3 font-semibold text-purple-700">Avg Lazy Update (ms)</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
                             ${(per_scenario || []).map(row => `
                                 <tr class="hover:bg-purple-50 transition-colors">
                                     <td class="p-3 font-medium">${row.scenario}</td>
+                                    <td class="p-3 text-center"><span class="px-2 py-1 rounded text-xs font-medium ${row.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">${row.algorithm}</span></td>
                                     <td class="p-3 text-right font-mono">${row.simulations}</td>
                                     <td class="p-3 text-right font-mono font-bold">${row.avg_query_time_ms?.toFixed(3) || '--'}</td>
+                                    <td class="p-3 text-right font-mono">${row.avg_label_size_mb?.toFixed(4) || '--'}</td>
+                                    <td class="p-3 text-right font-mono">${row.avg_peak_label_size_mb?.toFixed(4) || '--'}</td>
+                                    <td class="p-3 text-right font-mono">${row.avg_lazy_update_time_ms?.toFixed(3) || '--'}</td>
                                 </tr>
                             `).join('')}
                         </tbody>
@@ -3237,18 +3291,24 @@ const ExperimentRunner = {
                         <thead class="bg-amber-50 border-b border-amber-200">
                             <tr>
                                 <th class="text-left p-3 font-semibold text-amber-700">Severity</th>
+                                <th class="text-center p-3 font-semibold text-amber-700">Algorithm</th>
                                 <th class="text-right p-3 font-semibold text-amber-700">Simulations</th>
                                 <th class="text-right p-3 font-semibold text-amber-700">Avg Query Time (ms)</th>
                                 <th class="text-right p-3 font-semibold text-amber-700">Avg Label Size (MB)</th>
+                                <th class="text-right p-3 font-semibold text-amber-700">Avg Peak Label (MB)</th>
+                                <th class="text-right p-3 font-semibold text-amber-700">Avg Lazy Update (ms)</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
                             ${(per_severity || []).map(row => `
                                 <tr class="hover:bg-amber-50 transition-colors">
                                     <td class="p-3"><span class="px-2 py-1 rounded text-xs font-medium ${this.getLevelBadgeClass(row.severity)}">${row.severity}</span></td>
+                                    <td class="p-3 text-center"><span class="px-2 py-1 rounded text-xs font-medium ${row.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">${row.algorithm}</span></td>
                                     <td class="p-3 text-right font-mono">${row.simulations}</td>
                                     <td class="p-3 text-right font-mono font-bold">${row.avg_query_time_ms?.toFixed(3) || '--'}</td>
                                     <td class="p-3 text-right font-mono">${row.avg_label_size_mb?.toFixed(4) || '--'}</td>
+                                    <td class="p-3 text-right font-mono">${row.avg_peak_label_size_mb?.toFixed(4) || '--'}</td>
+                                    <td class="p-3 text-right font-mono">${row.avg_lazy_update_time_ms?.toFixed(3) || '--'}</td>
                                 </tr>
                             `).join('')}
                         </tbody>
@@ -3274,19 +3334,21 @@ const ExperimentRunner = {
                             <tr>
                                 <th class="text-left p-3 font-semibold text-green-700">Algorithm</th>
                                 <th class="text-right p-3 font-semibold text-green-700">Total Simulations</th>
-                                <th class="text-right p-3 font-semibold text-green-700">Avg Distance (km)</th>
                                 <th class="text-right p-3 font-semibold text-green-700">Avg Query Time (ms)</th>
                                 <th class="text-right p-3 font-semibold text-green-700">Avg Label Size (MB)</th>
+                                <th class="text-right p-3 font-semibold text-green-700">Avg Peak Label (MB)</th>
+                                <th class="text-right p-3 font-semibold text-green-700">Avg Lazy Update (ms)</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
                             ${(averages || []).map(row => `
                                 <tr class="hover:bg-green-50 transition-colors">
-                                    <td class="p-3 font-medium font-bold">${row.algorithm}</td>
+                                    <td class="p-3"><span class="px-2 py-1 rounded text-xs font-medium font-bold ${row.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">${row.algorithm}</span></td>
                                     <td class="p-3 text-right font-mono font-bold">${row.total_simulations || 0}</td>
-                                    <td class="p-3 text-right font-mono font-bold">${row.avg_distance_km?.toFixed(2) || '--'}</td>
                                     <td class="p-3 text-right font-mono font-bold">${row.avg_query_time_ms?.toFixed(3) || '--'}</td>
                                     <td class="p-3 text-right font-mono font-bold">${row.avg_label_size_mb?.toFixed(4) || '--'}</td>
+                                    <td class="p-3 text-right font-mono font-bold">${row.avg_peak_label_size_mb?.toFixed(4) || '--'}</td>
+                                    <td class="p-3 text-right font-mono font-bold">${row.avg_lazy_update_time_ms?.toFixed(3) || '--'}</td>
                                 </tr>
                             `).join('')}
                         </tbody>
@@ -3503,6 +3565,7 @@ const ExperimentRunner = {
                                 <thead class="bg-blue-50 border-b border-blue-200">
                                     <tr>
                                         <th class="text-left p-3 font-semibold text-blue-700">Scenario</th>
+                                        <th class="text-center p-3 font-semibold text-blue-700">Algorithm</th>
                                         <th class="text-right p-3 font-semibold text-blue-700">Simulations</th>
                                         <th class="text-right p-3 font-semibold text-blue-700">Avg Construction Time (ms)</th>
                                         <th class="text-right p-3 font-semibold text-blue-700">Avg Label Size (MB)</th>
@@ -3512,6 +3575,7 @@ const ExperimentRunner = {
                                     ${perScenario.map(row => `
                                         <tr class="hover:bg-blue-50 transition-colors">
                                             <td class="p-3 font-medium">${row.scenario}</td>
+                                            <td class="p-3 text-center"><span class="px-2 py-1 rounded text-xs font-medium ${row.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">${row.algorithm}</span></td>
                                             <td class="p-3 text-right font-mono">${row.simulations}</td>
                                             <td class="p-3 text-right font-mono">${row.avg_construction_time_ms}</td>
                                             <td class="p-3 text-right font-mono">${row.avg_label_size_mb}</td>
@@ -3539,6 +3603,7 @@ const ExperimentRunner = {
                                 <thead class="bg-amber-50 border-b border-amber-200">
                                     <tr>
                                         <th class="text-left p-3 font-semibold text-amber-700">Severity</th>
+                                        <th class="text-center p-3 font-semibold text-amber-700">Algorithm</th>
                                         <th class="text-right p-3 font-semibold text-amber-700">Simulations</th>
                                         <th class="text-right p-3 font-semibold text-amber-700">Avg Construction Time (ms)</th>
                                         <th class="text-right p-3 font-semibold text-amber-700">Avg Label Size (MB)</th>
@@ -3548,6 +3613,7 @@ const ExperimentRunner = {
                                     ${perSeverity.map(row => `
                                         <tr class="hover:bg-amber-50 transition-colors">
                                             <td class="p-3"><span class="px-2 py-1 rounded text-xs font-medium ${this.getLevelBadgeClass(row.severity)}">${row.severity}</span></td>
+                                            <td class="p-3 text-center"><span class="px-2 py-1 rounded text-xs font-medium ${row.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">${row.algorithm}</span></td>
                                             <td class="p-3 text-right font-mono">${row.simulations}</td>
                                             <td class="p-3 text-right font-mono">${row.avg_construction_time_ms}</td>
                                             <td class="p-3 text-right font-mono">${row.avg_label_size_mb}</td>
@@ -3808,6 +3874,7 @@ const ExperimentRunner = {
                                 <thead class="bg-amber-50 border-b border-amber-200">
                                     <tr>
                                         <th class="text-left p-3 font-semibold text-amber-700">Severity</th>
+                                        <th class="text-center p-3 font-semibold text-amber-700">Algorithm</th>
                                         <th class="text-right p-3 font-semibold text-amber-700">Simulations</th>
                                         <th class="text-right p-3 font-semibold text-amber-700">Avg Lazy Update (ms)</th>
                                         <th class="text-right p-3 font-semibold text-amber-700">Avg Query Time (ms)</th>
@@ -3818,6 +3885,7 @@ const ExperimentRunner = {
                                     ${perSeverity.map(row => `
                                         <tr class="hover:bg-amber-50 transition-colors">
                                             <td class="p-3"><span class="px-2 py-1 rounded text-xs font-medium ${this.getLevelBadgeClass(row.severity)}">${row.severity}</span></td>
+                                            <td class="p-3 text-center"><span class="px-2 py-1 rounded text-xs font-medium ${row.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">${row.algorithm}</span></td>
                                             <td class="p-3 text-right font-mono">${row.simulations}</td>
                                             <td class="p-3 text-right font-mono">${row.avg_lazy_update_time_ms}</td>
                                             <td class="p-3 text-right font-mono">${row.avg_query_time_ms}</td>
