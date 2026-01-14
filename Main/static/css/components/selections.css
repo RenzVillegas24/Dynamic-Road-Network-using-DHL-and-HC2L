@@ -610,6 +610,12 @@
   color: rgba(245, 158, 11, 0.8);
 }
 
+.nav-select__option[data-color="rose"] {
+  --color-option-rgb: 244, 63, 94;
+  background: rgba(244, 63, 94, 0.08);
+  color: rgba(244, 63, 94, 0.8);
+}
+
 .nav-select__option[data-color="orange"] {
   --color-option-rgb: 249, 115, 22;
   background: rgba(249, 115, 22, 0.08);
