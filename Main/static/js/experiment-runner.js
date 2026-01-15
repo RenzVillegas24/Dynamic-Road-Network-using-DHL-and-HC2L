@@ -6341,7 +6341,6 @@ const ExperimentRunner = {
                                 ${isClosed ? 'Closed' : 'Open'}
                             </span>
                         </td>
-                        <td class="p-2 text-right font-mono">${parseFloat(row.length || 0).toFixed(1)}</td>
                     </tr>
                 `;
                 }).join('');
@@ -6411,9 +6410,9 @@ const ExperimentRunner = {
             'performance': ['Category', 'Scenario', 'Severity', 'Route', 'Algorithm', 'Query (ms)', 'Label (MB)', 'Lazy (ms)', 'Rebuilds'],
             'similarity': ['Batch', 'Route', 'OD Pair', 'HC2L Dist', 'HERE Dist', 'Deviation', 'Fréchet', 'Rating'],
             'comprehensive': ['Route', 'Category', 'Scenario', 'Severity', 'Start Lat', 'Start Lon', 'End Lat', 'End Lon', 'Disruptions', 'Types', 'HC2L Dist', 'DHL Dist', 'HERE Dist', 'HC2L Time', 'DHL Time', 'HERE Time', 'Accuracy', 'Fréchet', 'Query'],
-            'labeling': ['Route', 'Category', 'Scenario', 'Severity', 'Algorithm', 'Edges', 'Nodes', 'Dirty', 'Repaired', 'Accuracy'],
-            'injected-disruptions': ['Route', 'Scenario', 'Severity', 'Category', 'Source', 'Target', 'Type', 'Criticality', 'Jam Factor', 'Road Name'],
-            'system-labels': ['Route', 'Scenario', 'Severity', 'Algorithm', 'Source', 'Target', 'Label', 'Closed', 'Detected']
+            'labeling': ['Route', 'Category', 'Scenario', 'Severity', 'Algorithm', 'Disrupted Edges', 'Disrupted Nodes', 'Correctly Labeled', 'Accuracy'],
+            'injected-disruptions': ['Route', 'Scenario', 'Severity', 'Category', 'Node ID', 'Injected Label', 'Road Status'],
+            'system-labels': ['Route', 'Scenario', 'Severity', 'Algorithm', 'Node ID', 'System Label', 'Road Status']
         };
         
         // Define headers for standard mode
@@ -6425,8 +6424,8 @@ const ExperimentRunner = {
             'performance': ['Trial', 'Batch', 'Level', 'Route', 'Algorithm', 'Query (ms)', 'Label (MB)', 'Lazy (ms)', 'Rebuilds'],
             'similarity': ['Batch', 'Route', 'OD Pair', 'HC2L Dist', 'HERE Dist', 'Deviation', 'Fréchet', 'Rating'],
             'comprehensive': ['Route', 'Category', 'Scenario', 'Severity', 'Start Lat', 'Start Lon', 'End Lat', 'End Lon', 'Disruptions', 'Types', 'HC2L Dist', 'DHL Dist', 'HERE Dist', 'HC2L Time', 'DHL Time', 'HERE Time', 'Accuracy', 'Fréchet', 'Query'],
-            'injected-disruptions': ['Route', 'Scenario', 'Severity', 'Category', 'Source', 'Target', 'Type', 'Criticality', 'Jam Factor', 'Road Name'],
-            'system-labels': ['Route', 'Scenario', 'Severity', 'Algorithm', 'Source', 'Target', 'Label', 'Closed', 'Detected']
+            'injected-disruptions': ['Route', 'Scenario', 'Severity', 'Category', 'Node ID', 'Injected Label', 'Road Status'],
+            'system-labels': ['Route', 'Scenario', 'Severity', 'Algorithm', 'Node ID', 'System Label', 'Road Status']
         };
         
         const colorClasses = {

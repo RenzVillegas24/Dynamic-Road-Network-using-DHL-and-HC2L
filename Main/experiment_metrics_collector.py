@@ -265,8 +265,7 @@ CSV_HEADERS_LABELING_RESULTS = [
 # Updated: Now per-node tracking instead of per-edge
 CSV_HEADERS_INJECTED_DISRUPTIONS = [
     "route_id", "route_category", "scenario_id", "severity_level",
-    "node_id", "injected_label", "road_closed",
-    "length"
+    "node_id", "injected_label", "road_closed"
 ]
 
 # System Labels - What the system detected/labeled per node
@@ -1234,8 +1233,7 @@ class ExperimentMetricsCollector:
                             "severity_level": severity_level,
                             "node_id": node_id,
                             "injected_label": label,
-                            "road_closed": road_closed,
-                            "length": 0.0  # Will be filled from edge info if available
+                            "road_closed": road_closed
                         }
                         self.injected_disruptions.append(injected_record)
                     
