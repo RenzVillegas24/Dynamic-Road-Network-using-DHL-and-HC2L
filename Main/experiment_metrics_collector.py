@@ -207,6 +207,8 @@ CSV_HEADERS_SCENARIO_COMPREHENSIVE = [
     "disruption_num_accident",
     # Algorithm performance
     "algorithm_labeling_time_ms", "algorithm_label_size_mb",
+    "algorithm_hc2l_labeling_time_ms", "algorithm_hc2l_label_size_mb",
+    "algorithm_dhl_labeling_time_ms", "algorithm_dhl_label_size_mb",
     "algorithm_hc2l_query_response_time_ms", "algorithm_dhl_query_response_time_ms",
     "algorithm_here_query_response_time_ms",
     "algorithm_here_travel_time_sec", "algorithm_dhc2l_travel_time_sec",
@@ -2858,9 +2860,6 @@ class ExperimentMetricsCollector:
                     dhl_label_size = float(dhl_record.get("label_size_mb", 0) or 0) if dhl_record else 0
                     avg_label_size_mb = (hc2l_label_size + dhl_label_size) / 2 if (hc2l_label_size + dhl_label_size) > 0 else 0
                     
-                    # HERE doesn't provide query time in experiments - set to 0
-                    here_query_time_ms = 0
-                    
                     writer.writerow({
                         # Route identification
                         "route_id": route_id,
@@ -2897,6 +2896,11 @@ class ExperimentMetricsCollector:
                         # Algorithm performance (averaged from both)
                         "algorithm_labeling_time_ms": round(avg_labeling_time_ms, 2),
                         "algorithm_label_size_mb": round(avg_label_size_mb, 5),
+                        # Individual algorithm labeling metrics
+                        "algorithm_hc2l_labeling_time_ms": round(hc2l_labeling, 2),
+                        "algorithm_hc2l_label_size_mb": round(hc2l_label_size, 5),
+                        "algorithm_dhl_labeling_time_ms": round(dhl_labeling, 2),
+                        "algorithm_dhl_label_size_mb": round(dhl_label_size, 5),
                         # Split query times for each algorithm
                         "algorithm_hc2l_query_response_time_ms": round(hc2l_query_time_ms, 3),
                         "algorithm_dhl_query_response_time_ms": round(dhl_query_time_ms, 3),

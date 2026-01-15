@@ -4796,6 +4796,11 @@ const ExperimentRunner = {
                                         <th class="text-right p-2 font-semibold text-slate-700">HERE Time (s)</th>
                                         <th class="text-right p-2 font-semibold text-slate-700">HC2L Query (ms)</th>
                                         <th class="text-right p-2 font-semibold text-slate-700">DHL Query (ms)</th>
+                                        <th class="text-right p-2 font-semibold text-slate-700">HERE Query (ms)</th>
+                                        <th class="text-right p-2 font-semibold text-slate-700">HC2L Label Time (ms)</th>
+                                        <th class="text-right p-2 font-semibold text-slate-700">HC2L Label Size (MB)</th>
+                                        <th class="text-right p-2 font-semibold text-slate-700">DHL Label Time (ms)</th>
+                                        <th class="text-right p-2 font-semibold text-slate-700">DHL Label Size (MB)</th>
                                         <th class="text-center p-2 font-semibold text-slate-700">Accuracy</th>
                                         <th class="text-right p-2 font-semibold text-slate-700">Fréchet (km)</th>
                                     </tr>
@@ -4835,6 +4840,11 @@ const ExperimentRunner = {
                             <td class="p-2 text-right font-mono">${parseFloat(row.algorithm_here_travel_time_sec || 0).toFixed(1)}</td>
                             <td class="p-2 text-right font-mono">${parseFloat(row.algorithm_hc2l_query_response_time_ms || 0).toFixed(3)}</td>
                             <td class="p-2 text-right font-mono">${parseFloat(row.algorithm_dhl_query_response_time_ms || 0).toFixed(3)}</td>
+                            <td class="p-2 text-right font-mono">${parseFloat(row.algorithm_here_query_response_time_ms || 0).toFixed(3)}</td>
+                            <td class="p-2 text-right font-mono">${parseFloat(row.algorithm_hc2l_labeling_time_ms || 0).toFixed(2)}</td>
+                            <td class="p-2 text-right font-mono">${parseFloat(row.algorithm_hc2l_label_size_mb || 0).toFixed(3)}</td>
+                            <td class="p-2 text-right font-mono">${parseFloat(row.algorithm_dhl_labeling_time_ms || 0).toFixed(2)}</td>
+                            <td class="p-2 text-right font-mono">${parseFloat(row.algorithm_dhl_label_size_mb || 0).toFixed(3)}</td>
                             <td class="p-2 text-center">
                                 <span class="px-2 py-0.5 rounded text-xs ${isCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">
                                     ${isCorrect ? 'Pass' : 'Fail'}
@@ -6237,68 +6247,6 @@ const ExperimentRunner = {
                 `).join('');
                 break;
 
-            case 'comprehensive':
-                // Calculate total disruptions from individual incident counts
-                tbody.innerHTML = data.map(row => {
-                    const totalDisruptions = 
-                        parseInt(row.disruption_num_road_closure || 0) +
-                        parseInt(row.disruption_num_road_hazard || 0) +
-                        parseInt(row.disruption_num_construction || 0) +
-                        parseInt(row.disruption_num_congestion || 0) +
-                        parseInt(row.disruption_num_disabled_vehicle || 0) +
-                        parseInt(row.disruption_num_mass_transit_event || 0) +
-                        parseInt(row.disruption_num_planned_event || 0) +
-                        parseInt(row.disruption_num_weather || 0) +
-                        parseInt(row.disruption_num_lane_restriction || 0) +
-                        parseInt(row.disruption_num_other || 0) +
-                        parseInt(row.disruption_num_accident || 0);
-                    
-                    // Build disruption types string from non-zero counts
-                    const types = [];
-                    if (parseInt(row.disruption_num_accident || 0) > 0) types.push('Accident');
-                    if (parseInt(row.disruption_num_road_closure || 0) > 0) types.push('Closure');
-                    if (parseInt(row.disruption_num_construction || 0) > 0) types.push('Construction');
-                    if (parseInt(row.disruption_num_congestion || 0) > 0) types.push('Congestion');
-                    if (parseInt(row.disruption_num_weather || 0) > 0) types.push('Weather');
-                    if (parseInt(row.disruption_num_lane_restriction || 0) > 0) types.push('Lane');
-                    if (parseInt(row.disruption_num_road_hazard || 0) > 0) types.push('Hazard');
-                    if (parseInt(row.disruption_num_disabled_vehicle || 0) > 0) types.push('Disabled');
-                    const disruptionTypes = types.join(', ') || 'None';
-                    
-                    // Accuracy status based on is_correct field
-                    const isCorrect = row.algorithm_is_correct === 'True' || row.algorithm_is_correct === true;
-                    const accuracyStatus = isCorrect ? 'Pass' : 'Fail';
-                    
-                    return `
-                    <tr class="hover:bg-gray-50 text-xs">
-                        <td class="p-2 text-center font-mono">${row.route_id || ''}</td>
-                        <td class="p-2 text-center"><span class="px-2 py-0.5 rounded text-xs font-medium ${this.getCategoryBadgeClass(row.route_length_category)}">${row.route_length_category || ''}</span></td>
-                        <td class="p-2 text-center">${row.disruption_scenario_id || ''}</td>
-                        <td class="p-2 text-center"><span class="px-2 py-0.5 rounded text-xs ${this.getLevelBadgeClass(row.disruption_severity_level)}">${row.disruption_severity_level || ''}</span></td>
-                        <td class="p-2 text-right font-mono text-xs">${parseFloat(row.route_start_lat || 0).toFixed(5)}</td>
-                        <td class="p-2 text-right font-mono text-xs">${parseFloat(row.route_start_lon || 0).toFixed(5)}</td>
-                        <td class="p-2 text-right font-mono text-xs">${parseFloat(row.route_end_lat || 0).toFixed(5)}</td>
-                        <td class="p-2 text-right font-mono text-xs">${parseFloat(row.route_end_lon || 0).toFixed(5)}</td>
-                        <td class="p-2 text-right">${totalDisruptions}</td>
-                        <td class="p-2 text-right text-xs">${disruptionTypes}</td>
-                        <td class="p-2 text-right font-mono">${parseFloat(row.algorithm_dhc2l_distance_km || 0).toFixed(3)}</td>
-                        <td class="p-2 text-right font-mono">${parseFloat(row.algorithm_dhl_distance_km || 0).toFixed(3)}</td>
-                        <td class="p-2 text-right font-mono">${parseFloat(row.algorithm_here_distance_km || 0).toFixed(3)}</td>
-                        <td class="p-2 text-right font-mono">${parseFloat(row.algorithm_dhc2l_travel_time_sec || 0).toFixed(1)}s</td>
-                        <td class="p-2 text-right font-mono">${parseFloat(row.algorithm_dhl_travel_time_sec || 0).toFixed(1)}s</td>
-                        <td class="p-2 text-right font-mono">${parseFloat(row.algorithm_here_travel_time_sec || 0).toFixed(1)}s</td>
-                        <td class="p-2 text-center">
-                            <span class="px-2 py-0.5 rounded text-xs ${isCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">
-                                ${accuracyStatus}
-                            </span>
-                        </td>
-                        <td class="p-2 text-right font-mono">${parseFloat(row.algorithm_frechet_distance_km || 0).toFixed(3)}km</td>
-                        <td class="p-2 text-right text-xs text-gray-500">${row.algorithm_query_response_time_ms || ''}ms</td>
-                    </tr>
-                `;
-                }).join('');
-                break;
-
             case 'labeling':
                 // Labeling accuracy - always scenario mode
                 tbody.innerHTML = data.map(row => {
@@ -6409,7 +6357,7 @@ const ExperimentRunner = {
             'updates': ['Category', 'Algorithm', 'Lazy (ms)', 'Peak (MB)', 'Size Δ%', 'Query (ms)'],
             'performance': ['Category', 'Scenario', 'Severity', 'Route', 'Algorithm', 'Query (ms)', 'Label (MB)', 'Lazy (ms)', 'Rebuilds'],
             'similarity': ['Batch', 'Route', 'OD Pair', 'HC2L Dist', 'HERE Dist', 'Deviation', 'Fréchet', 'Rating'],
-            'comprehensive': ['Route', 'Category', 'Scenario', 'Severity', 'Start Lat', 'Start Lon', 'End Lat', 'End Lon', 'Disruptions', 'Types', 'HC2L Dist', 'DHL Dist', 'HERE Dist', 'HC2L Time', 'DHL Time', 'HERE Time', 'Accuracy', 'Fréchet', 'Query'],
+            'comprehensive': ['Route', 'Category', 'Scenario', 'Severity', 'Start Lat', 'Start Lon', 'End Lat', 'End Lon', 'Disruptions', 'Types', 'HC2L Dist', 'DHL Dist', 'HERE Dist', 'HC2L Time', 'DHL Time', 'HERE Time', 'HC2L Label Time', 'HC2L Label Size', 'DHL Label Time', 'DHL Label Size', 'Accuracy', 'Fréchet', 'Query'],
             'labeling': ['Route', 'Category', 'Scenario', 'Severity', 'Algorithm', 'Disrupted Edges', 'Disrupted Nodes', 'Correctly Labeled', 'Accuracy'],
             'injected-disruptions': ['Route', 'Scenario', 'Severity', 'Category', 'Node ID', 'Injected Label', 'Road Status'],
             'system-labels': ['Route', 'Scenario', 'Severity', 'Algorithm', 'Node ID', 'System Label', 'Road Status']
@@ -6423,7 +6371,7 @@ const ExperimentRunner = {
             'updates': ['Trial', 'Batch', 'Algorithm', 'Lazy (ms)', 'Peak (MB)', 'Size Δ%', 'Query (ms)'],
             'performance': ['Trial', 'Batch', 'Level', 'Route', 'Algorithm', 'Query (ms)', 'Label (MB)', 'Lazy (ms)', 'Rebuilds'],
             'similarity': ['Batch', 'Route', 'OD Pair', 'HC2L Dist', 'HERE Dist', 'Deviation', 'Fréchet', 'Rating'],
-            'comprehensive': ['Route', 'Category', 'Scenario', 'Severity', 'Start Lat', 'Start Lon', 'End Lat', 'End Lon', 'Disruptions', 'Types', 'HC2L Dist', 'DHL Dist', 'HERE Dist', 'HC2L Time', 'DHL Time', 'HERE Time', 'Accuracy', 'Fréchet', 'Query'],
+            'comprehensive': ['Route', 'Category', 'Scenario', 'Severity', 'Start Lat', 'Start Lon', 'End Lat', 'End Lon', 'Disruptions', 'Types', 'HC2L Dist', 'DHL Dist', 'HERE Dist', 'HC2L Time', 'DHL Time', 'HERE Time', 'HC2L Label Time', 'HC2L Label Size', 'DHL Label Time', 'DHL Label Size', 'Accuracy', 'Fréchet', 'Query'],
             'injected-disruptions': ['Route', 'Scenario', 'Severity', 'Category', 'Node ID', 'Injected Label', 'Road Status'],
             'system-labels': ['Route', 'Scenario', 'Severity', 'Algorithm', 'Node ID', 'System Label', 'Road Status']
         };
