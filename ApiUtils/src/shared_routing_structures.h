@@ -147,6 +147,92 @@ struct EdgeDisruptionMetrics {
  * Disruption cache: stores parsed disruption data to avoid re-parsing
  * Now includes precomputed EdgeDisruptionMetrics for each edge
  */
+// ============================================================
+// NODE LABEL TRACKING (for labeling accuracy)
+// ============================================================
+
+/**
+ * Represents a single node's disruption label
+ * Used to track both injected (ground truth) and system-detected labels
+ */
+struct NodeDisruptionLabel {
+    NodeID node_id;                 // Node that was affected
+    std::string label;              // Disruption type (congestion, accident, roadClosure, etc.)
+    std::string criticality;        // minor, major, severe, critical
+    double jam_factor;              // 0.0-10.0 scale
+    bool is_road_closed;            // Whether road is completely closed
+    
+    NodeDisruptionLabel() 
+        : node_id(0), label("unknown"), criticality("minor"),
+          jam_factor(0.0), is_road_closed(false) {}
+    
+    NodeDisruptionLabel(NodeID id, const std::string& lbl, const std::string& crit, 
+                        double jf, bool closed)
+        : node_id(id), label(lbl), criticality(crit),
+          jam_factor(jf), is_road_closed(closed) {}
+};
+
+/**
+ * Container for tracking all node labels in a query
+ * Separates injected (ground truth) from system-detected labels
+ */
+struct NodeLabelTracker {
+    // Injected labels (ground truth - what was actually injected)
+    std::vector<NodeDisruptionLabel> injected_labels;
+    
+    // System labels (what the algorithm detected/marked)
+    std::vector<NodeDisruptionLabel> system_labels;
+    
+    // Map for quick lookup: node_id -> index in injected_labels
+    std::map<NodeID, size_t> injected_index;
+    
+    void add_injected(NodeID node, const std::string& label, const std::string& criticality,
+                      double jam_factor, bool is_closed) {
+        if (injected_index.find(node) == injected_index.end()) {
+            injected_index[node] = injected_labels.size();
+            injected_labels.emplace_back(node, label, criticality, jam_factor, is_closed);
+        }
+    }
+    
+    void add_system_label(NodeID node, const std::string& label, const std::string& criticality,
+                          double jam_factor, bool is_closed) {
+        system_labels.emplace_back(node, label, criticality, jam_factor, is_closed);
+    }
+    
+    // Check if a node was correctly labeled
+    bool is_correctly_labeled(NodeID node, const std::string& system_label) const {
+        auto it = injected_index.find(node);
+        if (it == injected_index.end()) return false;
+        return injected_labels[it->second].label == system_label;
+    }
+    
+    // Count correctly labeled nodes
+    int count_correct_labels() const {
+        int correct = 0;
+        std::map<NodeID, std::string> system_map;
+        for (const auto& sl : system_labels) {
+            system_map[sl.node_id] = sl.label;
+        }
+        for (const auto& il : injected_labels) {
+            auto it = system_map.find(il.node_id);
+            if (it != system_map.end() && it->second == il.label) {
+                correct++;
+            }
+        }
+        return correct;
+    }
+    
+    void clear() {
+        injected_labels.clear();
+        system_labels.clear();
+        injected_index.clear();
+    }
+};
+
+// ============================================================
+// CACHING & AGGREGATION
+// ============================================================
+
 struct DisruptionCache {
     // Raw data from CSV
     std::map<std::pair<NodeID, NodeID>, IncidentInfo> incidents;

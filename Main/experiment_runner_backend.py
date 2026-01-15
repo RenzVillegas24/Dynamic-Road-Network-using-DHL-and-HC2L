@@ -3339,6 +3339,9 @@ class ExperimentRunner:
                                 lazy_hc2l_info = result.get("lazy_hc2l", {})
                                 dhl_update_info = result.get("dhl_update_info", {})
                                 
+                                # Get node_labels from C++ API output (new per-node accuracy tracking)
+                                node_labels = result.get("node_labels", {})
+                                
                                 metrics_collector.record_labeling_data(
                                     route_id=route_idx + 1,  # 1-indexed
                                     route_category=category,
@@ -3347,7 +3350,8 @@ class ExperimentRunner:
                                     algorithm=algorithm,
                                     disruption_edges=disruption_edges,
                                     lazy_hc2l_info=lazy_hc2l_info,
-                                    dhl_update_info=dhl_update_info
+                                    dhl_update_info=dhl_update_info,
+                                    node_labels=node_labels
                                 )
                             
                             # Update progress

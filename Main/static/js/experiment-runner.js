@@ -3249,9 +3249,8 @@ const ExperimentRunner = {
                 '<td class="p-3 text-center"><span class="px-2 py-1 rounded text-xs font-medium font-bold ' + algBadge + '">' + row.algorithm + '</span></td>' +
                 '<td class="p-3 text-right font-mono">' + (row.simulations || 0) + '</td>' +
                 '<td class="p-3 text-right font-mono">' + (row.total_disrupted_edges || 0) + '</td>' +
-                '<td class="p-3 text-right font-mono">' + (row.total_disrupted_nodes || 0) + '</td>' +
-                '<td class="p-3 text-right font-mono">' + (row.dirty_nodes_marked || 0) + '</td>' +
-                '<td class="p-3 text-right font-mono">' + (row.nodes_repaired || 0) + '</td>' +
+                '<td class="p-3 text-right font-mono">' + (row.disrupted_nodes || row.total_disrupted_nodes || 0) + '</td>' +
+                '<td class="p-3 text-right font-mono">' + (row.correct_labeled_nodes || row.nodes_repaired || 0) + '</td>' +
                 '<td class="p-3 text-right font-mono font-bold">' + (row.avg_labeling_accuracy_pct || 0).toFixed(1) + '%</td>' +
                 '</tr>';
         }).join('');
@@ -3264,9 +3263,8 @@ const ExperimentRunner = {
                 '<td class="p-3 text-center"><span class="px-2 py-1 rounded text-xs font-medium font-bold ' + algBadge + '">' + row.algorithm + '</span></td>' +
                 '<td class="p-3 text-right font-mono">' + (row.simulations || 0) + '</td>' +
                 '<td class="p-3 text-right font-mono">' + (row.total_disrupted_edges || 0) + '</td>' +
-                '<td class="p-3 text-right font-mono">' + (row.total_disrupted_nodes || 0) + '</td>' +
-                '<td class="p-3 text-right font-mono">' + (row.dirty_nodes_marked || 0) + '</td>' +
-                '<td class="p-3 text-right font-mono">' + (row.nodes_repaired || 0) + '</td>' +
+                '<td class="p-3 text-right font-mono">' + (row.disrupted_nodes || row.total_disrupted_nodes || 0) + '</td>' +
+                '<td class="p-3 text-right font-mono">' + (row.correct_labeled_nodes || row.nodes_repaired || 0) + '</td>' +
                 '<td class="p-3 text-right font-mono font-bold">' + (row.avg_labeling_accuracy_pct || 0).toFixed(1) + '%</td>' +
                 '</tr>';
         }).join('');
@@ -3280,9 +3278,8 @@ const ExperimentRunner = {
                 '<td class="p-3 text-center"><span class="px-2 py-1 rounded text-xs font-medium font-bold ' + algBadge + '">' + row.algorithm + '</span></td>' +
                 '<td class="p-3 text-right font-mono">' + (row.simulations || 0) + '</td>' +
                 '<td class="p-3 text-right font-mono">' + (row.total_disrupted_edges || 0) + '</td>' +
-                '<td class="p-3 text-right font-mono">' + (row.total_disrupted_nodes || 0) + '</td>' +
-                '<td class="p-3 text-right font-mono">' + (row.dirty_nodes_marked || 0) + '</td>' +
-                '<td class="p-3 text-right font-mono">' + (row.nodes_repaired || 0) + '</td>' +
+                '<td class="p-3 text-right font-mono">' + (row.disrupted_nodes || row.total_disrupted_nodes || 0) + '</td>' +
+                '<td class="p-3 text-right font-mono">' + (row.correct_labeled_nodes || row.nodes_repaired || 0) + '</td>' +
                 '<td class="p-3 text-right font-mono font-bold">' + (row.avg_labeling_accuracy_pct || 0).toFixed(1) + '%</td>' +
                 '</tr>';
         }).join('');
@@ -3294,9 +3291,8 @@ const ExperimentRunner = {
                 '<td class="p-3"><span class="px-2 py-1 rounded text-xs font-medium font-bold ' + algBadge + '">' + row.algorithm + '</span></td>' +
                 '<td class="p-3 text-right font-mono font-bold">' + (row.total_simulations || 0) + '</td>' +
                 '<td class="p-3 text-right font-mono">' + (row.total_disrupted_edges || 0) + '</td>' +
-                '<td class="p-3 text-right font-mono">' + (row.total_disrupted_nodes || 0) + '</td>' +
-                '<td class="p-3 text-right font-mono">' + (row.dirty_nodes_marked || 0) + '</td>' +
-                '<td class="p-3 text-right font-mono">' + (row.nodes_repaired || 0) + '</td>' +
+                '<td class="p-3 text-right font-mono">' + (row.disrupted_nodes || row.total_disrupted_nodes || 0) + '</td>' +
+                '<td class="p-3 text-right font-mono">' + (row.correct_labeled_nodes || row.nodes_repaired || 0) + '</td>' +
                 '<td class="p-3 text-right font-mono font-bold">' + (row.avg_labeling_accuracy_pct || 0).toFixed(1) + '%</td>' +
                 '</tr>';
         }).join('');
@@ -3323,8 +3319,7 @@ const ExperimentRunner = {
                                 <th class="text-right p-3 font-semibold text-pink-700">Simulations</th>
                                 <th class="text-right p-3 font-semibold text-pink-700">Disrupted Edges</th>
                                 <th class="text-right p-3 font-semibold text-pink-700">Disrupted Nodes</th>
-                                <th class="text-right p-3 font-semibold text-pink-700">Dirty Marked</th>
-                                <th class="text-right p-3 font-semibold text-pink-700">Nodes Repaired</th>
+                                <th class="text-right p-3 font-semibold text-pink-700">Correct Labeled</th>
                                 <th class="text-right p-3 font-semibold text-pink-700">Accuracy %</th>
                             </tr>
                         </thead>
@@ -3356,8 +3351,7 @@ const ExperimentRunner = {
                                 <th class="text-right p-3 font-semibold text-purple-700">Simulations</th>
                                 <th class="text-right p-3 font-semibold text-purple-700">Disrupted Edges</th>
                                 <th class="text-right p-3 font-semibold text-purple-700">Disrupted Nodes</th>
-                                <th class="text-right p-3 font-semibold text-purple-700">Dirty Marked</th>
-                                <th class="text-right p-3 font-semibold text-purple-700">Nodes Repaired</th>
+                                <th class="text-right p-3 font-semibold text-purple-700">Correct Labeled</th>
                                 <th class="text-right p-3 font-semibold text-purple-700">Accuracy %</th>
                             </tr>
                         </thead>
@@ -3389,8 +3383,7 @@ const ExperimentRunner = {
                                 <th class="text-right p-3 font-semibold text-amber-700">Simulations</th>
                                 <th class="text-right p-3 font-semibold text-amber-700">Disrupted Edges</th>
                                 <th class="text-right p-3 font-semibold text-amber-700">Disrupted Nodes</th>
-                                <th class="text-right p-3 font-semibold text-amber-700">Dirty Marked</th>
-                                <th class="text-right p-3 font-semibold text-amber-700">Nodes Repaired</th>
+                                <th class="text-right p-3 font-semibold text-amber-700">Correct Labeled</th>
                                 <th class="text-right p-3 font-semibold text-amber-700">Accuracy %</th>
                             </tr>
                         </thead>
@@ -3420,9 +3413,8 @@ const ExperimentRunner = {
                                 <th class="text-left p-3 font-semibold text-green-700">Algorithm</th>
                                 <th class="text-right p-3 font-semibold text-green-700">Total Simulations</th>
                                 <th class="text-right p-3 font-semibold text-green-700">Total Edges</th>
-                                <th class="text-right p-3 font-semibold text-green-700">Total Nodes</th>
-                                <th class="text-right p-3 font-semibold text-green-700">Dirty Marked</th>
-                                <th class="text-right p-3 font-semibold text-green-700">Repaired</th>
+                                <th class="text-right p-3 font-semibold text-green-700">Disrupted Nodes</th>
+                                <th class="text-right p-3 font-semibold text-green-700">Correct Labeled</th>
                                 <th class="text-right p-3 font-semibold text-green-700">Avg Accuracy %</th>
                             </tr>
                         </thead>
@@ -6311,6 +6303,9 @@ const ExperimentRunner = {
                 // Labeling accuracy - always scenario mode
                 tbody.innerHTML = data.map(row => {
                     const algBadge = row.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700';
+                    // Use new field names with fallback to old names for backward compatibility
+                    const disruptedNodes = row.disrupted_nodes || row.total_disrupted_nodes || 0;
+                    const correctLabeled = row.correct_labeled_nodes || row.nodes_repaired || 0;
                     return `
                     <tr class="hover:bg-pink-50 text-xs">
                         <td class="p-2 font-mono">${row.route_id || ''}</td>
@@ -6319,9 +6314,8 @@ const ExperimentRunner = {
                         <td class="p-2"><span class="px-2 py-0.5 rounded text-xs ${this.getLevelBadgeClass(row.severity_level)}">${row.severity_level || ''}</span></td>
                         <td class="p-2 text-center"><span class="px-2 py-0.5 rounded text-xs font-medium ${algBadge}">${row.algorithm || ''}</span></td>
                         <td class="p-2 text-right font-mono">${row.total_disrupted_edges || 0}</td>
-                        <td class="p-2 text-right font-mono">${row.total_disrupted_nodes || 0}</td>
-                        <td class="p-2 text-right font-mono">${row.dirty_nodes_marked || 0}</td>
-                        <td class="p-2 text-right font-mono">${row.nodes_repaired || 0}</td>
+                        <td class="p-2 text-right font-mono">${disruptedNodes}</td>
+                        <td class="p-2 text-right font-mono">${correctLabeled}</td>
                         <td class="p-2 text-right font-mono font-bold">${parseFloat(row.labeling_accuracy_pct || 0).toFixed(1)}%</td>
                     </tr>
                 `;
@@ -6329,22 +6323,25 @@ const ExperimentRunner = {
                 break;
 
             case 'injected-disruptions':
-                // Injected disruptions from HERE API
+                // Injected disruptions - now per-node tracking
                 tbody.innerHTML = data.map(row => {
-                    const critBadge = row.incident_criticality === 'critical' ? 'bg-red-100 text-red-700' : 
-                                      row.incident_criticality === 'major' ? 'bg-orange-100 text-orange-700' : 'bg-yellow-100 text-yellow-700';
+                    // Convert string 'True'/'False' to boolean
+                    const isClosed = row.road_closed === 'True' || row.road_closed === true || row.road_closed === 'true' || 
+                                   row.is_road_closed === 'True' || row.is_road_closed === true || row.is_road_closed === 'true';
                     return `
                     <tr class="hover:bg-rose-50 text-xs">
                         <td class="p-2 font-mono">${row.route_id || ''}</td>
                         <td class="p-2">${row.scenario_id || ''}</td>
                         <td class="p-2"><span class="px-2 py-0.5 rounded text-xs ${this.getLevelBadgeClass(row.severity_level)}">${row.severity_level || ''}</span></td>
                         <td class="p-2"><span class="px-2 py-0.5 rounded text-xs font-medium ${this.getCategoryBadgeClass(row.route_category)}">${row.route_category || ''}</span></td>
-                        <td class="p-2 text-right font-mono">${row.edge_source || ''}</td>
-                        <td class="p-2 text-right font-mono">${row.edge_target || ''}</td>
-                        <td class="p-2">${row.incident_type || ''}</td>
-                        <td class="p-2"><span class="px-2 py-0.5 rounded text-xs ${critBadge}">${row.incident_criticality || ''}</span></td>
-                        <td class="p-2 text-right font-mono">${parseFloat(row.jam_factor || 0).toFixed(1)}</td>
-                        <td class="p-2">${row.road_name || ''}</td>
+                        <td class="p-2 text-right font-mono">${row.node_id || row.edge_source || ''}</td>
+                        <td class="p-2">${row.injected_label || row.incident_type || ''}</td>
+                        <td class="p-2 text-center">
+                            <span class="px-2 py-0.5 rounded text-xs ${isClosed ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}">
+                                ${isClosed ? 'Closed' : 'Open'}
+                            </span>
+                        </td>
+                        <td class="p-2 text-right font-mono">${parseFloat(row.length || 0).toFixed(1)}</td>
                     </tr>
                 `;
                 }).join('');
@@ -6354,20 +6351,24 @@ const ExperimentRunner = {
                 break;
 
             case 'system-labels':
-                // System-detected labels from HC2L/DHL algorithms
+                // System-detected labels from HC2L/DHL algorithms - now per-node tracking
                 tbody.innerHTML = data.map(row => {
                     const algBadge = row.algorithm === 'DHL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700';
+                    // Convert string 'True'/'False' to boolean
+                    const isClosed = row.is_road_closed === 'True' || row.is_road_closed === true || row.is_road_closed === 'true';
                     return `
                     <tr class="hover:bg-indigo-50 text-xs">
                         <td class="p-2 font-mono">${row.route_id || ''}</td>
                         <td class="p-2">${row.scenario_id || ''}</td>
                         <td class="p-2"><span class="px-2 py-0.5 rounded text-xs ${this.getLevelBadgeClass(row.severity_level)}">${row.severity_level || ''}</span></td>
                         <td class="p-2 text-center"><span class="px-2 py-0.5 rounded text-xs font-medium ${algBadge}">${row.algorithm || ''}</span></td>
-                        <td class="p-2 text-right font-mono">${row.edge_source || ''}</td>
-                        <td class="p-2 text-right font-mono">${row.edge_target || ''}</td>
-                        <td class="p-2">${row.detected_label || ''}</td>
-                        <td class="p-2 text-center">${row.is_road_closed === 'True' || row.is_road_closed === true ? '🔴' : '⚪'}</td>
-                        <td class="p-2 text-center">${row.was_detected === 'True' || row.was_detected === true ? '✓' : '✗'}</td>
+                        <td class="p-2 text-right font-mono">${row.node_id || row.edge_source || ''}</td>
+                        <td class="p-2">${row.system_label || row.detected_label || ''}</td>
+                        <td class="p-2 text-center">
+                            <span class="px-2 py-0.5 rounded text-xs ${isClosed ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}">
+                                ${isClosed ? 'Closed' : 'Open'}
+                            </span>
+                        </td>
                     </tr>
                 `;
                 }).join('');

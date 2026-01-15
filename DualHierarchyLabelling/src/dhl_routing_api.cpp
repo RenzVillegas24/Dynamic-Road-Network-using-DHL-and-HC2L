@@ -538,7 +538,8 @@ void output_json_response(bool success, const string& error_message = "",
                          size_t initial_index_size = 0,
                          bool index_was_rebuilt = false,
                          size_t current_index_size = 0,
-                         const MemoryUsageTracker* memory_tracker = nullptr) {
+                         const MemoryUsageTracker* memory_tracker = nullptr,
+                         const NodeLabelTracker* label_tracker = nullptr) {
     
     cout << "{" << endl;
     cout << "  \"success\": " << (success ? "true" : "false") << "," << endl;
@@ -724,6 +725,55 @@ void output_json_response(bool success, const string& error_message = "",
         cout << "    \"nodes_updated\": " << nodes_updated << "," << endl;
         cout << "    \"threshold_rebuild_time_ms\": " << fixed << setprecision(3) << threshold_rebuild_time_ms << "," << endl;
         cout << "    \"note\": \"DHL performs immediate update for all disruptions (no lazy marking)\"" << endl;
+        cout << "  }," << endl;
+        
+        // Node labels section (for labeling accuracy tracking)
+        cout << "  \"node_labels\": {" << endl;
+        if (label_tracker != nullptr) {
+            // Output injected labels (ground truth)
+            cout << "    \"injected\": [" << endl;
+            for (size_t i = 0; i < label_tracker->injected_labels.size(); i++) {
+                const auto& lbl = label_tracker->injected_labels[i];
+                cout << "      {\"node_id\": " << lbl.node_id 
+                     << ", \"label\": \"" << lbl.label << "\""
+                     << ", \"criticality\": \"" << lbl.criticality << "\""
+                     << ", \"jam_factor\": " << fixed << setprecision(1) << lbl.jam_factor
+                     << ", \"is_closed\": " << (lbl.is_road_closed ? "true" : "false") << "}";
+                if (i < label_tracker->injected_labels.size() - 1) cout << ",";
+                cout << endl;
+            }
+            cout << "    ]," << endl;
+            
+            // Output system labels (what algorithm detected)
+            cout << "    \"system\": [" << endl;
+            for (size_t i = 0; i < label_tracker->system_labels.size(); i++) {
+                const auto& lbl = label_tracker->system_labels[i];
+                cout << "      {\"node_id\": " << lbl.node_id 
+                     << ", \"label\": \"" << lbl.label << "\""
+                     << ", \"criticality\": \"" << lbl.criticality << "\""
+                     << ", \"jam_factor\": " << fixed << setprecision(1) << lbl.jam_factor
+                     << ", \"is_closed\": " << (lbl.is_road_closed ? "true" : "false") << "}";
+                if (i < label_tracker->system_labels.size() - 1) cout << ",";
+                cout << endl;
+            }
+            cout << "    ]," << endl;
+            
+            // Summary stats
+            int correct_count = label_tracker->count_correct_labels();
+            int total_injected = label_tracker->injected_labels.size();
+            double accuracy = total_injected > 0 ? (double)correct_count / total_injected * 100.0 : 100.0;
+            cout << "    \"total_injected\": " << total_injected << "," << endl;
+            cout << "    \"total_system_labeled\": " << label_tracker->system_labels.size() << "," << endl;
+            cout << "    \"correct_labeled\": " << correct_count << "," << endl;
+            cout << "    \"labeling_accuracy_pct\": " << fixed << setprecision(2) << accuracy << endl;
+        } else {
+            cout << "    \"injected\": []," << endl;
+            cout << "    \"system\": []," << endl;
+            cout << "    \"total_injected\": 0," << endl;
+            cout << "    \"total_system_labeled\": 0," << endl;
+            cout << "    \"correct_labeled\": 0," << endl;
+            cout << "    \"labeling_accuracy_pct\": 100.00" << endl;
+        }
         cout << "  }," << endl;
         
         cout << "  \"route\": {" << endl;
@@ -1585,6 +1635,9 @@ int main(int argc, char* argv[]) {
         map<pair<NodeID, NodeID>, IncidentInfo> incident_data;
         int nodes_updated = 0;
         
+        // Initialize label tracker for accuracy tracking (scope outside if block for output)
+        NodeLabelTracker label_tracker;
+        
         if (use_disruptions) {
             cerr << "🔧 DHL Processing disruptions from: " << disruption_file << endl;
             cerr << "   DHL always performs immediate update (no lazy marking)" << endl;
@@ -1638,6 +1691,30 @@ int main(int argc, char* argv[]) {
                         flow_ptr = &flow_data.at(edge_key);
                     }
                     if (!incident_ptr && !flow_ptr) continue;
+                    
+                    // Record injected label (ground truth) for this edge's nodes
+                    // This is what we "injected" as disruption - used for accuracy calculation
+                    string injected_label = "";
+                    string criticality = "minor";
+                    double jam_factor_value = 0.0;
+                    bool is_closed_for_label = false;
+                    
+                    if (incident_ptr) {
+                        injected_label = incident_ptr->type.empty() ? "incident" : incident_ptr->type;
+                        criticality = incident_ptr->criticality;
+                        is_closed_for_label = incident_ptr->road_closed;
+                        jam_factor_value = 10.0;  // Incidents get high jam factor
+                    } else if (flow_ptr) {
+                        injected_label = "congestion";
+                        criticality = "minor";
+                        jam_factor_value = flow_ptr->jam_factor;
+                        is_closed_for_label = (flow_ptr->traversability == "closed" || flow_ptr->jam_factor >= 9.5);
+                    }
+                    
+                    if (!injected_label.empty()) {
+                        label_tracker.add_injected(source, injected_label, criticality, jam_factor_value, is_closed_for_label);
+                        label_tracker.add_injected(target, injected_label, criticality, jam_factor_value, is_closed_for_label);
+                    }
                     
                     string highway_type = "unknown";
                     if (g_highway_types.count(edge_key)) {
@@ -1702,6 +1779,13 @@ int main(int argc, char* argv[]) {
                             cerr << "   🚫 Blocked (reverse): " << target << " → " << source << " (" << blocked_reverse_count << " occurrence(s), weight=infinity)" << endl;
                         }
                         
+                        // Record system label for road closure (DHL always does immediate update)
+                        string closure_label = "road_closed";
+                        string closure_criticality = "critical";
+                        double closure_jam = 10.0;
+                        label_tracker.add_system_label(source, closure_label, closure_criticality, closure_jam, true);
+                        label_tracker.add_system_label(target, closure_label, closure_criticality, closure_jam, true);
+                        
                         disruption_impact_score = 1.0;
                     } else {
                         // Update ALL occurrences of this edge (handle duplicates)
@@ -1714,6 +1798,11 @@ int main(int argc, char* argv[]) {
                                 }
                             }
                         }
+                        
+                        // Record system label for immediate update (DHL always updates immediately)
+                        string system_label = injected_label.empty() ? "immediate_update" : injected_label;
+                        label_tracker.add_system_label(source, system_label, criticality, jam_factor_value, false);
+                        label_tracker.add_system_label(target, system_label, criticality, jam_factor_value, false);
                         
                         // Calculate impact using correct formula from manuscript
                         // Equation 2: f_Δw = (v_new - v_old) / v_old
@@ -2058,7 +2147,7 @@ int main(int argc, char* argv[]) {
                            update_strategy, update_reason, nodes_updated, threshold_rebuild_time_ms,
                            flow_data, incident_data, &ci, adj_list, generate_alternatives,
                            peak_index_size, initial_index_size, index_was_rebuilt,
-                           current_index_size, &memory_tracker);
+                           current_index_size, &memory_tracker, &label_tracker);
         
         return 0;
         

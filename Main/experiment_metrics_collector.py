@@ -252,29 +252,30 @@ CSV_HEADERS_STANDARD_COMPREHENSIVE = [
 # ============================================================================
 
 # Labeling Results - Per-route labeling accuracy metrics
+# Updated: Now tracks per-node accuracy with correctly_labeled vs disrupted
 CSV_HEADERS_LABELING_RESULTS = [
     "route_id", "route_category", "scenario_id", "severity_level",
     "algorithm",
-    "total_disrupted_edges", "total_disrupted_nodes",
-    "dirty_nodes_marked", "nodes_repaired",
+    "total_disrupted_edges", "disrupted_nodes",
+    "correct_labeled_nodes",
     "labeling_accuracy_pct"
 ]
 
-# Injected Disruptions - Ground truth (what was injected)
+# Injected Disruptions - Ground truth (what was injected per node)
+# Updated: Now per-node tracking instead of per-edge
 CSV_HEADERS_INJECTED_DISRUPTIONS = [
     "route_id", "route_category", "scenario_id", "severity_level",
-    "edge_source", "edge_target",
-    "incident_type", "incident_criticality", "jam_factor",
-    "road_name"
+    "node_id", "injected_label", "road_closed",
+    "length"
 ]
 
-# System Labels - What the system detected/labeled
+# System Labels - What the system detected/labeled per node
+# Updated: Now per-node tracking
 CSV_HEADERS_SYSTEM_LABELS = [
     "route_id", "route_category", "scenario_id", "severity_level",
     "algorithm",
-    "edge_source", "edge_target",
-    "detected_label", "is_road_closed",
-    "was_detected"
+    "node_id", "system_label",
+    "is_road_closed"
 ]
 
 
@@ -1181,14 +1182,15 @@ class ExperimentMetricsCollector:
                              algorithm: str,
                              disruption_edges: List[Dict],
                              lazy_hc2l_info: Dict = None,
-                             dhl_update_info: Dict = None):
+                             dhl_update_info: Dict = None,
+                             node_labels: Dict = None):
         """
         Record labeling accuracy data for a route.
         
         Tracks:
-        - Injected disruptions (ground truth - edges that were disrupted)
-        - System labels (what the algorithm detected/labeled)
-        - Per-route labeling accuracy metrics
+        - Injected disruptions (ground truth - what we injected as disruption, per node)
+        - System labels (what the algorithm detected/labeled, per node)
+        - Per-route labeling accuracy metrics (correct_labeled_nodes / disrupted_nodes)
         
         Args:
             route_id: Route identifier
@@ -1200,52 +1202,145 @@ class ExperimentMetricsCollector:
                               Each dict has: source, target, incident_type, criticality, jam_factor, road_name
             lazy_hc2l_info: HC2L algorithm output with nodes_dirtied_this_query, nodes_repaired
             dhl_update_info: DHL algorithm output with nodes_updated
+            node_labels: Dict from C++ API with injected_disruptions, system_labels, and summary
+                         {
+                             "injected_disruptions": [{"node_id": X, "label": "type", "road_closed": bool}, ...],
+                             "system_labels": [{"node_id": X, "label": "type", "road_closed": bool}, ...],
+                             "summary": {"total_injected": N, "total_system_labels": N, "correctly_labeled": N, "accuracy_pct": F}
+                         }
         """
         with self.lock:
             try:
-                # Count total disrupted edges and nodes
-                total_disrupted_edges = len(disruption_edges)
-                # Each edge affects 2 nodes (source and target)
-                unique_nodes = set()
-                for edge in disruption_edges:
-                    unique_nodes.add(edge.get('source'))
-                    unique_nodes.add(edge.get('target'))
-                total_disrupted_nodes = len(unique_nodes)
-                
-                # Extract system detection metrics based on algorithm
-                dirty_nodes_marked = 0
-                nodes_repaired = 0
-                
-                if algorithm.upper() == "HC2L" and lazy_hc2l_info:
-                    # Use nodes_dirtied_this_query for per-query dirty count (not cumulative dirty_nodes_marked)
-                    dirty_nodes_marked = lazy_hc2l_info.get("nodes_dirtied_this_query", 0)
-                    # Fall back to dirty_nodes_marked if nodes_dirtied_this_query not available
-                    if dirty_nodes_marked == 0:
-                        dirty_nodes_marked = lazy_hc2l_info.get("dirty_nodes_marked", 0)
-                    nodes_repaired = lazy_hc2l_info.get("nodes_repaired", 0)
-                elif algorithm.upper() == "DHL" and dhl_update_info:
-                    # DHL does immediate full updates - nodes_updated is the count of affected nodes
-                    nodes_repaired = dhl_update_info.get("nodes_updated", 0)
-                    dirty_nodes_marked = nodes_repaired  # DHL doesn't use lazy marking, all nodes are updated immediately
-                
-                # Calculate labeling accuracy
-                # For HC2L: Accuracy = nodes_repaired / nodes_dirtied_this_query
-                #   (how many of the newly dirtied nodes were actually repaired)
-                # For DHL: Accuracy is based on nodes_updated vs disrupted nodes
-                #   (DHL always does immediate full update)
-                if algorithm.upper() == "HC2L":
-                    # HC2L accuracy: repaired / dirtied (nodes that needed repair vs actually repaired)
-                    if dirty_nodes_marked > 0:
-                        labeling_accuracy_pct = min(1.0, nodes_repaired / dirty_nodes_marked) * 100
-                    else:
-                        labeling_accuracy_pct = 100.0  # No nodes needed repair
+                # If we have node_labels from C++ API, use that for accuracy calculation
+                if node_labels:
+                    injected_list = node_labels.get("injected_disruptions", [])
+                    system_list = node_labels.get("system_labels", [])
+                    summary = node_labels.get("summary", {})
+                    
+                    total_disrupted_nodes = summary.get("total_injected", len(injected_list))
+                    correctly_labeled = summary.get("correctly_labeled", 0)
+                    labeling_accuracy_pct = summary.get("accuracy_pct", 0.0)
+                    
+                    # Record injected disruptions from C++ API (ground truth)
+                    for item in injected_list:
+                        node_id = item.get("node_id", 0)
+                        label = item.get("label", "unknown")
+                        road_closed = item.get("road_closed", False)
+                        
+                        injected_record = {
+                            "route_id": route_id,
+                            "route_category": route_category,
+                            "scenario_id": scenario_id,
+                            "severity_level": severity_level,
+                            "node_id": node_id,
+                            "injected_label": label,
+                            "road_closed": road_closed,
+                            "length": 0.0  # Will be filled from edge info if available
+                        }
+                        self.injected_disruptions.append(injected_record)
+                    
+                    # Record system labels from C++ API
+                    for item in system_list:
+                        node_id = item.get("node_id", 0)
+                        label = item.get("label", "unknown")
+                        road_closed = item.get("road_closed", False)
+                        
+                        system_record = {
+                            "route_id": route_id,
+                            "route_category": route_category,
+                            "scenario_id": scenario_id,
+                            "severity_level": severity_level,
+                            "algorithm": algorithm.upper(),
+                            "node_id": node_id,
+                            "system_label": label,
+                            "is_road_closed": road_closed
+                        }
+                        self.system_labels.append(system_record)
+                    
+                    # Use values from C++ API for the labeling record
+                    dirty_nodes_marked = len(injected_list)
+                    nodes_repaired = len(system_list)
+                    total_disrupted_edges = len(disruption_edges) if disruption_edges else 0
+                    
                 else:
-                    # DHL accuracy: nodes_updated / total_disrupted_nodes
-                    # Since DHL does immediate full update, this should typically be >= 100%
-                    if total_disrupted_nodes > 0:
-                        labeling_accuracy_pct = min(1.0, nodes_repaired / total_disrupted_nodes) * 100
+                    # Fall back to edge-based calculation (legacy path)
+                    total_disrupted_edges = len(disruption_edges)
+                    # Each edge affects 2 nodes (source and target)
+                    unique_nodes = set()
+                    for edge in disruption_edges:
+                        unique_nodes.add(edge.get('source'))
+                        unique_nodes.add(edge.get('target'))
+                    total_disrupted_nodes = len(unique_nodes)
+                    
+                    # Extract system detection metrics based on algorithm
+                    dirty_nodes_marked = 0
+                    nodes_repaired = 0
+                    correctly_labeled = 0
+                    
+                    if algorithm.upper() == "HC2L" and lazy_hc2l_info:
+                        dirty_nodes_marked = lazy_hc2l_info.get("nodes_dirtied_this_query", 0)
+                        if dirty_nodes_marked == 0:
+                            dirty_nodes_marked = lazy_hc2l_info.get("dirty_nodes_marked", 0)
+                        nodes_repaired = lazy_hc2l_info.get("nodes_repaired", 0)
+                    elif algorithm.upper() == "DHL" and dhl_update_info:
+                        nodes_repaired = dhl_update_info.get("nodes_updated", 0)
+                        dirty_nodes_marked = nodes_repaired
+                    
+                    # Calculate accuracy
+                    if algorithm.upper() == "HC2L":
+                        if dirty_nodes_marked > 0:
+                            labeling_accuracy_pct = min(1.0, nodes_repaired / dirty_nodes_marked) * 100
+                        else:
+                            labeling_accuracy_pct = 100.0
                     else:
-                        labeling_accuracy_pct = 100.0
+                        if total_disrupted_nodes > 0:
+                            labeling_accuracy_pct = min(1.0, nodes_repaired / total_disrupted_nodes) * 100
+                        else:
+                            labeling_accuracy_pct = 100.0
+                    
+                    correctly_labeled = nodes_repaired  # Legacy: assume all repaired nodes are correct
+                    
+                    # Record edge-based injected disruptions (legacy path)
+                    for edge in disruption_edges:
+                        # Record for source node
+                        injected_record = {
+                            "route_id": route_id,
+                            "route_category": route_category,
+                            "scenario_id": scenario_id,
+                            "severity_level": severity_level,
+                            "node_id": edge.get('source', 0),
+                            "injected_label": edge.get('incident_type', 'unknown'),
+                            "road_closed": edge.get('incident_road_closed', False),
+                            "length": 0.0
+                        }
+                        self.injected_disruptions.append(injected_record)
+                        
+                        # Record for target node
+                        injected_record_target = {
+                            "route_id": route_id,
+                            "route_category": route_category,
+                            "scenario_id": scenario_id,
+                            "severity_level": severity_level,
+                            "node_id": edge.get('target', 0),
+                            "injected_label": edge.get('incident_type', 'unknown'),
+                            "road_closed": edge.get('incident_road_closed', False),
+                            "length": 0.0
+                        }
+                        self.injected_disruptions.append(injected_record_target)
+                        
+                        # Record system labels for legacy path
+                        for node_id in [edge.get('source', 0), edge.get('target', 0)]:
+                            system_record = {
+                                "route_id": route_id,
+                                "route_category": route_category,
+                                "scenario_id": scenario_id,
+                                "severity_level": severity_level,
+                                "algorithm": algorithm.upper(),
+                                "node_id": node_id,
+                                "system_label": edge.get('incident_type', 'unknown'),
+                                "is_road_closed": edge.get('incident_road_closed', False)
+                            }
+                            self.system_labels.append(system_record)
                 
                 # Record per-route labeling result
                 labeling_record = {
@@ -1255,46 +1350,13 @@ class ExperimentMetricsCollector:
                     "severity_level": severity_level,
                     "algorithm": algorithm.upper(),
                     "total_disrupted_edges": total_disrupted_edges,
-                    "total_disrupted_nodes": total_disrupted_nodes,
-                    "dirty_nodes_marked": dirty_nodes_marked,
-                    "nodes_repaired": nodes_repaired,
+                    "disrupted_nodes": total_disrupted_nodes,
+                    "correct_labeled_nodes": correctly_labeled,
                     "labeling_accuracy_pct": round(labeling_accuracy_pct, 2)
                 }
                 self.labeling_records.append(labeling_record)
                 
-                # Record injected disruptions (ground truth)
-                for edge in disruption_edges:
-                    injected_record = {
-                        "route_id": route_id,
-                        "route_category": route_category,
-                        "scenario_id": scenario_id,
-                        "severity_level": severity_level,
-                        "edge_source": edge.get('source', 0),
-                        "edge_target": edge.get('target', 0),
-                        "incident_type": edge.get('incident_type', 'unknown'),
-                        "incident_criticality": edge.get('incident_criticality', 'minor'),
-                        "jam_factor": edge.get('jam_factor', 0.0),
-                        "road_name": edge.get('road_name', 'Unknown Road')
-                    }
-                    self.injected_disruptions.append(injected_record)
-                    
-                    # Record system labels for each edge
-                    # Since we know disruptions were applied, the system should have detected them
-                    system_record = {
-                        "route_id": route_id,
-                        "route_category": route_category,
-                        "scenario_id": scenario_id,
-                        "severity_level": severity_level,
-                        "algorithm": algorithm.upper(),
-                        "edge_source": edge.get('source', 0),
-                        "edge_target": edge.get('target', 0),
-                        "detected_label": edge.get('incident_type', 'unknown'),
-                        "is_road_closed": edge.get('incident_road_closed', False),
-                        "was_detected": True  # Edges were processed, so they were detected
-                    }
-                    self.system_labels.append(system_record)
-                
-                logger.debug(f"Recorded labeling data: route={route_id}, edges={total_disrupted_edges}, nodes={total_disrupted_nodes}, accuracy={labeling_accuracy_pct:.1f}%")
+                logger.debug(f"Recorded labeling data: route={route_id}, nodes={total_disrupted_nodes}, correct={correctly_labeled}, accuracy={labeling_accuracy_pct:.1f}%")
                 
             except Exception as e:
                 logger.error(f"Error recording labeling data: {e}")
@@ -2040,6 +2102,11 @@ class ExperimentMetricsCollector:
         - per_scenario: Labeling accuracy by disruption scenario
         - per_severity: Labeling accuracy by severity level
         - averages: Overall algorithm averages
+        
+        Uses the new per-node accuracy tracking:
+        - disrupted_nodes: Total nodes affected by disruptions
+        - correct_labeled_nodes: Nodes correctly labeled by the system
+        - accuracy = correct_labeled_nodes / disrupted_nodes
         """
         with self.lock:
             # By category (includes both algorithms)
@@ -2051,17 +2118,16 @@ class ExperimentMetricsCollector:
                     if cat_records:
                         avg_accuracy = sum(r.get("labeling_accuracy_pct", 0) for r in cat_records) / len(cat_records)
                         total_edges = sum(r.get("total_disrupted_edges", 0) for r in cat_records)
-                        total_nodes = sum(r.get("total_disrupted_nodes", 0) for r in cat_records)
-                        total_dirty = sum(r.get("dirty_nodes_marked", 0) for r in cat_records)
-                        total_repaired = sum(r.get("nodes_repaired", 0) for r in cat_records)
+                        # Use new field names with fallback to old names
+                        total_nodes = sum(r.get("disrupted_nodes", r.get("total_disrupted_nodes", 0)) for r in cat_records)
+                        total_correct = sum(r.get("correct_labeled_nodes", r.get("nodes_repaired", 0)) for r in cat_records)
                         per_category.append({
                             "category": category,
                             "algorithm": algorithm,
                             "simulations": len(cat_records),
                             "total_disrupted_edges": total_edges,
-                            "total_disrupted_nodes": total_nodes,
-                            "dirty_nodes_marked": total_dirty,
-                            "nodes_repaired": total_repaired,
+                            "disrupted_nodes": total_nodes,
+                            "correct_labeled_nodes": total_correct,
                             "avg_labeling_accuracy_pct": round(avg_accuracy, 2)
                         })
             
@@ -2075,17 +2141,15 @@ class ExperimentMetricsCollector:
                     if sc_records:
                         avg_accuracy = sum(r.get("labeling_accuracy_pct", 0) for r in sc_records) / len(sc_records)
                         total_edges = sum(r.get("total_disrupted_edges", 0) for r in sc_records)
-                        total_nodes = sum(r.get("total_disrupted_nodes", 0) for r in sc_records)
-                        total_dirty = sum(r.get("dirty_nodes_marked", 0) for r in sc_records)
-                        total_repaired = sum(r.get("nodes_repaired", 0) for r in sc_records)
+                        total_nodes = sum(r.get("disrupted_nodes", r.get("total_disrupted_nodes", 0)) for r in sc_records)
+                        total_correct = sum(r.get("correct_labeled_nodes", r.get("nodes_repaired", 0)) for r in sc_records)
                         per_scenario.append({
                             "scenario": scenario,
                             "algorithm": algorithm,
                             "simulations": len(sc_records),
                             "total_disrupted_edges": total_edges,
-                            "total_disrupted_nodes": total_nodes,
-                            "dirty_nodes_marked": total_dirty,
-                            "nodes_repaired": total_repaired,
+                            "disrupted_nodes": total_nodes,
+                            "correct_labeled_nodes": total_correct,
                             "avg_labeling_accuracy_pct": round(avg_accuracy, 2)
                         })
             
@@ -2098,17 +2162,15 @@ class ExperimentMetricsCollector:
                     if sev_records:
                         avg_accuracy = sum(r.get("labeling_accuracy_pct", 0) for r in sev_records) / len(sev_records)
                         total_edges = sum(r.get("total_disrupted_edges", 0) for r in sev_records)
-                        total_nodes = sum(r.get("total_disrupted_nodes", 0) for r in sev_records)
-                        total_dirty = sum(r.get("dirty_nodes_marked", 0) for r in sev_records)
-                        total_repaired = sum(r.get("nodes_repaired", 0) for r in sev_records)
+                        total_nodes = sum(r.get("disrupted_nodes", r.get("total_disrupted_nodes", 0)) for r in sev_records)
+                        total_correct = sum(r.get("correct_labeled_nodes", r.get("nodes_repaired", 0)) for r in sev_records)
                         per_severity.append({
                             "severity": severity,
                             "algorithm": algorithm,
                             "simulations": len(sev_records),
                             "total_disrupted_edges": total_edges,
-                            "total_disrupted_nodes": total_nodes,
-                            "dirty_nodes_marked": total_dirty,
-                            "nodes_repaired": total_repaired,
+                            "disrupted_nodes": total_nodes,
+                            "correct_labeled_nodes": total_correct,
                             "avg_labeling_accuracy_pct": round(avg_accuracy, 2)
                         })
             
@@ -2119,16 +2181,14 @@ class ExperimentMetricsCollector:
                 if alg_records:
                     avg_accuracy = sum(r.get("labeling_accuracy_pct", 0) for r in alg_records) / len(alg_records)
                     total_edges = sum(r.get("total_disrupted_edges", 0) for r in alg_records)
-                    total_nodes = sum(r.get("total_disrupted_nodes", 0) for r in alg_records)
-                    total_dirty = sum(r.get("dirty_nodes_marked", 0) for r in alg_records)
-                    total_repaired = sum(r.get("nodes_repaired", 0) for r in alg_records)
+                    total_nodes = sum(r.get("disrupted_nodes", r.get("total_disrupted_nodes", 0)) for r in alg_records)
+                    total_correct = sum(r.get("correct_labeled_nodes", r.get("nodes_repaired", 0)) for r in alg_records)
                     averages.append({
                         "algorithm": algorithm,
                         "total_simulations": len(alg_records),
                         "total_disrupted_edges": total_edges,
-                        "total_disrupted_nodes": total_nodes,
-                        "dirty_nodes_marked": total_dirty,
-                        "nodes_repaired": total_repaired,
+                        "disrupted_nodes": total_nodes,
+                        "correct_labeled_nodes": total_correct,
                         "avg_labeling_accuracy_pct": round(avg_accuracy, 2)
                     })
             
@@ -2874,7 +2934,7 @@ class ExperimentMetricsCollector:
         
         with self.csv_lock:
             with open(csv_path, 'w', newline='') as f:
-                writer = csv.DictWriter(f, fieldnames=CSV_HEADERS_LABELING_RESULTS)
+                writer = csv.DictWriter(f, fieldnames=CSV_HEADERS_LABELING_RESULTS, extrasaction='ignore')
                 writer.writeheader()
                 
                 for record in self.labeling_records:
@@ -2885,7 +2945,7 @@ class ExperimentMetricsCollector:
     
     def export_injected_disruptions_csv(self) -> Path:
         """
-        Export Injected Disruptions CSV - Ground truth of what was injected.
+        Export Injected Disruptions CSV - Ground truth of what was injected per node.
         
         Returns:
             Path to the exported CSV file
@@ -2894,7 +2954,7 @@ class ExperimentMetricsCollector:
         
         with self.csv_lock:
             with open(csv_path, 'w', newline='') as f:
-                writer = csv.DictWriter(f, fieldnames=CSV_HEADERS_INJECTED_DISRUPTIONS)
+                writer = csv.DictWriter(f, fieldnames=CSV_HEADERS_INJECTED_DISRUPTIONS, extrasaction='ignore')
                 writer.writeheader()
                 
                 for record in self.injected_disruptions:
@@ -2905,7 +2965,7 @@ class ExperimentMetricsCollector:
     
     def export_system_labels_csv(self) -> Path:
         """
-        Export System Labels CSV - What the system detected/labeled.
+        Export System Labels CSV - What the system detected/labeled per node.
         
         Returns:
             Path to the exported CSV file
@@ -2914,7 +2974,7 @@ class ExperimentMetricsCollector:
         
         with self.csv_lock:
             with open(csv_path, 'w', newline='') as f:
-                writer = csv.DictWriter(f, fieldnames=CSV_HEADERS_SYSTEM_LABELS)
+                writer = csv.DictWriter(f, fieldnames=CSV_HEADERS_SYSTEM_LABELS, extrasaction='ignore')
                 writer.writeheader()
                 
                 for record in self.system_labels:
